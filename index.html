@@ -665,7 +665,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <div class="row vt-row"><span>Lowest note<small>Slide down on “ah” and hold the lowest note that still sounds clear</small></span>
           <div class="vt-ctl"><output id="vtLo">–</output><button class="btn sm" id="vtLoBtn" type="button">Find</button></div>
         </div>
-        <div class="row vt-row"><span>Highest note<small>Slide up and hold the highest note you can sing without straining, in the voice you’d sing a song in</small></span>
+        <div class="row vt-row"><span>Highest note<small>Slide up and hold the highest note you can sing without straining. Men: chest or mixed voice (M1), no falsetto. Women: head voice (M2).</small></span>
           <div class="vt-ctl"><output id="vtHi">–</output><button class="btn sm" id="vtHiBtn" type="button">Find</button></div>
         </div>
       </div>
@@ -691,8 +691,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <li>Warm up for a few minutes first. A cold voice loses a few notes at both ends.</li>
         <li>The bars are typical ranges for trained singers. Untrained voices usually stop a few notes short at the top, so the lowest note counts more here.</li>
         <li>Range is only part of it. Teachers also listen for where your voice changes gear (the passaggio) and for its colour, so treat this as a starting point.</li>
-        <li>Falsetto past your break can make a low voice look higher. For the top note, use the voice you’d actually sing a song in.</li>
+        <li>M1 and M2 are the two main ways the vocal folds vibrate: M1 is chest and mixed voice, M2 is head voice and falsetto. The typical tops for bass, baritone and tenor are M1 notes; for alto, mezzo and soprano they are M2 notes. That’s why men leave out falsetto here: an M2 top would make a low voice look higher than it is.</li>
       </ul>
+      <div id="vtRefs"></div>
     </section>
   </main>
 </div>
@@ -1907,7 +1908,9 @@ function renderRange() {
     $(w === "lo" ? "#vtLo" : "#vtHi").textContent = VT[w] == null ? "–" : noteHz(VT[w]);
   }
   if (j) {
-    $("#vtHint").textContent = `Slide ${j.which === "lo" ? "down" : "up"} slowly on “ah”. At the ${j.which === "lo" ? "bottom" : "top"}, hold the note, then press Done.`;
+    $("#vtHint").textContent = j.which === "lo"
+      ? "Slide down slowly on “ah”. At the bottom, hold the note, then press Done."
+      : "Slide up slowly on “ah”. Men stay in chest or mixed voice (M1) and stop before falsetto; women go up in head voice (M2). At the top, hold the note, then press Done.";
     setText("vtNow", "–"); setText("vtNowSub", "Hold a note for half a second");
   }
   renderRangeChart();
@@ -1962,6 +1965,7 @@ function initRange() {
     if (vtJob && vtJob.best == null) { setText("vtNowSub", "Nothing steady yet. Hold one note for half a second, or press Cancel."); return; }
     vtStop(true);
   };
+  $("#vtRefs").append(refsBlock(["henrich2005"]));
   renderRange();
 }
 
