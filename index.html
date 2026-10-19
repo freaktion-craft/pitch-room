@@ -62,7 +62,7 @@ a { color: inherit; text-decoration: none; }
 
 /* Top nav: numbered segmented pill + mic chip */
 header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
-.seg { display: inline-flex; gap: 2px; background: var(--fill); border-radius: 6px; margin-right: auto; }
+.seg { display: inline-flex; gap: 2px; background: var(--fill); border-radius: 6px; margin-right: auto; white-space: nowrap; }
 .seg a { height: 32px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: 6px; font-size: 13px; color: rgba(var(--fg), 0.45);
   transition: color 0.22s var(--ease), background-color 0.25s var(--ease); }
 .seg a:hover { color: rgba(var(--fg), 0.7); }
@@ -73,7 +73,7 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .steps a i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font: 500 11px var(--mono); font-style: normal; box-shadow: inset 0 0 0 1px var(--ring); }
 .steps a[aria-current="step"] { color: var(--ink); font-weight: 500; }
 .steps a[aria-current="step"] i { background: var(--ink); color: var(--on-ink); box-shadow: none; }
-.chipbtn { height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: var(--fill);
+.chipbtn { height: 32px; padding: 0 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: var(--fill);
   font-size: 13px; color: rgba(var(--fg), 0.6); transition: background-color 0.15s; }
 .chipbtn:hover { background: rgba(var(--fg), 0.08); }
 .themebtn { width: 32px; padding: 0; justify-content: center; }
@@ -137,8 +137,11 @@ details.refs[open] summary::before { content: "– "; }
 details.refs ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 12.5px; color: var(--muted); }
 details.refs a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 
-.group { display: grid; gap: 8px; }
-.group-label { font-size: 13px; color: var(--faint); }
+.group { display: grid; gap: 10px; }
+/* Section titles: they head the content, so they read stronger than it */
+.group-label { font-size: 15px; font-weight: 500; color: var(--ink); }
+/* Side notes (caveats, "good to know"): still above their own text, but quieter than the main sections */
+.group-label.minor { font-size: 14px; color: var(--muted); }
 .rows { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 8px 16px; flex-wrap: wrap; }
 .row + .row { border-top: 1px solid var(--line); }
@@ -221,7 +224,10 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .key.b.live { box-shadow: inset 0 -5px 0 var(--voice); }
 
 @media (max-width: 760px) {
-  header { margin-bottom: 40px; }
+  /* the tabs get their own line; they scroll sideways rather than squeeze if they still don't fit */
+  header { margin-bottom: 40px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; row-gap: 8px; }
+  .seg { grid-row: 2; grid-column: 1 / -1; justify-self: start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  #micBtn { grid-column: 2; } #themeBtn { grid-column: 3; }
   .proto { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .proto-aside { position: static; }
   .seg a { padding: 0 8px; }
@@ -363,6 +369,38 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .songbar #kLeave { margin-left: auto; }
 .song-mode .play-bar .backkey { display: none; }
 .songcard b::before { content: "♪ "; color: var(--voice); }
+
+/* Voice type */
+#vRange { display: grid; gap: 40px; }
+#vRange .intro, #vRange .vt-live { margin: 0; }
+.vt-row > span:first-child { display: grid; gap: 2px; font-size: 14px; }
+.vt-row small { color: var(--faint); font-size: 12.5px; max-width: 60ch; }
+.vt-ctl { display: flex; align-items: center; gap: 12px; }
+.vt-ctl output { font: 15px var(--pixel); min-width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
+.vt-row.on { background: var(--fill); }
+.vt-now { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.vt-live p { margin: 0; }
+/* Range chart: one row per voice type, the singer's range as a band across all rows */
+.vt-chart { --lw: 168px; position: relative; margin: 0; padding: 16px; border-radius: 14px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); display: grid; gap: 10px; }
+.vt-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-left: var(--lw); }
+.vt-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.vt-legend i { display: inline-block; width: 14px; height: 8px; border-radius: 4px; background: rgba(var(--fg), 0.16); }
+.vt-legend i.you { background: color-mix(in srgb, var(--voice) 18%, transparent); box-shadow: inset 2px 0 0 var(--voice), inset -2px 0 0 var(--voice); border-radius: 0; }
+.vt-plot { position: relative; display: grid; gap: 6px; }
+.vt-line { display: grid; grid-template-columns: var(--lw) minmax(0, 1fr); align-items: center; min-height: 30px; }
+.vt-line .lab { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+.vt-line .lab small { color: var(--faint); font: 11.5px var(--mono); }
+.vt-line.best .lab { font-weight: 500; }
+.vt-track { position: relative; height: 30px; }
+.vt-bar { position: absolute; top: 11px; height: 8px; border-radius: 4px; background: rgba(var(--fg), 0.16); }
+.vt-line.best .vt-bar { background: var(--ink); }
+.vt-band { position: absolute; top: -4px; bottom: -4px; left: calc(var(--lw) + (100% - var(--lw)) * var(--a)); width: calc((100% - var(--lw)) * var(--w));
+  background: color-mix(in srgb, var(--voice) 10%, transparent); border-inline: 2px solid var(--voice); pointer-events: none; }
+.vt-axis { position: relative; height: 16px; margin-left: var(--lw); font: 11px var(--mono); color: var(--faint); }
+.vt-axis span { position: absolute; transform: translateX(-50%); }
+.vt-result { margin: 4px 0 0; font-size: 16px; line-height: 1.6; max-width: 62ch; text-wrap: pretty; }
+.vt-result:empty { display: none; }
+@media (max-width: 760px) { .vt-chart { --lw: 108px; padding: 12px; } .vt-line .lab small { display: none; } }
 </style>
 <script>/* apply a saved theme before first paint */ try { const t = JSON.parse(localStorage.getItem("pitchroom:theme")); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
@@ -371,6 +409,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   <header>
     <nav class="seg" aria-label="Sections">
       <a href="#pick" data-tab="practice" id="tabPractice">Practice</a>
+      <a href="#range" data-tab="range">Voice type</a>
       <a href="#timbre" data-tab="timbre">Timbre map</a>
       <a href="#stems" data-tab="stems">Stems</a>
     </nav>
@@ -543,7 +582,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     </section>
 
     <section class="group">
-      <div class="group-label">For a fair comparison</div>
+      <div class="group-label minor">For a fair comparison</div>
       <ul class="caveats">
         <li>Compare the same note (within a semitone) and the same vowel. Almost every measure shifts with pitch and vowel.</li>
         <li>Always record yourself with the same mic at the same distance. Volume doesn’t matter (only differences are compared), but the mic’s colour does.</li>
@@ -612,6 +651,48 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <section class="group" id="sLibWrap">
       <div class="group-label">Library</div>
       <div class="rows" id="sLib"><div class="row empty">No songs yet. Paste a link or drop a file above.</div></div>
+    </section>
+  </main>
+  <main id="vRange" aria-label="Voice type" hidden>
+    <div class="intro">
+      <h1 class="title">Voice type</h1>
+      <p class="lede">Sing your lowest and highest comfortable notes and see which voice type your range fits. Takes about a minute.</p>
+    </div>
+
+    <section class="group">
+      <div class="group-label">Your range</div>
+      <div class="rows">
+        <div class="row vt-row"><span>Lowest note<small>Slide down on “ah” and hold the lowest note that still sounds clear</small></span>
+          <div class="vt-ctl"><output id="vtLo">–</output><button class="btn sm" id="vtLoBtn" type="button">Find</button></div>
+        </div>
+        <div class="row vt-row"><span>Highest note<small>Slide up and hold the highest note you can sing without straining, in the voice you’d sing a song in</small></span>
+          <div class="vt-ctl"><output id="vtHi">–</output><button class="btn sm" id="vtHiBtn" type="button">Find</button></div>
+        </div>
+      </div>
+      <p class="mic-msg" id="vtMsg"></p>
+    </section>
+
+    <section class="panel-card vt-live" id="vtLive" aria-live="polite" hidden>
+      <div class="vt-now"><div class="note-big" id="vtNow">–</div><div class="note-sub" id="vtNowSub">Listening</div></div>
+      <p class="muted" id="vtHint"></p>
+      <div class="row-actions"><button class="btn dark" id="vtDone" type="button">Done</button><button class="btn" id="vtCancel" type="button">Cancel</button></div>
+    </section>
+
+    <section class="group">
+      <div class="group-label">Where it fits</div>
+      <figure class="vt-chart" id="vtChart" aria-label="Typical voice type ranges with your range"></figure>
+      <p class="vt-result" id="vtResult"></p>
+      <div class="go-row"><button class="btn dark" id="vtUse" type="button" hidden></button><span class="muted" id="vtUsed"></span></div>
+    </section>
+
+    <section class="group">
+      <div class="group-label minor">Good to know</div>
+      <ul class="caveats">
+        <li>Warm up for a few minutes first. A cold voice loses a few notes at both ends.</li>
+        <li>The bars are typical ranges for trained singers. Untrained voices usually stop a few notes short at the top, so the lowest note counts more here.</li>
+        <li>Range is only part of it. Teachers also listen for where your voice changes gear (the passaggio) and for its colour, so treat this as a starting point.</li>
+        <li>Falsetto past your break can make a low voice look higher. For the top note, use the voice you’d actually sing a song in.</li>
+      </ul>
     </section>
   </main>
 </div>
@@ -1773,6 +1854,117 @@ function initSing() {
   $("#kLeave").onclick = () => { leaveSong(); go("stems"); };
 }
 
+// ---------- voice type ----------
+// Typical ranges of trained singers (the usual choral and opera figures). Keys match VOICES, so a result can set up Practice.
+const VT_TYPES = [
+  { key: "bass", lo: 40, hi: 64 }, { key: "baritone", lo: 45, hi: 69 }, { key: "tenor", lo: 48, hi: 72 },
+  { key: "alto", lo: 53, hi: 77 }, { key: "mezzo", lo: 57, hi: 81 }, { key: "soprano", lo: 60, hi: 84 },
+];
+const VT_MIN = 38, VT_MAX = 86; // chart axis, D2–D6
+const VT = Object.assign({ lo: null, hi: null }, store.get("range", {}));
+let vtJob = null, vtSet = null; // vtJob: { which: "lo" | "hi", win, best, t0 } while listening
+const vtX = (m) => (Math.max(VT_MIN, Math.min(VT_MAX, m)) - VT_MIN) / (VT_MAX - VT_MIN);
+const noteHz = (m) => `${absName(m)} · ${mf(m).toFixed(0)} Hz`;
+// The lowest note counts most: it barely moves with training, while the top keeps growing.
+// Going past a type's top counts in full, falling short of it only a little.
+function vtFit(lo, hi) {
+  return VT_TYPES.map((t) => ({ t, d: Math.abs(lo - t.lo) + Math.max(0, hi - t.hi) + 0.35 * Math.max(0, t.hi - hi) }))
+    .sort((a, b) => a.d - b.d);
+}
+async function vtStart(which) {
+  vtStop(false);
+  if (!(await startMic())) return; // notice() has put the reason in #vtMsg
+  vtJob = { which, win: [], best: null, t0: clock() };
+  renderRange();
+}
+function vtStop(keep) {
+  if (!vtJob) return;
+  if (keep && vtJob.best != null) { VT[vtJob.which] = Math.round(vtJob.best); vtSet = null; store.set("range", { lo: VT.lo, hi: VT.hi }); }
+  vtJob = null; renderRange();
+}
+// Runs every frame from the main loop. A note counts once it has been held steady (within about a semitone) for half a second.
+function vtTick(now, m) {
+  const j = vtJob;
+  j.win.push({ t: now, m });
+  while (j.win.length && j.win[0].t < now - 0.5) j.win.shift();
+  if (now - j.t0 > 0.5 && j.win.every((s) => s.m != null)) {
+    const ms = j.win.map((s) => s.m).sort((a, b) => a - b);
+    if (ms[ms.length - 1] - ms[0] <= 1.2) {
+      const held = ms[ms.length >> 1];
+      if (j.best == null || (j.which === "lo" ? held < j.best : held > j.best)) j.best = held;
+    }
+  }
+  setText("vtNow", m == null ? "–" : absName(m));
+  setText("vtNowSub", j.best == null ? "Hold a note for half a second" : `${j.which === "lo" ? "Lowest" : "Highest"} so far: ${noteHz(Math.round(j.best))}`);
+}
+function renderRange() {
+  const j = vtJob;
+  $("#vtLive").hidden = !j;
+  for (const w of ["lo", "hi"]) {
+    const btn = $(w === "lo" ? "#vtLoBtn" : "#vtHiBtn"), on = !!(j && j.which === w);
+    btn.textContent = on ? "Listening…" : VT[w] == null ? "Find" : "Redo"; btn.disabled = on;
+    btn.closest(".vt-row").classList.toggle("on", on);
+    $(w === "lo" ? "#vtLo" : "#vtHi").textContent = VT[w] == null ? "–" : noteHz(VT[w]);
+  }
+  if (j) {
+    $("#vtHint").textContent = `Slide ${j.which === "lo" ? "down" : "up"} slowly on “ah”. At the ${j.which === "lo" ? "bottom" : "top"}, hold the note, then press Done.`;
+    setText("vtNow", "–"); setText("vtNowSub", "Hold a note for half a second");
+  }
+  renderRangeChart();
+}
+function renderRangeChart() {
+  const both = VT.lo != null && VT.hi != null;
+  const a = both ? Math.min(VT.lo, VT.hi) : VT.lo ?? VT.hi, b = both ? Math.max(VT.lo, VT.hi) : a;
+  const fit = both ? vtFit(a, b) : null, best = fit ? fit[0].t.key : null;
+
+  const legend = el("div", "vt-legend"), l1 = el("span");
+  l1.append(el("i"), "Typical range"); legend.append(l1);
+  if (a != null) { const l2 = el("span"); l2.append(el("i", "you"), both ? `You: ${absName(a)}–${absName(b)}` : `You: ${absName(a)}`); legend.append(l2); }
+  const plot = el("div", "vt-plot");
+  VT_TYPES.forEach((t) => {
+    const name = VOICES[t.key].name, line = el("div", "vt-line" + (t.key === best ? " best" : ""));
+    const lab = el("div", "lab"); lab.append(el("span", null, name), el("small", null, `${absName(t.lo)}–${absName(t.hi)}`));
+    const track = el("div", "vt-track"), bar = el("div", "vt-bar");
+    bar.style.left = vtX(t.lo) * 100 + "%"; bar.style.width = (vtX(t.hi) - vtX(t.lo)) * 100 + "%";
+    bar.title = `${name}: typically ${absName(t.lo)}–${absName(t.hi)}`;
+    track.append(bar); line.append(lab, track); plot.append(line);
+  });
+  if (a != null) {
+    const band = el("div", "vt-band");
+    band.style.setProperty("--a", vtX(a)); band.style.setProperty("--w", Math.max(0.004, vtX(b) - vtX(a)));
+    plot.append(band);
+  }
+  const axis = el("div", "vt-axis");
+  for (let m = 48; m <= 84; m += 12) { const s = el("span", null, absName(m)); s.style.left = vtX(m) * 100 + "%"; axis.append(s); }
+  const box = $("#vtChart"); box.innerHTML = ""; box.append(legend, plot, axis);
+
+  const res = $("#vtResult"), use = $("#vtUse"), used = $("#vtUsed");
+  use.hidden = true; used.textContent = "";
+  if (!both) { res.textContent = a == null ? "Find both notes to see where your range fits." : `Now find your ${VT.lo == null ? "lowest" : "highest"} note.`; return; }
+  const span = b - a, oc = Math.floor(span / 12), st = span % 12;
+  const spanTxt = oc ? `${oc} octave${oc > 1 ? "s" : ""}${st ? ` and ${st} semitone${st > 1 ? "s" : ""}` : ""}` : `${span} semitone${span === 1 ? "" : "s"}`;
+  const lc = (f) => VOICES[f.t.key].name.toLowerCase();
+  res.textContent = `Your range, ${absName(a)}–${absName(b)} (${spanTxt}), fits ${lc(fit[0])} best`
+    + (fit[1].d - fit[0].d < 1.5 ? `, with ${lc(fit[1])} close behind.` : ".")
+    + (span < 10 ? " That’s a narrow range, so this is a rough guess. Try again after warming up." : "");
+  const k = fit[0].t.key, v = VOICES[k];
+  if (S.voice === k) used.textContent = `Practice ${vtSet === k ? "now uses" : "already uses"} ${v.name}.`;
+  else {
+    use.hidden = false; use.textContent = `Use ${v.name} for practice`;
+    use.onclick = () => { S.voice = k; S.lo = v.lo; S.hi = v.hi; vtSet = k; syncControls(); centerKeys(); changed(true); renderRangeChart(); };
+  }
+}
+function initRange() {
+  $("#vtLoBtn").onclick = () => vtStart("lo");
+  $("#vtHiBtn").onclick = () => vtStart("hi");
+  $("#vtCancel").onclick = () => vtStop(false);
+  $("#vtDone").onclick = () => {
+    if (vtJob && vtJob.best == null) { setText("vtNowSub", "Nothing steady yet. Hold one note for half a second, or press Cancel."); return; }
+    vtStop(true);
+  };
+  renderRange();
+}
+
 // ---------- canvas ----------
 const cv = $("#cv"), g = cv.getContext("2d");
 let W = 0, H = 0, dpr = 1, C = {};
@@ -1929,6 +2121,7 @@ function loop() {
   else { miss = 0; med.push(m); while (med.length > (run ? run.cfg.smooth : 5)) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
   hist.push({ t: now, m: cur });
   while (hist.length && hist[0].t < now - 4) hist.shift();
+  if (vtJob) vtTick(now, cur);
 
   if (run && !run.stopped && now > run.end) finishRun();
 
@@ -2029,10 +2222,10 @@ function renderMic() {
   $("#micBtn").classList.toggle("on", micOn);
   setText("micLabel", micOn ? "Mic on" : "Turn on mic");
   setText("micBtn2", micOn ? "Turn off mic" : "Turn on mic");
-  if (micOn) setText("micMsg", "");
+  if (micOn) { setText("micMsg", ""); setText("vtMsg", ""); }
 }
 function notice(msg) {
-  setText("micMsg", msg);
+  setText("micMsg", msg); setText("vtMsg", msg);
   if (view !== "play") return;
   const ov = $("#overlay"); ov.innerHTML = "";
   ov.append(el("h2", null, "Can’t use the microphone"), el("p", null, msg), el("p", null, K.on ? "The song still plays — you just won’t see your own pitch." : "You can still hear the guide piano."));
@@ -2133,8 +2326,9 @@ let view = "pick", lastPractice = "pick";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
 function route() {
   const v = (location.hash || "#pick").slice(1);
-  view = ["pick", "setup", "play", "timbre", "stems"].includes(v) ? v : "pick";
-  $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vTimbre").hidden = view !== "timbre"; $("#vStems").hidden = view !== "stems";
+  view = ["pick", "setup", "play", "range", "timbre", "stems"].includes(v) ? v : "pick";
+  $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vRange").hidden = view !== "range"; $("#vTimbre").hidden = view !== "timbre"; $("#vStems").hidden = view !== "stems";
+  if (view === "range") renderRange(); else vtStop(false);
   if (view !== "stems" && !(view === "play" && K.on) && P.playing) pauseSong();
   if (view === "stems") stemsRefresh();
   if (view !== "timbre" && rec) rec.stop();
@@ -2185,7 +2379,7 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault(); run ? stopRun() : startRun();
 });
 
-syncControls(); renderMic(); renderStart(); renderPiano(); renderExInfo(); renderPick(); initTimbre(); initStems(); initSing(); route();
+syncControls(); renderMic(); renderStart(); renderPiano(); renderExInfo(); renderPick(); initTimbre(); initStems(); initSing(); initRange(); route();
 loadSamples();
 requestAnimationFrame(() => { resize(); centerKeys(); loop(); });
 })();
