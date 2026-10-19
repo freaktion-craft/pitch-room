@@ -325,7 +325,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .player-title b { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
 .player-title .muted { font-size: 13px; }
 /* the song's video, muted: the stems carry the sound, the picture is for following lyrics */
-#pVideo { display: block; width: 100%; max-height: 62vh; border-radius: 10px; background: #000; object-fit: contain; }
+/* the box holds its size while the video loads, so nothing below it jumps */
+.video { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 62vh; border-radius: 10px; background: #000; overflow: hidden; }
+.video video { display: block; width: 100%; height: 100%; object-fit: contain; }
+.video-wait { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13.5px; color: rgba(255, 255, 255, 0.6); animation: blink 1.6s ease-in-out infinite; }
+.video-wait.err { animation: none; }
+.video.ready .video-wait { display: none; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; }
 .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
@@ -638,9 +643,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <section class="player" id="sPlayer" hidden>
       <div class="player-head">
         <div class="player-title"><b id="pTitle"></b><span class="muted" id="pMeta"></span></div>
-        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm dark" id="pSing" type="button">Sing along</button><button class="btn sm" id="pClose" type="button">Library</button></div>
+        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button">Sing along</button><button class="btn sm" id="pClose" type="button">Library</button></div>
       </div>
-      <video id="pVideo" muted playsinline preload="auto" hidden></video>
+      <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play">Play</button>
@@ -1645,9 +1650,10 @@ async function openSong(m) {
   $("#pTitle").textContent = m.title;
   $("#pMeta").textContent = `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat found"} · loading tracks…`;
   P.tracks = {};
-  const v = $("#pVideo");
-  v.hidden = !m.video;
+  const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
+  box.classList.remove("ready"); box.style.aspectRatio = ""; wait.classList.remove("err"); wait.textContent = "Loading video…";
   if (m.video) v.src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
+  paintVideo();
   $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
   for (const name of m.stems) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
@@ -1666,13 +1672,22 @@ async function openSong(m) {
 function closeSong() {
   pauseSong();
   P.song = null; P.buffers = {}; P.peaks = null;
-  const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load(); v.hidden = true;
+  const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
+  $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
   $("#sPlayer").hidden = true;
+}
+let showVideo = store.get("showVideo", true);
+function paintVideo() {
+  const has = !!(P.song && P.song.video);
+  $("#pVideoBox").hidden = !has || !showVideo;
+  $("#pVideoBtn").hidden = !has;
+  $("#pVideoBtn").textContent = showVideo ? "Hide video" : "Show video";
+  if ($("#pVideoBox").hidden) $("#pVideo").pause();
 }
 // The video follows the stems player, which owns the clock: started, paused and nudged back whenever it drifts.
 function syncVideo() {
   const v = $("#pVideo");
-  if (v.hidden || !v.getAttribute("src") || v.readyState < 1 || v.seeking) return;
+  if ($("#pVideoBox").hidden || !v.getAttribute("src") || v.readyState < 1 || v.seeking) return;
   const pos = songPos(), past = pos >= v.duration - 0.05;
   if (P.playing && !past) {
     if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); }
@@ -1835,6 +1850,11 @@ function initStems() {
     try { const id = await postJob(`/api/library/${P.song.id}/video`); jobCard(id).querySelector(".top span").textContent = "Getting the video…"; watchJob(id, "video"); }
     catch (err) { b.disabled = false; const c = jobCard("x" + Date.now()); c.classList.add("err"); c.querySelector(".top span").textContent = err.message; }
   };
+  $("#pVideoBtn").onclick = () => { showVideo = !showVideo; store.set("showVideo", showVideo); paintVideo(); };
+  const v = $("#pVideo");
+  v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
+  v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));
+  v.addEventListener("error", () => { if (!v.getAttribute("src")) return; $("#pVideoWait").classList.add("err"); $("#pVideoWait").textContent = "Couldn’t load the video."; });
   $("#sFile").onchange = (e) => { submitFile(e.target.files[0]); e.target.value = ""; };
   const drop = $("#sDrop");
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
