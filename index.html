@@ -378,6 +378,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .vt-ctl { display: flex; align-items: center; gap: 12px; }
 .vt-ctl output { font: 15px var(--pixel); min-width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
 .vt-row.on { background: var(--fill); }
+.vt-group { gap: 6px; }
+.vt-group .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
 .vt-now { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
 .vt-live p { margin: 0; }
 /* Range chart: one row per voice type, the singer's range as a band across all rows */
@@ -396,6 +398,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .vt-line.best .vt-bar { background: var(--ink); }
 .vt-band { position: absolute; top: -4px; bottom: -4px; left: calc(var(--lw) + (100% - var(--lw)) * var(--a)); width: calc((100% - var(--lw)) * var(--w));
   background: color-mix(in srgb, var(--voice) 10%, transparent); border-inline: 2px solid var(--voice); pointer-events: none; }
+.vt-band.m2 { background: color-mix(in srgb, var(--voice) 4%, transparent); border-left: 0; border-right: 2px dashed color-mix(in srgb, var(--voice) 60%, transparent); }
+.vt-legend i.you.m2 { background: color-mix(in srgb, var(--voice) 6%, transparent); box-shadow: inset -2px 0 0 color-mix(in srgb, var(--voice) 60%, transparent); }
 .vt-axis { position: relative; height: 16px; margin-left: var(--lw); font: 11px var(--mono); color: var(--faint); }
 .vt-axis span { position: absolute; transform: translateX(-50%); }
 .vt-result { margin: 4px 0 0; font-size: 16px; line-height: 1.6; max-width: 62ch; text-wrap: pretty; }
@@ -662,10 +666,13 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <section class="group">
       <div class="group-label">Your range</div>
       <div class="rows">
+        <div class="row vt-row"><span>Voice group<small>Usually men: bass to tenor. Usually women: alto to soprano.</small></span>
+          <div class="vt-ctl vt-group" role="group" aria-label="Voice group"><button class="btn sm" type="button" data-group="low" aria-pressed="false">Bass–tenor</button><button class="btn sm" type="button" data-group="high" aria-pressed="false">Alto–soprano</button></div>
+        </div>
         <div class="row vt-row"><span>Lowest note<small>Slide down on “ah” and hold the lowest note that still sounds clear</small></span>
           <div class="vt-ctl"><output id="vtLo">–</output><button class="btn sm" id="vtLoBtn" type="button">Find</button></div>
         </div>
-        <div class="row vt-row"><span>Highest note<small>Slide up and hold the highest note you can sing without straining. Men: chest or mixed voice (M1), no falsetto. Women: head voice (M2).</small></span>
+        <div class="row vt-row"><span>Highest note<small id="vtHiHow"></small></span>
           <div class="vt-ctl"><output id="vtHi">–</output><button class="btn sm" id="vtHiBtn" type="button">Find</button></div>
         </div>
       </div>
@@ -689,9 +696,10 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <div class="group-label minor">Good to know</div>
       <ul class="caveats">
         <li>Warm up for a few minutes first. A cold voice loses a few notes at both ends.</li>
-        <li>The bars are typical ranges for trained singers. Untrained voices usually stop a few notes short at the top, so the lowest note counts more here.</li>
+        <li>The bars are typical ranges for trained singers. Untrained voices usually stop a few notes short at the top, so the lowest note decides here and the top only nudges it.</li>
         <li>Range is only part of it. Teachers also listen for where your voice changes gear (the passaggio) and for its colour, so treat this as a starting point.</li>
-        <li>M1 and M2 are the two main ways the vocal folds vibrate: M1 is chest and mixed voice, M2 is head voice and falsetto. The typical tops for bass, baritone and tenor are M1 notes; for alto, mezzo and soprano they are M2 notes. That’s why men leave out falsetto here: an M2 top would make a low voice look higher than it is.</li>
+        <li>M1 and M2 are the two main ways the vocal folds vibrate: M1 is chest and mixed voice, M2 is head voice and falsetto. The typical tops for bass, baritone and tenor are M1 notes; for alto, mezzo and soprano they are M2 notes, so for bass to tenor only your M1 top counts.</li>
+        <li>The app tells M1 from M2 by the sound: in M2 the first harmonic gets much stronger and the high ones fade, compared with how you sounded at the bottom of the same slide. It’s a guess from sound alone (studies use a sensor on the throat to be sure), and a smooth, trained mix can fool it.</li>
       </ul>
       <div id="vtRefs"></div>
     </section>
@@ -1857,100 +1865,176 @@ function initSing() {
 
 // ---------- voice type ----------
 // Typical ranges of trained singers (the usual choral and opera figures). Keys match VOICES, so a result can set up Practice.
+// The tops are M1 (chest/mix) notes for the low group and M2 (head voice) notes for the high group.
 const VT_TYPES = [
-  { key: "bass", lo: 40, hi: 64 }, { key: "baritone", lo: 45, hi: 69 }, { key: "tenor", lo: 48, hi: 72 },
-  { key: "alto", lo: 53, hi: 77 }, { key: "mezzo", lo: 57, hi: 81 }, { key: "soprano", lo: 60, hi: 84 },
+  { key: "bass", group: "low", lo: 40, hi: 64 }, { key: "baritone", group: "low", lo: 45, hi: 69 }, { key: "tenor", group: "low", lo: 48, hi: 72 },
+  { key: "alto", group: "high", lo: 53, hi: 77 }, { key: "mezzo", group: "high", lo: 57, hi: 81 }, { key: "soprano", group: "high", lo: 60, hi: 84 },
 ];
-const VT_MIN = 38, VT_MAX = 86; // chart axis, D2–D6
-const VT = Object.assign({ lo: null, hi: null }, store.get("range", {}));
-let vtJob = null, vtSet = null; // vtJob: { which: "lo" | "hi", win, best, t0 } while listening
-const vtX = (m) => (Math.max(VT_MIN, Math.min(VT_MAX, m)) - VT_MIN) / (VT_MAX - VT_MIN);
+const VT_AXIS = { low: [38, 79], high: [50, 86], all: [38, 86] }; // D2–G5, D3–D6, D2–D6
+// hi: top held note; hiMech: "M1" | "M2" | null (couldn't tell); hiM1: highest held M1 note; flip: where the slide switched to M2
+const VT = Object.assign({ lo: null, hi: null, hiMech: null, hiM1: null, flip: null, group: null }, store.get("range", {}));
+let vtJob = null, vtSet = null, vtSpec = null;
 const noteHz = (m) => `${absName(m)} · ${mf(m).toFixed(0)} Hz`;
-// The lowest note counts most: it barely moves with training, while the top keeps growing.
-// Going past a type's top counts in full, falling short of it only a little.
-function vtFit(lo, hi) {
-  return VT_TYPES.map((t) => ({ t, d: Math.abs(lo - t.lo) + Math.max(0, hi - t.hi) + 0.35 * Math.max(0, t.hi - hi) }))
-    .sort((a, b) => a.d - b.d);
+const vtSave = () => store.set("range", { lo: VT.lo, hi: VT.hi, hiMech: VT.hiMech, hiM1: VT.hiM1, flip: VT.flip, group: VT.group });
+const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
+
+// M1 or M2 from the sound alone. In M2 the folds stay open longer each cycle, so the first harmonic grows against the
+// second (H1–H2 up) and the high harmonics fade (alpha ratio down). Both are compared with the same voice at the bottom
+// of the same slide, which is surely M1, so the mic and the vowel cancel out.
+function vtFeatures(f0) {
+  if (!vtSpec || vtSpec.length !== analyser.frequencyBinCount) vtSpec = new Float32Array(analyser.frequencyBinCount);
+  analyser.getFloatFrequencyData(vtSpec);
+  const bw = ac.sampleRate / analyser.fftSize;
+  const peak = (f) => { let p = -Infinity; for (let i = Math.max(1, Math.round((f - f0 * 0.3) / bw)); i <= Math.round((f + f0 * 0.3) / bw) && i < vtSpec.length; i++) p = Math.max(p, vtSpec[i]); return p; };
+  let low = 1e-12, high = 1e-12;
+  for (let i = 1; i < vtSpec.length; i++) { const f = i * bw, p = Math.pow(10, vtSpec[i] / 10); if (f >= 50 && f < 1000) low += p; else if (f >= 1000 && f < 5000) high += p; }
+  return { h12: peak(f0) - peak(2 * f0), alpha: 10 * Math.log10(high / low) };
+}
+const VT_M2_H12 = 6, VT_M2_ALPHA = 4; // dB past the baseline on both cues
+
+// Within the chosen group the lowest note decides: it barely moves with training, while the top keeps growing.
+// The top only nudges the result when it goes past a type's top.
+function vtFit(lo, hi, group) {
+  const types = VT_TYPES.filter((t) => t.group === group);
+  return types.map((t) => ({ t, d: Math.abs(lo - t.lo) + (hi == null ? 0 : 0.25 * Math.max(0, hi - t.hi)) })).sort((a, b) => a.d - b.d);
+}
+// The top note that fits the group's typical ranges: an M1 top for bass–tenor, and whatever the slide reached for alto–soprano.
+// When the mechanism couldn't be told, a top far above every bass–tenor top is assumed to be falsetto and left out.
+function vtTop() {
+  if (VT.hi == null) return { top: null };
+  if (VT.group !== "low") return { top: VT.hi };
+  if (VT.hiMech === "M2") return { top: VT.hiM1, dropped: VT.hi, why: "m2" };
+  if (VT.hiMech == null && VT.hi > 74) return { top: null, dropped: VT.hi, why: "guess" };
+  return { top: VT.hi };
 }
 async function vtStart(which) {
   vtStop(false);
   if (!(await startMic())) return; // notice() has put the reason in #vtMsg
-  vtJob = { which, win: [], best: null, t0: clock() };
+  vtJob = { which, win: [], best: null, bestM1: null, calib: [], base: null, run: 0, flip: null, t0: clock() };
   renderRange();
 }
 function vtStop(keep) {
-  if (!vtJob) return;
-  if (keep && vtJob.best != null) { VT[vtJob.which] = Math.round(vtJob.best); vtSet = null; store.set("range", { lo: VT.lo, hi: VT.hi }); }
+  const j = vtJob;
+  if (!j) return;
+  if (keep && j.best != null) {
+    if (j.which === "lo") VT.lo = Math.round(j.best);
+    else {
+      VT.hi = Math.round(j.best.m);
+      VT.hiMech = j.base ? (j.best.m2 ? "M2" : "M1") : null;
+      VT.hiM1 = j.bestM1 == null ? null : Math.round(j.bestM1);
+      VT.flip = j.flip == null ? null : Math.round(j.flip);
+    }
+    vtSet = null; vtSave();
+  }
   vtJob = null; renderRange();
 }
 // Runs every frame from the main loop. A note counts once it has been held steady (within about a semitone) for half a second.
 function vtTick(now, m) {
-  const j = vtJob;
-  j.win.push({ t: now, m });
+  const j = vtJob, hi = j.which === "hi";
+  let m2 = false;
+  if (hi && m != null) {
+    const fe = vtFeatures(mf(m));
+    if (!j.base) {
+      j.calib.push(fe);
+      if (j.calib.length >= 30) j.base = { h12: median(j.calib.map((c) => c.h12)), alpha: median(j.calib.map((c) => c.alpha)) };
+    } else {
+      m2 = fe.h12 - j.base.h12 >= VT_M2_H12 && j.base.alpha - fe.alpha >= VT_M2_ALPHA;
+      j.run = m2 ? j.run + 1 : 0;
+      if (j.run === 6 && j.flip == null) j.flip = m; // a switch that lasts ~0.1 s, not a single odd frame
+    }
+  }
+  j.win.push({ t: now, m, m2 });
   while (j.win.length && j.win[0].t < now - 0.5) j.win.shift();
   if (now - j.t0 > 0.5 && j.win.every((s) => s.m != null)) {
     const ms = j.win.map((s) => s.m).sort((a, b) => a - b);
     if (ms[ms.length - 1] - ms[0] <= 1.2) {
       const held = ms[ms.length >> 1];
-      if (j.best == null || (j.which === "lo" ? held < j.best : held > j.best)) j.best = held;
+      if (!hi) { if (j.best == null || held < j.best) j.best = held; }
+      else {
+        const isM2 = j.win.filter((s) => s.m2).length > j.win.length / 2;
+        if (j.best == null || held > j.best.m) j.best = { m: held, m2: isM2 };
+        if (j.base && !isM2 && (j.bestM1 == null || held > j.bestM1)) j.bestM1 = held;
+      }
     }
   }
-  setText("vtNow", m == null ? "–" : absName(m));
-  setText("vtNowSub", j.best == null ? "Hold a note for half a second" : `${j.which === "lo" ? "Lowest" : "Highest"} so far: ${noteHz(Math.round(j.best))}`);
+  setText("vtNow", m == null ? "–" : absName(m) + (hi && j.base && m != null ? (m2 ? " M2" : " M1") : ""));
+  const bm = hi ? j.best && j.best.m : j.best;
+  setText("vtNowSub", hi && !j.base ? "Start on a comfortable low note: learning how your M1 sounds"
+    : bm == null ? "Hold a note for half a second"
+    : `${hi ? "Highest" : "Lowest"} so far: ${noteHz(Math.round(bm))}${hi ? (j.best.m2 ? " · M2" : " · M1") : ""}${hi && j.flip != null ? ` · switched to M2 around ${absName(Math.round(j.flip))}` : ""}`);
 }
+const vtTopHow = () => VT.group === "high" ? "Start low and slide up slowly into head voice (M2), as high as feels free."
+  : "Start on a comfortable low note and slide up slowly, as high as you can, falsetto included. The app tells chest and mix (M1) from head voice and falsetto (M2) by the sound.";
 function renderRange() {
   const j = vtJob;
   $("#vtLive").hidden = !j;
+  document.querySelectorAll(".vt-group .btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.group === VT.group)));
+  $("#vtHiHow").textContent = vtTopHow();
   for (const w of ["lo", "hi"]) {
     const btn = $(w === "lo" ? "#vtLoBtn" : "#vtHiBtn"), on = !!(j && j.which === w);
     btn.textContent = on ? "Listening…" : VT[w] == null ? "Find" : "Redo"; btn.disabled = on;
     btn.closest(".vt-row").classList.toggle("on", on);
-    $(w === "lo" ? "#vtLo" : "#vtHi").textContent = VT[w] == null ? "–" : noteHz(VT[w]);
   }
+  $("#vtLo").textContent = VT.lo == null ? "–" : noteHz(VT.lo);
+  $("#vtHi").textContent = VT.hi == null ? "–" : noteHz(VT.hi) + (VT.hiMech ? " · " + VT.hiMech : "");
   if (j) {
     $("#vtHint").textContent = j.which === "lo"
       ? "Slide down slowly on “ah”. At the bottom, hold the note, then press Done."
-      : "Slide up slowly on “ah”. Men stay in chest or mixed voice (M1) and stop before falsetto; women go up in head voice (M2). At the top, hold the note, then press Done.";
-    setText("vtNow", "–"); setText("vtNowSub", "Hold a note for half a second");
+      : `${vtTopHow()} Sing on “ah”. At the top, hold the note, then press Done.`;
+    setText("vtNow", "–"); setText("vtNowSub", j.which === "hi" ? "Start on a comfortable low note: learning how your M1 sounds" : "Hold a note for half a second");
   }
   renderRangeChart();
 }
 function renderRangeChart() {
-  const both = VT.lo != null && VT.hi != null;
-  const a = both ? Math.min(VT.lo, VT.hi) : VT.lo ?? VT.hi, b = both ? Math.max(VT.lo, VT.hi) : a;
-  const fit = both ? vtFit(a, b) : null, best = fit ? fit[0].t.key : null;
+  const lo = VT.lo, hi = VT.hi, { top, dropped, why } = vtTop();
+  const fit = lo != null && VT.group ? vtFit(lo, top, VT.group) : null, best = fit ? fit[0].t.key : null;
+  const [x0, x1] = VT_AXIS[VT.group || "all"], X = (m) => (Math.max(x0, Math.min(x1, m)) - x0) / (x1 - x0);
+  // the singer's band: lowest note to the top that counts; anything above it (M2 for bass–tenor) is drawn fainter
+  const a = lo ?? hi, b = top ?? (lo != null ? lo : hi), extra = dropped != null && lo != null ? dropped : null;
 
   const legend = el("div", "vt-legend"), l1 = el("span");
   l1.append(el("i"), "Typical range"); legend.append(l1);
-  if (a != null) { const l2 = el("span"); l2.append(el("i", "you"), both ? `You: ${absName(a)}–${absName(b)}` : `You: ${absName(a)}`); legend.append(l2); }
+  if (a != null) { const l2 = el("span"); l2.append(el("i", "you"), `You: ${absName(Math.min(a, b))}${a !== b ? "–" + absName(Math.max(a, b)) : ""}`); legend.append(l2); }
+  if (extra != null) { const l3 = el("span"); l3.append(el("i", "you m2"), `${why === "m2" ? "M2" : "Probably falsetto"}, left out: up to ${absName(extra)}`); legend.append(l3); }
   const plot = el("div", "vt-plot");
-  VT_TYPES.forEach((t) => {
+  VT_TYPES.filter((t) => !VT.group || t.group === VT.group).forEach((t) => {
     const name = VOICES[t.key].name, line = el("div", "vt-line" + (t.key === best ? " best" : ""));
     const lab = el("div", "lab"); lab.append(el("span", null, name), el("small", null, `${absName(t.lo)}–${absName(t.hi)}`));
     const track = el("div", "vt-track"), bar = el("div", "vt-bar");
-    bar.style.left = vtX(t.lo) * 100 + "%"; bar.style.width = (vtX(t.hi) - vtX(t.lo)) * 100 + "%";
+    bar.style.left = X(t.lo) * 100 + "%"; bar.style.width = (X(t.hi) - X(t.lo)) * 100 + "%";
     bar.title = `${name}: typically ${absName(t.lo)}–${absName(t.hi)}`;
     track.append(bar); line.append(lab, track); plot.append(line);
   });
-  if (a != null) {
-    const band = el("div", "vt-band");
-    band.style.setProperty("--a", vtX(a)); band.style.setProperty("--w", Math.max(0.004, vtX(b) - vtX(a)));
-    plot.append(band);
-  }
+  const band = (from, to, cls) => {
+    const d = el("div", cls); d.style.setProperty("--a", X(Math.min(from, to))); d.style.setProperty("--w", Math.max(0.004, Math.abs(X(to) - X(from))));
+    plot.append(d);
+  };
+  if (a != null) band(a, b, "vt-band");
+  if (extra != null) band(b, extra, "vt-band m2");
   const axis = el("div", "vt-axis");
-  for (let m = 48; m <= 84; m += 12) { const s = el("span", null, absName(m)); s.style.left = vtX(m) * 100 + "%"; axis.append(s); }
+  for (let m = Math.ceil(x0 / 12) * 12; m <= x1; m += 12) { const s = el("span", null, absName(m)); s.style.left = X(m) * 100 + "%"; axis.append(s); }
   const box = $("#vtChart"); box.innerHTML = ""; box.append(legend, plot, axis);
 
   const res = $("#vtResult"), use = $("#vtUse"), used = $("#vtUsed");
   use.hidden = true; used.textContent = "";
-  if (!both) { res.textContent = a == null ? "Find both notes to see where your range fits." : `Now find your ${VT.lo == null ? "lowest" : "highest"} note.`; return; }
-  const span = b - a, oc = Math.floor(span / 12), st = span % 12;
-  const spanTxt = oc ? `${oc} octave${oc > 1 ? "s" : ""}${st ? ` and ${st} semitone${st > 1 ? "s" : ""}` : ""}` : `${span} semitone${span === 1 ? "" : "s"}`;
-  const lc = (f) => VOICES[f.t.key].name.toLowerCase();
-  res.textContent = `Your range, ${absName(a)}–${absName(b)} (${spanTxt}), fits ${lc(fit[0])} best`
-    + (fit[1].d - fit[0].d < 1.5 ? `, with ${lc(fit[1])} close behind.` : ".")
-    + (span < 10 ? " That’s a narrow range, so this is a rough guess. Try again after warming up." : "");
-  const k = fit[0].t.key, v = VOICES[k];
+  if (!VT.group) { res.textContent = "Choose a voice group to see where your range fits."; return; }
+  if (lo == null || hi == null) { res.textContent = lo == null && hi == null ? "Find both notes to see where your range fits." : `Now find your ${lo == null ? "lowest" : "highest"} note.`; return; }
+  const nm = (f) => VOICES[f.t.key].name.toLowerCase(), plural = (f) => nm(f) === "bass" ? "basses" : nm(f) + "s";
+  const parts = [];
+  if (top != null) {
+    const span = top - lo, oc = Math.floor(span / 12), st = span % 12;
+    const spanTxt = oc ? `${oc} octave${oc > 1 ? "s" : ""}${st ? ` and ${st} semitone${st > 1 ? "s" : ""}` : ""}` : `${span} semitone${span === 1 ? "" : "s"}`;
+    parts.push(`Your range is ${absName(lo)}–${absName(top)} (${spanTxt}).`);
+  }
+  if (why === "m2") parts.push(`Your top note, ${absName(dropped)}, sounded like M2 (falsetto), so it’s left out${top != null ? `; your highest M1 note was ${absName(top)}` : ""}.`);
+  if (why === "guess") parts.push(`Your top note, ${absName(dropped)}, is far above where even tenors top out, so it was probably falsetto and is left out. Redo the highest note to let the app check.`);
+  if (VT.flip != null) parts.push(`Your voice switched from M1 to M2 around ${absName(VT.flip)}.`);
+  const [f0, f1] = fit;
+  parts.push(`The lowest note decides here: ${absName(lo)} is closest to where ${plural(f0)} usually bottom out (${absName(f0.t.lo)}), so you fit ${nm(f0)} best${f1.d - f0.d < 1.5 ? `, with ${nm(f1)} close behind` : ""}.`);
+  if (top != null && top - lo < 10) parts.push("That’s a narrow range, so this is a rough guess. Try again after warming up.");
+  if (VT.group === "high" && VT.hiMech === "M1") parts.push("Your top note sounded like chest voice (M1). Alto to soprano tops are head-voice notes, so try going higher in head voice.");
+  res.textContent = parts.join(" ");
+  const k = f0.t.key, v = VOICES[k];
   if (S.voice === k) used.textContent = `Practice ${vtSet === k ? "now uses" : "already uses"} ${v.name}.`;
   else {
     use.hidden = false; use.textContent = `Use ${v.name} for practice`;
@@ -1958,6 +2042,7 @@ function renderRangeChart() {
   }
 }
 function initRange() {
+  document.querySelectorAll(".vt-group .btn").forEach((b) => { b.onclick = () => { VT.group = b.dataset.group; vtSet = null; vtSave(); renderRange(); }; });
   $("#vtLoBtn").onclick = () => vtStart("lo");
   $("#vtHiBtn").onclick = () => vtStart("hi");
   $("#vtCancel").onclick = () => vtStop(false);
