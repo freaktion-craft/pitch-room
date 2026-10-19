@@ -692,7 +692,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <div id="sAddPage" hidden>
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
-      <p class="muted">Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, and YouTube links use yt-dlp. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
+      <p class="muted">Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the sing-along bars come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
       <div class="row-actions"><button class="btn dark" id="sInstallBtn" type="button">Install stem tools</button><span class="muted" id="sInstallState"></span></div>
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
@@ -2246,13 +2246,13 @@ function songView(snap) {
   if (hi - lo < 13) { const c = (lo + hi) / 2; lo = c - 6.5; hi = c + 6.5; }
   if (snap) { vLo = lo; vHi = hi; } else { vLo += (lo - vLo) * 0.07; vHi += (hi - vHi) * 0.07; } // eases only after an octave change
 }
-// btn: the button that started it, which says what's happening meanwhile (reading a song's melody the first time
-// takes several seconds) and shows any error.
+// btn: the button that started it, which says what's happening meanwhile (the first time, the server separates the
+// lead vocal and reads its melody: about a minute) and shows any error.
 async function singSong(m, btn) {
   const lbl = btn && (btn.querySelector(".how") || btn), was = lbl && lbl.textContent;
   const say = (text) => { if (lbl) lbl.textContent = text; };
   if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
-  say("Reading the melody…");
+  say("Reading the melody… (up to a minute the first time)");
   if (run) stopRun(true);
   let mel;
   try {

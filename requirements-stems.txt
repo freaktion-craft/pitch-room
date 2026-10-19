@@ -4,3 +4,4 @@ demucs>=4.0.1
 librosa>=0.10
 yt-dlp[default]>=2025.11.12
 deno>=2.0
+audio-separator[cpu]>=0.47; python_version >= "3.10"

@@ -4,6 +4,8 @@ Songs live in ./library/<id>/ :
     source.*        the original audio (upload or YouTube download)
     video.*         the picture of a YouTube video, no sound (shown above the player to follow lyrics)
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
+    lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out), for sing-along bars
+    melody.json     the sing-along notes, from lead.mp3 (or vocals.mp3 without the lead model)
     meta.json       title, duration, bpm, beat times, key, stems, model
 
 Heavy packages (torch, demucs, librosa, yt-dlp) are optional and installed from the
@@ -11,6 +13,7 @@ page on first use, so the base app stays small.
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
@@ -32,6 +35,12 @@ LIB = os.path.join(ROOT, "library")
 SR = 44100
 MODELS = {"htdemucs": "4 stems", "htdemucs_6s": "6 stems (+ guitar, piano)"}
 HEAVY = ["torch", "demucs", "librosa", "yt_dlp"]
+# Lead-vocal separation (audio-separator) is optional: without it the bars come from the whole vocal stem.
+# BS-Roformer karaoke by frazer & becruily (195 MB, ~60 s for a 4-minute song on an RTX 4070 Ti). On a song with
+# vocal chops, the bars it took out were the stretches a search for exact bar-to-bar loops had flagged. Two other
+# karaoke models (Mel-Roformer by becruily, 1.6 GB; by aufr33 & viperx, 871 MB) put backing in the same places.
+LEAD_MODEL = "bs_roformer_karaoke_frazer_becruily.ckpt"
+MODEL_DIR = os.path.join(ROOT, "models")
 
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
@@ -152,7 +161,7 @@ def _cuda_candidates() -> list[str]:
 
 def _install_cuda_torch(job, replace: bool) -> bool:
     if replace:
-        _pip(job, ["uninstall", "-y", "torch", "torchaudio"], (0.0, 0.05))
+        _pip(job, ["uninstall", "-y", "torch", "torchvision", "torchaudio"], (0.0, 0.05))
     candidates = _cuda_candidates()
     if not candidates:
         with _jobs_lock:
@@ -160,7 +169,8 @@ def _install_cuda_torch(job, replace: bool) -> bool:
         return False
     for idx in candidates:
         _set(job, stage=f"Installing PyTorch for your NVIDIA GPU ({idx}, ≈2–3 GB)…")
-        if _pip(job, ["install", "torch", "torchaudio", "--index-url", f"https://download.pytorch.org/whl/{idx}"], (0.05, 0.6)) == 0:
+        # torchvision from the same index: the lead-vocal package needs it, and PyPI would bring a CPU build
+        if _pip(job, ["install", "torch", "torchvision", "torchaudio", "--index-url", f"https://download.pytorch.org/whl/{idx}"], (0.05, 0.6)) == 0:
             return True
         with _jobs_lock:
             job["log"].append(f"No matching {idx} build, trying an older CUDA version…")
@@ -333,7 +343,7 @@ def _separate(job, wav: np.ndarray, model_name: str):
         if d.get("state") == "end":
             frac = min(1.0, (d.get("segment_offset", 0) + seg) / length)
             done["max"] = max(done["max"], frac)
-            _set(job, progress=0.25 + 0.6 * done["max"])
+            _set(job, progress=0.25 + 0.45 * done["max"])
 
     dev = device()
     with torch.no_grad():
@@ -407,17 +417,21 @@ def _pipeline(job, src: dict, model_name: str):
             _get_model(model_name)
             _set(job, stage=f"Separating on {device().upper()}", progress=0.25)
             names, stems = _separate(job, wav, model_name)
-            _set(job, stage="Finding the beat", progress=0.86)
-            drums = stems[names.index("drums")].mean(0) if "drums" in names else wav.mean(0)
-            bpm, beats = _beats(drums, wav.mean(0), dur)
-            _set(job, stage="Finding the key", progress=0.87)
+            _set(job, stage="Finding the beat", progress=0.71)
+            drum_stem = stems[names.index("drums")].mean(0) if "drums" in names else None
+            bpm, beats = _beats(wav.mean(0) if drum_stem is None else drum_stem, wav.mean(0), dur)
+            _set(job, stage="Finding the key", progress=0.72)
             try:
                 key = _key(sum(stems[i].mean(0) for i, n in enumerate(names) if n != "drums"))
             except Exception:  # noqa: BLE001  (the song works without it)
                 key = None
             if "vocals" in names:
-                _set(job, stage="Reading the vocal melody", progress=0.88)
-                _save_melody(folder, stems[names.index("vocals")].mean(0), stems[names.index("drums")].mean(0) if "drums" in names else None)
+                vox = stems[names.index("vocals")]
+                lead = _lead_vocal(vox, job, (0.73, 0.86))
+                if lead is not None:
+                    _encode_mp3(lead, os.path.join(folder, "lead.mp3"))
+                _set(job, stage="Reading the vocal melody", progress=0.87)
+                _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None)
             _set(job, stage="Saving tracks", progress=0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):
@@ -482,30 +496,118 @@ def song_info(song_id: str) -> dict:
     return info
 
 
+# ---------- lead vocal (sing-along) ----------
+def lead_available() -> bool:
+    return importlib.util.find_spec("audio_separator") is not None
+
+
+def _ffmpeg_on_path():
+    """audio-separator runs plain "ffmpeg"; when none is installed, expose the bundled binary under that name."""
+    if shutil.which("ffmpeg"):
+        return
+    d = os.path.join(ROOT, ".ffmpeg")
+    exe = os.path.join(d, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+    if not os.path.isfile(exe):
+        os.makedirs(d, exist_ok=True)
+        try:
+            os.link(ffmpeg_exe(), exe)  # a hard link takes no extra space
+        except OSError:
+            shutil.copy2(ffmpeg_exe(), exe)
+    os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+
+
+@contextlib.contextmanager
+def _creep(job, share: tuple[float, float], expected: float):
+    """Move a job's progress through `share` over about `expected` seconds, for a step that reports none."""
+    if job is None:
+        yield
+        return
+    stop = threading.Event()
+
+    def tick():
+        t0 = time.time()
+        while not stop.wait(0.5):
+            _set(job, progress=share[0] + (share[1] - share[0]) * (1 - np.exp(-(time.time() - t0) / expected)))
+    threading.Thread(target=tick, daemon=True).start()
+    try:
+        yield
+    finally:
+        stop.set()
+
+
+def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0, 1.0)) -> np.ndarray | None:
+    """The lead vocal alone, (2, n) at SR, from the vocal stem: a karaoke model moves backing vocals, harmonies and
+    vocal chops out of it. None when the model's package isn't installed."""
+    if not lead_available():
+        return None
+    import logging
+
+    import soundfile as sf
+    from audio_separator.separator import Separator
+    _ffmpeg_on_path()
+    if job:
+        first = not os.path.isfile(os.path.join(MODEL_DIR, LEAD_MODEL))
+        _set(job, stage="Downloading the lead-vocal model (first time only, ≈200 MB)" if first else "Taking out backing vocals and chops",
+             progress=share[0])
+    expected = vocals.shape[1] / SR * (0.3 if device() == "cuda" else 3.0)
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp, _creep(job, share, expected):
+        src = os.path.join(tmp, "vocals.wav")
+        sf.write(src, vocals.T, SR)
+        sep = Separator(log_level=logging.WARNING, model_file_dir=MODEL_DIR, output_dir=tmp, output_format="WAV")
+        sep.load_model(model_filename=LEAD_MODEL)
+        if job:
+            _set(job, stage="Taking out backing vocals and chops")
+        lead = [f for f in sep.separate(src) if "(Vocals)" in os.path.basename(f)][0]
+        y, sr = sf.read(os.path.join(tmp, os.path.basename(lead)), dtype="float32", always_2d=True)
+        del sep
+    if sr != SR:
+        raise RuntimeError(f"The lead-vocal model returned {sr} Hz audio.")
+    if device() == "cuda":
+        import torch
+        torch.cuda.empty_cache()
+    return y.T.copy()
+
+
 # ---------- melody (sing-along) ----------
-def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | None = None) -> dict:
+_melody_lock = threading.Lock()  # one rebuild at a time, so two pages asking at once don't both build it
+
+
+def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | None = None, lead: bool = False) -> dict:
     import melody
     data = melody.extract(vocals_mono, drums=drums_mono)
+    data["lead"] = lead  # built from the lead vocal alone
     with open(os.path.join(folder, "melody.json"), "w", encoding="utf-8") as f:
         json.dump(data, f, separators=(",", ":"))
     return data
 
 
 def get_melody(song_id: str) -> dict:
-    """Cached melody.json, computed from the vocal stem the first time (songs separated before sing-along existed)."""
+    """Cached melody.json. Rebuilt when the extraction changed, or when it came from the whole vocal stem and the
+    lead model is installed now; then the lead vocal is separated first (about a minute, once per song)."""
     folder = _song_dir(song_id)
     path = os.path.join(folder, "melody.json")
-    if os.path.isfile(path):
-        import melody
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        if data.get("v") == melody.VERSION:
-            return data
-    vocals = os.path.join(folder, "vocals.mp3")
-    if not os.path.isfile(vocals):
-        raise ValueError("This song has no vocal track to sing along with.")
-    drums = os.path.join(folder, "drums.mp3")
-    return _save_melody(folder, _decode_stereo(vocals).mean(0), _decode_stereo(drums).mean(0) if os.path.isfile(drums) else None)
+    with _melody_lock:
+        if os.path.isfile(path):
+            import melody
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("v") == melody.VERSION and (data.get("lead") or not lead_available()):
+                return data
+        vocals = os.path.join(folder, "vocals.mp3")
+        if not os.path.isfile(vocals):
+            raise ValueError("This song has no vocal track to sing along with.")
+        lead_path = os.path.join(folder, "lead.mp3")
+        if os.path.isfile(lead_path):
+            src, lead = _decode_stereo(lead_path), True
+        else:
+            vox = _decode_stereo(vocals)
+            with _work_lock:  # one model on the GPU at a time
+                y = _lead_vocal(vox)
+            if y is not None:
+                _encode_mp3(y, lead_path)
+            src, lead = (vox if y is None else y), y is not None
+        drums = os.path.join(folder, "drums.mp3")
+        return _save_melody(folder, src.mean(0), _decode_stereo(drums).mean(0) if os.path.isfile(drums) else None, lead)
 
 
 # ---------- export ----------
