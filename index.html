@@ -337,13 +337,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .transport-row .kb { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
 .btn.round { min-width: 72px; justify-content: center; }
-/* play ⇄ pause: the triangle splits down the middle, its halves square off into two bars, and the whole thing flips over */
-.pp { position: relative; display: inline-block; width: 14px; height: 16px; flex: none; transition: transform 0.45s cubic-bezier(0.5, 1.6, 0.4, 1); }
-.pp::before, .pp::after { content: ""; position: absolute; inset: 0; background: currentColor; transition: clip-path 0.45s cubic-bezier(0.5, 1.6, 0.4, 1); }
+/* play ⇄ pause: the triangle splits down the middle and its halves square off into two bars, and back */
+.pp { position: relative; display: inline-block; width: 14px; height: 16px; flex: none; }
+.pp::before, .pp::after { content: ""; position: absolute; inset: 0; background: currentColor; transition: clip-path 0.32s cubic-bezier(0.65, 0, 0.35, 1); }
 /* the halves overlap a little (52–56%) so no seam shows down the middle of the triangle */
 .pp::before { clip-path: polygon(8% 0, 56% 26.1%, 56% 73.9%, 8% 100%); }
 .pp::after { clip-path: polygon(52% 23.9%, 100% 50%, 100% 50%, 52% 76.1%); }
-.on > .pp { transform: rotate(180deg); }
 .on > .pp::before { clip-path: polygon(6% 0, 38% 0, 38% 100%, 6% 100%); }
 .on > .pp::after { clip-path: polygon(62% 0, 94% 0, 94% 100%, 62% 100%); }
 @media (prefers-reduced-motion: reduce) { .pp::before, .pp::after { transition: none !important; } }
