@@ -335,24 +335,23 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; }
 .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
-.transport-row .kb { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
-.btn.round { min-width: 72px; justify-content: center; }
-/* play ⇄ pause: the triangle splits down the middle and its halves square off into two bars, and back */
-.pp { position: relative; display: inline-block; width: 14px; height: 16px; flex: none; }
-.pp::before, .pp::after { content: ""; position: absolute; inset: 0; background: currentColor; transition: clip-path 0.32s cubic-bezier(0.65, 0, 0.35, 1); }
-/* the halves overlap a little (52–56%) so no seam shows down the middle of the triangle */
-.pp::before { clip-path: polygon(8% 0, 56% 26.1%, 56% 73.9%, 8% 100%); }
-.pp::after { clip-path: polygon(52% 23.9%, 100% 50%, 100% 50%, 52% 76.1%); }
-.on > .pp::before { clip-path: polygon(6% 0, 38% 0, 38% 100%, 6% 100%); }
-.on > .pp::after { clip-path: polygon(62% 0, 94% 0, 94% 100%, 62% 100%); }
-@media (prefers-reduced-motion: reduce) { .pp::before, .pp::after { transition: none !important; } }
+.transport-row .kb { margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
+.btn.round { width: 40px; padding: 0; justify-content: center; border-radius: 50%; }
+/* Hugeicons line icons: stroke settings live here, the paths in ICONS */
+.ico { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.mvol { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: rgba(var(--fg), 0.55); }
+.mvol .ico { width: 18px; height: 18px; }
+.mvol input { width: 120px; }
+/* play ⇄ pause icon, drawn by ppTo(). A stroke in the fill colour with round joins softens the corners
+   (and covers the seam where the triangle's two halves meet). */
+.pp { width: 14px; height: 16px; flex: none; fill: currentColor; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
 .tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
-.track { display: grid; grid-template-columns: 12px minmax(84px, 1fr) auto auto minmax(90px, 160px) auto; align-items: center; gap: 10px; padding: 8px 12px; min-height: 48px; }
+.track { display: grid; grid-template-columns: 18px minmax(84px, 1fr) auto auto minmax(90px, 160px) auto; align-items: center; gap: 10px; padding: 8px 12px; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
-.track .dot { width: 10px; height: 10px; border-radius: 50%; }
+.track .ico { width: 18px; height: 18px; }
 .track .name { font-size: 14px; }
 .track .name small { display: block; color: var(--faint); font-size: 12px; }
-.track.off .name, .track.off .dot { opacity: 0.35; }
+.track.off .name, .track.off .ico { opacity: 0.35; }
 .tog { height: 28px; min-width: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fill); font: 500 12px var(--mono); color: rgba(var(--fg), 0.55); }
 .tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
 .tog[aria-pressed="true"].s { background: #F2C14E; color: #3A2A00; }
@@ -376,7 +375,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .song small { color: var(--faint); font-size: 12.5px; }
 .song-actions { display: flex; gap: 6px; }
 @media (max-width: 760px) {
-  .track { grid-template-columns: 12px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
+  .track { grid-template-columns: 18px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
   .track > :last-child { grid-row: 1; grid-column: 5; }
   .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
   .yt { flex-direction: column; }
@@ -525,7 +524,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <a class="backkey" href="#setup"><span class="keycap">←</span><span class="lbl">Setup</span></a>
       <h1 class="title" id="playTitle"></h1>
       <span class="kb"><span class="keycap">Space</span>start / stop</span>
-      <button class="btn dark" id="startBtn" type="button"><span class="pp" aria-hidden="true" hidden></span><span class="lbl">Start</span></button>
+      <button class="btn dark" id="startBtn" type="button"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true" hidden><path/><path/></svg><span class="lbl">Start</span></button>
     </div>
     <div class="songbar" id="songBar" hidden>
       <button class="btn sm" id="kBack" type="button">−5 s</button>
@@ -674,10 +673,11 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
       <div class="transport-row">
-        <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><span class="pp" aria-hidden="true"></span></button>
+        <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
         <button class="btn sm" id="pFwd" type="button" aria-label="Forward 5 seconds">+5 s</button>
         <output id="pTime">0:00 / 0:00</output>
+        <label class="mvol"><input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume"></label>
         <span class="kb"><span class="keycap">Space</span>play / pause</span>
       </div>
       <div class="tracks" id="pTracks"></div>
@@ -1543,6 +1543,23 @@ function initTimbre() {
 }
 
 // ---------- stems ----------
+// Icons: Hugeicons, stroke rounded (hugeicons.com, MIT). The <svg> gets the stroke settings from .ico.
+const ICONS = {
+  vocals: '<path d="M19.7836 10.5355C17.831 12.4882 14.6651 12.4882 12.7125 10.5355C10.7599 8.58291 10.7599 5.41709 12.7125 3.46447C14.6651 1.51184 17.831 1.51184 19.7836 3.46447C21.7362 5.41709 21.7362 8.58291 19.7836 10.5355Z"/><path d="M11.2538 8L4.83517 15.3889C4.75179 15.4848 4.7101 15.5328 4.67652 15.5761C4.08338 16.3395 4.12122 17.4179 4.76642 18.1379C4.80295 18.1786 4.8479 18.2236 4.9378 18.3135C5.02765 18.4033 5.0726 18.4483 5.11335 18.4848C5.83313 19.1298 6.91119 19.1679 7.67463 18.5751C7.71785 18.5416 7.76584 18.4999 7.86182 18.4166L15.2538 12"/><path d="M4.80431 18.5L4.71852 18.5858C3.26547 20.0388 2.53894 20.7654 2.79464 21.3827C3.05034 22 4.07781 22 6.13274 22H13.3043"/>',
+  drums: '<path d="M14 4.1239C13.3568 4.04281 12.6874 4 12 4C7.02944 4 3 6.23858 3 9C3 11.7614 7.02944 14 12 14C16.9706 14 21 11.7614 21 9C21 8.65753 20.938 8.32311 20.82 8"/><path d="M21 9V16C21 18.7614 16.9706 21 12 21C7.02944 21 3 18.7614 3 16V9"/><path d="M8 14V20"/><path d="M16 14V20"/><path d="M12 9.5L21 3"/>',
+  guitar: '<path d="M18.0029 6.00049L13.6748 10.3301"/><path d="M11.5675 15.2239C10.7949 15.9962 9.54238 15.9962 8.76984 15.2239C7.99729 14.4517 7.99729 13.1996 8.76984 12.4273C9.54238 11.6551 10.7949 11.6551 11.5675 12.4273C12.34 13.1996 12.34 14.4517 11.5675 15.2239Z"/><path d="M5.98828 16.6216L7.38709 18.0199"/><path d="M9.56292 7.94818C8.84611 8.66473 8.48771 9.023 8.40162 9.08719C8.09753 9.31393 8.32517 9.19714 7.96359 9.31192C7.86123 9.34441 7.49363 9.40483 6.75844 9.52566C5.71822 9.69663 4.75154 10.161 3.98531 10.9269C1.80353 13.1079 0.685178 15.5243 4.58186 19.4195C8.47854 23.3148 10.8958 22.1968 13.0776 20.0158C13.8438 19.2499 14.3083 18.2836 14.4793 17.2437C14.6002 16.5088 14.6606 16.1413 14.6932 16.039C14.808 15.6776 14.6911 15.9051 14.918 15.6012C14.9822 15.5151 15.3406 15.1568 16.0574 14.4403C17.6928 12.8055 18.5557 11.0155 15.7723 8.23313C12.989 5.45077 11.1983 6.31341 9.56292 7.94818Z"/><path d="M21.5134 4.50448L20.5045 5.51344C20.3957 5.62225 20.3413 5.67665 20.2907 5.71771C19.8274 6.0941 19.1636 6.0941 18.7003 5.71771C18.6498 5.67665 18.5954 5.62224 18.4866 5.51344C18.3778 5.40464 18.3233 5.35024 18.2823 5.29969C17.9059 4.83636 17.9059 4.17261 18.2823 3.70927C18.3233 3.65872 18.3778 3.60432 18.4866 3.49552L19.4955 2.48656C19.6043 2.37775 19.6587 2.32335 19.7093 2.28229C20.1726 1.9059 20.8364 1.9059 21.2997 2.28229C21.3502 2.32335 21.4046 2.37775 21.5134 2.48656C21.6222 2.59535 21.6767 2.64976 21.7177 2.70031C22.0941 3.16364 22.0941 3.82739 21.7177 4.29073C21.6767 4.34128 21.6222 4.39568 21.5134 4.50448Z"/>',
+  piano: '<circle cx="6.5" cy="18.5" r="3.5"/><circle cx="18" cy="16" r="3"/><path d="M10 18.5L10 7C10 6.07655 10 5.61483 10.2635 5.32794C10.5269 5.04106 11.0175 4.9992 11.9986 4.91549C16.022 4.57222 18.909 3.26005 20.3553 2.40978C20.6508 2.236 20.7986 2.14912 20.8993 2.20672C21 2.26432 21 2.4315 21 2.76587V16"/><path d="M10 10C15.8667 10 19.7778 7.66667 21 7"/>',
+  other: '<path d="M7 9.5C7 10.8807 5.88071 12 4.5 12C3.11929 12 2 10.8807 2 9.5C2 8.11929 3.11929 7 4.5 7C5.88071 7 7 8.11929 7 9.5ZM7 9.5V2C7.33333 2.5 7.6 4.6 10 5"/><circle cx="10.5" cy="19.5" r="2.5"/><circle cx="20" cy="18" r="2"/><path d="M13 19.5L13 11C13 10.09 13 9.63502 13.2466 9.35248C13.4932 9.06993 13.9938 9.00163 14.9949 8.86504C18.0085 8.45385 20.2013 7.19797 21.3696 6.42937C21.6498 6.24509 21.7898 6.15295 21.8949 6.20961C22 6.26627 22 6.43179 22 6.76283V17.9259"/><path d="M13 13C17.8 13 21 10.6667 22 10"/>',
+  click: '<path d="M14.0073 6L13.7349 4.91043C13.5833 4.30398 13.5075 4.00075 13.3905 3.74637C12.9843 2.86326 12.1754 2.2317 11.2201 2.05182C10.945 2 10.6324 2 10.0073 2C9.38217 2 9.06961 2 8.79444 2.05182C7.83919 2.2317 7.0303 2.86326 6.6241 3.74637C6.50709 4.00075 6.43129 4.30398 6.27968 4.91043L3.87108 14.5448C3.01314 17.9766 2.58416 19.6925 3.48499 20.8462C4.38583 22 6.15453 22 9.69194 22H10.3226C13.86 22 15.6287 22 16.5296 20.8462C17.2402 19.9361 17.1233 18.6761 16.6211 16.5"/><path d="M10.0078 13.5V6"/><path d="M10.0078 18L17.0078 11"/><circle cx="18.5078" cy="9.5" r="2"/><path d="M20.0078 8L21.0078 7"/>',
+  volume: '<path d="M14 14.8135V9.18646C14 6.04126 14 4.46866 13.0747 4.0773C12.1494 3.68593 11.0603 4.79793 8.88232 7.02192C7.75439 8.17365 7.11085 8.42869 5.50604 8.42869C4.10257 8.42869 3.40084 8.42869 2.89675 8.77262C1.85035 9.48655 2.00852 10.882 2.00852 12C2.00852 13.118 1.85035 14.5134 2.89675 15.2274C3.40084 15.5713 4.10257 15.5713 5.50604 15.5713C7.11085 15.5713 7.75439 15.8264 8.88232 16.9781C11.0603 19.2021 12.1494 20.3141 13.0747 19.9227C14 19.5313 14 17.9587 14 14.8135Z"/><path d="M17 9C17.6254 9.81968 18 10.8634 18 12C18 13.1366 17.6254 14.1803 17 15"/><path d="M20 7C21.2508 8.36613 22 10.1057 22 12C22 13.8943 21.2508 15.6339 20 17"/>',
+};
+ICONS.bass = ICONS.guitar; // the set has no bass guitar
+function icon(name) {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "ico"); s.setAttribute("aria-hidden", "true");
+  s.innerHTML = ICONS[name] || ICONS.other;
+  return s;
+}
 const STEM_COLORS = { vocals: "#2F6BFF", drums: "#E0484E", bass: "#7A5AF8", guitar: "#D99A1E", piano: "#1FA971", other: "#8A8F98", click: "var(--ink)" };
 const STEM_NOTES = { vocals: "lead and backing voices", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
 const P = { song: null, buffers: {}, tracks: {}, playing: false, startAt: 0, offset: 0, sources: [], peaks: null, bus: null, clickNext: 0 };
@@ -1719,6 +1736,7 @@ async function videoFetched(songId, ok) {
   $("#pVideo").src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
   paintVideo();
 }
+let stemVol = store.get("stemVol", 1); // the whole song's volume, on top of each track's
 let showVideo = false; // hidden whenever a song opens; Show video brings it up (it loads in the background meanwhile)
 function paintVideo() {
   const has = !!(P.song && P.song.video);
@@ -1754,7 +1772,7 @@ function playSong() {
   if (!P.song || !Object.keys(P.buffers).length) return;
   ensureCtx();
   if (P.offset >= songDur() - 0.05) P.offset = 0;
-  P.bus = ac.createGain(); P.bus.connect(master);
+  P.bus = ac.createGain(); P.bus.gain.value = stemVol; P.bus.connect(master);
   const at = ac.currentTime + 0.06;
   P.sources = [];
   for (const [name, buf] of Object.entries(P.buffers)) {
@@ -1767,7 +1785,36 @@ function playSong() {
   const beats = P.song.beats || []; P.clickNext = beats.findIndex((b) => b >= P.offset); if (P.clickNext < 0) P.clickNext = beats.length;
   paintPlay($("#pPlay"), true);
 }
-function paintPlay(b, playing) { b.classList.toggle("on", playing); b.setAttribute("aria-label", playing ? "Pause" : "Play"); }
+function paintPlay(b, playing) { ppTo(b.querySelector(".pp"), playing ? 1 : 0); b.setAttribute("aria-label", playing ? "Pause" : "Play"); }
+// Play ⇄ pause: the triangle is two halves (corners listed in the same order as the bars') that square off into the
+// pause bars and back. Coordinates are the shapes' cores; the round-joined stroke adds 1.25 all round.
+const PP = {
+  play: [[[2.4, 1.6], [7, 4.49], [7, 11.51], [2.4, 14.4]], [[7, 4.49], [12.6, 8], [12.6, 8], [7, 11.51]]],
+  pause: [[[2.2, 1.6], [4.2, 1.6], [4.2, 14.4], [2.2, 14.4]], [[9.8, 1.6], [11.8, 1.6], [11.8, 14.4], [9.8, 14.4]]],
+};
+const ppState = new WeakMap(); // svg -> { t: 0 play … 1 pause, to, raf }
+function ppDraw(svg, t) {
+  svg.querySelectorAll("path").forEach((p, i) => p.setAttribute("d", "M" + PP.play[i].map(([x, y], j) => {
+    const [x2, y2] = PP.pause[i][j];
+    return `${(x + (x2 - x) * t).toFixed(2)} ${(y + (y2 - y) * t).toFixed(2)}`;
+  }).join("L") + "Z"));
+}
+function ppTo(svg, to) {
+  const s = ppState.get(svg) || { t: to, to: null, raf: 0 };
+  ppState.set(svg, s);
+  if (s.to === to) return;
+  s.to = to; cancelAnimationFrame(s.raf);
+  const from = s.t, t0 = performance.now(), dur = 320 * Math.abs(to - from);
+  if (!dur || matchMedia("(prefers-reduced-motion: reduce)").matches) { s.t = to; ppDraw(svg, to); return; }
+  const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(2 - 2 * k, 3) / 2);
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur);
+    s.t = from + (to - from) * ease(k); ppDraw(svg, s.t);
+    if (k < 1) s.raf = requestAnimationFrame(step);
+  };
+  s.raf = requestAnimationFrame(step);
+}
+document.querySelectorAll(".pp").forEach((svg) => ppTo(svg, 0));
 function pauseSong() {
   if (!P.playing) return;
   P.offset = songPos(); P.playing = false;
@@ -1835,7 +1882,7 @@ function renderTracks() {
   const box = $("#pTracks"); box.innerHTML = "";
   for (const [name, t] of Object.entries(P.tracks)) {
     const row = el("div", "track" + (audible(name) ? "" : " off")); row.dataset.name = name;
-    const dot = el("span", "dot"); dot.style.background = STEM_COLORS[name] || "#999";
+    const dot = icon(name); dot.style.color = STEM_COLORS[name] || "#999";
     const bpm = P.song.bpm, isClick = name === "click";
     const title = isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : name[0].toUpperCase() + name.slice(1);
     const note = isClick ? (bpm ? `click · ${t.bpb}/4 · follows the song’s beat` : "click") : STEM_NOTES[name] || "";
@@ -1896,6 +1943,10 @@ function initStems() {
     catch (err) { b.disabled = false; if (P.song && P.song.id === songId) videoWait(err.message, true); }
   };
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
+  $(".mvol").prepend(icon("volume"));
+  $("#pVol").value = stemVol;
+  $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
+  resetOnDblClick($("#pVol"), 1);
   const v = $("#pVideo");
   v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
   v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));
@@ -2402,9 +2453,10 @@ function renderHudRep(now) {
 }
 function renderStart() {
   const b = $("#startBtn");
-  b.querySelector(".pp").hidden = !K.on; b.querySelector(".lbl").hidden = K.on; b.classList.toggle("round", K.on);
+  b.querySelector(".pp").toggleAttribute("hidden", !K.on); // an <svg> has no .hidden property
+  b.querySelector(".lbl").hidden = K.on; b.classList.toggle("round", K.on);
   if (K.on) { paintPlay(b, P.playing); return; }
-  b.classList.remove("on"); b.removeAttribute("aria-label");
+  b.removeAttribute("aria-label");
   b.querySelector(".lbl").textContent = run ? "Stop" : "Start";
 }
 function renderPiano() {
