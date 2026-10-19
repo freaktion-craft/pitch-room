@@ -2246,12 +2246,6 @@ function songView(snap) {
   if (hi - lo < 13) { const c = (lo + hi) / 2; lo = c - 6.5; hi = c + 6.5; }
   if (snap) { vLo = lo; vHi = hi; } else { vLo += (lo - vLo) * 0.07; vHi += (hi - vHi) * 0.07; } // eases only after an octave change
 }
-// pick the octave that puts the song's middle closest to the middle of the singer's comfortable notes
-function suggestOctave(range) {
-  if (!range) return 0;
-  const mid = (range[0] + range[1]) / 2, mine = (Math.min(S.lo, S.hi) + Math.max(S.lo, S.hi) + 7) / 2;
-  return [-1, 0, 1].reduce((best, o) => (Math.abs(mid + 12 * o - mine) < Math.abs(mid + 12 * best - mine) ? o : best), 0);
-}
 // btn: the button that started it, which says what's happening meanwhile (reading a song's melody the first time
 // takes several seconds) and shows any error.
 async function singSong(m, btn) {
@@ -2272,7 +2266,7 @@ async function singSong(m, btn) {
     return;
   } finally { if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
   say(was);
-  K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = suggestOctave(mel.range); K.on = true;
+  K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = 0; K.on = true; // bars as sung; "Bars" moves them an octave
   K.entries = songEntries(K.notes, m.beats, m.bpm);
   songEvs(); songView(true);
   if (P.tracks.vocals) { P.tracks.vocals.mute = false; P.tracks.vocals.solo = false; P.tracks.vocals.vol = K.guideVol; }
