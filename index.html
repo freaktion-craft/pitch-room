@@ -54,9 +54,9 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 :focus-visible { outline: 2px solid var(--voice); outline-offset: 2px; border-radius: 6px; }
 
-.app { max-width: 848px; margin: 0 auto; padding-block: 24px 64px;
+/* One width for every page, so the header and column edges don't jump when switching views */
+.app { max-width: 1240px; margin: 0 auto; padding-block: 24px 64px;
   padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
-.app.wide { max-width: 1180px; }
 
 /* Top nav: numbered segmented pill + mic chip */
 header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
@@ -2134,7 +2134,6 @@ function route() {
   const v = (location.hash || "#pick").slice(1);
   view = ["pick", "setup", "play", "timbre", "stems"].includes(v) ? v : "pick";
   $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vTimbre").hidden = view !== "timbre"; $("#vStems").hidden = view !== "stems";
-  $("#app").classList.toggle("wide", view === "play" || view === "timbre" || view === "stems");
   if (view !== "stems" && !(view === "play" && K.on) && P.playing) pauseSong();
   if (view === "stems") stemsRefresh();
   if (view !== "timbre" && rec) rec.stop();
