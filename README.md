@@ -45,6 +45,8 @@ Compare like with like: same note, same vowel, same mic. Vocals pulled from a re
 - waveform overview to jump around, Space to play / pause,
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that stem.
 
+**Sing along** — any separated song with vocals becomes a practice track. The lead melody is read from the vocal stem (Praat pitch tracking, cut into notes), so note bars scroll in just like the exercises while the instrumental plays. The original vocal stays on as a **guide** with its own volume, and the singer's actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top. Switch the bars an octave up or down if the song sits outside your range — the app suggests one from your voice type. Start it from **Sing along** in the Stems player or from **Your songs** at the top of Practice › Pick.
+
 Songs are kept in `library/` so they open instantly next time. The first time you open Stems, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp — about 1–2 GB, into `.venv`). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, under a minute on an NVIDIA GPU, several minutes on a CPU.
 
 **GPU:** on Windows and Linux the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the Stems page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
@@ -59,6 +61,7 @@ Only use audio you have the right to use; downloading from YouTube may go agains
 | `server.py` | Serves the page and the `/api/analyze` endpoint |
 | `analyze.py` | Voice measurements with parselmouth + numpy |
 | `stems.py` | Downloads, stem separation, beat tracking, MP3 export (jobs run in the background) |
+| `melody.py` | Lead-melody notes and pitch contour from the vocal stem, for sing-along |
 | `launch.py` | Installs packages, finds a free port, starts the server, opens Chrome |
 | `start-*` | One-click launchers per OS |
 

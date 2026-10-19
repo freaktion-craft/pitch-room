@@ -361,6 +361,9 @@ def _pipeline(job, src: dict, model_name: str):
             _set(job, stage="Finding the beat", progress=0.86)
             drums = stems[names.index("drums")].mean(0) if "drums" in names else wav.mean(0)
             bpm, beats = _beats(drums, wav.mean(0), dur)
+            if "vocals" in names:
+                _set(job, stage="Reading the vocal melody", progress=0.88)
+                _save_melody(folder, stems[names.index("vocals")].mean(0))
             _set(job, stage="Saving tracks", progress=0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):
@@ -374,6 +377,31 @@ def _pipeline(job, src: dict, model_name: str):
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
+
+
+# ---------- melody (sing-along) ----------
+def _save_melody(folder: str, vocals_mono: np.ndarray) -> dict:
+    import melody
+    data = melody.extract(vocals_mono)
+    with open(os.path.join(folder, "melody.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, separators=(",", ":"))
+    return data
+
+
+def get_melody(song_id: str) -> dict:
+    """Cached melody.json, computed from the vocal stem the first time (songs separated before sing-along existed)."""
+    folder = _song_dir(song_id)
+    path = os.path.join(folder, "melody.json")
+    if os.path.isfile(path):
+        import melody
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("v") == melody.VERSION:
+            return data
+    vocals = os.path.join(folder, "vocals.mp3")
+    if not os.path.isfile(vocals):
+        raise ValueError("This song has no vocal track to sing along with.")
+    return _save_melody(folder, _decode_stereo(vocals).mean(0))
 
 
 # ---------- export ----------
