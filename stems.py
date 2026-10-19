@@ -417,7 +417,7 @@ def _pipeline(job, src: dict, model_name: str):
                 key = None
             if "vocals" in names:
                 _set(job, stage="Reading the vocal melody", progress=0.88)
-                _save_melody(folder, stems[names.index("vocals")].mean(0))
+                _save_melody(folder, stems[names.index("vocals")].mean(0), stems[names.index("drums")].mean(0) if "drums" in names else None)
             _set(job, stage="Saving tracks", progress=0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):
@@ -483,9 +483,9 @@ def song_info(song_id: str) -> dict:
 
 
 # ---------- melody (sing-along) ----------
-def _save_melody(folder: str, vocals_mono: np.ndarray) -> dict:
+def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | None = None) -> dict:
     import melody
-    data = melody.extract(vocals_mono)
+    data = melody.extract(vocals_mono, drums=drums_mono)
     with open(os.path.join(folder, "melody.json"), "w", encoding="utf-8") as f:
         json.dump(data, f, separators=(",", ":"))
     return data
@@ -504,7 +504,8 @@ def get_melody(song_id: str) -> dict:
     vocals = os.path.join(folder, "vocals.mp3")
     if not os.path.isfile(vocals):
         raise ValueError("This song has no vocal track to sing along with.")
-    return _save_melody(folder, _decode_stereo(vocals).mean(0))
+    drums = os.path.join(folder, "drums.mp3")
+    return _save_melody(folder, _decode_stereo(vocals).mean(0), _decode_stereo(drums).mean(0) if os.path.isfile(drums) else None)
 
 
 # ---------- export ----------

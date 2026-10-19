@@ -11,7 +11,7 @@ import numpy as np
 
 SR = 44100
 STEP = 0.01  # 10 ms frames
-VERSION = 4  # bump when the extraction changes so cached melody.json files are rebuilt
+VERSION = 5  # bump when the extraction changes so cached melody.json files are rebuilt
 # Shorter blips are consonants and slides. 80 ms keeps quick syllables: at 127 BPM a 16th note is 118 ms, and a
 # 150 ms floor left about 40% of the sung time on one test song without a bar.
 MIN_NOTE = 0.08
@@ -45,8 +45,9 @@ def _median_filter(x: np.ndarray, k: int) -> np.ndarray:
     return np.array([np.median(xp[i:i + k]) for i in range(len(x))])
 
 
-def extract(vocals: np.ndarray, a4: float = 440.0) -> dict:
-    """vocals: mono float32 at 44.1 kHz. Returns notes [[t0, t1, midi]], a contour [[t, midi|None]] and the range."""
+def extract(vocals: np.ndarray, a4: float = 440.0, drums: np.ndarray | None = None) -> dict:
+    """vocals (and the drum stem, if there is one): mono float32 at 44.1 kHz.
+    Returns notes [[t0, t1, midi]], a contour [[t, midi|None]] and the range."""
     t, f0 = _track(vocals)
 
     # loudness gate: keep frames within 30 dB of the loud singing
@@ -114,7 +115,18 @@ def extract(vocals: np.ndarray, a4: float = 440.0) -> dict:
     # Notes more than 24 dB under are breaths and bleed the tracker took for voice, like a stray C♯2 an octave
     # below everything else.
     quiet = lambda nt: np.median(db[(t >= nt[0]) & (t < nt[1])]) < ref - 24  # noqa: E731
-    merged = [nt for nt in merged if nt[1] - nt[0] >= MIN_NOTE and not quiet(nt)]
+
+    def bleed(nt):
+        """A short note where the drum stem is over 10 dB louder than the vocal stem: a drum hit leaking into the
+        vocals. On a test song real notes reached 9 dB (99th percentile); a hit on the downbeat that read as a G♯4
+        an octave above the singing was at 22 dB."""
+        if drums is None or nt[1] - nt[0] >= 0.25:
+            return False
+        a, b = int(nt[0] * SR), int(nt[1] * SR)
+        rms = lambda x: np.sqrt(np.mean(x[a:b] ** 2)) + 1e-9  # noqa: E731
+        return 20 * np.log10(rms(drums) / rms(vocals)) > 10
+
+    merged = [nt for nt in merged if nt[1] - nt[0] >= MIN_NOTE and not quiet(nt) and not bleed(nt)]
 
     contour = [[round(float(t[k]), 2), None if np.isnan(sm[k]) else round(float(sm[k]), 2)] for k in range(0, n, 2)]
     # collapse runs of silence to keep the file small
