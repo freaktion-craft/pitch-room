@@ -13,8 +13,43 @@ import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, urlparse
 
-import stems
-from analyze import analyze, decode
+
+def _dll_version(path):
+    import ctypes
+    v = ctypes.windll.version
+    size = v.GetFileVersionInfoSizeW(path, None)
+    if not size:
+        return ()
+    buf = ctypes.create_string_buffer(size)
+    v.GetFileVersionInfoW(path, 0, size, buf)
+    info, n = ctypes.c_void_p(), ctypes.c_uint()
+    if not v.VerQueryValueW(buf, "\\", ctypes.byref(info), ctypes.byref(n)):
+        return ()
+    ms, ls = ctypes.cast(info, ctypes.POINTER(ctypes.c_uint32 * 4)).contents[2:4]  # VS_FIXEDFILEINFO file version
+    return (ms >> 16, ms & 0xFFFF, ls >> 16, ls & 0xFFFF)
+
+
+def _prefer_newer_vc_runtime():
+    """Anaconda's Python on Windows keeps an old Visual C++ runtime next to python.exe, and current PyTorch can't
+    start on it (WinError 1114 loading c10.dll), which broke the Stems page. When the system's copy is newer, load it
+    first. This must run before numpy, parselmouth or torch load the runtime: once loaded, a DLL can't be swapped."""
+    if os.name != "nt":
+        return
+    sys32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    for name in ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"):
+        mine, system = os.path.join(sys.base_prefix, name), os.path.join(sys32, name)
+        try:
+            if os.path.isfile(mine) and os.path.isfile(system) and _dll_version(system) > _dll_version(mine):
+                import ctypes
+                ctypes.WinDLL(system)
+        except OSError:
+            pass
+
+
+_prefer_newer_vc_runtime()
+
+import stems  # noqa: E402  (after the runtime fix above)
+from analyze import analyze, decode  # noqa: E402
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 MAX_UPLOAD = 40 * 1024 * 1024
@@ -64,6 +99,16 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if not path.startswith("/api/"):
+            return super().do_GET()
+        try:
+            return self._get_api(path)
+        except Exception as e:  # noqa: BLE001
+            # answer instead of dropping the connection, so the page can say what failed rather than "server not running"
+            traceback.print_exc()
+            return self._json(500, {"error": f"{e.__class__.__name__}: {e}"})
+
+    def _get_api(self, path):
         if path == "/api/health":
             return self._json(200, {"ok": True, "app": "pitch-room"})
         if path == "/api/stems/status":

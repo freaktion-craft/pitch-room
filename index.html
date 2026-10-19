@@ -602,6 +602,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <p class="lede">Split a song into vocals, drums, bass and the rest. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
     </div>
     <p class="server-off" id="sServer" hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
+    <p class="server-off" id="sErr" hidden></p>
 
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
@@ -1515,10 +1516,15 @@ const fmtTime = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:
 let stemsStatus = null, pollers = {};
 
 async function stemsRefresh() {
-  let st = null;
-  try { const r = await fetch("/api/stems/status", { cache: "no-store" }); st = r.ok ? await r.json() : null; } catch (e) { st = null; }
+  let st = null, err = null; // err: the server answered but the check failed, which is not "server not running"
+  try {
+    const r = await fetch("/api/stems/status", { cache: "no-store" });
+    if (r.ok) st = await r.json(); else err = (await r.json().catch(() => ({}))).error || `HTTP ${r.status}`;
+  } catch (e) { st = null; }
   stemsStatus = st;
-  $("#sServer").hidden = !!st;
+  $("#sServer").hidden = !!st || !!err;
+  $("#sErr").hidden = !err;
+  if (err) $("#sErr").textContent = `The server is running, but checking the stem tools failed: ${err}. The terminal window has the details.`;
   $("#sInstall").hidden = !st || st.installed;
   $("#sAdd").hidden = !st || !st.installed;
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
