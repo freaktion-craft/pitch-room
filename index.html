@@ -1235,6 +1235,11 @@ function stepRoots(st) {
   return st.reps ? roots.slice(0, st.reps) : roots;
 }
 function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+// Double-click a slider to put it back where it started (runs its own oninput, so everything that listens updates)
+function resetOnDblClick(input, def) {
+  input.title = "Double-click to reset";
+  input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
+}
 function refsBlock(ids) {
   const used = new Set(ids);
   const d = el("details", "refs"); d.append(el("summary", null, "Research"));
@@ -1783,6 +1788,7 @@ function renderTracks() {
     m.onclick = () => { t.mute = !t.mute; applyGains(); renderTracks(); };
     s.onclick = () => { t.solo = !t.solo; applyGains(); renderTracks(); };
     v.oninput = () => { t.vol = +v.value; applyGains(); };
+    resetOnDblClick(v, name === "click" ? 0.7 : 1);
     let last;
     if (name === "click") {
       last = el("div", "clickopts");
@@ -1890,6 +1896,7 @@ function initSing() {
   $("#kOct").onchange = (e) => { K.oct = +e.target.value; songEvs(); };
   $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; if (P.tracks.vocals) { P.tracks.vocals.vol = K.guideVol; applyGains(); } };
   $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== "vocals" && n !== "click") t.vol = K.bandVol; applyGains(); };
+  resetOnDblClick($("#kGuide"), 0.5); resetOnDblClick($("#kBand"), 1);
   $("#kClick").onclick = () => { const c = P.tracks.click; c.mute = !c.mute; $("#kClick").setAttribute("aria-pressed", String(!c.mute)); applyGains(); };
   $("#kBack").onclick = () => { K.hist = []; seekSong(songPos() - 5); };
   $("#kFwd").onclick = () => { K.hist = []; seekSong(songPos() + 5); };
