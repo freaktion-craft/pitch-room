@@ -4,7 +4,7 @@ Songs live in ./library/<id>/ :
     source.*        the original audio (upload or YouTube download)
     video.*         the picture of a YouTube video, no sound (shown above the player to follow lyrics)
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
-    meta.json       title, duration, bpm, beat times, stems, model
+    meta.json       title, duration, bpm, beat times, key, stems, model
 
 Heavy packages (torch, demucs, librosa, yt-dlp) are optional and installed from the
 page on first use, so the base app stays small.
@@ -410,6 +410,11 @@ def _pipeline(job, src: dict, model_name: str):
             _set(job, stage="Finding the beat", progress=0.86)
             drums = stems[names.index("drums")].mean(0) if "drums" in names else wav.mean(0)
             bpm, beats = _beats(drums, wav.mean(0), dur)
+            _set(job, stage="Finding the key", progress=0.87)
+            try:
+                key = _key(sum(stems[i].mean(0) for i, n in enumerate(names) if n != "drums"))
+            except Exception:  # noqa: BLE001  (the song works without it)
+                key = None
             if "vocals" in names:
                 _set(job, stage="Reading the vocal melody", progress=0.88)
                 _save_melody(folder, stems[names.index("vocals")].mean(0))
@@ -419,13 +424,56 @@ def _pipeline(job, src: dict, model_name: str):
                 _encode_mp3(stems[names.index(name)], os.path.join(folder, name + ".mp3"))
                 _set(job, progress=0.9 + 0.09 * (i + 1) / len(order))
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
-                    "stems": order, "model": model_name, "created": time.time(), "video": video}
+                    "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
             with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
                 json.dump(meta, f, ensure_ascii=False)
             _set(job, songId=song_id)
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
+
+
+# ---------- key ----------
+# Krumhansl–Kessler key profiles (Krumhansl 1990, Cognitive Foundations of Musical Pitch), from C.
+KK_MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+KK_MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+
+
+def _key(mono: np.ndarray) -> dict:
+    """Most likely key of the pitched stems (drums left out): the song's average chroma correlated with each of the
+    24 rotated profiles. pc: tonic pitch class (0 = C); r: the correlation; alt: the runner-up, often the relative key."""
+    import librosa
+    y = librosa.resample(mono.astype(np.float32), orig_sr=SR, target_sr=22050)
+    chroma = librosa.feature.chroma_cqt(y=y, sr=22050, hop_length=4096).mean(axis=1)
+    scores = sorted(((float(np.corrcoef(chroma, np.roll(prof, pc))[0, 1]), pc, mode)
+                     for mode, prof in (("major", KK_MAJOR), ("minor", KK_MINOR)) for pc in range(12)), reverse=True)
+    (r, pc, mode), (r2, pc2, mode2) = scores[0], scores[1]
+    return {"pc": pc, "mode": mode, "r": round(r, 3), "alt": {"pc": pc2, "mode": mode2, "r": round(r2, 3)}}
+
+
+def song_info(song_id: str) -> dict:
+    """meta.json without the beat list, plus the vocal range. Songs added before keys were read get theirs worked out
+    (a few seconds) and saved the first time."""
+    folder = _song_dir(song_id)
+    path = os.path.join(folder, "meta.json")
+    if not os.path.isfile(path):
+        raise ValueError("Unknown song.")
+    with open(path, encoding="utf-8") as f:
+        meta = json.load(f)
+    tonal = [n for n in meta.get("stems", []) if n != "drums"]
+    if "key" not in meta and tonal and importlib.util.find_spec("librosa"):
+        parts = [_decode_stereo(os.path.join(folder, n + ".mp3")).mean(0) for n in tonal]
+        n = min(len(p) for p in parts)
+        meta["key"] = _key(sum(p[:n] for p in parts))
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False)
+    info = {k: v for k, v in meta.items() if k != "beats"}
+    info["beatCount"] = len(meta.get("beats") or [])
+    if "vocals" in meta.get("stems", []):
+        notes = get_melody(song_id)
+        ms = [x[2] for x in notes["notes"]]
+        info["vocals"] = {"lo": min(ms), "hi": max(ms), "mostly": notes.get("range")} if ms else None
+    return info
 
 
 # ---------- melody (sing-along) ----------

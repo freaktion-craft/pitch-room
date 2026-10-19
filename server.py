@@ -152,6 +152,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, job) if job else self._json(404, {"error": "Unknown job."})
         if path == "/api/library":
             return self._json(200, stems.library())
+        if path.startswith("/api/library/") and path.endswith("/info"):
+            try:
+                return self._json(200, stems.song_info(path.split("/")[3]))
+            except ValueError as e:
+                return self._json(422, {"error": str(e)})
         if path.startswith("/api/melody/"):
             try:
                 return self._json(200, stems.get_melody(path.rsplit("/", 1)[-1]))

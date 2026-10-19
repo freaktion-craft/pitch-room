@@ -382,9 +382,36 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .song small { color: var(--faint); font-size: 12.5px; }
 .song-actions { display: flex; gap: 6px; }
-/* the bin stays faint until you point at the song (always shown in full where there's no hover) */
+/* the ⋮ button stays faint until you point at the song (always shown in full where there's no hover) */
 #sLib .song-actions .btn { opacity: 0.3; transition: opacity 0.15s, background-color 0.15s, color 0.15s; }
-#sLib .row:hover .song-actions .btn, #sLib .song-actions .btn:focus-visible, #sLib .song-actions .btn[data-armed="1"] { opacity: 1; }
+#sLib .row:hover .song-actions .btn, #sLib .song-actions .btn:focus-visible, #sLib .song-actions .btn.open { opacity: 1; }
+#sLib .song-actions .btn.open { background: var(--fill); color: var(--ink); }
+.menu { position: fixed; z-index: 20; min-width: 168px; padding: 4px; border-radius: 10px; background: var(--surface); display: grid;
+  box-shadow: 0 0 0 1px var(--line), 0 10px 28px rgba(0, 0, 0, 0.18); }
+.menu button { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--ink); font-size: 13.5px; text-align: left; }
+.menu button:hover, .menu button:focus-visible { background: var(--fill); outline: none; }
+.menu .ico { width: 16px; height: 16px; color: var(--muted); }
+.menu .danger, .menu .danger .ico { color: var(--bad); }
+/* Info page */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 0; }
+.facts div { display: grid; align-content: start; gap: 6px; padding: 12px 14px; border-radius: 10px; background: var(--bg); }
+.facts dt { font-size: 12.5px; color: var(--muted); }
+.facts dd { margin: 0; font-size: 18px; font-weight: 500; }
+.facts dd small { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 400; color: var(--faint); }
+.info-range { display: grid; gap: 12px; }
+.info-range:empty { display: none; }
+.rbars { display: grid; gap: 10px; }
+.rbar { display: grid; grid-template-columns: 48px minmax(0, 1fr) 96px; align-items: center; gap: 12px; font-size: 13px; }
+.rbar .lane { position: relative; height: 10px; border-radius: 5px; background: var(--fill); }
+.rbar .lane i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.rbar .full { background: color-mix(in srgb, #2F6BFF 35%, transparent); }
+.rbar .core { background: #2F6BFF; }
+.rbar .you { background: var(--ink); }
+.rbar output { font: 12.5px var(--mono); color: var(--muted); text-align: right; }
+.rbar.axis .lane { height: 14px; background: none; }
+.rbar.axis .lane span { position: absolute; transform: translateX(-50%); font: 11px var(--mono); color: var(--faint); }
+.fine-note { margin: 0; font-size: 13.5px; }
 #sLib .song-actions .btn.icon { background: transparent; color: var(--muted); }
 #sLib .song-actions .btn.icon:hover { background: var(--fill); color: var(--ink); }
 @media (hover: none) { #sLib .song-actions .btn { opacity: 1; } }
@@ -679,6 +706,16 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     </section>
     </div>
 
+    <section class="panel-card info" id="sInfo" hidden>
+      <div class="player-head">
+        <div class="player-title"><b id="iTitle"></b><span class="muted" id="iSub"></span></div>
+        <div class="row-actions" id="iActs" hidden><a class="btn sm" id="iOpen" href="#stems">Open player</a><button class="btn sm dark" id="iSing" type="button">Sing along</button></div>
+      </div>
+      <p class="muted" id="iWait">Reading the song…</p>
+      <dl class="facts" id="iFacts"></dl>
+      <div class="info-range" id="iRange"></div>
+    </section>
+
     <section class="player" id="sPlayer" hidden>
       <div class="player-head">
         <div class="player-title"><b id="pTitle"></b><span class="muted" id="pMeta"></span></div>
@@ -700,6 +737,11 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <div class="tracks" id="pTracks"></div>
       <p class="muted export-state" id="pExportState"></p>
     </section>
+
+    <div class="menu" id="songMenu" role="menu" hidden>
+      <button type="button" role="menuitem" id="mInfo"><span>Info</span></button>
+      <button type="button" role="menuitem" class="danger" id="mDelete"><span>Delete</span></button>
+    </div>
   </main>
   <main id="vRange" aria-label="Voice type" hidden>
     <div class="intro">
@@ -1569,6 +1611,10 @@ const ICONS = {
   download: '<path d="M2.99969 17.0002C2.99969 17.9302 2.99969 18.3952 3.10192 18.7767C3.37932 19.8119 4.18796 20.6206 5.22324 20.898C5.60474 21.0002 6.06972 21.0002 6.99969 21.0002L16.9997 21.0002C17.9297 21.0002 18.3947 21.0002 18.7762 20.898C19.8114 20.6206 20.6201 19.8119 20.8975 18.7767C20.9997 18.3952 20.9997 17.9302 20.9997 17.0002"/><path d="M16.4998 11.5002C16.4998 11.5002 13.1856 16.0002 11.9997 16.0002C10.8139 16.0002 7.49976 11.5002 7.49976 11.5002M11.9997 15.0002V3.00016"/>',
   trash: '<path d="M19.5 5.5L18.8803 15.5251C18.7219 18.0864 18.6428 19.3671 18.0008 20.2879C17.6833 20.7431 17.2747 21.1273 16.8007 21.416C15.8421 22 14.559 22 11.9927 22C9.42312 22 8.1383 22 7.17905 21.4149C6.7048 21.1257 6.296 20.7408 5.97868 20.2848C5.33688 19.3626 5.25945 18.0801 5.10461 15.5152L4.5 5.5"/><path d="M3 5.5H21M16.0557 5.5L15.3731 4.09173C14.9196 3.15626 14.6928 2.68852 14.3017 2.39681C14.215 2.3321 14.1231 2.27454 14.027 2.2247C13.5939 2 13.0741 2 12.0345 2C10.9688 2 10.436 2 9.99568 2.23412C9.8981 2.28601 9.80498 2.3459 9.71729 2.41317C9.32164 2.7167 9.10063 3.20155 8.65861 4.17126L8.05292 5.5"/><path d="M9.5 16.5L9.5 10.5"/><path d="M14.5 16.5L14.5 10.5"/>',
 };
+Object.assign(ICONS, {
+  more: '<path d="M11.9967 12.5V12M11.9967 6.5V6M11.9967 18.5V18M12.9967 12.5C12.9967 11.9477 12.549 11.5 11.9967 11.5C11.4444 11.5 10.9967 11.9477 10.9967 12.5C10.9967 13.0523 11.4444 13.5 11.9967 13.5C12.549 13.5 12.9967 13.0523 12.9967 12.5ZM12.9967 6.5C12.9967 5.94772 12.549 5.5 11.9967 5.5C11.4444 5.5 10.9967 5.94772 10.9967 6.5C10.9967 7.05228 11.4444 7.5 11.9967 7.5C12.549 7.5 12.9967 7.05228 12.9967 6.5ZM12.9967 18.5C12.9967 17.9477 12.549 17.5 11.9967 17.5C11.4444 17.5 10.9967 17.9477 10.9967 18.5C10.9967 19.0523 11.4444 19.5 11.9967 19.5C12.549 19.5 12.9967 19.0523 12.9967 18.5Z"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16V12"/><path d="M12.125 8.25H12M12.25 8.25C12.25 8.11193 12.1381 8 12 8C11.8619 8 11.75 8.11193 11.75 8.25C11.75 8.38807 11.8619 8.5 12 8.5C12.1381 8.5 12.25 8.38807 12.25 8.25Z"/>',
+});
 ICONS.bass = ICONS.guitar; // the set has no bass guitar
 function icon(name) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1617,21 +1663,136 @@ async function renderLibrary() {
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     link.href = "#stems/" + m.id; link.append(el("b", null, m.title));
-    info.append(link, el("small", null, `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat"} · ${m.stems.length} tracks · ${new Date(m.created * 1000).toLocaleDateString()}`));
-    // composedPath, not e.target.closest: the delete button swaps its icon out on click, detaching the target
+    info.append(link, el("small", null, libLine(m)));
+    keyOf(m).then(() => { info.querySelector("small").textContent = libLine(m); });
     row.onclick = (e) => { if (!e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
     const acts = el("div", "song-actions");
-    // a bin icon; the first click asks "Really delete?" for 3 seconds, a second click deletes
-    const bin = () => { del.dataset.armed = ""; del.classList.add("icon"); del.setAttribute("aria-label", "Delete " + m.title); del.replaceChildren(icon("trash")); };
-    const del = mkBtn("", async () => {
-      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.classList.remove("icon"); del.removeAttribute("aria-label"); del.textContent = "Really delete?"; setTimeout(bin, 3000); return; }
-      await fetch(`/api/library/${m.id}/delete`, { method: "POST" });
-      if (P.song && P.song.id === m.id) closeSong();
-      renderLibrary();
-    });
-    del.title = "Delete"; bin();
-    acts.append(del); row.append(info, acts); box.append(row);
+    const more = mkBtn("", () => songMenu(more, m));
+    more.classList.add("icon"); more.title = "More"; more.setAttribute("aria-label", "More for " + m.title);
+    more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false"); more.append(icon("more"));
+    acts.append(more); row.append(info, acts); box.append(row);
   });
+}
+// Key names spelled the usual way for each key (D♭ major, C♯ minor).
+const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
+const KEY_MINOR = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"];
+const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${k.mode}` : "");
+const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : "no steady beat", keyName(m.key)].filter(Boolean);
+const libLine = (m) => [...songFacts(m), `${m.stems.length} tracks`, new Date(m.created * 1000).toLocaleDateString()].join(" · ");
+// Songs added before keys were read get theirs from /info, which works it out once (about a second) and saves it.
+const keyJobs = new Map();
+function keyOf(m) {
+  if ("key" in m) return Promise.resolve(m.key);
+  if (!keyJobs.has(m.id)) keyJobs.set(m.id, fetch(`/api/library/${m.id}/info`).then((r) => (r.ok ? r.json() : {})).then((s) => s.key).catch(() => undefined));
+  return keyJobs.get(m.id).then((k) => { if (k !== undefined) m.key = k; return k; });
+}
+
+// The library's ⋮ menu: Info, and Delete (which asks "Really delete?" first). One shared menu, placed under the button.
+let menuSong = null, menuBtn = null;
+function songMenu(btn, m) {
+  if (menuBtn === btn) { closeMenu(); return; }
+  closeMenu();
+  const menu = $("#songMenu"), del = $("#mDelete");
+  menuSong = m; menuBtn = btn; btn.setAttribute("aria-expanded", "true"); btn.classList.add("open");
+  del.dataset.armed = ""; del.querySelector("span").textContent = "Delete";
+  menu.hidden = false;
+  const r = btn.getBoundingClientRect();
+  menu.style.top = `${r.bottom + 4}px`; menu.style.left = `${Math.max(8, r.right - menu.offsetWidth)}px`;
+  $("#mInfo").focus();
+}
+function closeMenu() {
+  if (!menuBtn) return;
+  $("#songMenu").hidden = true; menuBtn.setAttribute("aria-expanded", "false"); menuBtn.classList.remove("open");
+  menuSong = null; menuBtn = null;
+}
+function initSongMenu() {
+  $("#mInfo").prepend(icon("info")); $("#mDelete").prepend(icon("trash"));
+  $("#mInfo").onclick = () => { const id = menuSong.id; closeMenu(); go(`stems/${id}/info`); };
+  $("#mDelete").onclick = async () => {
+    const b = $("#mDelete"), m = menuSong;
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.querySelector("span").textContent = "Really delete?"; return; }
+    closeMenu();
+    await fetch(`/api/library/${m.id}/delete`, { method: "POST" });
+    if (P.song && P.song.id === m.id) closeSong();
+    renderLibrary();
+  };
+  document.addEventListener("click", (e) => { if (menuBtn && !e.composedPath().some((n) => n === menuBtn || n === $("#songMenu"))) closeMenu(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuBtn) { const b = menuBtn; closeMenu(); b.focus(); } });
+  for (const ev of ["scroll", "resize", "hashchange"]) addEventListener(ev, closeMenu, { passive: true });
+}
+
+// Info page (#stems/<id>/info): key, tempo, length, the vocal range and how it sits against yours.
+async function renderInfo(id) {
+  const wait = $("#iWait");
+  $("#iTitle").textContent = ""; $("#iSub").replaceChildren(); $("#iFacts").replaceChildren(); $("#iRange").replaceChildren();
+  $("#iActs").hidden = true; wait.hidden = false; wait.textContent = "Reading the song…";
+  let s, lib;
+  try {
+    const r = await fetch(`/api/library/${id}/info`, { cache: "no-store" });
+    s = await r.json();
+    if (!r.ok) throw new Error(s.error || "Couldn’t read this song.");
+    lib = await (await fetch("/api/library", { cache: "no-store" })).json();
+  } catch (e) { wait.textContent = e.message; return; }
+  if (location.hash !== `#stems/${id}/info`) return;
+  const m = lib.find((x) => x.id === id) || s;
+  wait.hidden = true;
+  $("#iTitle").textContent = s.title;
+  const sub = $("#iSub"), src = s.source || "";
+  if (/^https?:\/\//.test(src)) { const a = el("a", null, "Source"); a.href = src; a.target = "_blank"; a.rel = "noopener"; sub.append(a, " · "); }
+  sub.append(`Added ${new Date(s.created * 1000).toLocaleDateString()} · ${{ htdemucs: "4 stems", htdemucs_6s: "6 stems" }[s.model] || s.model}`);
+  const fact = (label, value, note) => {
+    const d = el("div"); const dd = el("dd", null, value);
+    if (note) dd.append(el("small", null, note));
+    d.append(el("dt", null, label), dd); $("#iFacts").append(d);
+  };
+  if (s.key) {
+    const k = s.key, rel = k.mode === "major" ? { pc: (k.pc + 9) % 12, mode: "minor" } : { pc: (k.pc + 3) % 12, mode: "major" };
+    const close = k.alt && k.r - k.alt.r < 0.05 && !(k.alt.pc === rel.pc && k.alt.mode === rel.mode);
+    fact("Key", keyName(k), close ? `could also be ${keyName(k.alt)}` : `relative ${rel.mode}: ${keyName(rel)}`);
+  } else fact("Key", "–", s.key === null ? "no pitched tracks" : "not read yet");
+  fact("Tempo", s.bpm ? `${s.bpm} BPM` : "–", s.bpm ? null : "no steady beat found");
+  fact("Length", fmtTime(s.duration));
+  const v = s.vocals;
+  if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, `${v.hi - v.lo} semitones${v.mostly ? ` · mostly ${absName(v.mostly[0])}–${absName(v.mostly[1])}` : ""}`);
+  fact("Tracks", String(s.stems.length), s.stems.join(", "));
+  if (v) renderInfoRange(v);
+  $("#iOpen").href = `#stems/${id}`;
+  $("#iSing").hidden = !s.stems.includes("vocals");
+  $("#iSing").onclick = () => singSong(m);
+  $("#iActs").hidden = false;
+}
+// The melody's range (lighter: all of it, solid: where it mostly sits) above yours from the Voice type test.
+function renderInfoRange(v) {
+  const box = $("#iRange"), you = VT.lo != null && VT.hi != null ? { lo: VT.lo, hi: VT.hi } : null;
+  const lo = Math.min(v.lo, you ? you.lo : v.lo) - 2, hi = Math.max(v.hi, you ? you.hi : v.hi) + 2;
+  const at = (x) => `${((x - lo) / (hi - lo)) * 100}%`;
+  const bar = (name, text, spans) => {
+    const row = el("div", "rbar"), lane = el("div", "lane");
+    for (const [a, b, cls] of spans) { const i = el("i", cls); i.style.left = at(a); i.style.width = `calc(${at(b)} - ${at(a)})`; lane.append(i); }
+    row.append(el("span", null, name), lane, el("output", null, text)); return row;
+  };
+  const axis = el("div", "rbar axis"), ticks = el("div", "lane");
+  for (let x = Math.ceil(lo); x <= hi; x++) if (x % 12 === 0) { const t = el("span", null, absName(x)); t.style.left = at(x); ticks.append(t); }
+  axis.append(el("span"), ticks, el("output"));
+  box.append(el("div", "group-label minor", you ? "The song against your range" : "Where the melody sits"));
+  const bars = el("div", "rbars");
+  bars.append(bar("Song", `${absName(v.lo)}–${absName(v.hi)}`, [[v.lo, v.hi, "full"], ...(v.mostly ? [[v.mostly[0], v.mostly[1], "core"]] : [])]));
+  if (you) bars.append(bar("You", `${absName(you.lo)}–${absName(you.hi)}`, [[you.lo, you.hi, "you"]]));
+  bars.append(axis); box.append(bars);
+  if (!you) {
+    const p = el("p", "muted fine-note"), a = el("a", null, "Voice type"); a.href = "#range";
+    p.append("Find your range on the ", a, " tab to see how this song sits against it."); box.append(p); return;
+  }
+  // how many semitones of the melody fall outside your range, as written and an octave either way
+  const out = (o) => Math.max(0, you.lo - (v.lo + 12 * o)) + Math.max(0, v.hi + 12 * o - you.hi);
+  const best = [-1, 1].reduce((b, o) => (out(o) < out(b) ? o : b), 0);
+  const st = (n) => `${n} semitone${n > 1 ? "s" : ""}`;
+  const msg = out(0) === 0 ? "The whole melody sits inside your range."
+    : [v.hi > you.hi && `the top goes ${st(v.hi - you.hi)} above your highest note`, v.lo < you.lo && `the bottom goes ${st(you.lo - v.lo)} below your lowest`]
+      .filter(Boolean).join(", and ").replace(/^./, (c) => c.toUpperCase()) + ".";
+  const p = el("p", "fine-note", msg);
+  if (best !== 0) p.append(` An octave ${best < 0 ? "down" : "up"} it fits ${out(best) === 0 ? "entirely" : "better"}; Sing along can show the bars there.`);
+  box.append(p);
 }
 function jobCard(id) {
   let card = document.getElementById("job-" + id);
@@ -1714,7 +1875,8 @@ async function openSong(m) {
   P.song = m; P.offset = 0;
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
-  $("#pMeta").textContent = `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat found"} · loading tracks…`;
+  const meta = () => { $("#pMeta").textContent = [...songFacts(m), Object.keys(P.buffers).length ? `${m.stems.length} tracks` : "loading tracks…"].join(" · "); };
+  meta(); keyOf(m).then(() => { if (P.song === m) meta(); });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
   box.classList.remove("ready"); box.style.aspectRatio = ""; wait.classList.remove("err"); wait.textContent = "Loading video…";
@@ -1731,7 +1893,7 @@ async function openSong(m) {
   if (P.song !== m) return;
   P.buffers = Object.fromEntries(loaded);
   computePeaks();
-  $("#pMeta").textContent = `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat found"} · ${m.stems.length} tracks`;
+  meta();
   drawWave();
 }
 function closeSong() {
@@ -1967,6 +2129,7 @@ function initStems() {
   };
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
   $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
+  initSongMenu();
   $("#pVol").value = stemVol;
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
   resetOnDblClick($("#pVol"), 1);
@@ -2602,12 +2765,14 @@ function renderPick() {
 let view = "pick", lastPractice = "pick", stemsPage = "lib";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
 // Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
-function stemsRoute(sub) {
-  stemsPage = !sub ? "lib" : sub === "add" ? "add" : "song";
+function stemsRoute(sub, extra) {
+  stemsPage = !sub ? "lib" : sub === "add" ? "add" : extra === "info" ? "info" : "song";
   $("#sIntro").hidden = stemsPage !== "lib"; $("#sBack").hidden = stemsPage === "lib";
   $("#sLibPage").hidden = stemsPage !== "lib"; $("#sAddPage").hidden = stemsPage !== "add"; $("#sPlayer").hidden = stemsPage !== "song";
+  $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
   if (stemsPage === "song" && (!P.song || P.song.id !== sub)) openSongById(sub);
+  if (stemsPage === "info") renderInfo(sub);
 }
 async function openSongById(id) {
   let m = null;
@@ -2616,11 +2781,11 @@ async function openSongById(id) {
   if (m) openSong(m); else location.replace("#stems");
 }
 function route() {
-  const [v, sub] = (location.hash || "#pick").slice(1).split("/");
+  const [v, sub, extra] = (location.hash || "#pick").slice(1).split("/");
   view = ["pick", "setup", "play", "range", "timbre", "stems"].includes(v) ? v : "pick";
   $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vRange").hidden = view !== "range"; $("#vTimbre").hidden = view !== "timbre"; $("#vStems").hidden = view !== "stems";
   if (view === "range") renderRange(); else vtStop(false);
-  if (view === "stems") stemsRoute(sub);
+  if (view === "stems") stemsRoute(sub, extra);
   if (P.playing && !(view === "stems" && stemsPage === "song") && !(view === "play" && K.on)) pauseSong();
   if (view !== "timbre" && rec) rec.stop();
   if (view === "timbre") { checkServer(); renderTimbre(); }
