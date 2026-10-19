@@ -382,6 +382,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .song small { color: var(--faint); font-size: 12.5px; }
 .song-actions { display: flex; gap: 6px; }
+/* the bin stays faint until you point at the song (always shown in full where there's no hover) */
+#sLib .song-actions .btn { opacity: 0.3; transition: opacity 0.15s, background-color 0.15s, color 0.15s; }
+#sLib .row:hover .song-actions .btn, #sLib .song-actions .btn:focus-visible, #sLib .song-actions .btn[data-armed="1"] { opacity: 1; }
+#sLib .song-actions .btn.icon { background: transparent; color: var(--muted); }
+#sLib .song-actions .btn.icon:hover { background: var(--fill); color: var(--ink); }
+@media (hover: none) { #sLib .song-actions .btn { opacity: 1; } }
 @media (max-width: 760px) {
   .track { grid-template-columns: 18px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
   .track > :last-child { grid-row: 1; grid-column: 5; }
