@@ -1969,6 +1969,14 @@ const K = { on: false, song: null, notes: [], evs: [], contour: [], oct: 0, hist
 function songEvs() {
   const sh = K.oct * 12;
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
+  const ms = K.notes.map((n) => n[2] + sh);
+  K.lo = ms.length ? Math.min(...ms) : 57; K.hi = ms.length ? Math.max(...ms) : 69;
+}
+// Sing along shows the whole song's range all the time, so the view doesn't zoom in and out while you sing.
+function songView(snap) {
+  let lo = K.lo - 2.5, hi = K.hi + 2.5;
+  if (hi - lo < 13) { const c = (lo + hi) / 2; lo = c - 6.5; hi = c + 6.5; }
+  if (snap) { vLo = lo; vHi = hi; } else { vLo += (lo - vLo) * 0.07; vHi += (hi - vHi) * 0.07; } // eases only after an octave change
 }
 // pick the octave that puts the song's middle closest to the middle of the singer's comfortable notes
 function suggestOctave(range) {
@@ -1986,7 +1994,7 @@ async function singSong(m) {
     if (!r.ok) throw new Error(mel.error || "Couldn’t read the melody.");
   } catch (e) { $("#pExportState").textContent = e.message; return; }
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = suggestOctave(mel.range); K.on = true;
-  songEvs();
+  songEvs(); songView(true);
   if (P.tracks.vocals) { P.tracks.vocals.mute = false; P.tracks.vocals.solo = false; P.tracks.vocals.vol = K.guideVol; }
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "vocals" && n !== "click") { t.mute = false; t.solo = false; t.vol = K.bandVol; }
   renderTracks(); applyGains();
@@ -2374,7 +2382,7 @@ function loop() {
     if (last && sn < last.t - 0.25) K.hist = []; // jumped back
     if (P.playing) K.hist.push({ t: sn, m: cur });
     while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
-    updateView(sn, K.evs, sn, K.hist);
+    songView();
     draw(sn, cur, K.hist, K.evs, 0, { pts: K.contour, shift: K.oct * 12 });
     setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
     renderHud(sn, cur);
