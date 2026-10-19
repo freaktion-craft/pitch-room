@@ -203,6 +203,14 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .gauge .zone { position: absolute; top: 0; bottom: 0; left: 50%; width: 16%; transform: translateX(-50%); border-radius: 2px; background: rgba(var(--fg), 0.12); }
 .gauge .needle { position: absolute; top: -4px; width: 2px; height: 12px; margin-left: -1px; left: 50%; border-radius: 1px; background: var(--faint); transition: left 60ms linear; }
 .gauge-labels { display: flex; justify-content: space-between; width: 140px; font: 10px/1 var(--mono); color: var(--faint); }
+/* sing along: the count-in before the voice comes back after an intro or a break */
+/* left of the playhead line: nothing is drawn there during an intro or break, while the coming bars arrive from the right */
+.countin { position: absolute; left: clamp(100px, 16%, 240px); top: 50%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px;
+  pointer-events: none; text-align: center; }
+.countin span { font-size: 13px; color: var(--muted); }
+.countin b { min-height: 1em; font-size: 104px; line-height: 1; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.countin b.beat { animation: countpop 0.4s var(--ease); }
+@keyframes countpop { from { transform: scale(1.3); opacity: 0.3; } }
 .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(380px, calc(100% - 32px));
   background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line), 0 12px 40px -16px rgba(0, 0, 0, 0.25);
   padding: 20px; display: grid; gap: 14px; text-align: center; }
@@ -595,6 +603,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <div class="gauge" aria-hidden="true"><div class="zone"></div><div class="needle" id="needle"></div></div>
         <div class="gauge-labels" aria-hidden="true"><span>flat</span><span>centre</span><span>sharp</span></div>
       </div>
+      <div class="countin" id="countIn" hidden><span id="countLbl"></span><b id="countNum"></b></div>
       <div class="overlay" id="overlay" hidden></div>
     </section>
     <div class="keys-wrap" id="keysWrap"><div class="keys" id="keys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
@@ -2189,12 +2198,47 @@ function initStems() {
 }
 
 // ---------- sing-along (songs from the Stems library) ----------
-const K = { on: false, song: null, notes: [], evs: [], contour: [], oct: 0, hist: [], guideVol: 0.5, bandVol: 1 };
+const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], oct: 0, hist: [], guideVol: 0.5, bandVol: 1 };
 function songEvs() {
   const sh = K.oct * 12;
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const ms = K.notes.map((n) => n[2] + sh);
   K.lo = ms.length ? Math.min(...ms) : 57; K.hi = ms.length ? Math.max(...ms) : 69;
+}
+// Where the voice comes in after the intro or a break (4 s or more without singing), with the four beats before it to
+// count down. A note after such a gap counts only if it starts a phrase (a second of singing within 4 s); a lone
+// ad-lib in an intro is skipped and the gap carries on.
+function songEntries(notes, beats, bpm) {
+  const beat = 60 / (bpm || 120), out = [];
+  let prevEnd = 0;
+  notes.forEach(([t0, t1], i) => {
+    const intro = prevEnd === 0, need = intro ? 4 * beat + 0.3 : Math.max(4, 6 * beat);
+    if (t0 - prevEnd >= need) {
+      let sung = 0;
+      for (const [a, b] of notes.slice(i)) { if (a >= t0 + 4) break; sung += Math.min(b, t0 + 4) - a; }
+      if (sung < 1) return;
+      let counts;
+      if (beats && beats.length) {
+        let j = beats.findIndex((b) => b >= t0 - 0.25 * beat); // the beat the voice comes in on (or just before)
+        if (j < 0) j = beats.length;
+        counts = beats.slice(Math.max(0, j - 4), j);
+      } else counts = [4, 3, 2, 1].map((k) => t0 - k * beat);
+      out.push({ t: t0, from: prevEnd, kind: intro ? "Intro" : "Break", counts: counts.filter((c) => c > prevEnd + 0.1) });
+    }
+    prevEnd = Math.max(prevEnd, t1);
+  });
+  return out;
+}
+// During an intro or break: "Intro · vocals in 12 s", then the last four beats as 4 3 2 1.
+function renderCountIn(sn) {
+  const box = $("#countIn"), e = K.on ? K.entries.find((x) => sn >= x.from + 0.5 && sn < x.t) : null;
+  if (!e) { box.hidden = true; return; }
+  let n = 0;
+  e.counts.forEach((c, i) => { if (sn >= c) n = e.counts.length - i; });
+  box.hidden = false;
+  setText("countLbl", n ? e.kind : `${e.kind} · vocals in ${Math.ceil(e.t - sn)} s`);
+  const num = $("#countNum"), text = n ? String(n) : "";
+  if (num.textContent !== text) { num.textContent = text; num.classList.remove("beat"); void num.offsetWidth; num.classList.toggle("beat", !!n); }
 }
 // Sing along shows the whole song's range all the time, so the view doesn't zoom in and out while you sing.
 function songView(snap) {
@@ -2229,6 +2273,7 @@ async function singSong(m, btn) {
   } finally { if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
   say(was);
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = suggestOctave(mel.range); K.on = true;
+  K.entries = songEntries(K.notes, m.beats, m.bpm);
   songEvs(); songView(true);
   if (P.tracks.vocals) { P.tracks.vocals.mute = false; P.tracks.vocals.solo = false; P.tracks.vocals.vol = K.guideVol; }
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "vocals" && n !== "click") { t.mute = false; t.solo = false; t.vol = K.bandVol; }
@@ -2238,7 +2283,7 @@ async function singSong(m, btn) {
   $("#kClick").disabled = !(m.beats && m.beats.length);
   go("play");
 }
-function leaveSong() { if (P.playing) pauseSong(); K.on = false; renderSongBar(); }
+function leaveSong() { if (P.playing) pauseSong(); K.on = false; renderSongBar(); $("#countIn").hidden = true; }
 function renderSongBar() {
   $("#songBar").hidden = !K.on;
   $("#vPlay").classList.toggle("song-mode", K.on);
@@ -2620,7 +2665,7 @@ function loop() {
     songView();
     draw(sn, cur, K.hist, K.evs, 0, { pts: K.contour, shift: K.oct * 12 });
     setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
-    renderHud(sn, cur);
+    renderHud(sn, cur); renderCountIn(sn);
     requestAnimationFrame(loop);
     return;
   }
