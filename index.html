@@ -40,7 +40,12 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
   transition: color 0.22s var(--ease), background-color 0.25s var(--ease); }
 .seg a:hover { color: rgba(0, 0, 0, 0.7); }
 .seg a[aria-current="page"] { background: var(--bg); color: var(--ink); font-weight: 500; box-shadow: 0 0 0 1px var(--line); }
-.seg a i { font-style: normal; font-size: 11px; color: var(--faint); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.steps { display: flex; align-items: center; gap: 6px; margin: -40px 0 40px; font-size: 13.5px; color: var(--faint); }
+.steps a { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-radius: 6px; color: rgba(0, 0, 0, 0.45); transition: background-color 0.15s, color 0.15s; }
+.steps a:hover { background: var(--fill); color: rgba(0, 0, 0, 0.7); }
+.steps a i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font: 500 11px var(--mono); font-style: normal; box-shadow: inset 0 0 0 1px var(--ring); }
+.steps a[aria-current="step"] { color: var(--ink); font-weight: 500; }
+.steps a[aria-current="step"] i { background: var(--ink); color: #fff; box-shadow: none; }
 .chipbtn { height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: var(--fill);
   font-size: 13px; color: rgba(0, 0, 0, 0.6); transition: background-color 0.15s; }
 .chipbtn:hover { background: rgba(0, 0, 0, 0.08); }
@@ -187,7 +192,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   .proto { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .proto-aside { position: static; }
   .seg a { padding: 0 8px; }
-  .seg a i { margin-right: 4px; }
+  .steps { margin-top: -20px; }
   .note-big { font-size: 34px; }
   .hud-l { top: auto; bottom: 10px; }
   .play-bar .kb { display: none; }
@@ -245,7 +250,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .mtable .vals .d { color: var(--muted); }
 .mtable .head { min-height: 36px; color: var(--faint); font-size: 12px; }
 .caveats { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); max-width: 72ch; }
-.seg .sep { width: 1px; background: rgba(0, 0, 0, 0.1); margin: 7px 2px; }
 @media (max-width: 760px) { .slots, .maps { grid-template-columns: minmax(0, 1fr); } .mtable .vals { gap: 10px; } .mtable .vals span { min-width: 52px; } }
 
 /* Stems page */
@@ -256,6 +260,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .row-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .inline-field { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .fine { font-size: 12.5px; color: var(--faint); }
+.gpu-row { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: #FFF4E5; color: #7A4B00; font-size: 13.5px; }
+.gpu-row .btn { justify-self: start; }
+.gpu-row .muted { color: #7A4B00; opacity: 0.8; }
 .bar { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width 0.4s var(--ease); }
 .log { margin: 0; max-height: 120px; overflow: auto; font: 11.5px/1.5 var(--mono); color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
@@ -312,16 +319,19 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 <body>
 <div class="app" id="app">
   <header>
-    <nav class="seg" aria-label="Steps">
-      <a href="#pick" data-view="pick"><i>1</i>Pick</a>
-      <a href="#setup" data-view="setup"><i>2</i>Set up</a>
-      <a href="#play" data-view="play"><i>3</i>Practice</a>
-      <span class="sep" aria-hidden="true"></span>
-      <a href="#timbre" data-view="timbre">Timbre map</a>
-      <a href="#stems" data-view="stems">Stems</a>
+    <nav class="seg" aria-label="Sections">
+      <a href="#pick" data-tab="practice" id="tabPractice">Practice</a>
+      <a href="#timbre" data-tab="timbre">Timbre map</a>
+      <a href="#stems" data-tab="stems">Stems</a>
     </nav>
     <button class="chipbtn mic" id="micBtn" type="button"><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="meter"><i id="meter"></i></span></button>
   </header>
+
+  <nav class="steps" id="practiceSteps" aria-label="Practice steps" hidden>
+    <a href="#pick" data-view="pick"><i>1</i>Pick</a><span aria-hidden="true">›</span>
+    <a href="#setup" data-view="setup"><i>2</i>Set up</a><span aria-hidden="true">›</span>
+    <a href="#play" data-view="play"><i>3</i>Sing</a>
+  </nav>
 
   <main id="vPick" aria-label="Pick an exercise">
     <div class="intro">
@@ -393,7 +403,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     </div>
   </main>
 
-  <main id="vPlay" aria-label="Practice" hidden>
+  <main id="vPlay" aria-label="Sing" hidden>
     <div class="play-bar">
       <a class="backkey" href="#setup"><span class="keycap">←</span><span class="lbl">Setup</span></a>
       <h1 class="title" id="playTitle"></h1>
@@ -506,6 +516,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <div class="row-actions">
         <label class="inline-field">Split into <select id="sModel"></select></label>
         <span class="muted" id="sDevice"></span>
+      </div>
+      <div class="gpu-row" id="sGpu" hidden>
+        <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
+        <button class="btn sm dark" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
+        <div class="bar" hidden id="sGpuBar"><i></i></div>
+        <span class="muted" id="sGpuState"></span>
       </div>
       <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
       <div id="sJobs"></div>
@@ -1356,7 +1372,13 @@ async function stemsRefresh() {
   if (st && st.installed) {
     const sel = $("#sModel");
     if (!sel.options.length) for (const [k, v] of Object.entries(st.models)) { const o = document.createElement("option"); o.value = k; o.textContent = v; sel.append(o); }
-    $("#sDevice").textContent = { mps: "Runs on your Apple GPU — about 30 s for a 4-minute song.", cuda: "Runs on your NVIDIA GPU — usually under a minute.", cpu: "Runs on the CPU — a 4-minute song can take several minutes." }[st.device] || "";
+    $("#sDevice").textContent = st.restartNeeded ? "Restart the app (close its window and open it again) to switch to the GPU."
+      : { mps: "Runs on your Apple GPU — about 30 s for a 4-minute song.", cuda: `Runs on your NVIDIA GPU${st.deviceName ? " (" + st.deviceName + ")" : ""} — usually under a minute.`, cpu: "Runs on the CPU — a 4-minute song can take several minutes." }[st.device] || "";
+    $("#sGpu").hidden = !st.gpuUnused || st.restartNeeded;
+    if (st.gpuUnused && st.driverOld) {
+      $("#sGpu").querySelector("span").textContent = "This PC has an NVIDIA graphics card, but its driver is too old for GPU separation. Update the NVIDIA driver (nvidia.com/drivers), restart the app, then come back here.";
+      $("#sGpuBtn").hidden = true;
+    }
   }
   renderLibrary();
 }
@@ -1395,7 +1417,11 @@ function watchJob(id, kind) {
   pollers[id] = setInterval(async () => {
     let j;
     try { j = await (await fetch("/api/jobs/" + id, { cache: "no-store" })).json(); } catch (e) { return; }
-    if (kind === "install") {
+    if (kind === "gpu") {
+      $("#sGpuBar").hidden = false; $("#sGpuBar i").style.width = Math.round(j.progress * 100) + "%";
+      $("#sGpuState").textContent = j.status === "error" ? j.error : j.status === "done" ? "Done — restart the app to use the GPU." : j.stage;
+      $("#sGpuBtn").disabled = j.status !== "error";
+    } else if (kind === "install") {
       $("#sInstallBar").hidden = false; $("#sInstallLog").hidden = false;
       $("#sInstallBar i").style.width = Math.round(j.progress * 100) + "%";
       $("#sInstallState").textContent = j.status === "error" ? j.error : j.stage;
@@ -1410,7 +1436,7 @@ function watchJob(id, kind) {
     }
     if (j.status === "done" || j.status === "error") {
       clearInterval(pollers[id]); delete pollers[id];
-      if (kind === "install" && j.status === "done") stemsRefresh();
+      if ((kind === "install" || kind === "gpu") && j.status === "done") stemsRefresh();
       if (kind !== "install" && j.status === "done") {
         document.getElementById("job-" + id)?.remove();
         const lib = await (await fetch("/api/library", { cache: "no-store" })).json();
@@ -1563,7 +1589,11 @@ function renderTracks() {
   for (const [name, t] of Object.entries(P.tracks)) {
     const row = el("div", "track" + (audible(name) ? "" : " off")); row.dataset.name = name;
     const dot = el("span", "dot"); dot.style.background = STEM_COLORS[name] || "#999";
-    const nm = el("div", "name"); nm.append(document.createTextNode(name === "click" ? "Click" : name[0].toUpperCase() + name.slice(1)), el("small", null, STEM_NOTES[name] || ""));
+    const bpm = P.song.bpm, isClick = name === "click";
+    const title = isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : name[0].toUpperCase() + name.slice(1);
+    const note = isClick ? (bpm ? `click · ${t.bpb}/4 · follows the song’s beat` : "click") : STEM_NOTES[name] || "";
+    const nm = el("div", "name"); nm.append(document.createTextNode(title), el("small", null, note));
+    if (isClick && bpm) nm.title = `Detected tempo ${bpm} BPM`;
     const m = el("button", "tog m", "M"); m.type = "button"; m.title = name === "click" ? "Click on/off" : "Mute"; m.setAttribute("aria-pressed", String(t.mute));
     const s = el("button", "tog s", "S"); s.type = "button"; s.title = "Solo"; s.setAttribute("aria-pressed", String(t.solo));
     const v = document.createElement("input"); v.type = "range"; v.min = 0; v.max = 1.5; v.step = 0.01; v.value = t.vol; v.setAttribute("aria-label", name + " volume");
@@ -1575,7 +1605,7 @@ function renderTracks() {
       last = el("div", "clickopts");
       const bpb = document.createElement("select"); bpb.setAttribute("aria-label", "Beats per bar");
       [2, 3, 4, 6].forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = k + "/4"; bpb.append(o); });
-      bpb.value = t.bpb; bpb.onchange = () => { t.bpb = +bpb.value; };
+      bpb.value = t.bpb; bpb.onchange = () => { t.bpb = +bpb.value; t.offset %= t.bpb; renderTracks(); };
       const sh = mkBtn("Shift accent", () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = `Accent on ${t.offset + 1}`; });
       sh.className = "tog"; sh.textContent = t.offset ? `Accent on ${t.offset + 1}` : "Shift accent";
       last.append(bpb, sh);
@@ -1609,6 +1639,7 @@ function exportAudible() {
 }
 function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };
+  $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { $("#sGpuState").textContent = e.message; $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
   $("#sFile").onchange = (e) => { submitFile(e.target.files[0]); e.target.value = ""; };
   const drop = $("#sDrop");
@@ -1906,7 +1937,7 @@ function renderPick() {
     nav.append(j);
   });
 }
-let view = "pick";
+let view = "pick", lastPractice = "pick";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
 function route() {
   const v = (location.hash || "#pick").slice(1);
@@ -1917,7 +1948,12 @@ function route() {
   if (view === "stems") stemsRefresh();
   if (view !== "timbre" && rec) rec.stop();
   if (view === "timbre") { checkServer(); renderTimbre(); }
-  document.querySelectorAll(".seg a").forEach((a) => { if (a.dataset.view === view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  const practice = ["pick", "setup", "play"].includes(view);
+  if (practice) { lastPractice = view; $("#tabPractice").setAttribute("href", "#" + view); }
+  const tab = practice ? "practice" : view;
+  document.querySelectorAll(".seg a").forEach((a) => { if (a.dataset.tab === tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  $("#practiceSteps").hidden = !practice;
+  document.querySelectorAll("#practiceSteps a").forEach((a) => { if (a.dataset.view === view) a.setAttribute("aria-current", "step"); else a.removeAttribute("aria-current"); });
   if (view !== "play" && run) stopRun();
   if (view === "play") {
     $("#overlay").hidden = true; preview = null;

@@ -85,21 +85,39 @@ def device() -> str:
     return "cpu"
 
 
+def has_nvidia() -> bool:
+    """An NVIDIA driver is present (nvidia-smi ships with it on Windows and Linux)."""
+    return sys.platform != "darwin" and shutil.which("nvidia-smi") is not None
+
+
+def gpu_status() -> dict:
+    dev = device()
+    name = None
+    if dev == "cuda":
+        import torch
+        name = torch.cuda.get_device_name(0)
+    drv = driver_cuda() if has_nvidia() else None
+    return {"device": dev, "deviceName": name, "nvidia": has_nvidia(), "driverOld": bool(drv and drv < (12, 4)),
+            # an NVIDIA card is there but the CPU-only PyTorch build is installed (pip's default on Windows)
+            "gpuUnused": dev == "cpu" and has_nvidia(), "restartNeeded": _restart_needed}
+
+
+# PyTorch publishes CUDA builds on its own index; newest first, the first one with a matching wheel wins.
+CUDA_INDEXES = ["cu130", "cu128", "cu126", "cu124"]
 _install_job: dict | None = None
+_restart_needed = False
 
 
-def start_install() -> str:
+def start_install(gpu_only: bool = False) -> str:
     global _install_job
     if _install_job and _install_job["status"] in ("queued", "running"):
         return _install_job["id"]
     _install_job = _new_job("install")
-    return _run(_install_job, _install)
+    return _run(_install_job, _install, gpu_only)
 
 
-def _install(job):
-    _set(job, status="running", stage="Downloading and installing (≈1–2 GB, a few minutes)…")
-    req = os.path.join(ROOT, "requirements-stems.txt")
-    p = subprocess.Popen([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--progress-bar", "off", "-r", req],
+def _pip(job, args: list[str], share: tuple[float, float]) -> int:
+    p = subprocess.Popen([sys.executable, "-m", "pip", *args, "--disable-pip-version-check", "--progress-bar", "off"],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     n = 0
     for line in p.stdout:
@@ -109,10 +127,63 @@ def _install(job):
         n += 1
         with _jobs_lock:
             job["log"].append(line[-160:])
-            job["progress"] = min(0.95, n / 120)
-    if p.wait() != 0:
-        raise RuntimeError("Installing failed. The last lines of the log above say why.")
+            job["progress"] = share[0] + (share[1] - share[0]) * min(1.0, n / 120)
+    return p.wait()
+
+
+def driver_cuda() -> tuple[int, int] | None:
+    """Highest CUDA version the installed NVIDIA driver supports, from nvidia-smi's header."""
+    try:
+        out = subprocess.run(["nvidia-smi"], capture_output=True, text=True, timeout=15).stdout
+    except Exception:  # noqa: BLE001
+        return None
+    m = re.search(r"CUDA Version:\s*(\d+)\.(\d+)", out)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _cuda_candidates() -> list[str]:
+    drv = driver_cuda()
+    if drv is None:
+        return CUDA_INDEXES
+    # cu128 → (12, 8); a build only runs if the driver supports at least that CUDA version
+    return [i for i in CUDA_INDEXES if (int(i[2:-1]), int(i[-1])) <= drv]
+
+
+def _install_cuda_torch(job, replace: bool) -> bool:
+    if replace:
+        _pip(job, ["uninstall", "-y", "torch", "torchaudio"], (0.0, 0.05))
+    candidates = _cuda_candidates()
+    if not candidates:
+        with _jobs_lock:
+            job["log"].append("The NVIDIA driver is too old for current PyTorch GPU builds (needs CUDA 12.4+). Update the driver to use the GPU.")
+        return False
+    for idx in candidates:
+        _set(job, stage=f"Installing PyTorch for your NVIDIA GPU ({idx}, ≈2–3 GB)…")
+        if _pip(job, ["install", "torch", "torchaudio", "--index-url", f"https://download.pytorch.org/whl/{idx}"], (0.05, 0.6)) == 0:
+            return True
+        with _jobs_lock:
+            job["log"].append(f"No matching {idx} build, trying an older CUDA version…")
+    return False
+
+
+def _install(job, gpu_only: bool = False):
+    global _restart_needed
+    _set(job, status="running", stage="Downloading and installing (≈1–2 GB, a few minutes)…")
+    torch_was_loaded = "torch" in sys.modules
+    if has_nvidia():
+        ok = _install_cuda_torch(job, replace=gpu_only)
+        if not ok:
+            with _jobs_lock:
+                job["log"].append("Couldn’t get a CUDA build of PyTorch; using the CPU build instead.")
+            if gpu_only:
+                raise RuntimeError("No CUDA build of PyTorch matched this system. Separation will keep using the CPU.")
+    if not gpu_only:
+        _set(job, stage="Installing Demucs, librosa and yt-dlp…")
+        if _pip(job, ["install", "-r", os.path.join(ROOT, "requirements-stems.txt")], (0.6, 0.98)) != 0:
+            raise RuntimeError("Installing failed. The last lines of the log above say why.")
     importlib.invalidate_caches()
+    if torch_was_loaded:  # the old PyTorch is already in memory; a fresh start picks up the new one
+        _restart_needed = True
 
 
 # ---------- library ----------
@@ -221,8 +292,9 @@ def _separate(job, wav: np.ndarray, model_name: str):
             done["max"] = max(done["max"], frac)
             _set(job, progress=0.25 + 0.6 * done["max"])
 
+    dev = device()
     with torch.no_grad():
-        out = apply_model(model, x[None], device=device(), shifts=1, split=True, overlap=0.25, progress=False, callback=cb)[0]
+        out = apply_model(model, x[None], device=dev, shifts=1, split=True, overlap=0.25, progress=False, callback=cb)[0]
     out = (out * std + mean).cpu().numpy()
     return list(model.sources), out
 
@@ -366,6 +438,6 @@ def export(song_id: str, tracks: list[dict], click: dict | None) -> tuple[bytes,
     else:
         label = " + ".join(on)
     if "click" in used and on:
-        label += " + click"
+        label += f" + click {round(meta['bpm'])} BPM" if meta.get("bpm") else " + click"
     return data, f"{safe} - {label}.mp3"
 

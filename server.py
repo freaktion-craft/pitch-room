@@ -44,7 +44,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/health":
             return self._json(200, {"ok": True, "app": "pitch-room"})
         if path == "/api/stems/status":
-            return self._json(200, {"installed": stems.installed(), "device": stems.device(), "models": stems.MODELS,
+            return self._json(200, {"installed": stems.installed(), "models": stems.MODELS, **stems.gpu_status(),
                                     "install": stems.get_job(stems._install_job["id"]) if stems._install_job else None})
         if path.startswith("/api/jobs/"):
             job = stems.get_job(path.rsplit("/", 1)[-1])
@@ -57,7 +57,7 @@ class Handler(SimpleHTTPRequestHandler):
         q = parse_qs(url.query)
         model = (q.get("model") or ["htdemucs"])[0]
         if url.path == "/api/stems/install":
-            return self._json(200, {"job": stems.start_install()})
+            return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1")})
         if url.path == "/api/stems/upload":
             name = (q.get("name") or ["upload"])[0]
             return self._json(200, {"job": stems.start_upload(self._body(MAX_SONG), name, model)})
@@ -109,7 +109,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(500, {"error": "Something went wrong during analysis. Check the terminal window for details."})
 
     def log_message(self, fmt, *args):
-        if "/api/" in (args[0] if args else ""):
+        # only log API calls; static files (and send_error's HTTPStatus args) stay quiet
+        if args and isinstance(args[0], str) and "/api/" in args[0]:
             super().log_message(fmt, *args)
 
 

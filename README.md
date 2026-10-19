@@ -24,11 +24,13 @@ Use earphones while practising so the piano doesn't leak into the mic.
 
 ## What's inside
 
+**Practice** has three steps.
+
 **1 · Pick** — exercises grouped by goal: warm up, SOVT (semi-occluded vocal tract), pitch matching, high notes, low notes, scales, leaps, long tones, singing without accompaniment, octave matching.
 
 **2 · Set up** — what the exercise is for and why (with the research behind it), voice type and range, tempo, guide piano (every note / first note / chord only), mic check.
 
-**3 · Practice** — note bars scroll in from the right; the piano plays each note as it reaches the line and your voice draws a line through it. A tuner-style readout shows how many cents sharp or flat you are.
+**3 · Sing** — note bars scroll in from the right; the piano plays each note as it reaches the line and your voice draws a line through it. A tuner-style readout shows how many cents sharp or flat you are.
 
 **Timbre map** — upload a clip of a voice you want to sound like and record yourself on the same note and vowel. A local Python server (Praat via [parselmouth](https://parselmouth.readthedocs.io)) measures ring (singing power ratio), brightness (alpha ratio, spectral centroid), breathiness (H1–H2, CPPS, HNR), vowel formants (F1–F3) and vibrato, then:
 
@@ -43,7 +45,9 @@ Compare like with like: same note, same vowel, same mic. Vocals pulled from a re
 - waveform overview to jump around, Space to play / pause,
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that stem.
 
-Songs are kept in `library/` so they open instantly next time. The first time you open Stems, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp — about 1–2 GB, into `.venv`). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, under a minute on an NVIDIA GPU, several minutes on a CPU (Windows installs the CPU build of PyTorch by default).
+Songs are kept in `library/` so they open instantly next time. The first time you open Stems, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp — about 1–2 GB, into `.venv`). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, under a minute on an NVIDIA GPU, several minutes on a CPU.
+
+**GPU:** on Windows and Linux the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the Stems page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
 
 Only use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service.
 
