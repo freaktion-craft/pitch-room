@@ -2,6 +2,7 @@
 
 Songs live in ./library/<id>/ :
     source.*        the original audio (upload or YouTube download)
+    video.*         the picture of a YouTube video, no sound (shown above the player to follow lyrics)
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
     meta.json       title, duration, bpm, beat times, stems, model
 
@@ -238,30 +239,72 @@ def _encode_mp3(samples: np.ndarray, path: str, bitrate: str = "256k"):
         raise RuntimeError("MP3 encoding failed: " + out.stderr.decode(errors="ignore")[-200:])
 
 
-def _download(job, url: str, folder: str) -> tuple[str, str]:
+def _ytdl(job, folder: str, name: str, fmt: str, p0: float, p1: float):
+    """A YoutubeDL that saves <folder>/<name>.<ext> and reports download progress as p0..p1 of the job."""
     import yt_dlp
 
     def hook(d):
         if d.get("status") == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             if total:
-                _set(job, progress=0.02 + 0.18 * d.get("downloaded_bytes", 0) / total)
+                _set(job, progress=p0 + (p1 - p0) * d.get("downloaded_bytes", 0) / total)
 
     # yt-dlp needs a JavaScript runtime for YouTube; the `deno` package puts one next to this Python
-    env_path = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")
-    os.environ["PATH"] = env_path
-    opts = {"format": "bestaudio/best", "outtmpl": os.path.join(folder, "source.%(ext)s"), "noplaylist": True,
-            "quiet": True, "no_warnings": True, "progress_hooks": [hook], "ffmpeg_location": ffmpeg_exe()}
+    os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")
+    return yt_dlp.YoutubeDL({"format": fmt, "outtmpl": os.path.join(folder, name + ".%(ext)s"), "noplaylist": True,
+                             "quiet": True, "no_warnings": True, "progress_hooks": [hook], "ffmpeg_location": ffmpeg_exe()})
+
+
+def _saved(folder: str, name: str) -> str | None:
+    return next((f for f in os.listdir(folder) if f.startswith(name + ".") and not f.endswith((".part", ".ytdl"))), None)
+
+
+def _download(job, url: str, folder: str) -> tuple[str, str]:
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        with _ytdl(job, folder, "source", "bestaudio/best", 0.02, 0.12) as ydl:
             info = ydl.extract_info(url, download=True)
     except Exception as e:  # noqa: BLE001
         msg = str(e)
         raise ValueError("Couldn’t download that link. " + (msg.split("ERROR:")[-1].strip()[:200] if msg else "")) from None
-    path = next((os.path.join(folder, f) for f in os.listdir(folder) if f.startswith("source.")), None)
-    if not path:
+    name = _saved(folder, "source")
+    if not name:
         raise ValueError("The download finished but no audio file was saved.")
-    return path, info.get("title") or "YouTube audio"
+    return os.path.join(folder, name), info.get("title") or "YouTube audio"
+
+
+# The picture only, to follow lyrics while singing: the stems play the sound. Up to 720p, H.264 MP4 when there is one
+# (plays everywhere), else whatever video stream exists. Audio and video streams of one YouTube video share a timeline.
+VIDEO_FORMAT = "bv*[height<=720][vcodec^=avc1][ext=mp4]/bv*[height<=720][ext=mp4]/bv*[height<=720]/bv*"
+
+
+def _download_video(job, url: str, folder: str, p0: float, p1: float) -> str | None:
+    with _ytdl(job, folder, "video", VIDEO_FORMAT, p0, p1) as ydl:
+        ydl.extract_info(url, download=True)
+    return _saved(folder, "video")
+
+
+def start_video(song_id: str) -> str:
+    """Fetch the video for a song added from a link before videos were saved."""
+    folder = _song_dir(song_id)
+    with open(os.path.join(folder, "meta.json"), encoding="utf-8") as f:
+        meta = json.load(f)
+    if not re.match(r"^https?://", meta.get("source") or ""):
+        raise ValueError("This song wasn’t added from a link, so there’s no video to get.")
+
+    def work(job):
+        _set(job, status="running", stage="Getting the video", progress=0.02)
+        try:
+            video = _download_video(job, meta["source"], folder, 0.02, 0.98)
+        except Exception as e:  # noqa: BLE001
+            raise ValueError("Couldn’t get the video. " + str(e).split("ERROR:")[-1].strip()[:200]) from None
+        if not video:
+            raise ValueError("That link has no video.")
+        meta["video"] = video
+        with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False)
+        _set(job, songId=song_id)
+
+    return _run(_new_job("video"), work)
 
 
 def _get_model(name: str):
@@ -337,9 +380,15 @@ def _pipeline(job, src: dict, model_name: str):
         _set(job, status="queued", stage="Waiting for the previous song to finish")
         with _work_lock:
             _set(job, status="running", stage="Getting the audio", progress=0.02)
+            video = None
             if src["kind"] == "url":
                 path, title = _download(job, src["url"], folder)
                 source = src["url"]
+                _set(job, stage="Getting the video", progress=0.12)
+                try:
+                    video = _download_video(job, src["url"], folder, 0.12, 0.2)
+                except Exception:  # noqa: BLE001  (the song still works without a picture)
+                    video = None
             else:
                 ext = os.path.splitext(src["filename"] or "")[1].lower()[:6] or ".audio"
                 path = os.path.join(folder, "source" + ext)
@@ -370,7 +419,7 @@ def _pipeline(job, src: dict, model_name: str):
                 _encode_mp3(stems[names.index(name)], os.path.join(folder, name + ".mp3"))
                 _set(job, progress=0.9 + 0.09 * (i + 1) / len(order))
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
-                    "stems": order, "model": model_name, "created": time.time()}
+                    "stems": order, "model": model_name, "created": time.time(), "video": video}
             with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
                 json.dump(meta, f, ensure_ascii=False)
             _set(job, songId=song_id)

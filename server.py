@@ -8,6 +8,7 @@ Then open http://localhost:5178 (localhost is needed for microphone access).
 """
 import json
 import os
+import re
 import sys
 import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -97,10 +98,42 @@ class Handler(SimpleHTTPRequestHandler):
         self._unread = 0
         return self.rfile.read(n)
 
+    def _send_range(self):
+        """Serve one byte range of a static file (206), so the browser can seek in a video. False = not a range request."""
+        m = re.fullmatch(r"bytes=(\d*)-(\d*)", (self.headers.get("Range") or "").strip())
+        path = self.translate_path(self.path)
+        if not m or m.groups() == ("", "") or not os.path.isfile(path):
+            return False
+        size = os.path.getsize(path)
+        a, b = m.groups()
+        start, end = (max(0, size - int(b)), size - 1) if a == "" else (int(a), min(size - 1, int(b) if b else size - 1))
+        if start >= size or start > end:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return True
+        self.send_response(206)
+        self.send_header("Content-Type", self.guess_type(path))
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(end - start + 1))
+        self.end_headers()
+        with open(path, "rb") as f:
+            f.seek(start)
+            left = end - start + 1
+            while left > 0:
+                chunk = f.read(min(left, 1 << 20))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                left -= len(chunk)
+        return True
+
     def do_GET(self):
         path = urlparse(self.path).path
         if not path.startswith("/api/"):
-            return super().do_GET()
+            return None if self._send_range() else super().do_GET()
         try:
             return self._get_api(path)
         except Exception as e:  # noqa: BLE001
@@ -142,6 +175,8 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == "delete":
                 stems.delete_song(parts[2])
                 return self._json(200, {"ok": True})
+            if parts[3] == "video":
+                return self._json(200, {"job": stems.start_video(parts[2])})
             if parts[3] == "export":
                 body = json.loads(self._body(100_000) or b"{}")
                 data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"))

@@ -324,6 +324,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .player-title { display: grid; gap: 2px; min-width: 0; }
 .player-title b { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
 .player-title .muted { font-size: 13px; }
+/* the song's video, muted: the stems carry the sound, the picture is for following lyrics */
+#pVideo { display: block; width: 100%; max-height: 62vh; border-radius: 10px; background: #000; object-fit: contain; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; }
 .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
@@ -636,8 +638,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <section class="player" id="sPlayer" hidden>
       <div class="player-head">
         <div class="player-title"><b id="pTitle"></b><span class="muted" id="pMeta"></span></div>
-        <div class="row-actions"><button class="btn sm dark" id="pSing" type="button">Sing along</button><button class="btn sm" id="pClose" type="button">Library</button></div>
+        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm dark" id="pSing" type="button">Sing along</button><button class="btn sm" id="pClose" type="button">Library</button></div>
       </div>
+      <video id="pVideo" muted playsinline preload="auto" hidden></video>
       <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play">Play</button>
@@ -1637,6 +1640,10 @@ async function openSong(m) {
   $("#pTitle").textContent = m.title;
   $("#pMeta").textContent = `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat found"} · loading tracks…`;
   P.tracks = {};
+  const v = $("#pVideo");
+  v.hidden = !m.video;
+  if (m.video) v.src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
+  $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
   for (const name of m.stems) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
   renderTracks();
@@ -1654,8 +1661,23 @@ async function openSong(m) {
 function closeSong() {
   pauseSong();
   P.song = null; P.buffers = {}; P.peaks = null;
+  const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load(); v.hidden = true;
   $("#sPlayer").hidden = true;
 }
+// The video follows the stems player, which owns the clock: started, paused and nudged back whenever it drifts.
+function syncVideo() {
+  const v = $("#pVideo");
+  if (v.hidden || !v.getAttribute("src") || v.readyState < 1 || v.seeking) return;
+  const pos = songPos(), past = pos >= v.duration - 0.05;
+  if (P.playing && !past) {
+    if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); }
+    else if (Math.abs(v.currentTime - pos) > 0.15) v.currentTime = pos;
+  } else {
+    if (!v.paused) v.pause();
+    if (!past && Math.abs(v.currentTime - pos) > 0.05) v.currentTime = pos;
+  }
+}
+setInterval(syncVideo, 100);
 function songDur() { return P.song ? P.song.duration : 0; }
 function songPos() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt)) : P.offset; }
 function audible(name) {
@@ -1802,6 +1824,11 @@ function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { $("#sGpuState").textContent = e.message; $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
+  $("#pGetVideo").onclick = async () => {
+    const b = $("#pGetVideo"); b.disabled = true;
+    try { const id = await postJob(`/api/library/${P.song.id}/video`); jobCard(id).querySelector(".top span").textContent = "Getting the video…"; watchJob(id, "video"); }
+    catch (err) { b.disabled = false; const c = jobCard("x" + Date.now()); c.classList.add("err"); c.querySelector(".top span").textContent = err.message; }
+  };
   $("#sFile").onchange = (e) => { submitFile(e.target.files[0]); e.target.value = ""; };
   const drop = $("#sDrop");
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
