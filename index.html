@@ -1764,7 +1764,7 @@ async function renderInfo(id) {
   if (v) renderInfoRange(v, id);
   $("#iOpen").href = `#stems/${id}`;
   $("#iSing").hidden = !s.stems.includes("vocals");
-  $("#iSing").onclick = () => singSong(m);
+  $("#iSing").onclick = () => singSong(m, $("#iSing"));
   $("#iActs").hidden = false;
 }
 // A moment of the vocal track (decoded on first use), with a little room either side and short fades.
@@ -2183,7 +2183,7 @@ function initStems() {
   $("#pPlay").onclick = () => (P.playing ? pauseSong() : playSong());
   $("#pBack").onclick = () => seekSong(songPos() - 5);
   $("#pFwd").onclick = () => seekSong(songPos() + 5);
-  $("#pSing").onclick = () => P.song && singSong(P.song);
+  $("#pSing").onclick = () => P.song && singSong(P.song, $("#pSing"));
   $("#pExport").onclick = exportAudible;
   $("#pWave").addEventListener("click", (e) => { const r = e.currentTarget.getBoundingClientRect(); seekSong(((e.clientX - r.left) / r.width) * songDur()); });
 }
@@ -2208,15 +2208,26 @@ function suggestOctave(range) {
   const mid = (range[0] + range[1]) / 2, mine = (Math.min(S.lo, S.hi) + Math.max(S.lo, S.hi) + 7) / 2;
   return [-1, 0, 1].reduce((best, o) => (Math.abs(mid + 12 * o - mine) < Math.abs(mid + 12 * best - mine) ? o : best), 0);
 }
-async function singSong(m) {
+// btn: the button that started it, which says what's happening meanwhile (reading a song's melody the first time
+// takes several seconds) and shows any error.
+async function singSong(m, btn) {
+  const lbl = btn && (btn.querySelector(".how") || btn), was = lbl && lbl.textContent;
+  const say = (text) => { if (lbl) lbl.textContent = text; };
+  if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
+  say("Reading the melody…");
   if (run) stopRun(true);
-  if (!P.song || P.song.id !== m.id) await openSong(m);
   let mel;
   try {
+    if (!P.song || P.song.id !== m.id) await openSong(m);
     const r = await fetch("/api/melody/" + m.id);
     mel = await r.json();
     if (!r.ok) throw new Error(mel.error || "Couldn’t read the melody.");
-  } catch (e) { $("#pExportState").textContent = e.message; return; }
+  } catch (e) {
+    $("#pExportState").textContent = e.message; say(e.message);
+    setTimeout(() => say(was), 4000);
+    return;
+  } finally { if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
+  say(was);
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = suggestOctave(mel.range); K.on = true;
   songEvs(); songView(true);
   if (P.tracks.vocals) { P.tracks.vocals.mute = false; P.tracks.vocals.solo = false; P.tracks.vocals.vol = K.guideVol; }
@@ -2770,7 +2781,7 @@ async function renderSongsOnPick() {
   lib.forEach((m) => {
     const b = el("button", "card songcard"); b.type = "button";
     b.append(el("b", null, m.title), el("span", "how", "Note bars from the original vocal, which plays as a guide"), el("span", "meta", `${fmtTime(m.duration)}${m.bpm ? " · " + Math.round(m.bpm) + " BPM" : ""}`));
-    b.onclick = () => singSong(m);
+    b.onclick = () => singSong(m, b);
     cards.append(b);
   });
   sec.append(head, cards); $("#pickList").prepend(sec);
