@@ -1561,6 +1561,7 @@ const ICONS = {
   click: '<path d="M14.0073 6L13.7349 4.91043C13.5833 4.30398 13.5075 4.00075 13.3905 3.74637C12.9843 2.86326 12.1754 2.2317 11.2201 2.05182C10.945 2 10.6324 2 10.0073 2C9.38217 2 9.06961 2 8.79444 2.05182C7.83919 2.2317 7.0303 2.86326 6.6241 3.74637C6.50709 4.00075 6.43129 4.30398 6.27968 4.91043L3.87108 14.5448C3.01314 17.9766 2.58416 19.6925 3.48499 20.8462C4.38583 22 6.15453 22 9.69194 22H10.3226C13.86 22 15.6287 22 16.5296 20.8462C17.2402 19.9361 17.1233 18.6761 16.6211 16.5"/><path d="M10.0078 13.5V6"/><path d="M10.0078 18L17.0078 11"/><circle cx="18.5078" cy="9.5" r="2"/><path d="M20.0078 8L21.0078 7"/>',
   volume: '<path d="M14 14.8135V9.18646C14 6.04126 14 4.46866 13.0747 4.0773C12.1494 3.68593 11.0603 4.79793 8.88232 7.02192C7.75439 8.17365 7.11085 8.42869 5.50604 8.42869C4.10257 8.42869 3.40084 8.42869 2.89675 8.77262C1.85035 9.48655 2.00852 10.882 2.00852 12C2.00852 13.118 1.85035 14.5134 2.89675 15.2274C3.40084 15.5713 4.10257 15.5713 5.50604 15.5713C7.11085 15.5713 7.75439 15.8264 8.88232 16.9781C11.0603 19.2021 12.1494 20.3141 13.0747 19.9227C14 19.5313 14 17.9587 14 14.8135Z"/><path d="M17 9C17.6254 9.81968 18 10.8634 18 12C18 13.1366 17.6254 14.1803 17 15"/><path d="M20 7C21.2508 8.36613 22 10.1057 22 12C22 13.8943 21.2508 15.6339 20 17"/>',
   download: '<path d="M2.99969 17.0002C2.99969 17.9302 2.99969 18.3952 3.10192 18.7767C3.37932 19.8119 4.18796 20.6206 5.22324 20.898C5.60474 21.0002 6.06972 21.0002 6.99969 21.0002L16.9997 21.0002C17.9297 21.0002 18.3947 21.0002 18.7762 20.898C19.8114 20.6206 20.6201 19.8119 20.8975 18.7767C20.9997 18.3952 20.9997 17.9302 20.9997 17.0002"/><path d="M16.4998 11.5002C16.4998 11.5002 13.1856 16.0002 11.9997 16.0002C10.8139 16.0002 7.49976 11.5002 7.49976 11.5002M11.9997 15.0002V3.00016"/>',
+  trash: '<path d="M19.5 5.5L18.8803 15.5251C18.7219 18.0864 18.6428 19.3671 18.0008 20.2879C17.6833 20.7431 17.2747 21.1273 16.8007 21.416C15.8421 22 14.559 22 11.9927 22C9.42312 22 8.1383 22 7.17905 21.4149C6.7048 21.1257 6.296 20.7408 5.97868 20.2848C5.33688 19.3626 5.25945 18.0801 5.10461 15.5152L4.5 5.5"/><path d="M3 5.5H21M16.0557 5.5L15.3731 4.09173C14.9196 3.15626 14.6928 2.68852 14.3017 2.39681C14.215 2.3321 14.1231 2.27454 14.027 2.2247C13.5939 2 13.0741 2 12.0345 2C10.9688 2 10.436 2 9.99568 2.23412C9.8981 2.28601 9.80498 2.3459 9.71729 2.41317C9.32164 2.7167 9.10063 3.20155 8.65861 4.17126L8.05292 5.5"/><path d="M9.5 16.5L9.5 10.5"/><path d="M14.5 16.5L14.5 10.5"/>',
 };
 ICONS.bass = ICONS.guitar; // the set has no bass guitar
 function icon(name) {
@@ -1611,14 +1612,18 @@ async function renderLibrary() {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     link.href = "#stems/" + m.id; link.append(el("b", null, m.title));
     info.append(link, el("small", null, `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat"} · ${m.stems.length} tracks · ${new Date(m.created * 1000).toLocaleDateString()}`));
-    row.onclick = (e) => { if (!e.target.closest("a, button")) go("stems/" + m.id); };
+    // composedPath, not e.target.closest: the delete button swaps its icon out on click, detaching the target
+    row.onclick = (e) => { if (!e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
     const acts = el("div", "song-actions");
-    const del = mkBtn("Delete", async () => {
-      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Really delete?"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Delete"; }, 3000); return; }
+    // a bin icon; the first click asks "Really delete?" for 3 seconds, a second click deletes
+    const bin = () => { del.dataset.armed = ""; del.classList.add("icon"); del.setAttribute("aria-label", "Delete " + m.title); del.replaceChildren(icon("trash")); };
+    const del = mkBtn("", async () => {
+      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.classList.remove("icon"); del.removeAttribute("aria-label"); del.textContent = "Really delete?"; setTimeout(bin, 3000); return; }
       await fetch(`/api/library/${m.id}/delete`, { method: "POST" });
       if (P.song && P.song.id === m.id) closeSong();
       renderLibrary();
     });
+    del.title = "Delete"; bin();
     acts.append(del); row.append(info, acts); box.append(row);
   });
 }
