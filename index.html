@@ -47,6 +47,8 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+/* Always reserve the scrollbar's space, so short pages (Stems) don't shift sideways when switching tabs */
+html { scrollbar-gutter: stable; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font); -webkit-font-smoothing: antialiased; }
 [hidden] { display: none !important; }
 button, select, input { font: inherit; color: inherit; }
