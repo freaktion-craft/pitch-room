@@ -337,6 +337,16 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .transport-row .kb { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
 .btn.round { min-width: 72px; justify-content: center; }
+/* play ⇄ pause: the triangle splits down the middle, its halves square off into two bars, and the whole thing flips over */
+.pp { position: relative; display: inline-block; width: 14px; height: 16px; flex: none; transition: transform 0.45s cubic-bezier(0.5, 1.6, 0.4, 1); }
+.pp::before, .pp::after { content: ""; position: absolute; inset: 0; background: currentColor; transition: clip-path 0.45s cubic-bezier(0.5, 1.6, 0.4, 1); }
+/* the halves overlap a little (52–56%) so no seam shows down the middle of the triangle */
+.pp::before { clip-path: polygon(8% 0, 56% 26.1%, 56% 73.9%, 8% 100%); }
+.pp::after { clip-path: polygon(52% 23.9%, 100% 50%, 100% 50%, 52% 76.1%); }
+.on > .pp { transform: rotate(180deg); }
+.on > .pp::before { clip-path: polygon(6% 0, 38% 0, 38% 100%, 6% 100%); }
+.on > .pp::after { clip-path: polygon(62% 0, 94% 0, 94% 100%, 62% 100%); }
+@media (prefers-reduced-motion: reduce) { .pp::before, .pp::after { transition: none !important; } }
 .tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
 .track { display: grid; grid-template-columns: 12px minmax(84px, 1fr) auto auto minmax(90px, 160px) auto; align-items: center; gap: 10px; padding: 8px 12px; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
@@ -516,7 +526,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <a class="backkey" href="#setup"><span class="keycap">←</span><span class="lbl">Setup</span></a>
       <h1 class="title" id="playTitle"></h1>
       <span class="kb"><span class="keycap">Space</span>start / stop</span>
-      <button class="btn dark" id="startBtn" type="button">Start</button>
+      <button class="btn dark" id="startBtn" type="button"><span class="pp" aria-hidden="true" hidden></span><span class="lbl">Start</span></button>
     </div>
     <div class="songbar" id="songBar" hidden>
       <button class="btn sm" id="kBack" type="button">−5 s</button>
@@ -665,7 +675,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
       <div class="transport-row">
-        <button class="btn dark round" id="pPlay" type="button" aria-label="Play">Play</button>
+        <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><span class="pp" aria-hidden="true"></span></button>
         <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
         <button class="btn sm" id="pFwd" type="button" aria-label="Forward 5 seconds">+5 s</button>
         <output id="pTime">0:00 / 0:00</output>
@@ -1756,15 +1766,16 @@ function playSong() {
   const cg = ac.createGain(); cg.gain.value = audible("click") ? P.tracks.click.vol : 0; cg.connect(P.bus); P.tracks.click.gain = cg;
   P.startAt = at; P.playing = true; renderStart();
   const beats = P.song.beats || []; P.clickNext = beats.findIndex((b) => b >= P.offset); if (P.clickNext < 0) P.clickNext = beats.length;
-  $("#pPlay").textContent = "Pause";
+  paintPlay($("#pPlay"), true);
 }
+function paintPlay(b, playing) { b.classList.toggle("on", playing); b.setAttribute("aria-label", playing ? "Pause" : "Play"); }
 function pauseSong() {
   if (!P.playing) return;
   P.offset = songPos(); P.playing = false;
   P.sources.forEach((s) => { try { s.stop(); } catch (e) {} });
   const bus = P.bus; if (bus) { bus.gain.setTargetAtTime(0, ac.currentTime, 0.01); setTimeout(() => bus.disconnect(), 200); }
   P.sources = []; Object.values(P.tracks).forEach((t) => (t.gain = null));
-  $("#pPlay").textContent = "Play"; renderStart();
+  paintPlay($("#pPlay"), false); renderStart();
 }
 function seekSong(t) {
   const was = P.playing; pauseSong(); P.offset = Math.max(0, Math.min(songDur(), t)); if (was) playSong(); drawWave();
@@ -2392,9 +2403,10 @@ function renderHudRep(now) {
 }
 function renderStart() {
   const b = $("#startBtn");
-  if (K.on) { b.textContent = P.playing ? "Pause" : "Play"; return; }
-  const on = !!run;
-  b.textContent = on ? "Stop" : "Start";
+  b.querySelector(".pp").hidden = !K.on; b.querySelector(".lbl").hidden = K.on; b.classList.toggle("round", K.on);
+  if (K.on) { paintPlay(b, P.playing); return; }
+  b.classList.remove("on"); b.removeAttribute("aria-label");
+  b.querySelector(".lbl").textContent = run ? "Stop" : "Start";
 }
 function renderPiano() {
   const el = document.getElementById("pianoState");
