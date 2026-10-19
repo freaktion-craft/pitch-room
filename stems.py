@@ -470,9 +470,15 @@ def song_info(song_id: str) -> dict:
     info = {k: v for k, v in meta.items() if k != "beats"}
     info["beatCount"] = len(meta.get("beats") or [])
     if "vocals" in meta.get("stems", []):
-        notes = get_melody(song_id)
-        ms = [x[2] for x in notes["notes"]]
-        info["vocals"] = {"lo": min(ms), "hi": max(ms), "mostly": notes.get("range")} if ms else None
+        data = get_melody(song_id)
+        mel = data["notes"]
+        if mel:
+            lo, hi = min(x[2] for x in mel), max(x[2] for x in mel)
+            # where to hear each extreme: its longest note, so a passing blip isn't the one played
+            at = lambda m: max((x for x in mel if x[2] == m), key=lambda x: x[1] - x[0])[:2]  # noqa: E731
+            info["vocals"] = {"lo": lo, "hi": hi, "mostly": data.get("range"), "loAt": at(lo), "hiAt": at(hi)}
+        else:
+            info["vocals"] = None
     return info
 
 
