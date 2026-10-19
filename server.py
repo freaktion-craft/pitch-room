@@ -22,10 +22,32 @@ MAX_SONG = 400 * 1024 * 1024
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # Keep-alive. With HTTP/1.0 the server closes the socket after every reply, and on Windows that
+    # sometimes reset the connection before the browser read it (~1 in 7 API calls failed).
+    protocol_version = "HTTP/1.1"
+    _unread = 0  # request body bytes not read yet
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
 
+    def handle(self):
+        try:
+            super().handle()
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass  # the client dropped a keep-alive connection; nothing to report
+
+    def _drain(self):
+        # Discard a body we won't use (too big, unknown path): left unread it would be parsed as the next
+        # request, and closing on unread data makes Windows reset the connection before the reply arrives.
+        while self._unread > 0:
+            chunk = self.rfile.read(min(self._unread, 1 << 20))
+            if not chunk:
+                break
+            self._unread -= len(chunk)
+        self._unread = 0
+
     def _json(self, code, payload):
+        self._drain()
         body = json.dumps(payload, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -37,6 +59,7 @@ class Handler(SimpleHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0 or n > limit:
             raise ValueError(f"Please send a file under {limit // (1024 * 1024)} MB.")
+        self._unread = 0
         return self.rfile.read(n)
 
     def do_GET(self):
@@ -89,6 +112,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         url = urlparse(self.path)
+        self._unread = int(self.headers.get("Content-Length") or 0)
         if url.path.startswith(("/api/stems/", "/api/library/")):
             try:
                 return self._stems_post(url)
@@ -105,7 +129,8 @@ class Handler(SimpleHTTPRequestHandler):
         q = parse_qs(url.query)
         num = lambda k: float(q[k][0]) if k in q and q[k][0] not in ("", "NaN") else None  # noqa: E731
         try:
-            samples = decode(self.rfile.read(n), num("start"), num("end"))
+            data, self._unread = self.rfile.read(n), 0
+            samples = decode(data, num("start"), num("end"))
             return self._json(200, analyze(samples))
         except ValueError as e:
             return self._json(422, {"error": str(e)})
