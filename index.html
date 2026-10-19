@@ -117,8 +117,12 @@ details.refs a { color: var(--ink); text-decoration: underline; text-decoration-
 .row > span:first-child { font-size: 14px; }
 .row em { font-style: normal; color: var(--faint); font-size: 12.5px; margin-left: 6px; }
 .row em.fail { color: var(--bad); }
-select, input[type="number"] { height: 32px; border: 0; border-radius: 8px; background: var(--surface-2); padding: 0 10px; font-size: 14px; max-width: 100%; }
-select:hover, input[type="number"]:hover { background: #ECECEC; }
+select, input[type="number"] { height: 32px; border: 0; border-radius: 8px; background-color: var(--surface-2); padding: 0 10px; font-size: 14px; max-width: 100%; }
+select:hover, input[type="number"]:hover { background-color: #ECECEC; }
+/* Our own chevron instead of the OS one: same 1.5px stroke and grey as the rest of the UI, centred, with room on the right */
+select { appearance: none; -webkit-appearance: none; padding-right: 30px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px; }
 .range-row { display: flex; align-items: center; gap: 6px; color: var(--faint); }
 .range-row select { color: var(--ink); }
 .tempo { display: flex; align-items: center; gap: 10px; }
@@ -305,7 +309,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .dl { height: 28px; width: 30px; border: 0; border-radius: 6px; background: transparent; color: rgba(0, 0, 0, 0.45); font-size: 15px; }
 .dl:hover { background: var(--fill); color: var(--ink); }
 .clickopts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
-.clickopts select { height: 28px; font-size: 12.5px; padding: 0 6px; }
+.clickopts select { height: 28px; font-size: 12.5px; padding: 0 24px 0 8px; background-position: right 8px center; }
 .export-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 #sLib .row { cursor: default; }
 #sLib .row.empty { color: var(--muted); font-size: 14px; }
