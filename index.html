@@ -307,12 +307,13 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .log { margin: 0; max-height: 120px; overflow: auto; font: 11.5px/1.5 var(--mono); color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
 .yt { display: flex; gap: 8px; }
 /* flex-basis auto (not 0) so the field keeps its height when the row stacks on narrow screens */
-.yt input { flex: 1 1 auto; min-width: 0; height: 52px; border: 1px solid transparent; border-radius: 10px; background: var(--surface-2);
-  padding: 0 16px; font-size: 15px; transition: border-color 0.15s, background-color 0.15s; }
+/* same height as the app's other fields (selects, small buttons) */
+.yt input { flex: 1 1 auto; min-width: 0; height: 32px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2);
+  padding: 0 10px; font-size: 14px; transition: border-color 0.15s, background-color 0.15s; }
 .yt input::placeholder { color: rgba(var(--fg), 0.38); }
 .yt input:hover { background: var(--hover-2); }
 .yt input:focus { outline: none; background: var(--surface); border-color: var(--ink); }
-.yt .btn { height: 52px; padding: 0 22px; font-size: 15px; border-radius: 10px; flex: none; }
+.yt .btn { flex: none; }
 .job { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13.5px; }
 .job .top { display: flex; justify-content: space-between; gap: 12px; }
 .job .top span:last-child { font: 12.5px var(--mono); color: var(--muted); }
@@ -353,8 +354,14 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .clickopts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
 .clickopts select { height: 28px; font-size: 12.5px; padding: 0 24px 0 8px; background-position: right 8px center; }
 .export-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-#sLib .row { cursor: default; }
-#sLib .row.empty { color: var(--muted); font-size: 14px; }
+.back { display: flex; width: fit-content; margin-bottom: 20px; }
+.lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#sJobs { display: grid; gap: 8px; }
+#sJobs:empty { display: none; }
+#sLib { overflow: hidden; }
+#sLib .row { cursor: pointer; transition: background-color 0.15s; }
+#sLib .row:hover { background: rgba(var(--fg), 0.03); }
+#sLib .row.empty { cursor: default; background: none; color: var(--muted); font-size: 14px; }
 .song { display: grid; gap: 2px; min-width: 0; }
 .song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .song small { color: var(--faint); font-size: 12.5px; }
@@ -603,14 +610,23 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <div id="tRefs"></div>
     </section>
   </main>
+  <!-- three pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>) -->
   <main id="vStems" aria-label="Stems" hidden>
-    <div class="intro">
+    <div class="intro" id="sIntro">
       <h1 class="title">Stems</h1>
       <p class="lede">Split a song into vocals, drums, bass and the rest. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
     </div>
+    <a class="btn sm back" id="sBack" href="#stems" hidden>← Library</a>
     <p class="server-off" id="sServer" hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
+    <section class="group" id="sLibPage">
+      <div class="lib-head"><div class="group-label">Library</div><a class="btn sm dark" href="#stems/add">Add song</a></div>
+      <div id="sJobs"></div>
+      <div class="rows" id="sLib"><div class="row empty">No songs yet.</div></div>
+    </section>
+
+    <div id="sAddPage" hidden>
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
       <p class="muted">Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, and YouTube links use yt-dlp. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
@@ -623,7 +639,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <b>Add a song</b>
       <form class="yt" id="sYtForm">
         <input type="url" id="sYtUrl" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false" aria-label="YouTube link">
-        <button class="btn dark" type="submit">Separate</button>
+        <button class="btn sm dark" type="submit">Separate</button>
       </form>
       <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*"><span>or choose an audio file · drop it here</span></label>
       <div class="row-actions">
@@ -636,14 +652,15 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <div class="bar" hidden id="sGpuBar"><i></i></div>
         <span class="muted" id="sGpuState"></span>
       </div>
+      <p class="muted" id="sAddMsg" hidden></p>
       <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
-      <div id="sJobs"></div>
     </section>
+    </div>
 
     <section class="player" id="sPlayer" hidden>
       <div class="player-head">
         <div class="player-title"><b id="pTitle"></b><span class="muted" id="pMeta"></span></div>
-        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button">Sing along</button><button class="btn sm" id="pClose" type="button">Library</button></div>
+        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button">Sing along</button></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
@@ -659,11 +676,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <button class="btn dark" id="pExport" type="button">Export what you hear (MP3)</button>
         <span class="muted" id="pExportState"></span>
       </div>
-    </section>
-
-    <section class="group" id="sLibWrap">
-      <div class="group-label">Library</div>
-      <div class="rows" id="sLib"><div class="row empty">No songs yet. Paste a link or drop a file above.</div></div>
     </section>
   </main>
   <main id="vRange" aria-label="Voice type" hidden>
@@ -1529,6 +1541,7 @@ const fmtTime = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:
 let stemsStatus = null, pollers = {};
 
 async function stemsRefresh() {
+  renderLibrary(); // doesn't wait for the tools check, which can take a while
   let st = null, err = null; // err: the server answered but the check failed, which is not "server not running"
   try {
     const r = await fetch("/api/stems/status", { cache: "no-store" });
@@ -1552,19 +1565,19 @@ async function stemsRefresh() {
       $("#sGpuBtn").hidden = true;
     }
   }
-  renderLibrary();
 }
 async function renderLibrary() {
   const box = $("#sLib");
   let lib = [];
   try { lib = await (await fetch("/api/library", { cache: "no-store" })).json(); } catch (e) { lib = []; }
   box.innerHTML = "";
-  if (!lib.length) { box.append(el("div", "row empty", "No songs yet. Paste a link or drop a file above.")); return; }
+  if (!lib.length) { box.append(el("div", "row empty", "No songs yet. Add one with Add song.")); return; }
   lib.forEach((m) => {
-    const row = el("div", "row"), info = el("div", "song");
-    info.append(el("b", null, m.title), el("small", null, `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat"} · ${m.stems.length} tracks · ${new Date(m.created * 1000).toLocaleDateString()}`));
+    const row = el("div", "row"), info = el("div", "song"), link = el("a");
+    link.href = "#stems/" + m.id; link.append(el("b", null, m.title));
+    info.append(link, el("small", null, `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat"} · ${m.stems.length} tracks · ${new Date(m.created * 1000).toLocaleDateString()}`));
+    row.onclick = (e) => { if (!e.target.closest("a, button")) go("stems/" + m.id); };
     const acts = el("div", "song-actions");
-    acts.append(mkBtn("Open", () => openSong(m), true));
     const del = mkBtn("Delete", async () => {
       if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Really delete?"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Delete"; }, 3000); return; }
       await fetch(`/api/library/${m.id}/delete`, { method: "POST" });
@@ -1584,7 +1597,7 @@ function jobCard(id) {
   }
   return card;
 }
-function watchJob(id, kind) {
+function watchJob(id, kind, forSong) {
   if (pollers[id]) return;
   pollers[id] = setInterval(async () => {
     let j;
@@ -1599,6 +1612,8 @@ function watchJob(id, kind) {
       $("#sInstallState").textContent = j.status === "error" ? j.error : j.stage;
       $("#sInstallLog").textContent = (j.log || []).join("\n");
       $("#sInstallBtn").disabled = j.status === "running" || j.status === "queued";
+    } else if (kind === "video") {
+      if (P.song && P.song.id === forSong) videoWait(j.status === "error" ? j.error : `${j.stage}… ${Math.round(j.progress * 100)}%`, j.status === "error");
     } else {
       const card = jobCard(id), [a, b] = card.querySelectorAll(".top span");
       a.textContent = j.status === "error" ? j.error : j.stage;
@@ -1609,11 +1624,12 @@ function watchJob(id, kind) {
     if (j.status === "done" || j.status === "error") {
       clearInterval(pollers[id]); delete pollers[id];
       if ((kind === "install" || kind === "gpu") && j.status === "done") stemsRefresh();
-      if (kind !== "install" && j.status === "done") {
+      if (kind === "video") videoFetched(forSong, j.status === "done");
+      if (kind === "separate" && j.status === "done") {
         document.getElementById("job-" + id)?.remove();
-        const lib = await (await fetch("/api/library", { cache: "no-store" })).json();
         renderLibrary();
-        const m = lib.find((x) => x.id === j.songId); if (m) openSong(m);
+        // open the new song, unless that would pull the user away from something else
+        if (view === "stems" && stemsPage === "lib") go("stems/" + j.songId);
       }
     }
   }, 700);
@@ -1627,25 +1643,29 @@ async function postJob(url, body, headers) {
 async function submitYoutube(e) {
   e.preventDefault();
   const url = $("#sYtUrl").value.trim(); if (!url) return;
+  addMsg("Starting…");
   try {
     const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: $("#sModel").value }), { "Content-Type": "application/json" });
-    $("#sYtUrl").value = ""; jobCard(id).querySelector(".top span").textContent = "Starting…"; watchJob(id, "separate");
-  } catch (err) { const c = jobCard("x" + Date.now()); c.classList.add("err"); c.querySelector(".top span").textContent = err.message; }
+    $("#sYtUrl").value = ""; jobStarted(id, "Starting…");
+  } catch (err) { addMsg(err.message, true); }
 }
 async function submitFile(file) {
   if (!file) return;
+  addMsg("Uploading…");
   try {
     const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${$("#sModel").value}`, file);
-    jobCard(id).querySelector(".top span").textContent = "Uploading…"; watchJob(id, "separate");
-  } catch (err) { const c = jobCard("x" + Date.now()); c.classList.add("err"); c.querySelector(".top span").textContent = err.message; }
+    jobStarted(id, "Uploading…");
+  } catch (err) { addMsg(err.message, true); }
 }
+function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; p.textContent = text || ""; p.style.color = err ? "var(--bad)" : ""; }
+// The new song's progress shows in the library, where it will land.
+function jobStarted(id, text) { addMsg(""); jobCard(id).querySelector(".top span").textContent = text; watchJob(id, "separate"); if (view === "stems" && stemsPage === "add") go("stems"); }
 
 // player
 async function openSong(m) {
   closeSong();
   ensureCtx();
   P.song = m; P.offset = 0;
-  $("#sPlayer").hidden = false;
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
   $("#pMeta").textContent = `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat found"} · loading tracks…`;
@@ -1653,12 +1673,11 @@ async function openSong(m) {
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
   box.classList.remove("ready"); box.style.aspectRatio = ""; wait.classList.remove("err"); wait.textContent = "Loading video…";
   if (m.video) v.src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
-  paintVideo();
+  showVideo = false; paintVideo();
   $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
   for (const name of m.stems) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
   renderTracks();
-  $("#sPlayer").scrollIntoView({ behavior: "smooth", block: "start" });
   const loaded = await Promise.all(m.stems.map(async (name) => {
     const r = await fetch(`/library/${m.id}/${name}.mp3`);
     return [name, await ac.decodeAudioData(await r.arrayBuffer())];
@@ -1674,9 +1693,24 @@ function closeSong() {
   P.song = null; P.buffers = {}; P.peaks = null;
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
-  $("#sPlayer").hidden = true;
 }
-let showVideo = store.get("showVideo", true);
+function videoWait(text, err) {
+  const box = $("#pVideoBox"), wait = $("#pVideoWait");
+  box.hidden = false; box.classList.remove("ready"); wait.textContent = text; wait.classList.toggle("err", !!err);
+}
+async function videoFetched(songId, ok) {
+  if (!P.song || P.song.id !== songId) return;
+  if (!ok) { $("#pGetVideo").disabled = false; return; }
+  let m = null;
+  try { m = (await (await fetch("/api/library", { cache: "no-store" })).json()).find((x) => x.id === songId); } catch (e) { m = null; }
+  if (!m || !m.video || !P.song || P.song.id !== songId) return;
+  P.song.video = m.video; $("#pGetVideo").hidden = true;
+  showVideo = true; // asked for it, so show it
+  videoWait("Loading video…");
+  $("#pVideo").src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
+  paintVideo();
+}
+let showVideo = false; // hidden whenever a song opens; Show video brings it up (it loads in the background meanwhile)
 function paintVideo() {
   const has = !!(P.song && P.song.video);
   $("#pVideoBox").hidden = !has || !showVideo;
@@ -1785,7 +1819,7 @@ function drawWave() {
   x.fillStyle = C.voice; x.fillRect(prog * W - 1, 0, 2, H);
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
 }
-requestAnimationFrame(function waveLoop() { if (view === "stems" && P.song) drawWave(); requestAnimationFrame(waveLoop); });
+requestAnimationFrame(function waveLoop() { if (view === "stems" && stemsPage === "song" && P.song) drawWave(); requestAnimationFrame(waveLoop); });
 
 function renderTracks() {
   const box = $("#pTracks"); box.innerHTML = "";
@@ -1846,11 +1880,12 @@ function initStems() {
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { $("#sGpuState").textContent = e.message; $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
   $("#pGetVideo").onclick = async () => {
-    const b = $("#pGetVideo"); b.disabled = true;
-    try { const id = await postJob(`/api/library/${P.song.id}/video`); jobCard(id).querySelector(".top span").textContent = "Getting the video…"; watchJob(id, "video"); }
-    catch (err) { b.disabled = false; const c = jobCard("x" + Date.now()); c.classList.add("err"); c.querySelector(".top span").textContent = err.message; }
+    const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
+    videoWait("Getting the video…");
+    try { watchJob(await postJob(`/api/library/${songId}/video`), "video", songId); }
+    catch (err) { b.disabled = false; if (P.song && P.song.id === songId) videoWait(err.message, true); }
   };
-  $("#pVideoBtn").onclick = () => { showVideo = !showVideo; store.set("showVideo", showVideo); paintVideo(); };
+  $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
   const v = $("#pVideo");
   v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
   v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));
@@ -1863,7 +1898,6 @@ function initStems() {
   $("#pPlay").onclick = () => (P.playing ? pauseSong() : playSong());
   $("#pBack").onclick = () => seekSong(songPos() - 5);
   $("#pFwd").onclick = () => seekSong(songPos() + 5);
-  $("#pClose").onclick = closeSong;
   $("#pSing").onclick = () => P.song && singSong(P.song);
   $("#pExport").onclick = exportAudible;
   $("#pWave").addEventListener("click", (e) => { const r = e.currentTarget.getBoundingClientRect(); seekSong(((e.clientX - r.left) / r.width) * songDur()); });
@@ -1920,7 +1954,7 @@ function initSing() {
   $("#kClick").onclick = () => { const c = P.tracks.click; c.mute = !c.mute; $("#kClick").setAttribute("aria-pressed", String(!c.mute)); applyGains(); };
   $("#kBack").onclick = () => { K.hist = []; seekSong(songPos() - 5); };
   $("#kFwd").onclick = () => { K.hist = []; seekSong(songPos() + 5); };
-  $("#kLeave").onclick = () => { leaveSong(); go("stems"); };
+  $("#kLeave").onclick = () => { leaveSong(); go(P.song ? "stems/" + P.song.id : "stems"); };
 }
 
 // ---------- voice type ----------
@@ -2471,15 +2505,29 @@ function renderPick() {
     nav.append(j);
   });
 }
-let view = "pick", lastPractice = "pick";
+let view = "pick", lastPractice = "pick", stemsPage = "lib";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
+// Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
+function stemsRoute(sub) {
+  stemsPage = !sub ? "lib" : sub === "add" ? "add" : "song";
+  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBack").hidden = stemsPage === "lib";
+  $("#sLibPage").hidden = stemsPage !== "lib"; $("#sAddPage").hidden = stemsPage !== "add"; $("#sPlayer").hidden = stemsPage !== "song";
+  stemsRefresh();
+  if (stemsPage === "song" && (!P.song || P.song.id !== sub)) openSongById(sub);
+}
+async function openSongById(id) {
+  let m = null;
+  try { m = (await (await fetch("/api/library", { cache: "no-store" })).json()).find((x) => x.id === id); } catch (e) { m = null; }
+  if (location.hash !== "#stems/" + id) return; // moved on meanwhile
+  if (m) openSong(m); else location.replace("#stems");
+}
 function route() {
-  const v = (location.hash || "#pick").slice(1);
+  const [v, sub] = (location.hash || "#pick").slice(1).split("/");
   view = ["pick", "setup", "play", "range", "timbre", "stems"].includes(v) ? v : "pick";
   $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vRange").hidden = view !== "range"; $("#vTimbre").hidden = view !== "timbre"; $("#vStems").hidden = view !== "stems";
   if (view === "range") renderRange(); else vtStop(false);
-  if (view !== "stems" && !(view === "play" && K.on) && P.playing) pauseSong();
-  if (view === "stems") stemsRefresh();
+  if (view === "stems") stemsRoute(sub);
+  if (P.playing && !(view === "stems" && stemsPage === "song") && !(view === "play" && K.on)) pauseSong();
   if (view !== "timbre" && rec) rec.stop();
   if (view === "timbre") { checkServer(); renderTimbre(); }
   const practice = ["pick", "setup", "play"].includes(view);
@@ -2522,7 +2570,7 @@ $("#startBtn").onclick = () => (K.on ? songToggle() : run ? stopRun() : startRun
 $("#goBtn").onclick = () => { if (K.on) leaveSong(); go("play"); startRun(); };
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
 document.addEventListener("keydown", (e) => {
-  if (e.code === "Space" && view === "stems" && P.song && !e.target.closest("input, select, button, textarea")) { e.preventDefault(); P.playing ? pauseSong() : playSong(); return; }
+  if (e.code === "Space" && view === "stems" && stemsPage === "song" && P.song &&!e.target.closest("input, select, button, textarea")) { e.preventDefault(); P.playing ? pauseSong() : playSong(); return; }
   if (e.code === "Space" && view === "play" && K.on && !e.target.closest("input, select, button, textarea")) { e.preventDefault(); songToggle(); return; }
   if (e.code !== "Space" || view !== "play" || e.target.closest("input, select, button, .key")) return;
   e.preventDefault(); run ? stopRun() : startRun();
