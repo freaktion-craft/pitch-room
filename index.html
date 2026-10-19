@@ -267,7 +267,13 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width 0.4s var(--ease); }
 .log { margin: 0; max-height: 120px; overflow: auto; font: 11.5px/1.5 var(--mono); color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
 .yt { display: flex; gap: 8px; }
-.yt input { flex: 1; min-width: 0; height: 40px; border: 0; border-radius: 8px; background: var(--surface-2); padding: 0 12px; font-size: 14px; }
+/* flex-basis auto (not 0) so the field keeps its height when the row stacks on narrow screens */
+.yt input { flex: 1 1 auto; min-width: 0; height: 52px; border: 1px solid transparent; border-radius: 10px; background: var(--surface-2);
+  padding: 0 16px; font-size: 15px; transition: border-color 0.15s, background-color 0.15s; }
+.yt input::placeholder { color: rgba(0, 0, 0, 0.38); }
+.yt input:hover { background: #ECECEC; }
+.yt input:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+.yt .btn { height: 52px; padding: 0 22px; font-size: 15px; border-radius: 10px; flex: none; }
 .job { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13.5px; }
 .job .top { display: flex; justify-content: space-between; gap: 12px; }
 .job .top span:last-child { font: 12.5px var(--mono); color: var(--muted); }
@@ -312,6 +318,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   .track > :last-child { grid-row: 1; grid-column: 5; }
   .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
   .yt { flex-direction: column; }
+  .yt input, .yt .btn { width: 100%; justify-content: center; }
   .transport-row .kb { display: none; }
 }
 </style>
@@ -509,7 +516,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <section class="panel-card" id="sAdd" hidden>
       <b>Add a song</b>
       <form class="yt" id="sYtForm">
-        <input type="url" id="sYtUrl" placeholder="Paste a YouTube link — https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" aria-label="YouTube link">
+        <input type="url" id="sYtUrl" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false" aria-label="YouTube link">
         <button class="btn dark" type="submit">Separate</button>
       </form>
       <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*"><span>or choose an audio file · drop it here</span></label>
