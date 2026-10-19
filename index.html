@@ -247,6 +247,66 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .caveats { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); max-width: 72ch; }
 .seg .sep { width: 1px; background: rgba(0, 0, 0, 0.1); margin: 7px 2px; }
 @media (max-width: 760px) { .slots, .maps { grid-template-columns: minmax(0, 1fr); } .mtable .vals { gap: 10px; } .mtable .vals span { min-width: 52px; } }
+
+/* Stems page */
+.panel-card { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 16px; display: grid; gap: 12px; margin-bottom: 24px; }
+.panel-card > b { font-weight: 500; font-size: 15px; }
+.panel-card p { margin: 0; max-width: 72ch; }
+.panel-card a { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
+.row-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inline-field { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.fine { font-size: 12.5px; color: var(--faint); }
+.bar { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width 0.4s var(--ease); }
+.log { margin: 0; max-height: 120px; overflow: auto; font: 11.5px/1.5 var(--mono); color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
+.yt { display: flex; gap: 8px; }
+.yt input { flex: 1; min-width: 0; height: 40px; border: 0; border-radius: 8px; background: var(--surface-2); padding: 0 12px; font-size: 14px; }
+.job { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13.5px; }
+.job .top { display: flex; justify-content: space-between; gap: 12px; }
+.job .top span:last-child { font: 12.5px var(--mono); color: var(--muted); }
+.job.err { color: var(--bad); }
+.job.err .bar { display: none; }
+
+.player { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 16px; display: grid; gap: 14px; margin-bottom: 32px; }
+.player-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.player-title { display: grid; gap: 2px; min-width: 0; }
+.player-title b { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
+.player-title .muted { font-size: 13px; }
+#pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; }
+.transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.transport-row output { font: 13px var(--mono); color: rgba(0, 0, 0, 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.transport-row .kb { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(0, 0, 0, 0.35); }
+.btn.round { min-width: 72px; justify-content: center; }
+.tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
+.track { display: grid; grid-template-columns: 12px minmax(84px, 1fr) auto auto minmax(90px, 160px) auto; align-items: center; gap: 10px; padding: 8px 12px; min-height: 48px; }
+.track + .track { border-top: 1px solid var(--line); }
+.track .dot { width: 10px; height: 10px; border-radius: 50%; }
+.track .name { font-size: 14px; }
+.track .name small { display: block; color: var(--faint); font-size: 12px; }
+.track.off .name, .track.off .dot { opacity: 0.35; }
+.tog { height: 28px; min-width: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fill); font: 500 12px var(--mono); color: rgba(0, 0, 0, 0.55); }
+.tog[aria-pressed="true"].m { background: var(--ink); color: #fff; }
+.tog[aria-pressed="true"].s { background: #F2C14E; color: #3A2A00; }
+.tog:hover { background: rgba(0, 0, 0, 0.09); }
+.track input[type="range"] { width: 100%; }
+.dl { height: 28px; width: 30px; border: 0; border-radius: 6px; background: transparent; color: rgba(0, 0, 0, 0.45); font-size: 15px; }
+.dl:hover { background: var(--fill); color: var(--ink); }
+.clickopts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.clickopts select { height: 28px; font-size: 12.5px; padding: 0 6px; }
+.export-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+#sLib .row { cursor: default; }
+#sLib .row.empty { color: var(--muted); font-size: 14px; }
+.song { display: grid; gap: 2px; min-width: 0; }
+.song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
+.song small { color: var(--faint); font-size: 12.5px; }
+.song-actions { display: flex; gap: 6px; }
+@media (max-width: 760px) {
+  .track { grid-template-columns: 12px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
+  .track > :last-child { grid-row: 1; grid-column: 5; }
+  .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
+  .yt { flex-direction: column; }
+  .transport-row .kb { display: none; }
+}
 </style>
 </head>
 <body>
@@ -258,6 +318,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <a href="#play" data-view="play"><i>3</i>Practice</a>
       <span class="sep" aria-hidden="true"></span>
       <a href="#timbre" data-view="timbre">Timbre map</a>
+      <a href="#stems" data-view="stems">Stems</a>
     </nav>
     <button class="chipbtn mic" id="micBtn" type="button"><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="meter"><i id="meter"></i></span></button>
   </header>
@@ -418,6 +479,61 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <li>Above about 350 Hz (around F4) vowel formants can’t be measured reliably, so the vowel chart is greyed out.</li>
       </ul>
       <div id="tRefs"></div>
+    </section>
+  </main>
+  <main id="vStems" aria-label="Stems" hidden>
+    <div class="intro">
+      <h1 class="title">Stems</h1>
+      <p class="lede">Split a song into vocals, drums, bass and the rest. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
+    </div>
+    <p class="server-off" id="sServer" hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
+
+    <section class="panel-card" id="sInstall" hidden>
+      <b>One-time setup</b>
+      <p class="muted">Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, and YouTube links use yt-dlp. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
+      <div class="row-actions"><button class="btn dark" id="sInstallBtn" type="button">Install stem tools</button><span class="muted" id="sInstallState"></span></div>
+      <div class="bar" hidden id="sInstallBar"><i></i></div>
+      <pre class="log" id="sInstallLog" hidden></pre>
+    </section>
+
+    <section class="panel-card" id="sAdd" hidden>
+      <b>Add a song</b>
+      <form class="yt" id="sYtForm">
+        <input type="url" id="sYtUrl" placeholder="Paste a YouTube link — https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" aria-label="YouTube link">
+        <button class="btn dark" type="submit">Separate</button>
+      </form>
+      <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*"><span>or choose an audio file · drop it here</span></label>
+      <div class="row-actions">
+        <label class="inline-field">Split into <select id="sModel"></select></label>
+        <span class="muted" id="sDevice"></span>
+      </div>
+      <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
+      <div id="sJobs"></div>
+    </section>
+
+    <section class="player" id="sPlayer" hidden>
+      <div class="player-head">
+        <div class="player-title"><b id="pTitle"></b><span class="muted" id="pMeta"></span></div>
+        <button class="btn sm" id="pClose" type="button">Library</button>
+      </div>
+      <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
+      <div class="transport-row">
+        <button class="btn dark round" id="pPlay" type="button" aria-label="Play">Play</button>
+        <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
+        <button class="btn sm" id="pFwd" type="button" aria-label="Forward 5 seconds">+5 s</button>
+        <output id="pTime">0:00 / 0:00</output>
+        <span class="kb"><span class="keycap">Space</span>play / pause</span>
+      </div>
+      <div class="tracks" id="pTracks"></div>
+      <div class="export-row">
+        <button class="btn dark" id="pExport" type="button">Export what you hear (MP3)</button>
+        <span class="muted" id="pExportState"></span>
+      </div>
+    </section>
+
+    <section class="group" id="sLibWrap">
+      <div class="group-label">Library</div>
+      <div class="rows" id="sLib"><div class="row empty">No songs yet. Paste a link or drop a file above.</div></div>
     </section>
   </main>
 </div>
@@ -1222,6 +1338,291 @@ function initTimbre() {
   renderTimbre();
 }
 
+// ---------- stems ----------
+const STEM_COLORS = { vocals: "#2F6BFF", drums: "#E0484E", bass: "#7A5AF8", guitar: "#D99A1E", piano: "#1FA971", other: "#8A8F98", click: "#202020" };
+const STEM_NOTES = { vocals: "lead and backing voices", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
+const P = { song: null, buffers: {}, tracks: {}, playing: false, startAt: 0, offset: 0, sources: [], peaks: null, bus: null, clickNext: 0 };
+const fmtTime = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`; };
+let stemsStatus = null, pollers = {};
+
+async function stemsRefresh() {
+  let st = null;
+  try { const r = await fetch("/api/stems/status", { cache: "no-store" }); st = r.ok ? await r.json() : null; } catch (e) { st = null; }
+  stemsStatus = st;
+  $("#sServer").hidden = !!st;
+  $("#sInstall").hidden = !st || st.installed;
+  $("#sAdd").hidden = !st || !st.installed;
+  if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
+  if (st && st.installed) {
+    const sel = $("#sModel");
+    if (!sel.options.length) for (const [k, v] of Object.entries(st.models)) { const o = document.createElement("option"); o.value = k; o.textContent = v; sel.append(o); }
+    $("#sDevice").textContent = { mps: "Runs on your Apple GPU — about 30 s for a 4-minute song.", cuda: "Runs on your NVIDIA GPU — usually under a minute.", cpu: "Runs on the CPU — a 4-minute song can take several minutes." }[st.device] || "";
+  }
+  renderLibrary();
+}
+async function renderLibrary() {
+  const box = $("#sLib");
+  let lib = [];
+  try { lib = await (await fetch("/api/library", { cache: "no-store" })).json(); } catch (e) { lib = []; }
+  box.innerHTML = "";
+  if (!lib.length) { box.append(el("div", "row empty", "No songs yet. Paste a link or drop a file above.")); return; }
+  lib.forEach((m) => {
+    const row = el("div", "row"), info = el("div", "song");
+    info.append(el("b", null, m.title), el("small", null, `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat"} · ${m.stems.length} tracks · ${new Date(m.created * 1000).toLocaleDateString()}`));
+    const acts = el("div", "song-actions");
+    acts.append(mkBtn("Open", () => openSong(m), true));
+    const del = mkBtn("Delete", async () => {
+      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Really delete?"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Delete"; }, 3000); return; }
+      await fetch(`/api/library/${m.id}/delete`, { method: "POST" });
+      if (P.song && P.song.id === m.id) closeSong();
+      renderLibrary();
+    });
+    acts.append(del); row.append(info, acts); box.append(row);
+  });
+}
+function jobCard(id) {
+  let card = document.getElementById("job-" + id);
+  if (!card) {
+    card = el("div", "job"); card.id = "job-" + id;
+    const top = el("div", "top"); top.append(el("span"), el("span"));
+    const bar = el("div", "bar"); bar.append(el("i"));
+    card.append(top, bar); $("#sJobs").prepend(card);
+  }
+  return card;
+}
+function watchJob(id, kind) {
+  if (pollers[id]) return;
+  pollers[id] = setInterval(async () => {
+    let j;
+    try { j = await (await fetch("/api/jobs/" + id, { cache: "no-store" })).json(); } catch (e) { return; }
+    if (kind === "install") {
+      $("#sInstallBar").hidden = false; $("#sInstallLog").hidden = false;
+      $("#sInstallBar i").style.width = Math.round(j.progress * 100) + "%";
+      $("#sInstallState").textContent = j.status === "error" ? j.error : j.stage;
+      $("#sInstallLog").textContent = (j.log || []).join("\n");
+      $("#sInstallBtn").disabled = j.status === "running" || j.status === "queued";
+    } else {
+      const card = jobCard(id), [a, b] = card.querySelectorAll(".top span");
+      a.textContent = j.status === "error" ? j.error : j.stage;
+      b.textContent = j.status === "error" ? "" : Math.round(j.progress * 100) + "%";
+      card.classList.toggle("err", j.status === "error");
+      card.querySelector(".bar i").style.width = Math.round(j.progress * 100) + "%";
+    }
+    if (j.status === "done" || j.status === "error") {
+      clearInterval(pollers[id]); delete pollers[id];
+      if (kind === "install" && j.status === "done") stemsRefresh();
+      if (kind !== "install" && j.status === "done") {
+        document.getElementById("job-" + id)?.remove();
+        const lib = await (await fetch("/api/library", { cache: "no-store" })).json();
+        renderLibrary();
+        const m = lib.find((x) => x.id === j.songId); if (m) openSong(m);
+      }
+    }
+  }, 700);
+}
+async function postJob(url, body, headers) {
+  const r = await fetch(url, { method: "POST", body, headers });
+  const j = await r.json().catch(() => ({ error: "The server didn’t answer properly." }));
+  if (!r.ok) throw new Error(j.error || "That didn’t work.");
+  return j.job;
+}
+async function submitYoutube(e) {
+  e.preventDefault();
+  const url = $("#sYtUrl").value.trim(); if (!url) return;
+  try {
+    const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: $("#sModel").value }), { "Content-Type": "application/json" });
+    $("#sYtUrl").value = ""; jobCard(id).querySelector(".top span").textContent = "Starting…"; watchJob(id, "separate");
+  } catch (err) { const c = jobCard("x" + Date.now()); c.classList.add("err"); c.querySelector(".top span").textContent = err.message; }
+}
+async function submitFile(file) {
+  if (!file) return;
+  try {
+    const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${$("#sModel").value}`, file);
+    jobCard(id).querySelector(".top span").textContent = "Uploading…"; watchJob(id, "separate");
+  } catch (err) { const c = jobCard("x" + Date.now()); c.classList.add("err"); c.querySelector(".top span").textContent = err.message; }
+}
+
+// player
+async function openSong(m) {
+  closeSong();
+  ensureCtx();
+  P.song = m; P.offset = 0;
+  $("#sPlayer").hidden = false;
+  $("#pTitle").textContent = m.title;
+  $("#pMeta").textContent = `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat found"} · loading tracks…`;
+  P.tracks = {};
+  for (const name of m.stems) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
+  P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
+  renderTracks();
+  $("#sPlayer").scrollIntoView({ behavior: "smooth", block: "start" });
+  const loaded = await Promise.all(m.stems.map(async (name) => {
+    const r = await fetch(`/library/${m.id}/${name}.mp3`);
+    return [name, await ac.decodeAudioData(await r.arrayBuffer())];
+  }));
+  if (P.song !== m) return;
+  P.buffers = Object.fromEntries(loaded);
+  computePeaks();
+  $("#pMeta").textContent = `${fmtTime(m.duration)} · ${m.bpm ? m.bpm + " BPM" : "no steady beat found"} · ${m.stems.length} tracks`;
+  drawWave();
+}
+function closeSong() {
+  pauseSong();
+  P.song = null; P.buffers = {}; P.peaks = null;
+  $("#sPlayer").hidden = true;
+}
+function songDur() { return P.song ? P.song.duration : 0; }
+function songPos() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt)) : P.offset; }
+function audible(name) {
+  const t = P.tracks[name], anySolo = Object.values(P.tracks).some((x) => x.solo);
+  return anySolo ? t.solo : !t.mute;
+}
+function applyGains() {
+  for (const [name, t] of Object.entries(P.tracks)) if (t.gain) t.gain.gain.setTargetAtTime(audible(name) ? t.vol : 0, ac.currentTime, 0.015);
+}
+function playSong() {
+  if (!P.song || !Object.keys(P.buffers).length) return;
+  ensureCtx();
+  if (P.offset >= songDur() - 0.05) P.offset = 0;
+  P.bus = ac.createGain(); P.bus.connect(master);
+  const at = ac.currentTime + 0.06;
+  P.sources = [];
+  for (const [name, buf] of Object.entries(P.buffers)) {
+    const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.bus);
+    const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(at, P.offset);
+    P.tracks[name].gain = g; P.sources.push(s);
+  }
+  const cg = ac.createGain(); cg.gain.value = audible("click") ? P.tracks.click.vol : 0; cg.connect(P.bus); P.tracks.click.gain = cg;
+  P.startAt = at; P.playing = true;
+  const beats = P.song.beats || []; P.clickNext = beats.findIndex((b) => b >= P.offset); if (P.clickNext < 0) P.clickNext = beats.length;
+  $("#pPlay").textContent = "Pause";
+}
+function pauseSong() {
+  if (!P.playing) return;
+  P.offset = songPos(); P.playing = false;
+  P.sources.forEach((s) => { try { s.stop(); } catch (e) {} });
+  const bus = P.bus; if (bus) { bus.gain.setTargetAtTime(0, ac.currentTime, 0.01); setTimeout(() => bus.disconnect(), 200); }
+  P.sources = []; Object.values(P.tracks).forEach((t) => (t.gain = null));
+  $("#pPlay").textContent = "Play";
+}
+function seekSong(t) {
+  const was = P.playing; pauseSong(); P.offset = Math.max(0, Math.min(songDur(), t)); if (was) playSong(); drawWave();
+}
+function clickTick(at, accent) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.value = accent ? 1760 : 1175;
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(accent ? 0.9 : 0.6, at + 0.001); g.gain.setTargetAtTime(0, at + 0.002, 0.012);
+  o.connect(g); g.connect(P.tracks.click.gain); o.start(at); o.stop(at + 0.08);
+}
+function stemsTick() {
+  if (!P.playing || !P.song) return;
+  const pos = songPos(), beats = P.song.beats || [], c = P.tracks.click;
+  while (P.clickNext < beats.length && beats[P.clickNext] < pos + 0.25) {
+    const b = beats[P.clickNext], at = P.startAt + (b - P.offset);
+    if (at >= ac.currentTime - 0.01) clickTick(Math.max(at, ac.currentTime), ((P.clickNext - c.offset) % c.bpb + c.bpb) % c.bpb === 0);
+    P.clickNext++;
+  }
+  if (pos >= songDur() - 0.02) { pauseSong(); P.offset = songDur(); }
+}
+setInterval(stemsTick, 50);
+
+function computePeaks() {
+  const bufs = Object.values(P.buffers); if (!bufs.length) return;
+  const n = 1200, len = bufs[0].length, step = Math.max(1, Math.floor(len / n)), peaks = new Float32Array(n);
+  const chans = bufs.map((b) => b.getChannelData(0));
+  for (let i = 0; i < n; i++) {
+    let mx = 0; const s0 = i * step, s1 = Math.min(len, s0 + step);
+    for (let j = s0; j < s1; j += 16) { let v = 0; for (const c of chans) v += c[j]; v = Math.abs(v); if (v > mx) mx = v; }
+    peaks[i] = mx;
+  }
+  const top = Math.max(...peaks) || 1; for (let i = 0; i < n; i++) peaks[i] /= top;
+  P.peaks = peaks;
+}
+function drawWave() {
+  const c = $("#pWave"), r = c.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+  if (!r.width) return;
+  if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(96 * d); }
+  const x = c.getContext("2d"), W = r.width, H = 96; x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
+  const prog = songDur() ? songPos() / songDur() : 0;
+  if (P.peaks) {
+    const n = P.peaks.length, bw = W / n;
+    for (let i = 0; i < n; i++) {
+      const h = Math.max(1, P.peaks[i] * (H - 16));
+      x.fillStyle = i / n < prog ? "#202020" : "rgba(0,0,0,0.18)";
+      x.fillRect(i * bw, (H - h) / 2, Math.max(1, bw - 0.3), h);
+    }
+  } else {
+    x.fillStyle = "rgba(0,0,0,0.35)"; x.font = "13px Pretendard, system-ui, sans-serif"; x.fillText("Loading tracks…", 12, H / 2 + 4);
+  }
+  x.fillStyle = "#2F6BFF"; x.fillRect(prog * W - 1, 0, 2, H);
+  $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
+}
+requestAnimationFrame(function waveLoop() { if (view === "stems" && P.song) drawWave(); requestAnimationFrame(waveLoop); });
+
+function renderTracks() {
+  const box = $("#pTracks"); box.innerHTML = "";
+  for (const [name, t] of Object.entries(P.tracks)) {
+    const row = el("div", "track" + (audible(name) ? "" : " off")); row.dataset.name = name;
+    const dot = el("span", "dot"); dot.style.background = STEM_COLORS[name] || "#999";
+    const nm = el("div", "name"); nm.append(document.createTextNode(name === "click" ? "Click" : name[0].toUpperCase() + name.slice(1)), el("small", null, STEM_NOTES[name] || ""));
+    const m = el("button", "tog m", "M"); m.type = "button"; m.title = name === "click" ? "Click on/off" : "Mute"; m.setAttribute("aria-pressed", String(t.mute));
+    const s = el("button", "tog s", "S"); s.type = "button"; s.title = "Solo"; s.setAttribute("aria-pressed", String(t.solo));
+    const v = document.createElement("input"); v.type = "range"; v.min = 0; v.max = 1.5; v.step = 0.01; v.value = t.vol; v.setAttribute("aria-label", name + " volume");
+    m.onclick = () => { t.mute = !t.mute; applyGains(); renderTracks(); };
+    s.onclick = () => { t.solo = !t.solo; applyGains(); renderTracks(); };
+    v.oninput = () => { t.vol = +v.value; applyGains(); };
+    let last;
+    if (name === "click") {
+      last = el("div", "clickopts");
+      const bpb = document.createElement("select"); bpb.setAttribute("aria-label", "Beats per bar");
+      [2, 3, 4, 6].forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = k + "/4"; bpb.append(o); });
+      bpb.value = t.bpb; bpb.onchange = () => { t.bpb = +bpb.value; };
+      const sh = mkBtn("Shift accent", () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = `Accent on ${t.offset + 1}`; });
+      sh.className = "tog"; sh.textContent = t.offset ? `Accent on ${t.offset + 1}` : "Shift accent";
+      last.append(bpb, sh);
+      if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
+    } else {
+      last = el("button", "dl", "↓"); last.type = "button"; last.title = `Download ${name} only (MP3)`;
+      last.onclick = () => exportMix([{ name, gain: 1 }], null, last);
+    }
+    row.append(dot, nm, m, s, v, last); box.append(row);
+  }
+}
+async function exportMix(tracks, click, btn) {
+  const state = $("#pExportState");
+  if (!tracks.length && !click) { state.textContent = "Turn on at least one track."; return; }
+  const label = btn.textContent; btn.disabled = true; state.textContent = "Mixing the MP3…";
+  try {
+    const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
+    const cd = r.headers.get("Content-Disposition") || "", m = /filename\*=UTF-8''([^;]+)/.exec(cd);
+    const name = m ? decodeURIComponent(m[1]) : "export.mp3";
+    const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    state.textContent = "Saved “" + name + "” to your downloads.";
+  } catch (e) { state.textContent = e.message; }
+  btn.disabled = false; btn.textContent = label;
+}
+function exportAudible() {
+  const tracks = P.song.stems.filter((n) => audible(n)).map((n) => ({ name: n, gain: P.tracks[n].vol }));
+  const c = P.tracks.click, click = audible("click") && P.song.beats && P.song.beats.length ? { gain: c.vol, offset: c.offset, beatsPerBar: c.bpb } : null;
+  exportMix(tracks, click, $("#pExport"));
+}
+function initStems() {
+  $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };
+  $("#sYtForm").onsubmit = submitYoutube;
+  $("#sFile").onchange = (e) => { submitFile(e.target.files[0]); e.target.value = ""; };
+  const drop = $("#sDrop");
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); submitFile(e.dataTransfer.files[0]); });
+  $("#pPlay").onclick = () => (P.playing ? pauseSong() : playSong());
+  $("#pBack").onclick = () => seekSong(songPos() - 5);
+  $("#pFwd").onclick = () => seekSong(songPos() + 5);
+  $("#pClose").onclick = closeSong;
+  $("#pExport").onclick = exportAudible;
+  $("#pWave").addEventListener("click", (e) => { const r = e.currentTarget.getBoundingClientRect(); seekSong(((e.clientX - r.left) / r.width) * songDur()); });
+}
+
 // ---------- canvas ----------
 const cv = $("#cv"), g = cv.getContext("2d");
 let W = 0, H = 0, dpr = 1, C = {};
@@ -1509,9 +1910,11 @@ let view = "pick";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
 function route() {
   const v = (location.hash || "#pick").slice(1);
-  view = ["pick", "setup", "play", "timbre"].includes(v) ? v : "pick";
-  $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vTimbre").hidden = view !== "timbre";
-  $("#app").classList.toggle("wide", view === "play" || view === "timbre");
+  view = ["pick", "setup", "play", "timbre", "stems"].includes(v) ? v : "pick";
+  $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vTimbre").hidden = view !== "timbre"; $("#vStems").hidden = view !== "stems";
+  $("#app").classList.toggle("wide", view === "play" || view === "timbre" || view === "stems");
+  if (view !== "stems" && P.playing) pauseSong();
+  if (view === "stems") stemsRefresh();
   if (view !== "timbre" && rec) rec.stop();
   if (view === "timbre") { checkServer(); renderTimbre(); }
   document.querySelectorAll(".seg a").forEach((a) => { if (a.dataset.view === view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
@@ -1546,11 +1949,12 @@ $("#startBtn").onclick = () => (run ? stopRun() : startRun());
 $("#goBtn").onclick = () => { go("play"); startRun(); };
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
 document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && view === "stems" && P.song && !e.target.closest("input, select, button, textarea")) { e.preventDefault(); P.playing ? pauseSong() : playSong(); return; }
   if (e.code !== "Space" || view !== "play" || e.target.closest("input, select, button, .key")) return;
   e.preventDefault(); run ? stopRun() : startRun();
 });
 
-syncControls(); renderMic(); renderStart(); renderPiano(); renderExInfo(); renderPick(); initTimbre(); route();
+syncControls(); renderMic(); renderStart(); renderPiano(); renderExInfo(); renderPick(); initTimbre(); initStems(); route();
 loadSamples();
 requestAnimationFrame(() => { resize(); centerKeys(); loop(); });
 })();

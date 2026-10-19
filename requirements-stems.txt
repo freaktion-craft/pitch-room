@@ -1,0 +1,6 @@
+torch>=2.2
+torchaudio>=2.2
+demucs>=4.0.1
+librosa>=0.10
+yt-dlp[default]>=2025.11.12
+deno>=2.0
