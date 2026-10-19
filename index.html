@@ -335,18 +335,22 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; }
 .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
-.transport-row .kb { margin-left: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
 .btn.round { width: 40px; padding: 0; justify-content: center; border-radius: 50%; }
+.btn.icon { width: 32px; padding: 0; justify-content: center; }
+.btn.icon .ico { width: 18px; height: 18px; }
 /* Hugeicons line icons: stroke settings live here, the paths in ICONS */
 .ico { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.mvol { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: rgba(var(--fg), 0.55); }
-.mvol .ico { width: 18px; height: 18px; }
-.mvol input { width: 120px; }
+/* the song's volume and export sit in the same columns as each track's solo button, slider and download */
+.player { --c-btn: 32px; --c-vol: 160px; }
+.mix { margin-left: auto; margin-right: 12px; display: grid; grid-template-columns: var(--c-btn) var(--c-vol) var(--c-btn); gap: 10px; align-items: center; justify-items: center; }
+.mix-ico { display: flex; color: rgba(var(--fg), 0.55); }
+.mix-ico .ico { width: 18px; height: 18px; }
+.mix input { width: 100%; justify-self: start; } /* placed like the track sliders, which start-align */
 /* play ⇄ pause icon, drawn by ppTo(). A stroke in the fill colour with round joins softens the corners
    (and covers the seam where the triangle's two halves meet). */
 .pp { width: 14px; height: 16px; flex: none; fill: currentColor; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
 .tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
-.track { display: grid; grid-template-columns: 18px minmax(84px, 1fr) auto auto minmax(90px, 160px) auto; align-items: center; gap: 10px; padding: 8px 12px; min-height: 48px; }
+.track { display: grid; grid-template-columns: 18px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 10px; padding: 8px 12px; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
 .track .ico { width: 18px; height: 18px; }
 .track .name { font-size: 14px; }
@@ -357,11 +361,15 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .tog[aria-pressed="true"].s { background: #F2C14E; color: #3A2A00; }
 .tog:hover { background: rgba(var(--fg), 0.09); }
 .track input[type="range"] { width: 100%; }
-.dl { height: 28px; width: 30px; border: 0; border-radius: 6px; background: transparent; color: rgba(var(--fg), 0.45); font-size: 15px; }
+.dl { height: 28px; width: 32px; border: 0; border-radius: 6px; background: transparent; color: rgba(var(--fg), 0.45); display: inline-flex; align-items: center; justify-content: center; }
+.dl .ico { width: 16px; height: 16px; }
 .dl:hover { background: var(--fill); color: var(--ink); }
+/* the click's options sit beside its name, so its slider lines up with the others */
+.name-row { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; min-width: 0; }
 .clickopts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
 .clickopts select { height: 28px; font-size: 12.5px; padding: 0 24px 0 8px; background-position: right 8px center; }
-.export-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.export-state { margin: 0; font-size: 13px; }
+.export-state:empty { display: none; }
 .back { display: flex; width: fit-content; margin-bottom: 20px; }
 .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 #sJobs { display: grid; gap: 8px; }
@@ -380,7 +388,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
   .yt { flex-direction: column; }
   .yt input, .yt .btn { width: 100%; justify-content: center; }
-  .transport-row .kb { display: none; }
+  .mix { margin-right: 0; }
 }
 
 /* Sing-along */
@@ -677,14 +685,14 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
         <button class="btn sm" id="pFwd" type="button" aria-label="Forward 5 seconds">+5 s</button>
         <output id="pTime">0:00 / 0:00</output>
-        <label class="mvol"><input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume"></label>
-        <span class="kb"><span class="keycap">Space</span>play / pause</span>
+        <div class="mix">
+          <label class="mix-ico" for="pVol" title="Volume"></label>
+          <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+          <button class="btn sm dark icon" id="pExport" type="button" aria-label="Export what you hear (MP3)" title="Export what you hear (MP3)"></button>
+        </div>
       </div>
       <div class="tracks" id="pTracks"></div>
-      <div class="export-row">
-        <button class="btn dark" id="pExport" type="button">Export what you hear (MP3)</button>
-        <span class="muted" id="pExportState"></span>
-      </div>
+      <p class="muted export-state" id="pExportState"></p>
     </section>
   </main>
   <main id="vRange" aria-label="Voice type" hidden>
@@ -1552,6 +1560,7 @@ const ICONS = {
   other: '<path d="M7 9.5C7 10.8807 5.88071 12 4.5 12C3.11929 12 2 10.8807 2 9.5C2 8.11929 3.11929 7 4.5 7C5.88071 7 7 8.11929 7 9.5ZM7 9.5V2C7.33333 2.5 7.6 4.6 10 5"/><circle cx="10.5" cy="19.5" r="2.5"/><circle cx="20" cy="18" r="2"/><path d="M13 19.5L13 11C13 10.09 13 9.63502 13.2466 9.35248C13.4932 9.06993 13.9938 9.00163 14.9949 8.86504C18.0085 8.45385 20.2013 7.19797 21.3696 6.42937C21.6498 6.24509 21.7898 6.15295 21.8949 6.20961C22 6.26627 22 6.43179 22 6.76283V17.9259"/><path d="M13 13C17.8 13 21 10.6667 22 10"/>',
   click: '<path d="M14.0073 6L13.7349 4.91043C13.5833 4.30398 13.5075 4.00075 13.3905 3.74637C12.9843 2.86326 12.1754 2.2317 11.2201 2.05182C10.945 2 10.6324 2 10.0073 2C9.38217 2 9.06961 2 8.79444 2.05182C7.83919 2.2317 7.0303 2.86326 6.6241 3.74637C6.50709 4.00075 6.43129 4.30398 6.27968 4.91043L3.87108 14.5448C3.01314 17.9766 2.58416 19.6925 3.48499 20.8462C4.38583 22 6.15453 22 9.69194 22H10.3226C13.86 22 15.6287 22 16.5296 20.8462C17.2402 19.9361 17.1233 18.6761 16.6211 16.5"/><path d="M10.0078 13.5V6"/><path d="M10.0078 18L17.0078 11"/><circle cx="18.5078" cy="9.5" r="2"/><path d="M20.0078 8L21.0078 7"/>',
   volume: '<path d="M14 14.8135V9.18646C14 6.04126 14 4.46866 13.0747 4.0773C12.1494 3.68593 11.0603 4.79793 8.88232 7.02192C7.75439 8.17365 7.11085 8.42869 5.50604 8.42869C4.10257 8.42869 3.40084 8.42869 2.89675 8.77262C1.85035 9.48655 2.00852 10.882 2.00852 12C2.00852 13.118 1.85035 14.5134 2.89675 15.2274C3.40084 15.5713 4.10257 15.5713 5.50604 15.5713C7.11085 15.5713 7.75439 15.8264 8.88232 16.9781C11.0603 19.2021 12.1494 20.3141 13.0747 19.9227C14 19.5313 14 17.9587 14 14.8135Z"/><path d="M17 9C17.6254 9.81968 18 10.8634 18 12C18 13.1366 17.6254 14.1803 17 15"/><path d="M20 7C21.2508 8.36613 22 10.1057 22 12C22 13.8943 21.2508 15.6339 20 17"/>',
+  download: '<path d="M2.99969 17.0002C2.99969 17.9302 2.99969 18.3952 3.10192 18.7767C3.37932 19.8119 4.18796 20.6206 5.22324 20.898C5.60474 21.0002 6.06972 21.0002 6.99969 21.0002L16.9997 21.0002C17.9297 21.0002 18.3947 21.0002 18.7762 20.898C19.8114 20.6206 20.6201 19.8119 20.8975 18.7767C20.9997 18.3952 20.9997 17.9302 20.9997 17.0002"/><path d="M16.4998 11.5002C16.4998 11.5002 13.1856 16.0002 11.9997 16.0002C10.8139 16.0002 7.49976 11.5002 7.49976 11.5002M11.9997 15.0002V3.00016"/>',
 };
 ICONS.bass = ICONS.guitar; // the set has no bass guitar
 function icon(name) {
@@ -1895,27 +1904,30 @@ function renderTracks() {
     s.onclick = () => { t.solo = !t.solo; applyGains(); renderTracks(); };
     v.oninput = () => { t.vol = +v.value; applyGains(); };
     resetOnDblClick(v, name === "click" ? 0.7 : 1);
-    let last;
+    let last, label = nm;
     if (name === "click") {
-      last = el("div", "clickopts");
+      const opts = el("div", "clickopts");
+      label = el("div", "name-row"); label.append(nm, opts);
+      last = el("span"); // no download for the click alone
       const bpb = document.createElement("select"); bpb.setAttribute("aria-label", "Beats per bar");
       [2, 3, 4, 6].forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = k + "/4"; bpb.append(o); });
       bpb.value = t.bpb; bpb.onchange = () => { t.bpb = +bpb.value; t.offset %= t.bpb; renderTracks(); };
       const sh = mkBtn("Shift accent", () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = `Accent on ${t.offset + 1}`; });
       sh.className = "tog"; sh.textContent = t.offset ? `Accent on ${t.offset + 1}` : "Shift accent";
-      last.append(bpb, sh);
+      opts.append(bpb, sh);
       if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
     } else {
-      last = el("button", "dl", "↓"); last.type = "button"; last.title = `Download ${name} only (MP3)`;
+      last = el("button", "dl"); last.type = "button"; last.title = `Download ${name} only (MP3)`; last.setAttribute("aria-label", last.title);
+      last.append(icon("download"));
       last.onclick = () => exportMix([{ name, gain: 1 }], null, last);
     }
-    row.append(dot, nm, m, s, v, last); box.append(row);
+    row.append(dot, label, m, s, v, last); box.append(row);
   }
 }
 async function exportMix(tracks, click, btn) {
   const state = $("#pExportState");
   if (!tracks.length && !click) { state.textContent = "Turn on at least one track."; return; }
-  const label = btn.textContent; btn.disabled = true; state.textContent = "Mixing the MP3…";
+  btn.disabled = true; state.textContent = "Mixing the MP3…";
   try {
     const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
@@ -1925,7 +1937,7 @@ async function exportMix(tracks, click, btn) {
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     state.textContent = "Saved “" + name + "” to your downloads.";
   } catch (e) { state.textContent = e.message; }
-  btn.disabled = false; btn.textContent = label;
+  btn.disabled = false;
 }
 function exportAudible() {
   const tracks = P.song.stems.filter((n) => audible(n)).map((n) => ({ name: n, gain: P.tracks[n].vol }));
@@ -1943,7 +1955,7 @@ function initStems() {
     catch (err) { b.disabled = false; if (P.song && P.song.id === songId) videoWait(err.message, true); }
   };
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
-  $(".mvol").prepend(icon("volume"));
+  $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
   $("#pVol").value = stemVol;
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
   resetOnDblClick($("#pVol"), 1);
