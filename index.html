@@ -1018,7 +1018,7 @@ async function openSong(m) {
   P.buffers = Object.fromEntries(loaded);
   P.raw = { lead: P.buffers.lead, backing: P.buffers.backing };
   splitBuffers();
-  computePeaks();
+  computePeaks(); P.peaksAt = performance.now(); // the waveform rises in from here
   meta();
   drawWave();
 }
@@ -1152,17 +1152,22 @@ function stemsTick() {
 }
 setInterval(stemsTick, 50);
 
+// The waveform's bars: the whole mix, and each track on the same scale (shown in its colour while it's soloed).
 function computePeaks() {
-  const bufs = Object.values(P.buffers); if (!bufs.length) return;
-  const n = 1200, len = bufs[0].length, step = Math.max(1, Math.floor(len / n)), peaks = new Float32Array(n);
-  const chans = bufs.map((b) => b.getChannelData(0));
+  const names = Object.keys(P.buffers); if (!names.length) return;
+  const n = 1200, len = P.buffers[names[0]].length, step = Math.max(1, Math.floor(len / n));
+  const chans = names.map((k) => P.buffers[k].getChannelData(0)), mix = new Float32Array(n), each = names.map(() => new Float32Array(n));
   for (let i = 0; i < n; i++) {
-    let mx = 0; const s0 = i * step, s1 = Math.min(len, s0 + step);
-    for (let j = s0; j < s1; j += 16) { let v = 0; for (const c of chans) v += c[j]; v = Math.abs(v); if (v > mx) mx = v; }
-    peaks[i] = mx;
+    const s0 = i * step, s1 = Math.min(len, s0 + step);
+    for (let j = s0; j < s1; j += 16) {
+      let v = 0;
+      for (let k = 0; k < chans.length; k++) { const a = chans[k][j] || 0; v += a; if (Math.abs(a) > each[k][i]) each[k][i] = Math.abs(a); }
+      if (Math.abs(v) > mix[i]) mix[i] = Math.abs(v);
+    }
   }
-  const top = Math.max(...peaks) || 1; for (let i = 0; i < n; i++) peaks[i] /= top;
-  P.peaks = peaks; P.peaksAt = performance.now();
+  const top = Math.max(...mix) || 1;
+  for (const arr of [mix, ...each]) for (let i = 0; i < n; i++) arr[i] /= top;
+  P.peaks = mix; P.trackPeaks = Object.fromEntries(names.map((k, i) => [k, each[i]]));
 }
 // While the tracks load the waveform is a flat line; then its bars rise out of it, sweeping left to right.
 const WAVE_RISE = 900; // ms for the whole sweep
@@ -1185,10 +1190,18 @@ function drawWave() {
   x.fillStyle = C.ink;
   if (P.peaks) {
     const n = P.peaks.length, bw = W / n, t = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
-    for (let i = 0; i < n; i++) {
-      const h = 1 + (Math.max(1, P.peaks[i] * (H - 16)) - 1) * waveRise(i, n, t);
-      x.globalAlpha = i / n < prog ? 1 : 0.18;
-      x.fillRect(i * bw, (H - h) / 2, Math.max(1, bw - 0.3), h);
+    const soloed = Object.keys(P.tracks).filter((k) => P.tracks[k].solo && P.trackPeaks && P.trackPeaks[k]);
+    const bars = (peaks, played, ahead) => {
+      for (let i = 0; i < n; i++) {
+        const h = 1 + (Math.max(1, peaks[i] * (H - 16)) - 1) * waveRise(i, n, t);
+        x.globalAlpha = i / n < prog ? played : ahead;
+        x.fillRect(i * bw, (H - h) / 2, Math.max(1, bw - 0.3), h);
+      }
+    };
+    if (!soloed.length) bars(P.peaks, 1, 0.18);
+    else { // the mix faded behind the soloed tracks, each in its icon's colour
+      bars(P.peaks, 0.16, 0.08);
+      for (const k of soloed) { x.fillStyle = STEM_COLORS[k] || C.ink; bars(P.trackPeaks[k], 1, 0.4); }
     }
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
   x.globalAlpha = 1;
@@ -1326,7 +1339,7 @@ async function saveUnsplit(parts) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Couldn’t save that.");
     m.unsplit = j.unsplit;
-    if (P.song === m) { P.sel = null; splitBuffers(); if (P.playing) seekSong(songPos()); }
+    if (P.song === m) { P.sel = null; splitBuffers(); computePeaks(); if (P.playing) seekSong(songPos()); }
   } catch (e) { $("#pExportState").textContent = e.message; }
   act.disabled = false; paintSel(); drawWave();
 }
