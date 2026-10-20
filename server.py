@@ -130,6 +130,13 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/icons.local.js" and not os.path.isfile(os.path.join(ROOT, "icons.local.js")):
+            # optional (see index.html); answer with nothing rather than a 404 in the console
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript; charset=utf-8")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
         if not path.startswith("/api/"):
             return None if self._send_range() else super().do_GET()
         try:
