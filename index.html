@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 /* Layout: one column, settings as hairline-separated rows. Colours are OKLCH, dark only. */
-@font-face { font-family: "Geist Pixel Square"; src: url("fonts/GeistPixel-Square.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 :root {
   --fg: 255, 255, 255; /* rgb of every translucent ink tint below */
   --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.275 0 0); --hover-2: oklch(0.315 0 0); /* buttons and fields stand clear of the card */
@@ -33,9 +32,9 @@
   --stem-drums: var(--stem-band); --stem-bass: var(--stem-band); --stem-guitar: var(--stem-band); --stem-piano: var(--stem-band); --stem-other: var(--stem-band);
   --stem-vocals: var(--stem-lead); --stem-click: var(--ink);
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  --font: "Apple SD Gothic Neo", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --pixel: "Geist Pixel Square", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Pretendard throughout; what was set in a monospace (times, levels, M/S) keeps its digits in line with tabular-nums */
+  --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --mono: var(--font);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: dark;
 }
@@ -196,7 +195,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .hud-l .how { font-size: 13.5px; font-weight: 500; max-width: 46ch; }
 .hud-l .how:empty { display: none; }
 .hud-r { right: 16px; text-align: right; display: grid; justify-items: end; gap: 8px; }
-.note-big { font: 500 48px/1 var(--pixel); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.note-big { font: 600 48px/1 var(--font); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .note-sub { font: 12.5px/1.2 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gauge { position: relative; width: 140px; height: 4px; border-radius: 2px; background: rgba(var(--fg), 0.08); }
 .gauge .zone { position: absolute; top: 0; bottom: 0; left: 50%; width: 16%; transform: translateX(-50%); border-radius: 2px; background: rgba(var(--fg), 0.12); }
@@ -386,14 +385,14 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .track + .track { border-top: 1px solid var(--line); }
 .track { row-gap: 8px; }
 .track .twave { grid-column: 1 / -1; display: block; width: 100%; height: 28px; cursor: pointer; } /* as wide as the song's waveform */
-/* the Vocals row's open/close button, after its name; lead and backing under it, their icon and name one step in */
+/* the Vocals row's open/close button, after its name */
 .disclose { display: inline-grid; place-items: center; width: 24px; height: 24px; margin: -4px 0 -4px 4px; padding: 0; border: 0; border-radius: 6px;
   vertical-align: middle; background: transparent; color: var(--muted); }
 .disclose:hover { background: var(--fill); color: var(--ink); }
 .disclose .ico { width: 16px; height: 16px; transition: transform 0.2s var(--ease); }
 .disclose[aria-expanded="true"] .ico { transform: rotate(180deg); }
-.track.sub { grid-template-columns: 48px minmax(60px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); }
-.track.sub > .ico:first-child { justify-self: end; }
+/* lead and backing, revealed under Vocals: no icon, their names in line with its name, on a shade darker to the card's edges */
+.track.sub { margin: 0 -16px; padding-left: 16px; padding-right: 16px; background: color-mix(in oklab, var(--bg) 60%, var(--surface)); }
 .track .ico { width: 18px; height: 18px; }
 .track .name { font-size: 14px; min-width: 0; }
 .track .name small { display: block; color: var(--faint); font-size: 12px; }
@@ -481,7 +480,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 @media (hover: none) { #sLib .song-actions .btn { opacity: 1; } }
 @media (max-width: 760px) {
   .track { grid-template-columns: 24px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
-  .track.sub { grid-template-columns: 48px minmax(60px, 1fr) auto auto auto; }
   .track > :nth-child(6) { grid-row: 1; grid-column: 5; } /* the download button */
   .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
   .track .twave { grid-row: 3; }
@@ -986,8 +984,8 @@ function resetOnDblClick(input, def) {
   input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
 }
 // Every slider: only its handle can be grabbed (a press elsewhere on it doesn't jump the level there), and while it's
-// held, or moved with the keys, a tip over the handle says the level: a volume as a percentage of full (up to 150%),
-// others (data-tip="pos") as how far along they are.
+// held, or moved with the keys, a tip over the handle says the level: a volume out of 100 for full (up to 150), others
+// (data-tip="pos") as how far along they are, out of 100.
 (function sliderTips() {
   const THUMB = 16, tip = el("output", "slider-tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
   document.body.append(tip);
@@ -996,7 +994,7 @@ function resetOnDblClick(input, def) {
   const thumbX = (s) => { const r = s.getBoundingClientRect(); return r.left + THUMB / 2 + frac(s) * (r.width - THUMB); };
   function show(s) {
     if (!s) { tip.hidden = true; return; }
-    tip.textContent = s.dataset.tip === "pos" ? `${Math.round(frac(s) * 100)}%` : `${Math.round(s.value * 100)}%`;
+    tip.textContent = String(Math.round((s.dataset.tip === "pos" ? frac(s) : +s.value) * 100));
     tip.hidden = false;
     tip.style.left = thumbX(s) + "px"; tip.style.top = s.getBoundingClientRect().top - 4 + "px";
     placeKnob();
@@ -1767,12 +1765,14 @@ function renderTracks() {
     box.append(trackRow(name, [name]));
   }
 }
+const VOCAL_TRACKS = ["vocals", "lead", "backing"];
 function trackRow(name, members, sub, open) {
   const ts = members.map((k) => P.tracks[k]), t = ts[0], group = name === "voices";
   const row = el("div", "track" + (members.some(audible) ? "" : " off") + (sub ? " sub" : "")); row.dataset.name = name;
-  const dot = icon(group ? "vocals" : name); dot.style.color = `var(--stem-${group ? "lead" : name}, var(--muted))`;
+  const dot = sub ? el("span") : icon(group ? "vocals" : name); // lead and backing, under Vocals, go by name alone
+  dot.style.color = `var(--stem-${group ? "lead" : name}, var(--muted))`;
   const bpm = P.song.bpm, isClick = name === "click";
-  const title = group ? "Vocals" : isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : TRACK_TITLES[name] || name[0].toUpperCase() + name.slice(1);
+  const title = group ? "Vocals" : sub ? (name === "lead" ? "Lead" : "Backing") : isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : TRACK_TITLES[name] || name[0].toUpperCase() + name.slice(1);
   const note = group ? "lead and backing" : isClick ? (bpm ? `click · ${t.bpb}/4 · follows the song’s beat` : "click") : STEM_NOTES[name] || "";
   const nm = el("div", "name"); nm.append(document.createTextNode(title));
   if (group) { // opens and closes the lead and backing rows
@@ -1802,6 +1802,8 @@ function trackRow(name, members, sub, open) {
     sh.className = "tog"; sh.textContent = t.offset ? `Accent on ${t.offset + 1}` : "Shift accent";
     opts.append(bpb.btn, sh);
     if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
+  } else if (!group && !VOCAL_TRACKS.includes(name)) {
+    last = el("span"); // only the vocals have a download of their own; the band comes with the song's export
   } else {
     if (name === "vocals" && splitting[P.song.id]) nm.querySelector("small").textContent = splitting[P.song.id];
     last = el("button", "dl"); last.type = "button"; last.title = `Download ${group ? "the vocals" : TRACK_TITLES[name] || name} only (MP3)`; last.setAttribute("aria-label", last.title);

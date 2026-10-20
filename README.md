@@ -59,6 +59,6 @@ Run the server directly with `.venv/bin/python server.py` (port 5178) if you pre
 ## Credits
 
 - Piano (the keyboard under Practice): [Salamander Grand Piano](https://archive.org/details/SalamanderGrandPianoV3) by Alexander Holm (CC-BY 3.0), loaded at runtime from the Tone.js sample host.
-- Fonts: [Geist Pixel](https://github.com/vercel/geist-font) (SIL OFL 1.1, see `fonts/OFL.txt`); Pretendard loaded from jsDelivr.
+- Font: [Pretendard](https://github.com/orioncactus/pretendard) (SIL OFL 1.1), loaded from jsDelivr.
 - Icons: [Hugeicons](https://hugeicons.com) (MIT).
 - Stems: [Demucs](https://github.com/facebookresearch/demucs) (htdemucs / htdemucs_6s) on PyTorch; lead and backing vocals with [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) and the BS-Roformer karaoke model by frazer & becruily; beats, key and pitch tracking with [librosa](https://librosa.org) ([Praat](https://www.fon.hum.uva.nl/praat/) through parselmouth as a fallback); downloads with [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://deno.com) as its JavaScript runtime; ffmpeg via imageio-ffmpeg.
