@@ -1517,7 +1517,7 @@ function drawWave() {
   const x = c.getContext("2d"), W = r.width, H = 96; x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
   const X = (t) => (t / (songDur() || 1)) * W, prog = playheadShown(W);
   if (P.song && P.song.split) { // parts with the vocals kept whole, and the selection
-    x.fillStyle = stemColor("lead");
+    x.fillStyle = C.voice; // the accent, like the playhead
     for (const [a, b] of P.song.unsplit || []) { x.globalAlpha = 0.14; x.fillRect(X(a), 0, X(b) - X(a), H); x.globalAlpha = 0.8; x.fillRect(X(a), 0, X(b) - X(a), 3); }
     if (P.sel) { x.fillStyle = C.ink; x.globalAlpha = 0.1; x.fillRect(X(P.sel.a), 0, X(P.sel.b) - X(P.sel.a), H); }
     x.globalAlpha = 1;
@@ -1548,7 +1548,13 @@ function drawWave() {
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
   x.globalAlpha = 1;
   const lw = P.phHover || P.scrub ? 4 : 2, top = P.scrub ? 20 : 0; // thicker while you can grab it; hangs from the flag while dragged
-  x.fillStyle = C.voice; x.fillRect(Math.round((prog * W - lw / 2) * d) / d, top, lw, H - top); // on whole pixels: a crisp line, moving or not
+  x.fillStyle = C.voice;
+  if (P.ph && P.ph.from != null && Math.abs(P.ph.from - prog) * W > 3) { // travelling: the last frame's way as a fading streak
+    const a = P.ph.from * W, b = prog * W, k = 8;
+    for (let i = 0; i < k; i++) { x.globalAlpha = 0.45 * ((i + 1) / k) ** 2; x.fillRect(a + ((b - a) * i) / k, top, (b - a) / k, H - top); }
+    x.globalAlpha = 1;
+  }
+  x.fillRect(Math.round((prog * W - lw / 2) * d) / d, top, lw, H - top); // on whole pixels: a crisp line
   const flag = $("#pFlag");
   flag.hidden = !P.scrub;
   if (P.scrub) {
@@ -1559,23 +1565,20 @@ function drawWave() {
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
 }
 // Where the playhead is drawn, as a fraction of the song: where the song is, except just after a jump (a click on the
-// waveform, ±5 s…). Then the line lands on a spring: it comes in from a short way off (PH_RUN px, on the side it came
-// from) at speed, overshoots by about 9 px and settles within 0.2 s. Sweeping it across the whole jump left a smear of
-// lines behind it. The sound itself jumps at once.
-const PH_W = 40, PH_Z = 0.5, PH_RUN = 24, PH_V = 1200; // natural frequency (rad/s), damping ratio, run-up (px), speed (px/s)
+// waveform, ±5 s…). Then the line travels there on a spring, the whole way, lighting up the bars it passes: quick off
+// the mark, easing in with a small overshoot, settled in about a quarter second. drawWave blurs its last frame of
+// travel into a streak, so a fast line reads as one moving line, not a row of copies. The sound jumps at once.
+const PH_W = 22, PH_Z = 0.75; // the spring's natural frequency (rad/s) and damping ratio
 function playheadJump() {
   if (P.scrub || matchMedia("(prefers-reduced-motion: reduce)").matches) { P.ph = null; return; }
-  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: 0, t: performance.now(), fresh: true };
+  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: P.ph ? P.ph.v : 0, t: performance.now(), from: null };
 }
 function playheadShown(W) {
   const to = songDur() ? songPos() / songDur() : 0, s = P.ph;
   if (!s || P.scrub) { P.ph = null; return to; }
   const now = performance.now();
   if (now - s.t > 250) { P.ph = null; return to; } // a jump made where the waveform wasn't drawn (Practice): nothing to show
-  if (s.fresh) { // the run-up: at most PH_RUN px short of where it's going, coming in at speed
-    const d = (to - s.x) * W, run = Math.min(Math.abs(d), PH_RUN), dir = Math.sign(d);
-    s.fresh = false; s.x = to - (dir * run) / W; s.v = (dir * PH_V * (run / PH_RUN)) / W;
-  }
+  s.from = s.x; // where it was a frame ago: the motion blur runs from there
   const dt = Math.min(0.05, (now - s.t) / 1000) / 4; s.t = now;
   for (let i = 0; i < 4; i++) { s.v += (-PH_W * PH_W * (s.x - to) - 2 * PH_Z * PH_W * s.v) * dt; s.x += s.v * dt; } // semi-implicit Euler
   if (Math.abs(s.x - to) * W < 0.5 && Math.abs(s.v) * W < 30) { P.ph = null; return to; }
