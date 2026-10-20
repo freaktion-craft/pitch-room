@@ -93,11 +93,11 @@ header { position: relative; }
 #micSetBtn .ico { width: 16px; height: 16px; }
 
 .title { margin: 0; font-size: 15px; font-weight: 500; }
-.lede { margin: 0; font-size: 16px; line-height: 1.7; max-width: 62ch; text-wrap: pretty; }
+.lede { margin: 0; font-size: 16px; line-height: 1.5; max-width: 62ch; text-wrap: pretty; } /* 24 px lines, like the title's */
 .muted { color: var(--muted); }
 
-/* Page intro */
-.intro { display: grid; gap: 20px; margin-bottom: 28px; }
+/* Page intro: title and lede read as one block, set apart from what follows */
+.intro { display: grid; gap: 8px; margin-bottom: 32px; }
 .group { display: grid; gap: 12px; }
 /* Section titles: they head the content, so they read stronger than it */
 .group-label { font-size: 15px; font-weight: 500; color: var(--ink); }
