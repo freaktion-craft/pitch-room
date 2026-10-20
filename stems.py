@@ -8,6 +8,7 @@ Songs live in ./library/<id>/ :
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
     meta.json       title, duration, bpm, beat times, key, stems, model, unsplit (parts where the vocals stay whole)
+    keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
 
 Heavy packages (torch, demucs, librosa, yt-dlp) are optional and installed from the
 page on first use, so the base app stays small.
@@ -27,6 +28,7 @@ import tempfile
 import threading
 import time
 
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
 import numpy as np
@@ -75,11 +77,11 @@ class Cancelled(BaseException):
 
 
 def cancel_job(job_id: str) -> str:
-    """Ask a song that's being added to stop. It stops at its next checkpoint (within a second or so), its folder is
-    removed and its status becomes "cancelled". Returns the status it has now."""
+    """Ask a song that's being added, or a key change being rendered, to stop. It stops at its next checkpoint (within
+    a second or so), its unfinished files are removed and its status becomes "cancelled". Returns the status it has now."""
     with _jobs_lock:
         job = _jobs.get(job_id)
-        if job is None or job["kind"] != "separate":
+        if job is None or job["kind"] not in ("separate", "key"):
             raise ValueError("Unknown job.")
         if job["status"] in ("queued", "running"):
             job["cancel"] = True
@@ -812,9 +814,9 @@ def _unsplit_mask(n: int, ranges: list) -> np.ndarray:
     return m
 
 
-def _vocal_parts(folder: str, ranges: list) -> dict:
-    """{lead, backing}, (2, n) each, with the unsplit parts moved into backing."""
-    lead, back = _decode_stereo(os.path.join(folder, "lead.mp3")), _decode_stereo(os.path.join(folder, "backing.mp3"))
+def _vocal_parts(folder: str, ranges: list, key: int = 0) -> dict:
+    """{lead, backing}, (2, n) each, in that key, with the unsplit parts moved into backing."""
+    lead, back = _decode_stereo(_track_path(folder, "lead", key)), _decode_stereo(_track_path(folder, "backing", key))
     n = min(lead.shape[1], back.shape[1])
     lead, back = lead[:, :n], back[:, :n]
     if ranges:
@@ -892,6 +894,199 @@ def get_melody(song_id: str) -> dict:
         return _splice(data, ranges)
 
 
+# ---------- key change ----------
+# A song can be moved up to KEYS semitones up or down. Each pitched track is rendered once per key into keys/<n>/ with
+# ffmpeg's rubberband filter, at the original's length and in time with it; the drums aren't pitched and keep playing
+# from the original. Voices keep their formants, so they sound like the same singer rather than sped up or slowed down.
+# A track is written under a temporary name and renamed once complete, so a cancelled or failed render leaves nothing
+# that looks finished.
+KEYS = 6
+VOCALS = ("vocals", "lead", "backing")
+PREPAD = 8192  # samples of silence fed in first: going up, the filter's output runs early and would lose the start
+_key_jobs: dict[tuple[str, int], str] = {}  # (song id, n) -> its render, so a key asked for twice renders once
+_key_lock = threading.Lock()
+
+
+def _semitones(n) -> int:
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        raise ValueError("The key change is a whole number of semitones.") from None
+    if abs(n) > KEYS:
+        raise ValueError(f"The key goes up or down by {KEYS} semitones at most.")
+    return n
+
+
+def _key_file(folder: str, n: int, name: str) -> str:
+    return os.path.join(folder, "keys", f"{n:+d}", name + ".mp3")
+
+
+def _track_path(folder: str, name: str, key: int = 0) -> str:
+    """A track's file in key n: the rendered one for pitched tracks, the original for drums (and for key 0)."""
+    return _key_file(folder, key, name) if key and name != "drums" else os.path.join(folder, name + ".mp3")
+
+
+def _pitched(folder: str, meta: dict) -> list[str]:
+    """The tracks a key change renders: every stem but the drums, and the lead and backing vocals once split. The
+    vocal stem is rendered too when split, for Info's "In the song" in a part kept whole."""
+    return [n for n in [*meta["stems"], "lead", "backing"] if n != "drums" and os.path.isfile(os.path.join(folder, n + ".mp3"))]
+
+
+@lru_cache(maxsize=1)
+def _rubberband_ffmpeg() -> str:
+    """An ffmpeg with the rubberband filter: the system one if it has it, else the one imageio-ffmpeg ships."""
+    import imageio_ffmpeg
+    for exe in dict.fromkeys([ffmpeg_exe(), imageio_ffmpeg.get_ffmpeg_exe()]):
+        out = subprocess.run([exe, "-hide_banner", "-h", "filter=rubberband"], capture_output=True, text=True, check=False)
+        if "rubberband AVOptions" in out.stdout:
+            return exe
+    raise ValueError("This copy of ffmpeg can’t change the key (it has no rubberband filter).")
+
+
+def _rubberband(n: int, vocal: bool) -> str:
+    return f"rubberband=pitch={2 ** (n / 12):.8f}:transients=crisp" + (":formant=preserved" if vocal else "")
+
+
+@lru_cache(maxsize=64)
+def _key_offset(n: int, vocal: bool) -> int:
+    """Samples by which the rubberband filter moves the audio at this shift: later going down, earlier going up (about
+    ±690 at 6 semitones with ffmpeg 7.1), so measured once per shift. The probe is noise switched on and off every
+    50 ms; its loudness envelope survives a pitch shift, so cross-correlating the envelopes before and after finds
+    the offset to within a few samples."""
+    rng = np.random.default_rng(12)
+    size = 4 * SR
+    x = (rng.standard_normal(size) * np.repeat(rng.random(size // 2205 + 1) < 0.5, 2205)[:size] * 0.2).astype(np.float32)
+    out = subprocess.run([_rubberband_ffmpeg(), "-v", "error", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "pipe:0",
+                          "-af", f"adelay=delays={PREPAD}S:all=1,apad=pad_len={SR},{_rubberband(n, vocal)}", "-f", "f32le", "pipe:1"],
+                         input=np.repeat(x, 2).tobytes(), capture_output=True, check=False)
+    y = np.frombuffer(out.stdout, dtype=np.float32).reshape(-1, 2).mean(1)
+    if len(y) < size:
+        raise RuntimeError("Changing the key failed: " + out.stderr.decode(errors="ignore").strip()[-200:])
+
+    def env(s):
+        e = np.convolve(np.abs(s), np.ones(256) / 256, "same")
+        return e - e.mean()
+    a, b = env(x), env(y)
+    m = len(a) + len(b)
+    c = np.fft.irfft(np.fft.rfft(b, m) * np.conj(np.fft.rfft(a, m)), m)  # c[k]: a against b k samples later
+    lo = PREPAD - 4096
+    return lo + int(np.argmax(c[lo: PREPAD + 4096])) - PREPAD
+
+
+def _frames(path: str) -> int:
+    """Samples per channel of an audio file, as ffmpeg decodes it."""
+    p = subprocess.Popen([_rubberband_ffmpeg(), "-v", "error", "-nostdin", "-i", path, "-ac", "1", "-f", "s16le", "pipe:1"],
+                         stdout=subprocess.PIPE)
+    n = sum(len(chunk) for chunk in iter(lambda: p.stdout.read(1 << 20), b""))
+    p.wait()
+    return n // 2
+
+
+def _shift_track(folder: str, name: str, n: int, stop, progress):
+    """One track n semitones up or down, into keys/<n>/<name>.mp3: as many samples as the original, each where the
+    original has it (the filter's offset is trimmed off), encoded like the original. stop() says when to give up
+    (raises Cancelled); progress(0…1) as it goes."""
+    src, dst = os.path.join(folder, name + ".mp3"), _key_file(folder, n, name)
+    frames = _frames(src)
+    start = PREPAD + _key_offset(n, name in VOCALS)
+    af = (f"adelay=delays={PREPAD}S:all=1,apad=pad_len={SR},{_rubberband(n, name in VOCALS)},"
+          f"atrim=start_sample={start}:end_sample={start + frames},asetpts=PTS-STARTPTS,apad=whole_len={frames}")
+    tmp = dst + ".part"
+    p = subprocess.Popen([_rubberband_ffmpeg(), "-v", "error", "-nostdin", "-y", "-i", src, "-af", af, "-c:a", "libmp3lame",
+                          "-b:a", "256k", "-f", "mp3", "-progress", "pipe:1", "-nostats", tmp],
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    errors = []
+    try:
+        for line in p.stdout:  # key=value lines about twice a second; anything else is an error message
+            key, _, value = line.strip().partition("=")
+            if key == "out_time_us" and value.isdigit():
+                progress(min(1.0, int(value) / 1e6 * SR / frames))
+            elif line.strip() and not re.fullmatch(r"\w+", key):
+                errors.append(line.strip())
+            stop()
+        if p.wait() != 0:
+            raise RuntimeError("Changing the key failed: " + " ".join(errors)[-200:])
+        os.replace(tmp, dst)
+    finally:
+        if p.poll() is None:
+            p.kill()
+            p.wait()
+        with contextlib.suppress(OSError):
+            os.remove(tmp)
+
+
+def _render_key(folder: str, n: int, names: list[str], job=None):
+    """Render names into keys/<n>/, one ffmpeg per track, side by side. Stops early when the job is cancelled, a track
+    fails or the song is deleted."""
+    out = os.path.join(folder, "keys", f"{n:+d}")
+    os.makedirs(out, exist_ok=True)
+    done, failed = [0.0] * len(names), threading.Event()
+
+    def stop():
+        _check(job)
+        if failed.is_set() or not os.path.isfile(os.path.join(folder, "meta.json")):
+            raise Cancelled
+
+    def one(i, name):
+        def progress(f):
+            done[i] = f
+            if job:
+                _set(job, progress=0.02 + 0.96 * sum(done) / len(done))
+        try:
+            _shift_track(folder, name, n, stop, progress)
+        except BaseException:
+            failed.set()  # the others stop too
+            raise
+
+    try:
+        with ThreadPoolExecutor(max_workers=min(len(names), os.cpu_count() or 4)) as pool:
+            futures = [pool.submit(one, i, name) for i, name in enumerate(names)]
+        errors = [e for e in (f.exception() for f in futures) if e is not None]
+        if errors:  # the error that stopped the others, rather than their Cancelled
+            raise next((e for e in errors if not isinstance(e, Cancelled)), errors[0])
+    finally:
+        if not os.path.isfile(os.path.join(folder, "meta.json")):
+            shutil.rmtree(folder, ignore_errors=True)  # deleted meanwhile: its files were still open then
+        with contextlib.suppress(OSError):
+            os.rmdir(out)  # only goes if nothing was finished (cancelled at once)
+
+
+def start_key(song_id: str, n) -> dict:
+    """A song's pitched tracks n semitones up or down: {"ready": True} when they're there (or n is 0), else {"job": id}
+    of their render, which takes about as long as one track takes alone since they run side by side (about 10 s for a
+    4-minute song). A render already under way for the same key is returned instead of starting another."""
+    folder, n = _song_dir(song_id), _semitones(n)
+    names = _pitched(folder, _read_meta(folder))
+    with _key_lock:
+        todo = [t for t in names if n and not os.path.isfile(_key_file(folder, n, t))]
+        if not todo:
+            return {"ready": True}
+        running = get_job(_key_jobs.get((song_id, n), ""))
+        if running and running["status"] in ("queued", "running"):
+            return {"job": running["id"]}
+        job = _new_job("key")
+        _key_jobs[(song_id, n)] = job["id"]
+
+    def work(job):
+        _set(job, status="running", stage="Changing key", songId=song_id)
+        _render_key(folder, n, todo, job)
+
+    return {"job": _run(job, work)}
+
+
+def _key_ready(song_id: str, n: int):
+    """Wait until a song's tracks in key n are there, rendering them first if needed."""
+    r = start_key(song_id, n)
+    while r.get("job"):
+        j = get_job(r["job"])
+        if j["status"] in ("queued", "running"):
+            time.sleep(0.25)
+            continue
+        if j["status"] == "error":
+            raise ValueError(j["error"])
+        r = start_key(song_id, n)  # done: ready now; cancelled (another key was chosen meanwhile): start it again
+
+
 # ---------- export ----------
 def _click_track(beats: list[float], dur: float, offset: int, beats_per_bar: int) -> np.ndarray:
     n = int(dur * SR)
@@ -910,11 +1105,16 @@ def _click_track(beats: list[float], dur: float, offset: int, beats_per_bar: int
     return np.vstack([out, out])
 
 
-def export(song_id: str, tracks: list[dict], click: dict | None) -> tuple[bytes, str]:
-    """tracks: [{name, gain}] of audible tracks; click: {gain, offset, beatsPerBar} or None. Returns (mp3 bytes, filename)."""
-    folder = _song_dir(song_id)
+def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple[bytes, str]:
+    """tracks: [{name, gain}] of audible tracks; click: {gain, offset, beatsPerBar} or None; key: semitones up or down,
+    as played. Returns (mp3 bytes, filename)."""
+    folder, key = _song_dir(song_id), _semitones(key)
     meta = _read_meta(folder)
     names, vocal = _tracks(folder, meta), None
+    if not any(t.get("name") in names and t.get("name") != "drums" and float(t.get("gain", 1)) > 0 for t in tracks):
+        key = 0  # the drums (or the click) alone sound the same in any key
+    if key:
+        _key_ready(song_id, key)
     mix = None
     used = []
     for t in tracks:
@@ -922,10 +1122,10 @@ def export(song_id: str, tracks: list[dict], click: dict | None) -> tuple[bytes,
         if name not in names or gain <= 0:
             continue
         if name in ("lead", "backing"):
-            vocal = vocal or _vocal_parts(folder, meta.get("unsplit") or [])
+            vocal = vocal or _vocal_parts(folder, meta.get("unsplit") or [], key)
             wav = vocal[name] * gain
         else:
-            wav = _decode_stereo(os.path.join(folder, name + ".mp3")) * gain
+            wav = _decode_stereo(_track_path(folder, name, key)) * gain
         mix = wav if mix is None else mix[:, : wav.shape[1]] + wav[:, : mix.shape[1]]
         used.append(name)
     if click and meta.get("beats") and float(click.get("gain", 1)) > 0:
@@ -959,5 +1159,7 @@ def export(song_id: str, tracks: list[dict], click: dict | None) -> tuple[bytes,
         label = " + ".join(on)
     if "click" in used and on:
         label += f" + click {round(meta['bpm'])} BPM" if meta.get("bpm") else " + click"
+    if key:
+        label += f" ({key:+d})"
     return data, f"{safe} - {label}.mp3"
 

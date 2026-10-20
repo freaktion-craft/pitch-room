@@ -197,9 +197,12 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == "unsplit":
                 body = json.loads(self._body(100_000) or b"{}")
                 return self._json(200, {"unsplit": stems.set_unsplit(parts[2], body.get("unsplit") or [])})
+            if parts[3] == "key":
+                body = json.loads(self._body(1000) or b"{}")
+                return self._json(200, stems.start_key(parts[2], body.get("n")))
             if parts[3] == "export":
                 body = json.loads(self._body(100_000) or b"{}")
-                data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"))
+                data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"), body.get("key") or 0)
                 self.send_response(200)
                 self.send_header("Content-Type", "audio/mpeg")
                 self.send_header("Content-Length", str(len(data)))
