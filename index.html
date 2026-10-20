@@ -2636,7 +2636,8 @@ function initSing() {
   if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
   namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m))); });
   namesPick.set([{ v: "en", t: "C D E (C4)" }, { v: "ko", t: "Do Re Mi" }], S.names);
-  langPick = makePick($("#lang"), "Language", setLang); // set by setLang
+  // kept once picked; until then the browser's language decides (initLang)
+  langPick = makePick($("#lang"), "Language", (v) => { store.set("lang", v); setLang(v); });
 }
 
 // ---------- takes: you, recorded in Practice ----------
@@ -3374,7 +3375,7 @@ function resay() {
 const LANGS = [{ v: "en", t: "English" }, { v: "ko", t: "한국어" }]; // each named in its own
 function setLang(v) {
   lang = v === "ko" ? "ko" : "en";
-  store.set("lang", lang); document.documentElement.lang = lang;
+  document.documentElement.lang = lang;
   langPick.set(LANGS, lang);
   resay(); closeMenu();
   for (const p of picks) p.relabel();
