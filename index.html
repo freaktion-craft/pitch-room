@@ -888,19 +888,22 @@ async function renderInfo(id) {
   const v = s.vocals;
   if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, `${v.hi - v.lo} semitones${v.mostly ? ` · mostly ${absName(v.mostly[0])}–${absName(v.mostly[1])}` : ""}`);
   fact("Tracks", String(trackNames(s).length), trackNames(s).join(", "));
-  if (v) renderInfoRange(v, id);
+  if (v) renderInfoRange(s);
   $("#iOpen").href = `#stems/${id}`;
   $("#iSing").hidden = !s.stems.includes("vocals");
   $("#iSing").onclick = () => singSong(m, $("#iSing"));
   $("#iActs").hidden = false;
 }
 // A moment of the vocal track (decoded on first use), with a little room either side and short fades.
+// A moment of the vocal the melody was read from: the lead vocal once split (the backing vocals could bury the note),
+// except in a part kept whole, where the melody came from all the vocals.
 let infoVox = null, infoSrc = null;
-async function hearAt(id, t0, t1, btn) {
+async function hearAt(s, t0, t1, btn) {
   ensureCtx();
-  if (!infoVox || infoVox.id !== id) {
+  const file = s.split && !(s.unsplit || []).some(([a, b]) => t0 >= a && t0 < b) ? "lead" : "vocals";
+  if (!infoVox || infoVox.id !== s.id || infoVox.file !== file) {
     btn.disabled = true;
-    try { infoVox = { id, buf: await ac.decodeAudioData(await (await fetch(`/library/${id}/vocals.mp3`)).arrayBuffer()) }; }
+    try { infoVox = { id: s.id, file, buf: await ac.decodeAudioData(await (await fetch(`/library/${s.id}/${file}.mp3`)).arrayBuffer()) }; }
     catch (e) { btn.disabled = false; return; }
     btn.disabled = false;
   }
@@ -913,8 +916,8 @@ async function hearAt(id, t0, t1, btn) {
 }
 function stopHear() { if (infoSrc) { try { infoSrc.stop(); } catch (e) {} infoSrc = null; } }
 // The melody's range: lighter for all of it, solid for where it mostly sits.
-function renderInfoRange(v, id) {
-  const box = $("#iRange"), lo = v.lo - 2, hi = v.hi + 2;
+function renderInfoRange(s) {
+  const v = s.vocals, box = $("#iRange"), lo = v.lo - 2, hi = v.hi + 2;
   const at = (x) => `${((x - lo) / (hi - lo)) * 100}%`;
   const bar = (name, text, spans) => {
     const row = el("div", "rbar"), lane = el("div", "lane");
@@ -934,7 +937,7 @@ function renderInfoRange(v, id) {
     const row = el("div", "listen-row");
     row.append(el("span", "lbl", name), el("b", null, absName(m)));
     if (at) {
-      const hear = mkBtn("", () => hearAt(id, at[0], at[1], hear));
+      const hear = mkBtn("", () => hearAt(s, at[0], at[1], hear));
       hear.title = "Play that moment of the vocal track"; hear.append(icon("play"), `In the song · ${fmtTime(at[0])}`);
       row.append(hear);
     }

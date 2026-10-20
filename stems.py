@@ -519,15 +519,43 @@ def song_info(song_id: str) -> dict:
     info["split"] = _has_split(folder)
     if "vocals" in meta.get("stems", []):
         data = get_melody(song_id)
-        mel = data["notes"]
-        if mel:
-            lo, hi = min(x[2] for x in mel), max(x[2] for x in mel)
-            # where to hear each extreme: its longest note, so a passing blip isn't the one played
-            at = lambda m: max((x for x in mel if x[2] == m), key=lambda x: x[1] - x[0])[:2]  # noqa: E731
-            info["vocals"] = {"lo": lo, "hi": hi, "mostly": data.get("range"), "loAt": at(lo), "hiAt": at(hi)}
+        ends = _extremes(data["notes"])
+        if ends:
+            (lo, lo_at), (hi, hi_at) = ends
+            info["vocals"] = {"lo": lo, "hi": hi, "mostly": data.get("range"), "loAt": lo_at, "hiAt": hi_at}
         else:
             info["vocals"] = None
     return info
+
+
+HELD, ENOUGH, LEAP = 0.2, 0.4, 4  # s a note lasts, s sung at a pitch, semitones to the next pitch in
+PHRASE_GAP, SLIP = 1.0, 7  # s to the nearest note for it to be in a phrase; semitones away from every neighbour
+
+
+def _extremes(notes: list) -> tuple | None:
+    """The melody's lowest and highest notes that were really sung, each with the longest stretch to hear it:
+    ((midi, [t0, t1]), (midi, [t0, t1])). Left out: notes shorter than HELD (breaths, consonants), notes with no
+    other note within PHRASE_GAP (a stray sound in a rest), and notes more than SLIP semitones from every neighbour
+    (the pitch tracker jumping an octave). A pitch then needs ENOUGH time in all, and one more than LEAP semitones
+    beyond the rest at either end goes too. None when nothing is left."""
+    def sung_note(i):
+        a, b, m = notes[i]
+        near = [notes[j][2] for j in (i - 1, i + 1) if 0 <= j < len(notes)
+                and (notes[j][0] - b if j > i else a - notes[j][1]) <= PHRASE_GAP]
+        return b - a >= HELD and near and any(abs(m - x) <= SLIP for x in near)
+    held = [n for i, n in enumerate(notes) if sung_note(i)]
+    time: dict[int, float] = {}
+    for a, b, m in held:
+        time[m] = time.get(m, 0.0) + b - a
+    sung = sorted(m for m, t in time.items() if t >= ENOUGH)
+    while len(sung) > 2 and sung[1] - sung[0] > LEAP:
+        sung.pop(0)
+    while len(sung) > 2 and sung[-1] - sung[-2] > LEAP:
+        sung.pop()
+    if not sung:
+        return None
+    at = lambda m: max((n for n in held if n[2] == m), key=lambda n: n[1] - n[0])[:2]  # noqa: E731
+    return (sung[0], at(sung[0])), (sung[-1], at(sung[-1]))
 
 
 # ---------- lead vocal ----------
