@@ -80,8 +80,11 @@ header { position: relative; }
 .pop label { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .pop input[type="range"] { width: 140px; }
 .pop .hint { margin: 0; }
+/* the input menu keeps one width whatever the inputs are called (a long name ends in …); its hint sits right under it */
+#micDev { flex: 0 1 200px; min-width: 0; text-overflow: ellipsis; }
+#micDevHint { margin-top: -8px; }
 .iconchip .ico { width: 16px; height: 16px; }
-/* the accent colour: a dot of it in the header, the swatches in a panel under it, as wide as their row */
+/* the accent colour: picked in a panel of swatches under the palette button, as wide as their row */
 #accentSet { width: min-content; line-height: 20px; }
 .swatches { display: flex; gap: 4px; }
 .swatch { width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow 0.15s; }
@@ -417,6 +420,8 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span class="mic-lbl"><span class="if-on">Mic on</span><span class="if-off">Mic off</span></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     <button class="chipbtn iconchip" id="micSetBtn" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="micSet" hidden></button>
     <div class="pop" id="micSet" role="dialog" aria-label="Mic settings" hidden>
+      <label>Input <select id="micDev"><option value="">System default</option></select></label>
+      <p class="hint" id="micDevHint" hidden>Turn on the mic to see each input’s name.</p>
       <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
       <label>Note names <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi</option></select></label>
@@ -575,8 +580,8 @@ const store = { // falls back to what the app saved under its old name, Pitch Ro
   set(k, v) { try { localStorage.setItem("stem:" + k, JSON.stringify(v)); } catch (e) {} },
 };
 // names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
-// treated as silent; vol: the keyboard's piano
-const S = { names: "en", echo: false, gate: 0.01, vol: 0.7 };
+// treated as silent; vol: the keyboard's piano; mic: the input's deviceId ("" = the system default)
+const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "" };
 for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
 const save = () => store.set("settings", S);
 const A4 = 440;
@@ -681,7 +686,7 @@ async function startMic() {
   }
   ensureCtx();
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: S.echo, noiseSuppression: false, autoGainControl: false } });
+    micStream = await openMic();
   } catch (e) {
     notice(e && e.name === "NotAllowedError"
       ? "Microphone access is blocked. Allow it from the mic icon in the address bar, then try again."
@@ -689,8 +694,42 @@ async function startMic() {
     return false;
   }
   stopTest();
-  micNode = ac.createMediaStreamSource(micStream); micNode.connect(analyser);
-  micOn = true; renderMic(); return true;
+  micNode = ac.createMediaStreamSource(micStream); micNode.connect(analyser); onMicEnd(micStream);
+  micOn = true; renderMic(); listMics(); return true;
+}
+// The chosen input if it's still there, else the system default: an unplugged mic is no error.
+async function openMic() {
+  const audio = { echoCancellation: S.echo, noiseSuppression: false, autoGainControl: false };
+  if (S.mic) {
+    try { return await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: S.mic } } }); }
+    catch (e) { if (e && e.name === "NotAllowedError") throw e; }
+  }
+  return navigator.mediaDevices.getUserMedia({ audio });
+}
+// Another input while the mic is on: the new stream goes under the analyser before the old one stops, so the chip
+// stays on and the spectrum and pitch carry on.
+async function restartMic() {
+  if (!micOn) return;
+  let s;
+  try { s = await openMic(); } catch (e) { return; }
+  if (!micOn) { s.getTracks().forEach((t) => t.stop()); return; } // turned off meanwhile
+  const oldStream = micStream, oldNode = micNode;
+  micStream = s; micNode = ac.createMediaStreamSource(s); micNode.connect(analyser); onMicEnd(s);
+  oldNode.disconnect(); oldStream.getTracks().forEach((t) => t.stop());
+  listMics();
+}
+// An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
+function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
+// The mic settings' Input menu. Until the mic has been allowed, the browser holds back the inputs' names (and often
+// the inputs), so they're numbered and a hint says how to see them. A chosen input that's gone shows as the default.
+async function listMics() {
+  let ins = [];
+  try { ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput"); } catch (e) {}
+  const real = ins.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications"); // not the OS's aliases
+  const sel = $("#micDev"), opts = [["", "System default"], ...real.map((d, i) => [d.deviceId, d.label || `Microphone ${i + 1}`])];
+  sel.replaceChildren(...opts.map(([v, t]) => { const o = el("option", null, t); o.value = v; return o; }));
+  sel.value = real.some((d) => d.deviceId === S.mic) ? S.mic : "";
+  $("#micDevHint").hidden = !ins.some((d) => !d.label);
 }
 function stopMic() {
   if (micNode) micNode.disconnect();
@@ -1825,6 +1864,8 @@ function initSing() {
   $("#gate").oninput = (e) => { S.gate = +e.target.value; save(); };
   resetOnDblClick($("#gate"), 0.01);
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
+  $("#micDev").onchange = (e) => { S.mic = e.target.value; save(); restartMic(); };
+  if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
   $("#names").onchange = (e) => { S.names = e.target.value; save(); keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
 }
 
