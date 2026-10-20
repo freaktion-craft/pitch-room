@@ -178,6 +178,13 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }
 .key.live { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 -5px 0 var(--voice); }
 .key.b.live { box-shadow: inset 0 -5px 0 var(--voice); }
+/* keys you point at and play: a tint of your colour, then the colour itself while held (the label goes dark on it) */
+@media (hover: hover) {
+  .key.w:hover { background: color-mix(in oklab, var(--voice) 30%, var(--key-w)); }
+  .key.b:hover { background: color-mix(in oklab, var(--voice) 45%, var(--key-b)); }
+}
+.key.w.down, .key.b.down { background: var(--voice); }
+.key.w.down { color: var(--on-voice); }
 
 @media (max-width: 760px) {
   header { margin-bottom: 40px; }
@@ -405,7 +412,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <div class="pop" id="accentSet" role="dialog" aria-label="Accent colour" hidden>
       <span>Accent colour</span>
       <div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div>
-      <p class="hint">Your pitch line, the playhead and focus rings.</p>
+      <p class="hint">Your pitch line, the playhead and the keys you play.</p>
     </div>
   </header>
 
@@ -1979,8 +1986,11 @@ const keyEls = new Map();
     b.setAttribute("aria-label", absName(m));
     if (black) b.style.left = (wi * (KW - 1) - 8) + "px";
     else { if (pc(m) === 0) b.textContent = "C" + oct(m); wi++; }
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); playKey(m); });
-    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); playKey(m); } });
+    // held down: a class rather than :active, so Enter and Space show it too and it ends when the pointer slides off
+    const up = () => b.classList.remove("down");
+    b.addEventListener("pointerdown", (e) => { e.preventDefault(); b.classList.add("down"); playKey(m); });
+    for (const ev of ["pointerup", "pointerleave", "pointercancel", "keyup", "blur"]) b.addEventListener(ev, up);
+    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); b.classList.add("down"); playKey(m); } });
     box.append(b); keyEls.set(m, b);
   }
 })();
