@@ -358,8 +358,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 /* play ⇄ pause icon, drawn by ppTo(). A stroke in the fill colour with round joins softens the corners
    (and covers the seam where the triangle's two halves meet). */
 .pp { width: 14px; height: 16px; flex: none; fill: currentColor; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
-/* its edge as clear as the waveform's above the transport, so the row between reads as evenly spaced (16 px each way) */
-.tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--ring); }
+/* a well like the waveform's (no outline), so the transport row between them reads as evenly spaced */
+.tracks { display: grid; border-radius: 12px; background: var(--bg); }
 /* the icon gets room on both sides (wider first column, more left padding); the right side lines up with .mix above */
 .track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 12px; padding: 8px 12px 8px 20px; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
