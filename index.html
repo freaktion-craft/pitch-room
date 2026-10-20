@@ -221,11 +221,20 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .yt input:hover { background: var(--hover-2); }
 .yt input:focus { outline: none; background: var(--surface); border-color: var(--ink); }
 .yt .btn { flex: none; }
-.job { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--bg); font-size: 13.5px; }
-.job .top { display: flex; justify-content: space-between; gap: 12px; }
+.job { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px; border-radius: 10px; background: var(--bg); font-size: 13.5px; }
+.job > .top, .job > .bar { grid-column: 1; }
+.job .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+/* cancel (or, once it has failed, clear away): beside both rows */
+.job .x { grid-column: 2; grid-row: 1 / span 2; align-self: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--muted); display: grid; place-items: center; }
+.job .x:hover { background: var(--fill); color: var(--ink); }
+.job .x:disabled { opacity: 0.4; pointer-events: none; }
+.job .x .ico { width: 16px; height: 16px; }
 .job .top span:last-child { font: 12.5px var(--mono); color: var(--muted); }
 .job.err { color: var(--bad); }
 .job.err .bar { display: none; }
+.job.err .x { grid-row: 1; }
+.job.err .top { align-self: center; }
 
 .player { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 16px; display: grid; gap: 16px; margin-bottom: 32px; }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
@@ -955,9 +964,27 @@ function jobCard(id) {
     card = el("div", "job"); card.id = "job-" + id;
     const top = el("div", "top"); top.append(el("span"), el("span"));
     const bar = el("div", "bar"); bar.append(el("i"));
-    card.append(top, bar); $("#sJobs").prepend(card);
+    const x = el("button", "x"); x.type = "button"; x.title = "Cancel"; x.append(icon("close"));
+    x.onclick = () => cancelJob(id);
+    card.append(top, bar, x); $("#sJobs").prepend(card);
   }
   return card;
+}
+// Stop a song that's being added (the server stops within a second or so and throws its files away); one that
+// failed is just cleared off the list.
+async function cancelJob(id) {
+  const card = jobCard(id), x = card.querySelector(".x");
+  if (card.classList.contains("err")) return dropJob(id);
+  card.classList.add("stopping"); x.disabled = true; card.querySelector(".top span").textContent = "Cancelling…";
+  try {
+    const r = await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
+    if (!r.ok) dropJob(id); // the server doesn't know it any more (it was restarted): nothing is left to stop
+  } catch (e) { card.classList.remove("stopping"); x.disabled = false; }
+}
+function dropJob(id) {
+  clearInterval(pollers[id]); delete pollers[id];
+  document.getElementById("job-" + id)?.remove();
+  renderLibrary(); // an empty library shows its "Add your first song" card again
 }
 function watchJob(id, kind, forSong) {
   if (pollers[id]) return;
@@ -981,14 +1008,17 @@ function watchJob(id, kind, forSong) {
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = splitting[forSong];
     } else {
-      const card = jobCard(id), [a, b] = card.querySelectorAll(".top span");
-      a.textContent = j.status === "error" ? j.error : j.stage;
+      const card = jobCard(id), [a, b] = card.querySelectorAll(".top span"), x = card.querySelector(".x");
+      const stopping = (j.cancel || card.classList.contains("stopping")) && j.status !== "error";
+      a.textContent = j.status === "error" ? j.error : stopping ? "Cancelling…" : j.stage;
       b.textContent = j.status === "error" ? "" : Math.round(j.progress * 100) + "%";
       card.classList.toggle("err", j.status === "error");
+      x.title = j.status === "error" ? "Clear" : "Cancel"; x.disabled = stopping;
       card.querySelector(".bar i").style.width = Math.round(j.progress * 100) + "%";
     }
-    if (j.status === "done" || j.status === "error") {
+    if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
+      if (j.status === "cancelled") return dropJob(id);
       if ((kind === "install" || kind === "gpu") && j.status === "done") stemsRefresh();
       if (kind === "video") videoFetched(forSong, j.status === "done");
       if (kind === "split") {

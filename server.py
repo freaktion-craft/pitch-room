@@ -180,7 +180,9 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/stems/youtube":
             body = json.loads(self._body(10_000) or b"{}")
             return self._json(200, {"job": stems.start_youtube(body.get("url", "").strip(), body.get("model", model))})
-        parts = url.path.strip("/").split("/")  # api/library/<id>/<action>
+        parts = url.path.strip("/").split("/")  # api/library/<id>/<action>, api/jobs/<id>/cancel
+        if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "cancel":
+            return self._json(200, {"status": stems.cancel_job(parts[2])})
         if len(parts) == 4 and parts[1] == "library":
             if parts[3] == "delete":
                 stems.delete_song(parts[2])
@@ -208,7 +210,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         url = urlparse(self.path)
         self._unread = int(self.headers.get("Content-Length") or 0)
-        if url.path.startswith(("/api/stems/", "/api/library/")):
+        if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")):
             try:
                 return self._stems_post(url)
             except ValueError as e:

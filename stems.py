@@ -52,7 +52,7 @@ _model_cache: dict = {}
 # ---------- jobs ----------
 def _new_job(kind: str) -> dict:
     job = {"id": secrets.token_hex(6), "kind": kind, "status": "queued", "stage": "Waiting", "progress": 0.0,
-           "error": None, "songId": None, "log": [], "started": time.time()}
+           "error": None, "songId": None, "log": [], "started": time.time(), "cancel": False}
     with _jobs_lock:
         _jobs[job["id"]] = job
     return job
@@ -69,11 +69,53 @@ def _set(job, **kw):
         job.update(kw)
 
 
+class Cancelled(BaseException):
+    """Raised in a job's thread at its next checkpoint once the job is cancelled. A BaseException, so the
+    `except Exception` around optional steps (the video, the key) lets it through."""
+
+
+def cancel_job(job_id: str) -> str:
+    """Ask a song that's being added to stop. It stops at its next checkpoint (within a second or so), its folder is
+    removed and its status becomes "cancelled". Returns the status it has now."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is None or job["kind"] != "separate":
+            raise ValueError("Unknown job.")
+        if job["status"] in ("queued", "running"):
+            job["cancel"] = True
+        return job["status"]
+
+
+def _check(job):
+    if job and job["cancel"]:
+        raise Cancelled
+
+
+def _stage(job, stage: str, progress: float):
+    """Move a job on to its next step, unless it was cancelled."""
+    _check(job)
+    _set(job, stage=stage, progress=progress)
+
+
+@contextlib.contextmanager
+def _turn(job):
+    """Hold _work_lock for a job, waiting for it in short steps so a job cancelled while queued stops at once."""
+    while not _work_lock.acquire(timeout=0.25):
+        _check(job)
+    try:
+        _check(job)
+        yield
+    finally:
+        _work_lock.release()
+
+
 def _run(job, fn, *args):
     def body():
         try:
             fn(job, *args)
             _set(job, status="done", progress=1.0, stage="Done")
+        except Cancelled:
+            _set(job, status="cancelled", stage="Cancelled")
         except Exception as e:  # noqa: BLE001
             _set(job, status="error", error=str(e) or e.__class__.__name__)
     threading.Thread(target=body, daemon=True).start()
@@ -295,6 +337,7 @@ def _ytdl(job, folder: str, name: str, fmt: str, p0: float, p1: float):
     import yt_dlp
 
     def hook(d):
+        _check(job)
         if d.get("status") == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             if total:
@@ -378,6 +421,7 @@ def _separate(job, wav: np.ndarray, model_name: str):
     done = {"max": 0.0}
 
     def cb(d):
+        _check(job)
         if d.get("state") == "end":
             frac = min(1.0, (d.get("segment_offset", 0) + seg) / length)
             done["max"] = max(done["max"], frac)
@@ -426,13 +470,13 @@ def _pipeline(job, src: dict, model_name: str):
     os.makedirs(folder, exist_ok=True)
     try:
         _set(job, status="queued", stage="Waiting for the previous song to finish")
-        with _work_lock:
+        with _turn(job):
             _set(job, status="running", stage="Getting the audio", progress=0.02)
             video = None
             if src["kind"] == "url":
                 path, title = _download(job, src["url"], folder)
                 source = src["url"]
-                _set(job, stage="Getting the video", progress=0.12)
+                _stage(job, "Getting the video", 0.12)
                 try:
                     video = _download_video(job, src["url"], folder, 0.12, 0.2)
                 except Exception:  # noqa: BLE001  (the song still works without a picture)
@@ -444,21 +488,21 @@ def _pipeline(job, src: dict, model_name: str):
                     f.write(src["data"])
                 title = os.path.splitext(os.path.basename(src["filename"] or "Upload"))[0]
                 source = src["filename"]
-            _set(job, stage="Reading the audio", progress=0.2)
+            _stage(job, "Reading the audio", 0.2)
             wav = _decode_stereo(path)
             dur = wav.shape[1] / SR
             if dur < 3:
                 raise ValueError("The audio is shorter than 3 seconds.")
             if dur > 20 * 60:
                 raise ValueError("Songs up to 20 minutes, please.")
-            _set(job, stage=f"Loading the separation model ({MODELS[model_name]})", progress=0.22)
+            _stage(job, f"Loading the separation model ({MODELS[model_name]})", 0.22)
             _get_model(model_name)
-            _set(job, stage=f"Separating on {device().upper()}", progress=0.25)
+            _stage(job, f"Separating on {device().upper()}", 0.25)
             names, stems = _separate(job, wav, model_name)
-            _set(job, stage="Finding the beat", progress=0.71)
+            _stage(job, "Finding the beat", 0.71)
             drum_stem = stems[names.index("drums")].mean(0) if "drums" in names else None
             bpm, beats = _beats(wav.mean(0) if drum_stem is None else drum_stem, wav.mean(0), dur)
-            _set(job, stage="Finding the key", progress=0.72)
+            _stage(job, "Finding the key", 0.72)
             try:
                 key = _key(sum(stems[i].mean(0) for i, n in enumerate(names) if n != "drums"))
             except Exception:  # noqa: BLE001  (the song works without it)
@@ -467,14 +511,17 @@ def _pipeline(job, src: dict, model_name: str):
                 vox = stems[names.index("vocals")]
                 lead = _lead_vocal(vox, job, (0.73, 0.86))
                 if lead is not None:
+                    _check(job)
                     _write_split(folder, vox, lead)
-                _set(job, stage="Reading the vocal melody", progress=0.87)
+                _stage(job, "Reading the vocal melody", 0.87)
                 _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None)
-            _set(job, stage="Saving tracks", progress=0.9)
+            _stage(job, "Saving tracks", 0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):
+                _check(job)
                 _encode_mp3(stems[names.index(name)], os.path.join(folder, name + ".mp3"))
                 _set(job, progress=0.9 + 0.09 * (i + 1) / len(order))
+            _check(job)  # the last chance: once meta.json is written the song is in the library
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
                     "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
             with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
@@ -597,6 +644,17 @@ def _creep(job, share: tuple[float, float], expected: float):
         stop.set()
 
 
+_in_thread = threading.local()  # .job: the job whose lead vocal is being separated in this thread
+
+
+def _checked(iterable, *_args, **_kw):
+    """Stands in for tqdm in audio-separator's model code: the same loop with no progress bar in the terminal, and a
+    stop at the next chunk once the job is cancelled."""
+    for item in iterable:
+        _check(getattr(_in_thread, "job", None))
+        yield item
+
+
 def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0, 1.0)) -> np.ndarray | None:
     """The lead vocal alone, (2, n) at SR, from the vocal stem: a karaoke model moves backing vocals, harmonies and
     vocal chops out of it. None when the model's package isn't installed."""
@@ -606,22 +664,29 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
 
     import soundfile as sf
     from audio_separator.separator import Separator
+    from audio_separator.separator.architectures import mdxc_separator
+    mdxc_separator.tqdm = _checked  # the model's loop over the song's chunks then stops when the job is cancelled
     _ffmpeg_on_path()
     if job:
         first = not os.path.isfile(os.path.join(MODEL_DIR, LEAD_MODEL))
-        _set(job, stage="Downloading the lead-vocal model (first time only, ≈200 MB)" if first else "Taking out backing vocals and chops",
-             progress=share[0])
+        _stage(job, "Downloading the lead-vocal model (first time only, ≈200 MB)" if first else "Taking out backing vocals and chops",
+               share[0])
     expected = vocals.shape[1] / SR * (0.3 if device() == "cuda" else 3.0)
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp, _creep(job, share, expected):
-        src = os.path.join(tmp, "vocals.wav")
-        sf.write(src, vocals.T, SR)
-        sep = Separator(log_level=logging.WARNING, model_file_dir=MODEL_DIR, output_dir=tmp, output_format="WAV")
-        sep.load_model(model_filename=LEAD_MODEL)
-        if job:
-            _set(job, stage="Taking out backing vocals and chops")
-        lead = [f for f in sep.separate(src) if "(Vocals)" in os.path.basename(f)][0]
-        y, sr = sf.read(os.path.join(tmp, os.path.basename(lead)), dtype="float32", always_2d=True)
-        del sep
+    _in_thread.job = job
+    try:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp, _creep(job, share, expected):
+            src = os.path.join(tmp, "vocals.wav")
+            sf.write(src, vocals.T, SR)
+            sep = Separator(log_level=logging.WARNING, model_file_dir=MODEL_DIR, output_dir=tmp, output_format="WAV")
+            sep.load_model(model_filename=LEAD_MODEL)
+            if job:
+                _check(job)
+                _set(job, stage="Taking out backing vocals and chops")
+            lead = [f for f in sep.separate(src) if "(Vocals)" in os.path.basename(f)][0]
+            y, sr = sf.read(os.path.join(tmp, os.path.basename(lead)), dtype="float32", always_2d=True)
+            del sep
+    finally:
+        _in_thread.job = None
     if sr != SR:
         raise RuntimeError(f"The lead-vocal model returned {sr} Hz audio.")
     if device() == "cuda":
