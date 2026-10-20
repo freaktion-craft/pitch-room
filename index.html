@@ -300,6 +300,22 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   background: var(--ink); color: var(--on-ink); font-size: 12.5px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
 .transport-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
+/* Key change, in the transport row and in Practice's bar: − value +, the key that gives, then a note in whatever room
+   is left on the line (progress while the tracks render, or that big shifts can sound processed). The value and the
+   key have fixed widths and the note takes no room of its own, so nothing moves as they change. */
+.keyctl { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.kstep { display: flex; align-items: center; gap: 4px; }
+.keyctl .kval { width: 28px; margin: 0; text-align: center; font: 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.keyctl .btn:disabled { opacity: 0.35; pointer-events: none; }
+.kname { width: 64px; white-space: nowrap; color: rgba(var(--fg), 0.6); }
+.knote { flex: 1 1 0; width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.knote.warn { color: var(--warn-ink); }
+.knote.err { color: var(--bad); }
+@media (min-width: 900px) { .transport-row .keyctl { margin-left: 8px; } } /* apart from the time, where the row is one line */
+@media (max-width: 760px) { /* too little room beside the key: the note gets a line of its own, there even when empty */
+  .keyctl { flex-wrap: wrap; row-gap: 4px; }
+  .knote { flex-basis: 100%; width: auto; height: 20px; line-height: 20px; }
+}
 .btn.round { width: 40px; padding: 0; justify-content: center; border-radius: 50%; }
 .btn.icon { width: 32px; padding: 0; justify-content: center; }
 .btn.icon .ico { width: 18px; height: 18px; }
@@ -476,6 +492,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
       <span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span>
       <label class="kfield">Bars <select id="kOct" aria-label="Octave of the note bars"><option value="-1">octave down</option><option value="0">as sung</option><option value="1">octave up</option></select></label>
+      <div class="keyctl" role="group" aria-label="Key"></div>
       <div class="phrase-row">
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
@@ -575,6 +592,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
           <button class="btn sm icon" id="pEnd" type="button" aria-label="Go to end" title="Go to end (End)"></button>
         </div>
         <output id="pTime">0:00 / 0:00</output>
+        <div class="keyctl" role="group" aria-label="Key"></div>
         <div class="mix">
           <label class="mix-ico" for="pVol" title="Volume"></label>
           <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
@@ -905,6 +923,7 @@ Object.assign(ICONS, {
   tick: '<path d="M5 14L8.5 17.5L19 6.5"/>', // Tick02
   mic: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C15.8824 18 18.7174 15.3914 19 12M12 22H15M12 22H9"/><path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6V11C16 13.2091 14.2091 15 12 15C9.79086 15 8 13.2091 8 11V6Z"/>', // Mic02
   micOff: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C14.0193 18 15.443 17.4658 16.5665 16.5665M12 22H15M12 22H9M19 12C18.93 12.8406 18.7031 13.6331 18.3497 14.3497"/><path d="M8.3535 4.3535C8.98114 2.96566 10.3778 2 12 2C14.2091 2 16 3.79086 16 6V11C16 11.309 15.965 11.6098 15.8987 11.8987M8 8V11C8 13.2091 9.79086 15 12 15C12.8492 15 13.6365 14.7354 14.2841 14.2841"/><path d="M2 2L22 22"/>', // MicOff02
+  minus: '<path d="M20 12L4 12"/>', // MinusSign
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
   practice: '<path d="M7 6.5C7 4.01472 9.01472 2 11.5 2C13.9853 2 16 4.01472 16 6.5V11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5V6.5Z"/><path d="M11.5 19H11.0828C7.57267 19 4.57706 16.4623 4 13M11.5 19H11.9172C15.4273 19 18.4229 16.4623 19 13M11.5 19V22"/>', // Mic01
   video: '<path d="M2 11C2 7.70017 2 6.05025 3.02513 5.02513C4.05025 4 5.70017 4 9 4H10C13.2998 4 14.9497 4 15.9749 5.02513C17 6.05025 17 7.70017 17 11V13C17 16.2998 17 17.9497 15.9749 18.9749C14.9497 20 13.2998 20 10 20H9C5.70017 20 4.05025 20 3.02513 18.9749C2 17.9497 2 16.2998 2 13V11Z"/><path d="M17 8.90585L17.1259 8.80196C19.2417 7.05623 20.2996 6.18336 21.1498 6.60482C22 7.02628 22 8.42355 22 11.2181V12.7819C22 15.5765 22 16.9737 21.1498 17.3952C20.2996 17.8166 19.2417 16.9438 17.1259 15.198L17 15.0941"/><circle cx="11.5" cy="9.5" r="1.5"/>', // Video01
@@ -1293,7 +1312,7 @@ async function openSong(m) {
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
   const meta = () => { $("#pMeta").textContent = [...songFacts(m), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].join(" · "); };
-  meta(); keyOf(m).then(() => { if (P.song === m) meta(); });
+  meta(); keyOf(m).then(() => { if (P.song === m) { meta(); paintKey(); } });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
   box.classList.remove("ready"); box.style.aspectRatio = ""; wait.classList.remove("err"); wait.textContent = "Loading video…";
@@ -1303,14 +1322,18 @@ async function openSong(m) {
   for (const name of trackNames(m)) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
   renderTracks(); paintSel(); autoSplit(m);
+  P.keyWant = savedKey(m.id); paintKey();
+  if (P.keyWant) loadKey(m, P.keyWant); // alongside the originals, so a key already rendered is there as they are
   const loaded = await Promise.all(trackNames(m).map(async (name) => {
     const r = await fetch(`/library/${m.id}/${name}.mp3`);
     return [name, await ac.decodeAudioData(await r.arrayBuffer())];
   }));
   if (P.song !== m) return;
   P.buffers = Object.fromEntries(loaded);
+  P.orig = { ...P.buffers }; // as decoded, for key 0
   P.raw = { lead: P.buffers.lead, backing: P.buffers.backing };
   splitBuffers();
+  if (P.shifted && P.shifted.n === P.keyWant) applyKey(P.keyWant); // the remembered key came in first
   computePeaks(); P.peaksAt = performance.now(); // the waveform rises in from here
   meta();
   drawWave();
@@ -1318,6 +1341,7 @@ async function openSong(m) {
 function closeSong() {
   pauseSong();
   P.song = null; P.buffers = {}; P.raw = {}; P.peaks = null; P.sel = null;
+  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
 }
@@ -1590,7 +1614,7 @@ async function exportMix(tracks, click, btn) {
   if (!tracks.length && !click) { state.textContent = "Turn on at least one track."; return; }
   btn.disabled = true; state.textContent = "Mixing the MP3…";
   try {
-    const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click }) });
+    const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click, key: P.key }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
     const cd = r.headers.get("Content-Disposition") || "", m = /filename\*=UTF-8''([^;]+)/.exec(cd);
     const name = m ? decodeURIComponent(m[1]) : "export.mp3";
@@ -1605,6 +1629,114 @@ function exportAudible() {
   const c = P.tracks.click, click = audible("click") && P.song.beats && P.song.beats.length ? { gain: c.vol, offset: c.offset, beatsPerBar: c.bpb } : null;
   exportMix(tracks, click, $("#pExport"));
 }
+
+// Key change: the song up or down by up to 6 semitones, remembered per song. The server renders the pitched tracks
+// once per key (about 10 s, see stems.start_key) and the drums play from the original. Until they're in, the song plays
+// on in the key it was in; the original buffers stay loaded, so going back to 0 is instant. Practice's bars, guide line
+// and piano, and the notes on the Info page, move with the key.
+// key: the key P.buffers are in (semitones from the original); keyWant: the one chosen (ahead of key while it renders);
+// orig: the tracks as decoded; shifted: {n, bufs} for the last other key loaded; keyNote: what the control says
+Object.assign(P, { key: 0, keyWant: 0, orig: {}, shifted: null, keyNote: "", keyErr: false, keyJob: null, keyTimer: 0 });
+const KEYS = 6, KEY_WARN = 4; // from KEY_WARN semitones on, the processing can be heard
+const keySign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n); // +2, −3, 0
+const keyAfter = (k, n) => k && { pc: (((k.pc + n) % 12) + 12) % 12, mode: k.mode };
+const keyMap = () => { const k = store.get("keys", {}); return k && typeof k === "object" ? k : {}; }; // song id -> n
+const savedKey = (id) => Math.max(-KEYS, Math.min(KEYS, Math.round(+keyMap()[id] || 0)));
+function saveKey(id, n) { const k = keyMap(); if (n) k[id] = n; else delete k[id]; store.set("keys", k); }
+// A track's file in key n (keys/+2/bass.mp3); the drums aren't pitched.
+const trackUrl = (id, name, n) => (n && name !== "drums" ? `/library/${id}/keys/${n > 0 ? "%2B" : ""}${n}/${name}.mp3` : `/library/${id}/${name}.mp3`);
+// Resolves true once the song's tracks in key n are on the server, rendering them first if needed (onJob(id) when a
+// render runs, onProgress(0…1) as it goes); false if that render was cancelled or the server forgot it (restarted).
+async function keyRendered(id, n, onProgress, onJob) {
+  const r = await fetch(`/api/library/${id}/key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ n }) });
+  const j = await r.json().catch(() => ({ error: "The server didn’t answer properly." }));
+  if (!r.ok) throw new Error(j.error || "Couldn’t change the key.");
+  if (j.ready) return true;
+  if (onJob) onJob(j.job);
+  for (;;) {
+    await new Promise((ok) => setTimeout(ok, 400));
+    const s = await (await fetch("/api/jobs/" + j.job, { cache: "no-store" })).json();
+    if (s.status === "done") return true;
+    if (s.status === "error") throw new Error(s.error || "Couldn’t change the key.");
+    if (s.status !== "queued" && s.status !== "running") return false;
+    if (onProgress) onProgress(s.progress || 0);
+  }
+}
+function setKey(n) {
+  const m = P.song;
+  n = Math.max(-KEYS, Math.min(KEYS, n));
+  if (!m || n === P.keyWant) return;
+  const ready = n === P.key || !n || (P.shifted && P.shifted.n === n); // its buffers are here: no need to wait
+  P.keyWant = n; saveKey(m.id, n); P.keyNote = ready ? "" : "Changing key…"; P.keyErr = false;
+  paintKey();
+  clearTimeout(P.keyTimer);
+  // a few quick clicks change to the key they stop on, not each one on the way; back to the original at once
+  P.keyTimer = setTimeout(() => loadKey(m, n), n && n !== P.key ? 350 : 0);
+}
+async function loadKey(m, n) {
+  if (P.keyJob && P.keyJob.n !== n) { fetch(`/api/jobs/${P.keyJob.id}/cancel`, { method: "POST" }).catch(() => {}); P.keyJob = null; } // nobody wants it now
+  const still = () => P.song === m && P.keyWant === n;
+  const say = (text, err) => { if (still()) { P.keyNote = text; P.keyErr = !!err; paintKey(); } };
+  if (n === P.key) return say("");
+  if (!n || (P.shifted && P.shifted.n === n)) { say(""); return applyKey(n); }
+  say("Changing key…");
+  try {
+    // cancelled: by a newer choice (then stop), or from elsewhere (then ask again)
+    while (!(await keyRendered(m.id, n, (p) => say(p ? `Changing key… ${Math.round(p * 100)}%` : "Changing key…"), (id) => { if (still()) P.keyJob = { n, id }; })))
+      if (!still()) return;
+    if (!still()) return;
+    const bufs = Object.fromEntries(await Promise.all(trackNames(m).filter((k) => k !== "drums").map(async (k) =>
+      [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n))).arrayBuffer())])));
+    if (!still()) return;
+    P.shifted = { n, bufs }; P.keyNote = ""; applyKey(n);
+  } catch (e) { say(e instanceof TypeError ? "Couldn’t reach the server." : e.message, true); }
+  finally { if (P.song === m && P.keyJob && P.keyJob.n === n) P.keyJob = null; }
+}
+// Key n's buffers in place: the shifted tracks and the original drums, or all the originals for 0. While playing, the
+// song carries on from the same moment.
+function applyKey(n) {
+  if (!Object.keys(P.orig).length) return; // the originals aren't in yet: openSong applies it when they are
+  const bufs = (n && P.shifted && P.shifted.n === n && P.shifted.bufs) || {};
+  P.key = n;
+  P.buffers = Object.fromEntries(Object.entries(P.orig).map(([k, b]) => [k, bufs[k] || b]));
+  P.raw = { lead: P.buffers.lead, backing: P.buffers.backing }; splitBuffers();
+  if (P.playing) swapSources();
+  if (K.on && K.song === P.song) songEvs();
+  paintKey();
+}
+// New buffers while playing: the new sources start where the old ones are by then, fading in as the old ones fade out.
+function swapSources() {
+  const oldBus = P.bus, old = P.sources, pos = songPos();
+  P.playing = false; P.offset = pos + 0.06; // playSong starts them 0.06 s from now
+  playSong();
+  const at = P.startAt;
+  oldBus.gain.setTargetAtTime(0, at, 0.015); old.forEach((s) => { try { s.stop(at + 0.2); } catch (e) {} });
+  setTimeout(() => oldBus.disconnect(), 600);
+  P.bus.gain.setValueAtTime(0, ac.currentTime); P.bus.gain.setTargetAtTime(stemVol, at, 0.015);
+}
+// Both controls (Studio's transport row, Practice's bar): − value + and the key that gives, then the note.
+function paintKey() {
+  const m = P.song, n = P.keyWant, k = m && keyAfter(m.key, n);
+  const note = P.keyNote || (Math.abs(n) >= KEY_WARN ? `${KEY_WARN} or more semitones can sound processed.` : "");
+  document.querySelectorAll(".keyctl").forEach((box) => {
+    const [down, val, up] = box.querySelector(".kstep").children, name = box.querySelector(".kname"), msg = box.querySelector(".knote");
+    val.textContent = keySign(n); down.disabled = n <= -KEYS; up.disabled = n >= KEYS;
+    name.textContent = k ? keyName(k) : ""; name.title = k && n ? `Originally ${keyName(m.key)}` : "";
+    msg.textContent = msg.title = note; msg.classList.toggle("err", P.keyErr && !!P.keyNote); msg.classList.toggle("warn", !P.keyNote && !!note);
+  });
+}
+(function initKey() {
+  for (const box of document.querySelectorAll(".keyctl")) {
+    const step = el("span", "kstep"), down = el("button", "btn sm icon"), val = el("output", "kval"), up = el("button", "btn sm icon");
+    down.type = up.type = "button"; down.title = "Lower the key a semitone"; up.title = "Raise the key a semitone";
+    for (const b of [down, up]) b.setAttribute("aria-label", b.title);
+    down.append(icon("minus")); up.append(icon("plus")); val.title = "Semitones from the original key";
+    down.onclick = () => setKey(P.keyWant - 1); up.onclick = () => setKey(P.keyWant + 1);
+    step.append(down, val, up);
+    box.append(el("span", null, "Key"), step, el("span", "kname"), el("span", "knote"));
+  }
+  paintKey();
+})();
 
 // Lead and backing vocals. A song added before they were split gets split when it opens (about a minute); its vocal
 // track says so meanwhile, then the song reopens with the two tracks. Without the lead model it keeps one vocal track.
