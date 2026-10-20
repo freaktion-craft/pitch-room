@@ -142,14 +142,14 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
 .pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; margin-left: auto; visibility: hidden; }
 .pick-list [role="option"] .side { margin-left: auto; padding-left: 16px; min-width: 56px; text-align: right; font: 12.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .pick-list [role="option"] .side + .ico, .pick-list [role="option"] .side + .ring { margin-left: 0; } /* 12 px after the note, as after a name */
-.pick-list [role="option"] .side.accent { color: var(--voice); }
+.pick-list [role="option"] .side.accent { color: var(--muted); } /* the natural-sounding ones: as the notes are; the far ones fainter */
 .pick-list [role="option"] .side.faint, .pick-list .foot b { color: var(--faint); }
 .pick-list .foot b { font: 12px var(--mono); }
 /* how far a choice that takes a while has got, where its tick will be: a ring filling up (spinning until it knows) */
 .pick-list .ring { width: 16px; height: 16px; flex: none; margin-left: auto; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 2; }
 .ring circle:first-child { stroke: var(--ring); }
-.ring circle + circle { stroke: var(--voice); stroke-linecap: round; }
+.ring circle + circle { stroke: var(--muted); stroke-linecap: round; }
 .ring.spin { animation: ring-spin 0.9s linear infinite; }
 @keyframes ring-spin { to { transform: rotate(270deg); } }
 @media (prefers-reduced-motion: reduce) { .ring.spin { animation: none; } }
@@ -1802,7 +1802,7 @@ function swapSources() {
   P.bus.gain.setValueAtTime(0, ac.currentTime); P.bus.gain.setTargetAtTime(stemVol, at, 0.015);
 }
 // Both controls (Studio's header, Practice's bar): a list of the keys, under Higher +6 to +1, the original, then under
-// Lower −1 to −6, each with how far it is from the original: in the accent colour where it sounds natural, in grey from
+// Lower −1 to −6, each with how far it is from the original: in grey where it sounds natural, fainter from
 // KEY_WARN on, which the list's footnote explains (and the note beside the control, once chosen). Picking one that
 // isn't rendered yet keeps the list open, a ring filling up where its tick will be; the button counts too.
 const keyFoot = () => [el("b", null, `±${KEY_WARN}`), " or more semitones can sound processed."];
