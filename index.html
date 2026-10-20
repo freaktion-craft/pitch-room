@@ -237,9 +237,10 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #pParts .x .ico { width: 12px; height: 12px; }
 #pParts .part.hover .x, #pParts .x:focus-visible { opacity: 1; }
 @media (hover: none) { #pParts .x { opacity: 1; } }
-.sel-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; margin-top: -4px; font-size: 13px; color: var(--muted); }
-.sel-bar span { margin-right: auto; }
-.sel-bar .btn { color: var(--ink); }
+/* the dragged span's "Keep vocals here", at its top right (kept inside the waveform when the span is at its left edge) */
+#pParts .sel { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+#pParts .keep { position: absolute; top: 7px; right: 4px; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; white-space: nowrap;
+  background: var(--ink); color: var(--on-ink); font-size: 12.5px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
 .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .btn.round { width: 40px; padding: 0; justify-content: center; border-radius: 50%; }
@@ -475,7 +476,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div></div>
-      <div class="sel-bar" id="pSelBar" hidden><span id="pSelText"></span><button class="btn sm" id="pSelAct" type="button" hidden></button><button class="btn sm icon" id="pSelX" type="button" aria-label="Clear the selection" title="Clear the selection" hidden></button></div>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
@@ -1302,38 +1302,29 @@ function splitBuffers() {
   }
   P.buffers.lead = L; P.buffers.backing = B;
 }
-// The line under the waveform: a hint, or the dragged span and the button that keeps its vocals whole. Each kept-whole
-// part gets an × over the waveform (shown while you point at the part) that splits it again.
+// Over the waveform (no line of its own, so nothing below moves): the dragged span with a button that keeps its vocals,
+// and each kept part with an × (shown while you point at it) that lets it go.
 function paintSel() {
-  const bar = $("#pSelBar"), on = !!(P.song && P.song.split), s = P.sel, act = $("#pSelAct");
-  bar.hidden = !on;
-  $("#pWave").setAttribute("aria-label", on ? "Song overview — click to jump, drag to select a part" : "Song overview — click to jump");
-  renderParts();
-  if (!on) return;
-  act.hidden = $("#pSelX").hidden = !s;
-  if (!s) {
-    const n = (P.song.unsplit || []).length;
-    $("#pSelText").textContent = n ? `Vocals kept whole in ${n} shaded part${n > 1 ? "s" : ""}, which stay in with the lead muted. × on a part splits it again.`
-      : "Backing vocals split wrong somewhere? Drag across that part of the waveform to keep its vocals whole: they’ll stay in even with the lead muted.";
-    return;
-  }
-  $("#pSelText").textContent = `${fmtTime(s.a)}–${fmtTime(s.b)} selected`;
-  act.textContent = "Keep vocals whole here";
-}
-function renderParts() {
-  const box = $("#pParts"), parts = (P.song && P.song.split && P.song.unsplit) || [], dur = songDur() || 1;
+  const on = !!(P.song && P.song.split), parts = (on && P.song.unsplit) || [], dur = songDur() || 1, box = $("#pParts");
+  $("#pWave").setAttribute("aria-label", on ? "Song overview — click to jump, drag over a part to keep its vocals" : "Song overview — click to jump");
+  const span = (cls, a, b) => { const d = el("div", cls); d.style.left = (a / dur) * 100 + "%"; d.style.width = ((b - a) / dur) * 100 + "%"; return d; };
   box.innerHTML = "";
   parts.forEach(([a, b], i) => {
-    const part = el("div", "part"), x = el("button", "x");
-    part.style.left = (a / dur) * 100 + "%"; part.style.width = ((b - a) / dur) * 100 + "%";
-    x.type = "button"; x.title = `Split ${fmtTime(a)}–${fmtTime(b)} again`; x.setAttribute("aria-label", x.title); x.append(icon("close"));
+    const part = span("part", a, b), x = el("button", "x");
+    x.type = "button"; x.title = `Stop keeping the vocals at ${fmtTime(a)}–${fmtTime(b)}`; x.setAttribute("aria-label", x.title); x.append(icon("close"));
     x.onclick = () => saveUnsplit(parts.filter((_, k) => k !== i));
     part.append(x); box.append(part);
   });
+  if (on && P.sel) {
+    const sel = span("sel", P.sel.a, P.sel.b), keep = el("button", "keep", "Keep vocals here");
+    keep.type = "button"; keep.title = "Their vocals stay in even with the lead muted";
+    keep.onclick = () => saveUnsplit([...parts, [P.sel.a, P.sel.b]]);
+    if ((P.sel.b / dur) * $("#pWave").clientWidth < 140) { keep.style.right = "auto"; keep.style.left = "4px"; } // near the left edge
+    sel.append(keep); box.append(sel);
+  }
 }
 async function saveUnsplit(parts) {
-  const m = P.song, act = $("#pSelAct");
-  act.disabled = true;
+  const m = P.song;
   try {
     const r = await fetch(`/api/library/${m.id}/unsplit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unsplit: parts }) });
     const j = await r.json().catch(() => ({}));
@@ -1341,13 +1332,13 @@ async function saveUnsplit(parts) {
     m.unsplit = j.unsplit;
     if (P.song === m) { P.sel = null; splitBuffers(); computePeaks(); if (P.playing) seekSong(songPos()); }
   } catch (e) { $("#pExportState").textContent = e.message; }
-  act.disabled = false; paintSel(); drawWave();
+  paintSel(); drawWave();
 }
-// The waveform: a click jumps there; a drag selects a span. Pointing at a kept-whole part shows its ×.
+// The waveform: a click jumps there (and drops a selection); a drag selects a span. Pointing at a kept part shows its ×.
 function initWave() {
   const wave = $("#pWave"), wrap = $("#pWaveWrap");
   const tAt = (e) => { const r = wave.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur(); };
-  const hover = (i) => [...$("#pParts").children].forEach((p, k) => p.classList.toggle("hover", k === i));
+  const hover = (i) => document.querySelectorAll("#pParts .part").forEach((p, k) => p.classList.toggle("hover", k === i));
   wrap.addEventListener("pointermove", (e) => { const t = tAt(e); hover(((P.song && P.song.unsplit) || []).findIndex(([a, b]) => t >= a && t <= b)); });
   wrap.addEventListener("pointerleave", () => hover(-1));
   let drag = null;
@@ -1366,9 +1357,7 @@ function initWave() {
     seekSong(tAt(e));
   });
   wave.addEventListener("pointercancel", () => { drag = null; });
-  $("#pSelAct").onclick = () => { if (P.sel) saveUnsplit([...(P.song.unsplit || []), [P.sel.a, P.sel.b]]); };
-  $("#pSelX").append(icon("close"));
-  $("#pSelX").onclick = () => { P.sel = null; paintSel(); drawWave(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && P.sel && view === "stems") { P.sel = null; paintSel(); drawWave(); } });
 }
 function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };

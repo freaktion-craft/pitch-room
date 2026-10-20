@@ -26,7 +26,7 @@ Use earphones while practicing so the song doesn't leak into the mic, or turn on
 
 - mute / solo / volume per track, plus the click (accent shift, 2/4–6/4),
 - waveform overview to jump around, Space to play / pause,
-- where the lead / backing split is wrong, drag across that part of the waveform to keep its vocals whole there (they play on the backing track, so they stay in with the lead muted); × on a shaded part splits it again,
+- to keep the vocals of some part in even with the lead muted, drag across it on the waveform and press **Keep vocals here** (its vocals move to the backing track); × on a shaded part lets it go,
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that track,
 - **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.
 
