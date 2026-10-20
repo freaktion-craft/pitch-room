@@ -548,8 +548,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .hud-l .rep.rec::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--bad); vertical-align: 1px; }
 @media (prefers-reduced-motion: reduce) { .btn.rec.on .ico { animation: none; } }
 
-/* Takes: what you recorded in Practice, by day, newest first, under a chart of how in tune each day was. The sliders
-   in the head set how a take sounds, played here and downloaded. */
+/* Takes: what you recorded in Practice, by day, newest first, like notes to self. The sliders in the head set how a
+   take sounds, played here and downloaded. */
 .takes { display: grid; gap: 16px; margin-top: 40px; }
 .tk-head { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; min-height: 32px; }
 .tk-head h2 { margin: 0; }
@@ -559,9 +559,9 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-day { display: grid; gap: 8px; }
 .tk-day h3 { margin: 0; }
 .tk-rows { overflow: hidden; } /* a playing take's progress line keeps to the card's round corners */
-/* columns: play, time of day, the part sung, the score, download, delete. The score and "Really delete?" share a cell. */
-.take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) 152px 32px 32px; align-items: center; gap: 12px;
-  min-height: 56px; padding: 8px 12px; }
+/* columns: play, time of day, the part sung (its times beside it), "Really delete?" while asked, download, delete */
+.take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) auto 32px 32px; align-items: center; gap: 12px;
+  min-height: 48px; padding: 8px 12px; }
 .take + .take { border-top: 1px solid var(--line); }
 .tk-play { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--ink); display: grid; place-items: center;
   transition: background-color 0.15s; }
@@ -571,15 +571,11 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-play .ico { width: 16px; height: 16px; }
 .take.playing .tk-play { background: var(--ink); color: var(--on-ink); }
 .tk-when { font: 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.tk-part, .tk-score { display: grid; min-width: 0; line-height: 20px; }
-.tk-part b, .tk-score b { font-weight: 500; font-size: 14px; }
-.tk-part b, .tk-part small, .tk-score small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tk-part small, .tk-score small { font-size: 12.5px; line-height: 16px; color: var(--faint); }
+.tk-part { display: flex; align-items: baseline; gap: 8px; min-width: 0; line-height: 20px; }
+.tk-part b { flex: none; font-weight: 500; font-size: 14px; }
+.tk-part small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--faint); }
 .tk-part small.err, .take.failed .tk-part b { color: var(--bad); }
-.tk-score { grid-column: 4; grid-row: 1; font-size: 13px; color: var(--muted); }
-.tk-score b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .tk-confirm { grid-column: 4; grid-row: 1; justify-self: end; font-size: 13.5px; color: var(--bad); visibility: hidden; }
-.take.armed .tk-score { visibility: hidden; }
 .take.armed .tk-confirm { visibility: visible; }
 .take.armed .tk-del { background: color-mix(in oklab, var(--bad) 18%, transparent); color: var(--bad); }
 .take.saving .tk-part b { color: var(--muted); font-weight: 400; }
@@ -588,43 +584,14 @@ input[type="range"]:disabled { opacity: 0.4; }
 .take.paused .tk-prog { opacity: 0.45; }
 .tk-empty { display: flex; align-items: center; gap: 12px; margin: 0; padding: 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.18); color: var(--muted); font-size: 14px; }
 .tk-empty .ico { width: 18px; height: 18px; color: var(--bad); }
-/* the chart: one point per day, how much of what you sang that day was in tune; the summary beside it */
-.tk-trend { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px 32px; align-items: center; padding: 16px 20px 16px 16px; border-radius: 14px;
-  background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
-.tk-trend.one { grid-template-columns: 1fr; padding-left: 20px; }
-.tk-chart { position: relative; height: 152px; }
-.tk-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.tk-chart svg:focus-visible { outline-offset: 4px; }
-.tk-chart .grid { stroke: var(--line); }
-.tk-chart .base { stroke: var(--ring); }
-.tk-chart .cross { stroke: var(--ring); }
-.tk-chart text { font: 11px var(--mono); fill: var(--faint); font-variant-numeric: tabular-nums; }
-.tk-chart text.end { font: 500 12px var(--font); fill: var(--ink); }
-.tk-chart .line { fill: none; stroke: var(--voice); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.tk-chart .dot { fill: var(--voice); stroke: var(--surface); stroke-width: 2; }
-.tk-tip { position: absolute; z-index: 2; display: grid; gap: 2px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); white-space: nowrap; pointer-events: none;
-  box-shadow: 0 0 0 1px var(--ring), 0 8px 24px rgba(0, 0, 0, 0.3); font-size: 12px; line-height: 16px; color: var(--muted); }
-.tk-tip b { font-size: 13.5px; line-height: 20px; font-weight: 500; color: var(--ink); }
-.tk-sum { display: grid; align-content: center; gap: 4px; min-width: 0; }
-.tk-sum .big { font-size: 28px; line-height: 36px; font-weight: 500; color: var(--ink); }
-.tk-sum .lbl { font-size: 13px; color: var(--muted); }
-.tk-sum p { margin: 8px 0 0; font-size: 13.5px; line-height: 20px; }
-.tk-sum p.fine { margin-top: 4px; font-size: 12.5px; line-height: 18px; }
-/* one day so far: the number with its two lines of words beside it */
-.tk-trend.one .tk-sum { grid-template-columns: auto minmax(0, 1fr); gap: 0 16px; align-items: center; }
-.tk-trend.one .big { grid-row: 1 / 3; }
-.tk-trend.one .lbl { align-self: end; }
-.tk-trend.one p.fine { margin: 0; align-self: start; }
 @media (max-width: 760px) {
   .tk-mix { flex: 1 1 100%; display: grid; gap: 8px; }
   .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
   .tk-mix input[type="range"] { width: 100%; }
-  .tk-trend { grid-template-columns: 1fr; }
-  .take { grid-template-columns: 32px minmax(0, 1fr) 76px 32px 32px; gap: 8px; }
-  .tk-when, .tk-score small { display: none; }
+  .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px; gap: 8px; }
+  .tk-when { display: none; }
   .tk-part { grid-area: 1 / 2; }
-  .tk-score { grid-area: 1 / 3; }
-  .tk-confirm { grid-area: 1 / 2 / 2 / 4; }
+  .tk-confirm { grid-area: 1 / 2; } /* in the part's place while asked */
   .take.armed .tk-part { visibility: hidden; }
 }
 
@@ -704,7 +671,6 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
           <label class="kfield">Guide vocal <input type="range" id="tkGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
         </div>
       </div>
-      <div class="tk-trend" id="tkTrend" hidden></div>
       <div class="tk-days" id="tkList"></div>
       <p class="tk-empty" id="tkEmpty" hidden>Press record, then play.</p>
     </section>
@@ -2675,7 +2641,7 @@ function recBegin(at) {
   if (!R.armed || !R.node || !micOn || !K.on || view !== "practice" || !K.song || !P.song || K.song.id !== P.song.id) return;
   const lat = recLatency();
   R.cap = { song: P.song.id, start: P.offset + (at - P.startAt), key: P.key, oct: K.oct, lat, from: Math.round((at + lat) * ac.sampleRate), to: null,
-    parts: [], n: 0, guide: 0, sung: 0, voiced: 0, tuned: 0, t: null, heard: -Infinity };
+    parts: [], n: 0 };
   R.node.port.postMessage(true);
   paintRec();
 }
@@ -2720,30 +2686,6 @@ function wavFile(x, sr) {
   for (let i = 0; i < x.length; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, x[i])) * 32767, true);
   return new Blob([v.buffer], { type: "audio/wav" });
 }
-// Each frame of a take, your pitch against the bars (in the key the song plays in). guide: time with a note to sing;
-// sung: of that, time you were singing; voiced: of that, time a pitch was read; tuned: of that, time within 50 cents
-// of the note, in whatever octave: the right note an octave down (where many sing a song made for another voice, bars
-// moved or not) is in tune, and so is a frame the tracker read an octave off. The pitch read now is of the sound that
-// came in about half the analyser's window ago, sung to the song as it was the latency before that.
-function recScore() {
-  const c = R.cap;
-  if (!c || !P.playing) return;
-  const t = songPos() - c.lat - analyser.fftSize / 2 / ac.sampleRate, dt = c.t == null ? 0 : Math.min(0.1, t - c.t);
-  c.t = t;
-  if (cur != null) c.heard = t;
-  if (dt <= 0 || t < c.start) return;
-  const e = songNote(t);
-  if (!e) return;
-  c.guide += dt;
-  // Consonants and slides between notes read no pitch for a moment (on the song's own singer, gaps of 70 ms or so,
-  // which left a fifth of the notes "unsung"): up to 0.15 s of sound with no pitch still counts as singing.
-  if (cur == null && !(level > S.gate && t - c.heard <= 0.15)) return;
-  c.sung += dt;
-  if (cur == null) return;
-  c.voiced += dt;
-  const d = cur - e.midi;
-  if (Math.abs(d - 12 * Math.round(d / 12)) <= 0.5) c.tuned += dt;
-}
 function paintRec() {
   const b = $("#kRec");
   b.setAttribute("aria-pressed", String(R.armed)); b.classList.toggle("on", !!R.cap);
@@ -2753,7 +2695,7 @@ function paintRec() {
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
 // (play) or paused (at: {id, pos}). mix: how takes sound, played here and downloaded; Your voice works on top of the
 // take's own gain, which brings it to about the loudness of the song's singer.
-const T = { song: null, list: [], loaded: false, days: null, voice: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 } };
+const T = { song: null, list: [], loaded: false, voice: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 } };
 for (const [k, v] of Object.entries(store.get("takeMix", {}) || {})) if (k in T.mix && Number.isFinite(v)) T.mix[k] = Math.max(0, Math.min(2, v));
 async function loadTakes(m) {
   if (T.song !== m.id) {
@@ -2771,8 +2713,7 @@ async function takeSave(c, wav) {
   const t = c.entry || { id: "new" + Math.random().toString(16).slice(2), created: Date.now() / 1000, start: c.start, duration: c.n / ac.sampleRate, key: c.key };
   c.entry = t; t.saving = true; t.failed = null;
   if (T.song === c.song) { if (!T.list.includes(t)) T.list.unshift(t); renderTakes(); }
-  const q = new URLSearchParams({ start: c.start.toFixed(4), key: c.key, oct: c.oct, latency: c.lat.toFixed(4),
-    guide: c.guide.toFixed(3), sung: c.sung.toFixed(3), voiced: c.voiced.toFixed(3), tuned: c.tuned.toFixed(3) });
+  const q = new URLSearchParams({ start: c.start.toFixed(4), key: c.key, oct: c.oct, latency: c.lat.toFixed(4) });
   let saved = null;
   try {
     const r = await fetch(`/api/library/${c.song}/takes?${q}`, { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav });
@@ -2788,12 +2729,10 @@ async function takeSave(c, wav) {
   renderTakes();
 }
 
-// Dates in English, as they sit in English sentences ("Up 9 points since Oct 14"), whatever the system's language
-const shortDate = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+// Dates in English, like the rest of the page, whatever the system's language
 const longDate = (d) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
 const daysAgo = (d) => { const a = new Date(d), b = new Date(); a.setHours(12, 0, 0, 0); b.setHours(12, 0, 0, 0); return Math.round((b - a) / 864e5); };
 const dayName = (d) => ["Today", "Yesterday"][daysAgo(d)] || longDate(d);
-const dayWords = (d) => ["today", "yesterday"][daysAgo(d)] || "on " + shortDate(d);
 const fmtLen = (d) => (d < 59.5 ? `${Math.round(d)} s` : fmtTime(d));
 // The part of the song a take is of: the phrases whose middle it covers, or its times where it has none.
 function takePart(t) {
@@ -2803,11 +2742,10 @@ function takePart(t) {
   if (!ps.length) return { what: range, more: len };
   return { what: ps.length === 1 ? `Phrase ${ps[0]}` : `Phrases ${ps[0]}–${ps[ps.length - 1]}`, more: `${range} · ${len}` };
 }
-// Takes by day, newest first; the chart of the days above them.
+// Takes by day, newest first.
 function renderTakes() {
   $("#tkEmpty").hidden = !T.loaded || T.list.length > 0;
   $("#tkMix").hidden = !T.list.length;
-  renderTrend();
   const days = new Map();
   for (const t of T.list) {
     const k = new Date(t.created * 1000).toDateString();
@@ -2838,10 +2776,6 @@ function takeRow(t) {
   else { play.append(ppIcon()); play.disabled = !!t.saving; play.onclick = () => listenTake(t); }
   const what = el("span", "tk-part");
   what.append(el("b", null, t.saving ? "Saving take…" : t.failed ? "Couldn’t save this take" : part.what), el("small", null, t.failed || part.more));
-  const score = el("span", "tk-score"), line = el("span");
-  if (t.inTune == null) line.textContent = "Not scored"; // nothing (or hardly anything) sung where there are notes
-  else line.append(el("b", null, `${Math.round(t.inTune)}%`), " in tune");
-  if (!t.saving && !t.failed) score.append(line, el("small", null, t.coverage == null ? "no notes to sing here" : `${Math.round(t.coverage)}% of the notes sung`));
   const dl = el("button", "dl"), del = el("button", "dl tk-del");
   dl.type = del.type = "button"; dl.append(icon("download")); del.append(icon("trash"));
   dl.disabled = !!(t.saving || t.failed); del.disabled = !!t.saving;
@@ -2849,7 +2783,7 @@ function takeRow(t) {
   del.title = t.failed ? "Dismiss" : "Delete this take"; del.setAttribute("aria-label", del.title);
   dl.onclick = () => takeWav(t);
   del.onclick = () => takeDelete(t);
-  row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what, score,
+  row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what,
     el("span", "tk-confirm", "Really delete?"), dl, del, el("i", "tk-prog"));
   return row;
 }
@@ -2864,7 +2798,7 @@ function takeNote(id, text, err) {
   if (text == null) delete s.dataset.was;
   if (err) s.timer = setTimeout(() => takeNote(id, null), 4000);
 }
-// Delete asks "Really delete?" first (where the score was), like the library's; a click anywhere else or Escape takes
+// Delete asks "Really delete?" first (beside the part), like the library's; a click anywhere else or Escape takes
 // the question back. A take that couldn't be saved is just dismissed.
 function disarmTakes() {
   document.querySelectorAll("#tkList .take.armed").forEach((r) => {
@@ -3001,102 +2935,6 @@ async function takeBand(n) {
   return bufs;
 }
 
-// Progress: one point per day, how much of that day's singing was in tune (the time in tune over the time a pitch was
-// read, all of that day's takes together, so a long take counts for more than a short one), with the latest and the
-// change since the first day beside it in words.
-function takeDays() {
-  const days = new Map();
-  for (const t of T.list) {
-    if (t.saving || t.failed) continue;
-    const d = new Date(t.created * 1000), k = d.toDateString();
-    if (!days.has(k)) days.set(k, { date: new Date(d.getFullYear(), d.getMonth(), d.getDate()), n: 0, voiced: 0, tuned: 0, best: null });
-    const e = days.get(k);
-    e.n++;
-    if (t.inTune != null) { e.voiced += t.voiced; e.tuned += t.tuned; e.best = Math.max(e.best ?? 0, t.inTune); }
-  }
-  return [...days.values()].filter((e) => e.voiced > 0).map((e) => ({ ...e, avg: (100 * e.tuned) / e.voiced })).sort((a, b) => a.date - b.date);
-}
-function renderTrend() {
-  const box = $("#tkTrend"), days = (T.days = takeDays());
-  box.hidden = !days.length; box.classList.toggle("one", days.length === 1); box.replaceChildren();
-  if (!days.length) return;
-  const last = days[days.length - 1], sum = el("div", "tk-sum"), takes = (n) => `${n} take${n === 1 ? "" : "s"}`;
-  sum.append(el("span", "big", `${Math.round(last.avg)}%`), el("span", "lbl", `in tune ${dayWords(last.date)}`));
-  if (days.length === 1) { // no chart yet: the one value, with what it's from
-    sum.lastChild.textContent += `, across ${takes(last.n)}`;
-    sum.append(el("p", "fine", "Sing on another day to see your progress here."));
-    box.append(sum);
-    return;
-  }
-  const first = days[0], d = Math.round(last.avg) - Math.round(first.avg), best = days.reduce((a, b) => (b.avg > a.avg ? b : a)), since = shortDate(first.date);
-  const words = d > 0 ? `Up ${d} point${d === 1 ? "" : "s"} since ${since}.` : d < 0 ? `Down ${-d} point${d === -1 ? "" : "s"} since ${since}.` : `The same as on ${since}.`;
-  sum.append(el("p", null, words + (best !== last ? ` Best day: ${Math.round(best.avg)}% on ${shortDate(best.date)}.` : "")),
-    el("p", "fine", "Each point is a day: how much of your singing that day was in tune."));
-  const chart = el("div", "tk-chart");
-  box.append(chart, sum);
-  drawTrend(chart, days);
-}
-function svgEl(tag, attrs, cls) {
-  const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
-  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-  if (cls) n.setAttribute("class", cls);
-  return n;
-}
-// The chart, drawn to its box's size: 0–100% up the side on hairlines, days along the bottom (as far apart as they are
-// in time), a 2 px line and dots in your colour, the last value at its end. Pointing (or the arrow keys, once it has
-// focus) picks the nearest day and shows it in a tooltip.
-function drawTrend(box, days) {
-  const W = box.clientWidth, H = box.clientHeight;
-  if (!W) return;
-  const L = 40, Rt = 44, Tp = 8, B = 28, dayNo = (d) => Math.round(d.getTime() / 864e5 - d.getTimezoneOffset() / 1440);
-  const d0 = dayNo(days[0].date), span = Math.max(1, dayNo(days[days.length - 1].date) - d0);
-  const X = (e) => L + ((dayNo(e.date) - d0) / span) * (W - L - Rt), Y = (v) => Tp + (1 - v / 100) * (H - Tp - B);
-  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, tabindex: "0", role: "img",
-    "aria-label": "In tune by day: " + days.map((e) => `${shortDate(e.date)}, ${Math.round(e.avg)}%`).join("; ") });
-  const text = (s, attrs, cls) => { const t = svgEl("text", attrs, cls); t.textContent = s; svg.append(t); return t; };
-  for (const v of [0, 50, 100]) {
-    const y = Math.round(Y(v)) + 0.5; // a hairline on whole pixels
-    svg.append(svgEl("line", { x1: L, x2: W - Rt, y1: y, y2: y }, v ? "grid" : "base"));
-    text(`${v}%`, { x: L - 8, y, "text-anchor": "end", "dominant-baseline": "middle" });
-  }
-  const labelled = []; // the first and last day, then any others with room
-  for (const e of [days[0], days[days.length - 1], ...days.slice(1, -1)]) if (labelled.every((o) => Math.abs(X(o) - X(e)) >= 72)) labelled.push(e);
-  for (const e of labelled) text(shortDate(e.date), { x: X(e), y: H - 8, "text-anchor": "middle" });
-  const cross = svgEl("line", { y1: Tp, y2: H - B, visibility: "hidden" }, "cross");
-  svg.append(cross, svgEl("path", { d: days.map((e, i) => `${i ? "L" : "M"}${X(e).toFixed(1)} ${Y(e.avg).toFixed(1)}`).join("") }, "line"));
-  for (const e of days) svg.append(svgEl("circle", { cx: X(e), cy: Y(e.avg), r: 4 }, "dot"));
-  const hi = svgEl("circle", { r: 5.5, visibility: "hidden" }, "dot");
-  svg.append(hi);
-  const last = days[days.length - 1];
-  text(`${Math.round(last.avg)}%`, { x: X(last) + 10, y: Y(last.avg), "dominant-baseline": "middle" }, "end");
-  const tip = el("div", "tk-tip");
-  tip.hidden = true;
-  box.replaceChildren(svg, tip);
-  let sel = -1;
-  const show = (i) => {
-    sel = i;
-    for (const n of [cross, hi]) n.setAttribute("visibility", i < 0 ? "hidden" : "visible");
-    tip.hidden = i < 0;
-    if (i < 0) return;
-    const e = days[i], x = X(e), y = Y(e.avg), cx = Math.round(x) + 0.5;
-    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); hi.setAttribute("cx", x); hi.setAttribute("cy", y);
-    tip.replaceChildren(el("b", null, `${Math.round(e.avg)}% in tune`), el("span", null, longDate(e.date)),
-      el("span", null, `${e.n} take${e.n === 1 ? "" : "s"} · best ${Math.round(e.best)}%`));
-    const w = tip.offsetWidth, h = tip.offsetHeight;
-    tip.style.left = Math.max(0, Math.min(W - w, x - w / 2)) + "px";
-    tip.style.top = (y - h - 12 >= 0 ? y - h - 12 : y + 12) + "px";
-  };
-  const nearest = (px) => days.reduce((b, e, i) => (Math.abs(X(e) - px) < Math.abs(X(days[b]) - px) ? i : b), 0);
-  svg.addEventListener("pointermove", (ev) => show(nearest(ev.clientX - svg.getBoundingClientRect().left)));
-  svg.addEventListener("pointerleave", () => { if (document.activeElement !== svg) show(-1); });
-  svg.addEventListener("focus", () => show(sel >= 0 ? sel : days.length - 1));
-  svg.addEventListener("blur", () => show(-1));
-  svg.addEventListener("keydown", (ev) => { // the arrows move along the days here, rather than through the phrases
-    const to = { ArrowLeft: sel - 1, ArrowRight: sel + 1, Home: 0, End: days.length - 1 }[ev.key];
-    if (to !== undefined) { ev.preventDefault(); ev.stopPropagation(); show(Math.max(0, Math.min(days.length - 1, to))); }
-    else if (ev.key === "Escape") show(-1);
-  });
-}
 function initTakes() {
   $("#kRec").append(icon("record"));
   $("#kRec").onclick = () => setRec(!R.armed);
@@ -3112,7 +2950,6 @@ function initTakes() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") disarmTakes(); });
   // a take still being recorded or saved lives only in this page: closing or reloading it asks first
   addEventListener("beforeunload", (e) => { if (R.cap || R.closing.length || T.list.some((t) => t.saving || t.failed)) e.preventDefault(); });
-  new ResizeObserver(() => { const c = $("#tkTrend .tk-chart"); if (c && T.days) drawTrend(c, T.days); }).observe($("#tkTrend"));
 }
 
 // ---------- canvas ----------
@@ -3177,7 +3014,7 @@ function draw(now, cur, hist, evs, guide) {
     if (BLACK.has(p)) { g.globalAlpha = 0.55; g.fillStyle = C["surface-2"]; g.fillRect(GUT, y - ppS / 2, W - GUT, ppS); g.globalAlpha = 1; }
     if (p === 0) { g.fillStyle = C.line; g.fillRect(GUT, Math.round(y + ppS / 2), W - GUT, 1); }
     if (!BLACK.has(p) && (ppS >= 13 || p === 0)) {
-      g.fillStyle = p === 0 ? C.ink : C.muted; g.font = `${p === 0 ? 600 : 400} 11px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      g.fillStyle = p === 0 ? C.ink : C.muted; g.font = `${p === 0 ? 600 : 400} 11px Pretendard, system-ui, sans-serif`;
       g.textBaseline = "middle"; g.fillText(absName(m), 8, y);
     }
   }
@@ -3262,7 +3099,6 @@ function loop() {
 }
 // One frame of Practice: the bars, your pitch, the readouts.
 function practiceFrame() {
-  recScore(); // before a loop's restart below ends the take
   const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
   if (last && sn < last.t - 0.25) K.hist = []; // jumped back
   if (P.playing) K.hist.push({ t: sn, m: cur });

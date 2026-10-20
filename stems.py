@@ -1269,11 +1269,8 @@ def _singer_loud(path: str, _mtime: float) -> float:
 
 def save_take(song_id: str, data: bytes, info: dict) -> dict:
     """Keep a take. data: a 16-bit PCM WAV of the mic. info: start (song time of its first sample, s), key (semitones
-    the song played in), oct (the bars' octave, -1…1), latency (the speaker and mic delay allowed for, s), and the
-    seconds behind the scores: guide (time with a note to sing), sung (of that, time you sang), voiced (of that, time
-    your pitch was read) and tuned (of that, time within 50 cents of the note, in any octave). Returns the take's json:
-    those, plus id, created, end, duration, sampleRate, inTune (% of voiced that was tuned), coverage (% of guide that
-    was sung) and gain: how much to turn the take up or down to sound as loud as the song's own singer, so "Your voice"
+    the song played in), oct (the bars' octave, -1…1) and latency (the speaker and mic delay allowed for, s).
+    Returns the take's json: those, plus id, created, end, duration, sampleRate and gain: how much to turn the take up or down to sound as loud as the song's own singer, so "Your voice"
     at 100% sits in the band like the original vocal (the file keeps the recording as it was)."""
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
@@ -1291,19 +1288,11 @@ def save_take(song_id: str, data: bytes, info: dict) -> dict:
         raise ValueError(f"Takes under {TAKE_MIN:g} seconds aren’t kept.")
     start = _num(info, "start", 0, float(meta["duration"]))
     key = _semitones(info.get("key", 0))
-    guide, sung, voiced, tuned = (_num(info, k, 0, dur + 1) for k in ("guide", "sung", "voiced", "tuned"))
-    sung = min(sung, guide)
-    voiced = min(voiced, sung)
-    tuned = min(tuned, voiced)
     singer = next((p for p in (os.path.join(folder, n + ".mp3") for n in ("lead", "vocals")) if os.path.isfile(p)), None)
     loud, ref = _loud(x, rate), singer and _singer_loud(singer, os.path.getmtime(singer))
     take = {"id": secrets.token_hex(6), "created": round(time.time(), 3), "start": round(start, 4),
             "end": round(start + dur, 4), "duration": round(dur, 4), "key": key, "oct": int(_num(info, "oct", -1, 1)),
             "latency": round(_num(info, "latency", 0, 2), 4), "sampleRate": rate,
-            "guide": round(guide, 2), "sung": round(sung, 2), "voiced": round(voiced, 2), "tuned": round(tuned, 2),
-            # a score from under half a second of singing says nothing
-            "inTune": round(100 * tuned / voiced, 1) if voiced >= 0.5 else None,
-            "coverage": round(100 * sung / guide, 1) if guide >= 0.5 else None,
             "gain": round(float(np.clip(ref / loud, *TAKE_GAIN)), 3) if ref and loud > 1e-4 else 1.0}
     out = os.path.join(folder, "takes")
     os.makedirs(out, exist_ok=True)
