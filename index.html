@@ -229,11 +229,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .video-wait.err { animation: none; }
 .video.ready .video-wait { display: none; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; touch-action: pan-y; }
-/* the playhead's time while you drag it: a tooltip above the waveform, its tip on the line (--tip, from drawWave) */
-.ph-flag { position: absolute; bottom: calc(100% + 5px); z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 6px; display: grid; place-items: center;
+/* the playhead's time while you drag it: a flag at the top of the waveform, the line hanging from it (drawWave) */
+.ph-flag { position: absolute; top: 0; z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 6px; display: grid; place-items: center;
   border-radius: 4px; background: var(--voice); color: #fff; font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
-.ph-flag::after { content: ""; position: absolute; top: 100%; left: var(--tip, 50%); transform: translateX(-50%); border: 5px solid transparent; border-bottom: 0;
-  border-top-color: var(--voice); }
 /* kept-whole parts: an × in each one's top right corner, shown while you point at the part */
 .wave-wrap { position: relative; }
 #pParts .part { position: absolute; top: 0; bottom: 0; pointer-events: none; }
@@ -1211,15 +1209,14 @@ function drawWave() {
     }
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
   x.globalAlpha = 1;
-  const lw = P.phHover || P.scrub ? 4 : 2; // the playhead thickens while you can grab it
-  x.fillStyle = C.voice; x.fillRect(prog * W - lw / 2, 0, lw, H);
+  const lw = P.phHover || P.scrub ? 4 : 2, top = P.scrub ? 20 : 0; // thicker while you can grab it; hangs from the flag while dragged
+  x.fillStyle = C.voice; x.fillRect(prog * W - lw / 2, top, lw, H - top);
   const flag = $("#pFlag");
   flag.hidden = !P.scrub;
   if (P.scrub) {
     flag.textContent = `${fmtClock(songPos())} / ${fmtClock(songDur())}`;
-    const half = flag.offsetWidth / 2, fx = Math.max(half, Math.min(W - half, prog * W)); // kept over the waveform
-    flag.style.left = fx + "px";
-    flag.style.setProperty("--tip", prog * W - fx + half + "px"); // the tip stays on the line
+    const half = flag.offsetWidth / 2;
+    flag.style.left = Math.max(half, Math.min(W - half, prog * W)) + "px"; // kept over the waveform
   }
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
 }
