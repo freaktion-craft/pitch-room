@@ -797,14 +797,15 @@ const clock = () => performance.now() / 1000;
 
 // ---------- language ----------
 // The page is written in English. In Korean, tr() gives a string's entry in KO_TEXT (keyed by the English, at the end
-// of this script), {placeholders} filled in from vars. The server speaks English only: what it says (job stages,
-// errors) goes through tr() too, the messages with something of their own in them (a reason, a device) by pattern.
+// of this script), {placeholders} filled in from vars (a function for a part that's translated itself, so it's asked
+// again after a switch). The server speaks English only: what it says (job stages, errors) goes through tr() too, the
+// messages with something of their own in them (a reason, a device) by pattern.
 let lang = "en"; // until initLang: what's built at startup is built in English, then switched like the rest
 const locale = () => (lang === "ko" ? "ko-KR" : "en-US");
 function tr(en, vars) {
   let s = en;
   if (lang === "ko" && typeof en === "string") s = KO_TEXT[en] ?? (vars ? null : fromServer(en)) ?? en;
-  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)) : s;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (!(k in vars) ? m : typeof vars[k] === "function" ? vars[k]() : vars[k])) : s;
 }
 let serverPats = null;
 function fromServer(en) {
@@ -1262,7 +1263,7 @@ async function stemsRefresh() {
   stemsStatus = st;
   $("#sServer").hidden = !!st || !!err;
   $("#sErr").hidden = !err;
-  if (err) say($("#sErr"), "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err });
+  if (err) say($("#sErr"), "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err: () => tr(err) });
   $("#sInstall").hidden = !st || st.installed;
   $("#sAdd").hidden = !st || !st.installed;
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
@@ -1545,7 +1546,10 @@ function watchJob(id, kind, forSong) {
       $("#sInstallLog").textContent = (j.log || []).join("\n");
       $("#sInstallBtn").disabled = j.status === "running" || j.status === "queued";
     } else if (kind === "video") {
-      if (P.song && P.song.id === forSong) videoWait(j.status === "error" ? j.error : "{stage}… {pct}%", j.status === "error", { stage: tr(j.stage), pct: Math.round(j.progress * 100) });
+      if (P.song && P.song.id === forSong) {
+        if (j.status === "error") videoWait(j.error, true);
+        else videoWait("{stage}… {pct}%", false, { stage: () => tr(j.stage), pct: Math.round(j.progress * 100) });
+      }
     } else if (kind === "split") {
       splitting[forSong] = j.status === "queued" ? ["waiting to split into lead and backing…"] : ["splitting into lead and backing… {pct}%", { pct: Math.round(j.progress * 100) }];
       const note = $('#pTracks .track[data-name="vocals"] .name small');
@@ -1566,7 +1570,7 @@ function watchJob(id, kind, forSong) {
       if (kind === "split") {
         delete splitting[forSong];
         if (P.song && P.song.id === forSong) {
-          if (j.status === "error") { say($("#pExportState"), "Couldn’t split the vocals: {why}", { why: j.error }); renderTracks(); }
+          if (j.status === "error") { say($("#pExportState"), "Couldn’t split the vocals: {why}", { why: () => tr(j.error) }); renderTracks(); }
           else {
             libCache.delete(forSong); // its tracks changed: read them afresh
             if (location.hash === "#stems/" + forSong) openSongById(forSong);
