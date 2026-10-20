@@ -308,13 +308,16 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .keyctl .kval { width: 28px; margin: 0; text-align: center; font: 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
 .keyctl .btn:disabled { opacity: 0.35; pointer-events: none; }
 .kname { width: 64px; white-space: nowrap; color: rgba(var(--fg), 0.6); }
-.knote { flex: 1 1 0; width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* up to two lines (32 px) where the line is short: within the height of the row's 40 px play button. With less room
+   than its min-width for it, the control moves to the next line. */
+.knote { flex: 1 1 0; width: 0; min-width: 140px; font-size: 12.5px; line-height: 16px; max-height: 32px; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .knote.warn { color: var(--warn-ink); }
 .knote.err { color: var(--bad); }
 @media (min-width: 900px) { .transport-row .keyctl { margin-left: 8px; } } /* apart from the time, where the row is one line */
 @media (max-width: 760px) { /* too little room beside the key: the note gets a line of its own, there even when empty */
   .keyctl { flex-wrap: wrap; row-gap: 4px; }
-  .knote { flex-basis: 100%; width: auto; height: 20px; line-height: 20px; }
+  .knote { flex-basis: 100%; width: auto; height: 20px; line-height: 20px; -webkit-line-clamp: 1; }
 }
 .btn.round { width: 40px; padding: 0; justify-content: center; border-radius: 50%; }
 .btn.icon { width: 32px; padding: 0; justify-content: center; }
