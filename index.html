@@ -1516,18 +1516,23 @@ function drawWave() {
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
 }
 // Where the playhead is drawn, as a fraction of the song: where the song is, except just after a jump (a click on the
-// waveform, ±5 s…), when the line springs over to it: a little overshoot, settled in about 0.2 s. The sound itself
-// jumps at once. A jump mid-spring carries on from where the line is, at its speed.
-const PH_W = 34, PH_Z = 0.7; // the spring's natural frequency (rad/s) and damping ratio
+// waveform, ±5 s…). Then the line lands on a spring: it comes in from a short way off (PH_RUN px, on the side it came
+// from) at speed, overshoots by about 9 px and settles within 0.2 s. Sweeping it across the whole jump left a smear of
+// lines behind it. The sound itself jumps at once.
+const PH_W = 40, PH_Z = 0.5, PH_RUN = 24, PH_V = 1200; // natural frequency (rad/s), damping ratio, run-up (px), speed (px/s)
 function playheadJump() {
   if (P.scrub || matchMedia("(prefers-reduced-motion: reduce)").matches) { P.ph = null; return; }
-  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: P.ph ? P.ph.v : 0, t: performance.now() };
+  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: 0, t: performance.now(), fresh: true };
 }
 function playheadShown(W) {
   const to = songDur() ? songPos() / songDur() : 0, s = P.ph;
   if (!s || P.scrub) { P.ph = null; return to; }
   const now = performance.now();
   if (now - s.t > 250) { P.ph = null; return to; } // a jump made where the waveform wasn't drawn (Practice): nothing to show
+  if (s.fresh) { // the run-up: at most PH_RUN px short of where it's going, coming in at speed
+    const d = (to - s.x) * W, run = Math.min(Math.abs(d), PH_RUN), dir = Math.sign(d);
+    s.fresh = false; s.x = to - (dir * run) / W; s.v = (dir * PH_V * (run / PH_RUN)) / W;
+  }
   const dt = Math.min(0.05, (now - s.t) / 1000) / 4; s.t = now;
   for (let i = 0; i < 4; i++) { s.v += (-PH_W * PH_W * (s.x - to) - 2 * PH_Z * PH_W * s.v) * dt; s.x += s.v * dt; } // semi-implicit Euler
   if (Math.abs(s.x - to) * W < 0.5 && Math.abs(s.v) * W < 30) { P.ph = null; return to; }
