@@ -1529,12 +1529,13 @@ function songView(snap) {
   if (snap) { vLo = lo; vHi = hi; } else { vLo += (lo - vLo) * 0.07; vHi += (hi - vHi) * 0.07; } // eases only after an octave change
 }
 // btn: the button that started it, which says what's happening meanwhile (the first time, the server separates the
-// lead vocal and reads its melody: about a minute) and shows any error.
+// lead vocal and reads its melody: about a minute) and shows any error. A melody that's ready arrives in a moment, so
+// the button only says so after half a second, rather than flashing a long label.
 async function singSong(m, btn) {
   const lbl = btn && (btn.querySelector(".how") || btn), was = lbl && lbl.textContent;
   const say = (text) => { if (lbl) lbl.textContent = text; };
   if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
-  say("Reading the melody… (up to a minute the first time)");
+  const slow = setTimeout(() => say("Reading the melody… (up to a minute the first time)"), 500);
   let mel;
   try {
     if (!P.song || P.song.id !== m.id) await openSong(m);
@@ -1545,7 +1546,7 @@ async function singSong(m, btn) {
     $("#pExportState").textContent = e.message; say(e.message);
     setTimeout(() => say(was), 4000);
     return;
-  } finally { if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
+  } finally { clearTimeout(slow); if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
   say(was);
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = 0; K.on = true; // bars as sung; "Bars" moves them an octave
   K.entries = songEntries(K.notes, m.beats, m.bpm);
@@ -1613,7 +1614,10 @@ function readColors() {
 }
 function resize() {
   const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
-  W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  W = r.width; H = r.height;
+  // setting a canvas's size clears it, even to the same size, so only when it changed
+  if (cv.width !== Math.round(W * dpr)) cv.width = Math.round(W * dpr);
+  if (cv.height !== Math.round(H * dpr)) cv.height = Math.round(H * dpr);
 }
 new ResizeObserver(resize).observe(cv);
 readColors();
@@ -1740,18 +1744,19 @@ function loop() {
   if (m == null) { if (++miss > 3) { med = []; cur = null; } }
   else { miss = 0; med.push(m); while (med.length > 5) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
   if (view === "practice") drawSpectrum();
-
-  if (K.on && view === "practice") {
-    const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
-    if (last && sn < last.t - 0.25) K.hist = []; // jumped back
-    if (P.playing) K.hist.push({ t: sn, m: cur });
-    while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
-    songView();
-    draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 });
-    setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
-    renderHud(sn, cur); renderCountIn(sn);
-  }
+  if (K.on && view === "practice") practiceFrame();
   requestAnimationFrame(loop);
+}
+// One frame of Practice: the bars, your pitch, the readouts.
+function practiceFrame() {
+  const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
+  if (last && sn < last.t - 0.25) K.hist = []; // jumped back
+  if (P.playing) K.hist.push({ t: sn, m: cur });
+  while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
+  songView();
+  draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 });
+  setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
+  renderHud(sn, cur); renderCountIn(sn);
 }
 // The mic chip's spectrum: 7 bands from 90 Hz to 4 kHz, where a voice's energy is, spaced evenly in pitch. Each bar is
 // as tall as the loudest bin in its band (-95 dB flat … -35 dB full), rising at once and falling back gently.
@@ -1881,7 +1886,9 @@ function route() {
     $("#overlay").hidden = true;
     loadSamples(); // for the keyboard
     renderStart();
-    requestAnimationFrame(() => { resize(); centerKeys(); });
+    // size and draw the stage now, so the view's first frame is complete rather than an empty stage
+    resize(); centerKeys();
+    if (K.on) practiceFrame();
   }
   window.scrollTo(0, 0);
 }
