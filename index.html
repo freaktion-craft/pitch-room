@@ -1258,7 +1258,9 @@ function syncVideo() {
 }
 setInterval(syncVideo, 100);
 function songDur() { return P.song ? P.song.duration : 0; }
-function songPos() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt)) : P.offset; }
+// Playback starts a moment after Play (startAt, 60 ms ahead); until then the song is still at its offset, so a pause
+// or seek that soon never stores a position before it (below 0:00, start() throws).
+function songPos() { return P.playing ? Math.min(songDur(), P.offset + Math.max(0, ac.currentTime - P.startAt)) : P.offset; }
 function audible(name) {
   const t = P.tracks[name], anySolo = Object.values(P.tracks).some((x) => x.solo);
   return anySolo ? t.solo : !t.mute;
