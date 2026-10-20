@@ -1125,14 +1125,17 @@ async function renderInfo(id) {
     if (note) dd.append(el("small", null, note));
     d.append(el("dt", null, label), dd); $("#iFacts").append(d);
   };
-  if (s.key) {
+  const n = savedKey(id); // the key Studio and Practice play it in: the notes here move with it
+  if (s.key && n) fact("Key", keyName(keyAfter(s.key, n)), `${Math.abs(n)} semitone${Math.abs(n) > 1 ? "s" : ""} ${n > 0 ? "up" : "down"} from ${keyName(s.key)}`);
+  else if (s.key) {
     const k = s.key, rel = k.mode === "major" ? { pc: (k.pc + 9) % 12, mode: "minor" } : { pc: (k.pc + 3) % 12, mode: "major" };
     const close = k.alt && k.r - k.alt.r < 0.05 && !(k.alt.pc === rel.pc && k.alt.mode === rel.mode);
     fact("Key", keyName(k), close ? `could also be ${keyName(k.alt)}` : `relative ${rel.mode}: ${keyName(rel)}`);
   } else fact("Key", "–", s.key === null ? "no pitched tracks" : "not read yet");
   fact("Tempo", s.bpm ? `${s.bpm} BPM` : "–", s.bpm ? null : "no steady beat found");
   fact("Length", fmtTime(s.duration));
-  const v = s.vocals;
+  const v = s.vocals && { ...s.vocals, lo: s.vocals.lo + n, hi: s.vocals.hi + n, mostly: s.vocals.mostly && s.vocals.mostly.map((x) => x + n) };
+  s.vocals = v; s.shift = n;
   if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, `${v.hi - v.lo} semitones${v.mostly ? ` · mostly ${absName(v.mostly[0])}–${absName(v.mostly[1])}` : ""}`);
   fact("Tracks", String(trackNames(s).length), trackNames(s).join(", "));
   if (v) renderInfoRange(s);
@@ -1143,15 +1146,18 @@ async function renderInfo(id) {
 }
 // A moment of the vocal track (decoded on first use), with a little room either side and short fades.
 // A moment of the vocal the melody was read from: the lead vocal once split (the backing vocals could bury the note),
-// except in a part kept whole, where the melody came from all the vocals.
+// except in a part kept whole, where the melody came from all the vocals. In the song's chosen key (s.shift), rendered
+// first if it isn't yet.
 let infoVox = null, infoSrc = null;
 async function hearAt(s, t0, t1, btn) {
   ensureCtx();
-  const file = s.split && !(s.unsplit || []).some(([a, b]) => t0 >= a && t0 < b) ? "lead" : "vocals";
-  if (!infoVox || infoVox.id !== s.id || infoVox.file !== file) {
+  const file = s.split && !(s.unsplit || []).some(([a, b]) => t0 >= a && t0 < b) ? "lead" : "vocals", n = s.shift || 0;
+  if (!infoVox || infoVox.id !== s.id || infoVox.file !== file || infoVox.n !== n) {
     btn.disabled = true;
-    try { infoVox = { id: s.id, file, buf: await ac.decodeAudioData(await (await fetch(`/library/${s.id}/${file}.mp3`)).arrayBuffer()) }; }
-    catch (e) { btn.disabled = false; return; }
+    try {
+      if (n && !(await keyRendered(s.id, n))) throw new Error("cancelled");
+      infoVox = { id: s.id, file, n, buf: await ac.decodeAudioData(await (await fetch(trackUrl(s.id, file, n))).arrayBuffer()) };
+    } catch (e) { btn.disabled = false; return; }
     btn.disabled = false;
   }
   stopHear();
@@ -1890,7 +1896,7 @@ function initStems() {
 // count-in is showing after a jump to it
 const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1 };
 function songEvs() {
-  const sh = K.oct * 12;
+  const sh = K.oct * 12 + P.key; // the bars move with the octave picked and the key the song plays in
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const ms = K.notes.map((n) => n[2] + sh);
   K.lo = ms.length ? Math.min(...ms) : 57; K.hi = ms.length ? Math.max(...ms) : 69;
@@ -2288,7 +2294,7 @@ function practiceFrame() {
   if (P.playing) K.hist.push({ t: sn, m: cur });
   while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
   songView();
-  draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 });
+  draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 + P.key });
   setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
   renderHud(sn, cur); renderCountIn(sn);
 }
