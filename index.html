@@ -14,7 +14,13 @@
   --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.275 0 0); --hover-2: oklch(0.315 0 0); /* buttons and fields stand clear of the card */
   --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0); --knob: oklch(0.87 0 0);
   --muted: rgba(var(--fg), 0.45); --faint: rgba(var(--fg), 0.3); --fill: rgba(var(--fg), 0.05); --line: rgba(var(--fg), 0.06); --ring: rgba(var(--fg), 0.12);
-  --accent: oklch(0.94 0 0); --voice: oklch(0.68 0.17 262);
+  --accent: oklch(0.94 0 0);
+  /* --voice, your colour (your pitch, the playhead, focus rings): one of these, picked in the header and set on <html>
+     before first paint. Matched for the dark surface: L 0.68–0.77 (blue and violet lowest, as they look brighter),
+     C 0.15–0.17 (teal 0.12, the most sRGB has at that lightness); all ≥ 6:1 on the surface. Text on it is dark. */
+  --voice-blue: oklch(0.68 0.17 262); --voice-violet: oklch(0.7 0.16 295); --voice-pink: oklch(0.72 0.16 350); --voice-coral: oklch(0.72 0.16 32);
+  --voice-orange: oklch(0.75 0.15 58); --voice-amber: oklch(0.77 0.15 82); --voice-green: oklch(0.73 0.16 150); --voice-teal: oklch(0.74 0.12 195);
+  --voice: var(--voice-blue); --on-voice: oklch(0.165 0 0);
   --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --bad: oklch(0.66 0.2 25);
   --note-bg: oklch(0.27 0.03 75); --note-ink: oklch(0.86 0.09 80); --warn-ink: oklch(0.8 0.13 80);
   --key-w: oklch(0.87 0 0); --key-b: oklch(0.22 0 0); --key-w-on: oklch(0.72 0 0); --key-b-on: oklch(0 0 0);
@@ -75,6 +81,13 @@ header { position: relative; }
 .pop input[type="range"] { width: 140px; }
 .pop .hint { margin: 0; }
 #micSetBtn .ico { width: 16px; height: 16px; }
+/* the accent colour: a dot of it in the header, the swatches in a panel under it, as wide as their row */
+.accent-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--voice); }
+#accentSet { width: min-content; }
+.swatches { display: flex; gap: 4px; }
+.swatch { width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow 0.15s; }
+.swatch:hover { box-shadow: inset 0 0 0 2px rgba(var(--fg), 0.2); }
+.swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
 
 .title { margin: 0; font-size: 15px; font-weight: 500; }
 .lede { margin: 0; font-size: 16px; line-height: 1.5; max-width: 62ch; text-wrap: pretty; } /* 24 px lines, like the title's */
@@ -234,7 +247,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; touch-action: pan-y; }
 /* the playhead's time while you drag it: a flag at the top of the waveform, the line hanging from it (drawWave) */
 .ph-flag { position: absolute; top: 0; z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 8px; display: grid; place-items: center;
-  border-radius: 4px; background: var(--voice); color: oklch(1 0 0); font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+  border-radius: 4px; background: var(--voice); color: var(--on-voice); font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
 /* kept-whole parts: an × in each one's top right corner, shown while you point at the part */
 .wave-wrap { position: relative; }
 #pParts .part { position: absolute; top: 0; bottom: 0; pointer-events: none; }
@@ -373,6 +386,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
 
 </style>
+<script>/* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
+try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}</script>
 </head>
 <body>
 <div class="app" id="app">
@@ -385,6 +400,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
       <label>Note names <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi</option></select></label>
       <p class="hint">With earphones the song doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
+    </div>
+    <button class="chipbtn iconchip" id="accentBtn" type="button" aria-label="Accent colour" title="Accent colour" aria-expanded="false" aria-controls="accentSet"><i class="accent-dot"></i></button>
+    <div class="pop" id="accentSet" role="dialog" aria-label="Accent colour" hidden>
+      <span>Accent colour</span>
+      <div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div>
+      <p class="hint">Your pitch line, the playhead and focus rings.</p>
     </div>
   </header>
 
@@ -1674,7 +1695,7 @@ async function singSong(m, btn) {
   setText("playTitle", m.title);
   go("practice");
 }
-function showMicSet(on) { $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
+function showMicSet(on) { if (on) showAccent(false); $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
 function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").hidden = true; }
@@ -1737,6 +1758,35 @@ function resize() {
 }
 new ResizeObserver(resize).observe(cv);
 readColors();
+
+// accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked in a
+// panel under the dot in the header, which closes like the mic settings (a click elsewhere, Escape); one panel at a time.
+const ACCENTS = { blue: "Blue", violet: "Violet", pink: "Pink", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal" };
+let accent = store.get("accent", "blue");
+if (!(accent in ACCENTS)) accent = "blue";
+function setAccent(k) {
+  accent = k; store.set("accent", k);
+  document.documentElement.style.setProperty("--voice", `var(--voice-${k})`);
+  readColors(); // the canvas takes it from here
+  for (const b of $("#swatches").children) b.setAttribute("aria-pressed", String(b.dataset.k === k));
+}
+function showAccent(on) {
+  if (on) { showMicSet(false); closeMenu(); }
+  $("#accentSet").hidden = !on; $("#accentBtn").setAttribute("aria-expanded", String(on));
+  if (on) $("#swatches [aria-pressed='true']").focus();
+}
+(function initAccent() {
+  const btn = $("#accentBtn"), pop = $("#accentSet");
+  for (const [k, name] of Object.entries(ACCENTS)) {
+    const s = el("button", "swatch"); s.type = "button"; s.dataset.k = k; s.title = name; s.setAttribute("aria-label", name);
+    s.setAttribute("aria-pressed", String(k === accent)); s.style.setProperty("--c", `var(--voice-${k})`);
+    s.onclick = () => setAccent(k);
+    $("#swatches").append(s);
+  }
+  btn.onclick = (e) => { e.stopPropagation(); showAccent(pop.hidden); };
+  document.addEventListener("click", (e) => { if (!pop.hidden && !pop.contains(e.target)) showAccent(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showAccent(false); btn.focus(); } });
+})();
 
 function rr(x, y, w, h, r) {
   r = Math.min(r, h / 2, w / 2);
@@ -1903,7 +1953,7 @@ function renderHud(now, m) {
   }
   renderKeys(tm, m);
   setText("hudRep", `Practice · ${K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung"}`);
-  setText("hudHow", "Grey line: the original singer. Blue: you.");
+  setText("hudHow", `Grey line: the original singer. ${ACCENTS[accent]}: you.`);
 }
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
 function renderMic() {
