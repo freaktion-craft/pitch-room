@@ -126,6 +126,7 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
 .pick { display: inline-flex; align-items: center; min-width: 0; color: var(--ink); text-align: left; }
 .pick > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-list { position: fixed; z-index: 30; padding: 4px; border-radius: 10px; background: var(--surface); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--ring) transparent;
   box-shadow: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.4); }
 .pick-list .grp { padding: 12px 8px 4px 32px; font-size: 12px; line-height: 16px; color: var(--faint); } /* lined up with the names, past the ticks */
 .pick-list .grp:first-child { padding-top: 4px; }
@@ -134,6 +135,7 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
 .pick-list [role="option"]:hover, .pick-list [role="option"]:focus-visible { background: var(--fill); outline: none; }
 .pick-list [role="option"] span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; visibility: hidden; }
+.pick-list [role="option"] .side { margin-left: auto; padding-left: 16px; min-width: 56px; text-align: right; font: 12.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .pick-list [aria-selected="true"] .ico { visibility: visible; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: rgba(var(--fg), 0.12); position: relative;
@@ -305,17 +307,11 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   background: var(--ink); color: var(--on-ink); font-size: 12.5px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
 .transport-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
-/* Key change, in the transport row and in Practice's bar: − value +, the key that gives, then a note in whatever room
-   is left on the line (progress while the tracks render, or that big shifts can sound processed). The value and the
-   key have fixed widths and the note takes no room of its own, so nothing moves as they change. */
+/* Key change, in the Studio's header and in Practice's bar: a dropdown of the keys, then a note in whatever room is
+   left on the line (that big shifts can sound processed, or why a change failed). The dropdown has a fixed width and
+   the note takes no room of its own, so nothing moves as they change. */
 .keyctl { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-.kstep { display: flex; align-items: center; gap: 4px; }
-.kstep .btn { color: rgba(var(--fg), 0.8); } /* like the seek buttons beside it */
-.kstep .btn:hover { color: var(--ink); }
-.kstep .btn.icon .ico { width: 16px; height: 16px; }
-.keyctl .kval { width: 28px; margin: 0; text-align: center; font: 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
-.keyctl .btn:disabled { opacity: 0.35; pointer-events: none; }
-.kname { width: 64px; white-space: nowrap; color: rgba(var(--fg), 0.6); }
+.keypick { width: 168px; flex: none; font-size: 13px; } /* one width whatever key it says, or how far it's got */
 /* up to two lines (32 px) where the line is short: within the height of the row's 40 px play button. With less room
    than its min-width for it, the control moves to the next line. */
 .knote { flex: 1 1 0; width: 0; min-width: 140px; font-size: 12.5px; line-height: 16px; max-height: 32px; overflow: hidden;
@@ -343,7 +339,10 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .seek .btn:hover { color: var(--ink); }
 .seek .btn.icon .ico { width: 16px; height: 16px; }
 /* Hugeicons line icons: stroke settings live here, the paths in ICONS */
-.ico { fill: none; stroke: currentColor; stroke-width: 1.5; flex: none; }
+/* Icons are drawn on a 24 grid at 16–24 px; a stroke that scaled with them came out under a pixel at 16 px, thinner
+   than the text beside it. Their lines are 1.4 px at any size instead, about the weight of 13–14 px text. */
+.ico { fill: none; stroke: currentColor; stroke-width: 1.4px; flex: none; }
+.ico > * { vector-effect: non-scaling-stroke; }
 /* the song's volume and export sit in the same columns as each track's solo button, slider and download */
 .player { --c-btn: 32px; --c-vol: 160px; }
 .mix { margin-left: auto; margin-right: 12px; display: grid; grid-template-columns: var(--c-btn) var(--c-vol) var(--c-btn); gap: 12px; align-items: center; justify-items: center; }
@@ -390,7 +389,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #sLib .first { display: flex; align-items: center; gap: 16px; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2); }
 #sLib .first:hover { border-color: rgba(var(--fg), 0.4); background: rgba(var(--fg), 0.03); }
 #sLib .first .plus { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
-#sLib .first .plus .ico { width: 20px; height: 20px; stroke-width: 2; }
+#sLib .first .plus .ico { width: 20px; height: 20px; stroke-width: 1.6px; }
 #sLib .first b { display: block; font-weight: 500; font-size: 15px; }
 #sLib .first small { color: var(--muted); font-size: 13px; }
 #sLib:has(.first) { box-shadow: none; background: none; }
@@ -811,9 +810,11 @@ function splitInput(label) {
   return [s, ""];
 }
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
-// whole name, for its tooltip}); onPick(v) when another one is chosen. The list lives in the panel the button is in, so
-// a click on it counts as inside that panel; Escape closes the list only.
-function makePick(btn, name, onPick) {
+// whole name, for its tooltip, side: a note at the row's end, btn: what the button says when it's chosen, if not t});
+// onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v (to show how it's coming
+// along in its row). The list lives in the panel the button is in, so a click on it counts as inside that panel; Escape
+// closes the list only. Changing the items while it's open redraws it in place, focus and scroll kept.
+function makePick(btn, name, onPick, { stayOpen, minWidth } = {}) {
   const list = el("div", "pick-list"), label = el("span");
   list.setAttribute("role", "listbox"); list.setAttribute("aria-label", name); list.hidden = true;
   btn.append(label); btn.setAttribute("aria-haspopup", "listbox"); btn.setAttribute("aria-expanded", "false");
@@ -822,10 +823,11 @@ function makePick(btn, name, onPick) {
   const options = () => [...list.querySelectorAll('[role="option"]')];
   function paint() {
     const it = items.find((x) => x.v === value) || items[0];
-    label.textContent = it ? it.t : ""; btn.title = it ? it.full || it.t : "";
+    label.textContent = it ? it.btn || it.t : ""; btn.title = it ? it.full || it.t : "";
     btn.setAttribute("aria-label", `${name}: ${label.textContent}`);
   }
   function show(on) {
+    const again = on && !list.hidden, focused = again && list.contains(document.activeElement) ? document.activeElement.dataset.v : null, top = list.scrollTop;
     list.hidden = !on; btn.setAttribute("aria-expanded", String(on));
     if (!on) return;
     let g = "";
@@ -834,17 +836,30 @@ function makePick(btn, name, onPick) {
       if (it.g && it.g !== g) list.append(el("div", "grp", it.g));
       g = it.g || "";
       const o = el("button"); o.type = "button"; o.setAttribute("role", "option"); o.setAttribute("aria-selected", String(it.v === value));
-      o.title = it.full || it.t; o.append(icon("tick"), el("span", null, it.t));
-      o.onclick = () => { show(false); btn.focus(); if (it.v !== value) { value = it.v; paint(); onPick(value); } };
+      o.dataset.v = String(it.v); o.title = it.full || it.t; o.append(icon("tick"), el("span", null, it.t));
+      if (it.side) o.append(el("small", "side", it.side));
+      o.onclick = () => {
+        const keep = stayOpen && stayOpen(it.v);
+        if (!keep) { show(false); btn.focus(); }
+        if (it.v !== value) { value = it.v; paint(); onPick(value); }
+      };
       list.append(o);
     }
-    // under the button, right edges lined up, as wide as its longest name (from the button's width up to 360 px) and
-    // as tall as the window allows (above the button if there's no room below)
+    if (again) { // redrawn while open: where it was
+      list.scrollTop = top;
+      const f = options().find((o) => o.dataset.v === focused);
+      if (f) f.focus();
+      return;
+    }
+    // under the button, right edges lined up, as tall as the window allows up to 560 px (above the button if there's no
+    // room below), and as wide as its longest row plus a scrollbar if it needs one (from the button's width, or
+    // minWidth, up to 360 px)
+    const r = btn.getBoundingClientRect(), below = innerHeight - r.bottom - 20, above = r.top - 20, up = below < 200 && above > below;
+    list.style.maxHeight = Math.min(560, up ? above : below) + "px";
     list.style.width = "max-content";
-    const r = btn.getBoundingClientRect(), w = Math.min(Math.max(r.width, Math.ceil(list.offsetWidth) + 8), 360, innerWidth - 32);
+    const bar = list.offsetWidth - list.clientWidth;
+    const w = Math.min(Math.max(r.width, minWidth || 0, Math.ceil(list.offsetWidth) + bar + 8), 360, innerWidth - 32);
     list.style.width = w + "px"; list.style.left = Math.max(16, r.right - w) + "px";
-    const below = innerHeight - r.bottom - 20, above = r.top - 20, up = below < 200 && above > below;
-    list.style.maxHeight = Math.min(360, up ? above : below) + "px";
     list.style.top = up ? "" : r.bottom + 4 + "px"; list.style.bottom = up ? innerHeight - r.top + 4 + "px" : "";
     const cur = options().find((o) => o.getAttribute("aria-selected") === "true") || options()[0];
     if (cur) { cur.focus(); cur.scrollIntoView({ block: "nearest" }); }
@@ -858,8 +873,10 @@ function makePick(btn, name, onPick) {
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); show(false); btn.focus(); }
     else if (e.key === "Tab") show(false);
   });
-  document.addEventListener("click", (e) => { if (!list.hidden && !list.contains(e.target) && !btn.contains(e.target)) show(false); });
+  // a click elsewhere closes it (the path, not contains(): a click on a row that redraws the list leaves its target out)
+  document.addEventListener("click", (e) => { const path = e.composedPath(); if (!list.hidden && !path.includes(list) && !path.includes(btn)) show(false); });
   addEventListener("resize", () => show(false));
+  addEventListener("scroll", () => show(false), { passive: true }); // it's fixed in place; the button isn't
   return {
     set(next, v) { items = next; value = v; paint(); if (!list.hidden) show(true); },
     get value() { return value; },
@@ -939,7 +956,6 @@ Object.assign(ICONS, {
   tick: '<path d="M5 14L8.5 17.5L19 6.5"/>', // Tick02
   mic: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C15.8824 18 18.7174 15.3914 19 12M12 22H15M12 22H9"/><path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6V11C16 13.2091 14.2091 15 12 15C9.79086 15 8 13.2091 8 11V6Z"/>', // Mic02
   micOff: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C14.0193 18 15.443 17.4658 16.5665 16.5665M12 22H15M12 22H9M19 12C18.93 12.8406 18.7031 13.6331 18.3497 14.3497"/><path d="M8.3535 4.3535C8.98114 2.96566 10.3778 2 12 2C14.2091 2 16 3.79086 16 6V11C16 11.309 15.965 11.6098 15.8987 11.8987M8 8V11C8 13.2091 9.79086 15 12 15C12.8492 15 13.6365 14.7354 14.2841 14.2841"/><path d="M2 2L22 22"/>', // MicOff02
-  minus: '<path d="M20 12L4 12"/>', // MinusSign
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
   practice: '<path d="M7 6.5C7 4.01472 9.01472 2 11.5 2C13.9853 2 16 4.01472 16 6.5V11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5V6.5Z"/><path d="M11.5 19H11.0828C7.57267 19 4.57706 16.4623 4 13M11.5 19H11.9172C15.4273 19 18.4229 16.4623 19 13M11.5 19V22"/>', // Mic01
   video: '<path d="M2 11C2 7.70017 2 6.05025 3.02513 5.02513C4.05025 4 5.70017 4 9 4H10C13.2998 4 14.9497 4 15.9749 5.02513C17 6.05025 17 7.70017 17 11V13C17 16.2998 17 17.9497 15.9749 18.9749C14.9497 20 13.2998 20 10 20H9C5.70017 20 4.05025 20 3.02513 18.9749C2 17.9497 2 16.2998 2 13V11Z"/><path d="M17 8.90585L17.1259 8.80196C19.2417 7.05623 20.2996 6.18336 21.1498 6.60482C22 7.02628 22 8.42355 22 11.2181V12.7819C22 15.5765 22 16.9737 21.1498 17.3952C20.2996 17.8166 19.2417 16.9438 17.1259 15.198L17 15.0941"/><circle cx="11.5" cy="9.5" r="1.5"/>', // Video01
@@ -1365,7 +1381,7 @@ async function openSong(m) {
 function closeSong() {
   pauseSong();
   P.song = null; P.buffers = {}; P.raw = {}; P.peaks = null; P.sel = null;
-  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
+  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
 }
@@ -1665,8 +1681,9 @@ function exportAudible() {
 // on in the key it was in; the original buffers stay loaded, so going back to 0 is instant. Practice's bars, guide line
 // and piano, and the notes on the Info page, move with the key.
 // key: the key P.buffers are in (semitones from the original); keyWant: the one chosen (ahead of key while it renders);
-// orig: the tracks as decoded; shifted: {n, bufs} for the last other key loaded; keyNote: what the control says
-Object.assign(P, { key: 0, keyWant: 0, orig: {}, shifted: null, keyNote: "", keyErr: false, keyJob: null, keyTimer: 0 });
+// orig: the tracks as decoded; shifted: {n, bufs} for the last other key loaded; keyProg: how far its render is (0…1,
+// null when none is running); keyNote, keyErr: why it failed
+Object.assign(P, { key: 0, keyWant: 0, orig: {}, shifted: null, keyProg: null, keyNote: "", keyErr: false, keyJob: null, keyTimer: 0 });
 const KEYS = 6, KEY_WARN = 4; // from KEY_WARN semitones on, the processing can be heard
 const keySign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n); // +2, −3, 0
 const keyAfter = (k, n) => k && { pc: (((k.pc + n) % 12) + 12) % 12, mode: k.mode };
@@ -1696,30 +1713,31 @@ function setKey(n) {
   const m = P.song;
   n = Math.max(-KEYS, Math.min(KEYS, n));
   if (!m || n === P.keyWant) return;
-  const ready = n === P.key || !n || (P.shifted && P.shifted.n === n); // its buffers are here: no need to wait
-  P.keyWant = n; saveKey(m.id, n); P.keyNote = ready ? "" : "Changing key…"; P.keyErr = false;
+  P.keyWant = n; saveKey(m.id, n); P.keyProg = keyHere(n) ? null : 0; P.keyNote = ""; P.keyErr = false;
   paintKey();
   clearTimeout(P.keyTimer);
-  // a few quick clicks change to the key they stop on, not each one on the way; back to the original at once
-  P.keyTimer = setTimeout(() => loadKey(m, n), n && n !== P.key ? 350 : 0);
+  P.keyTimer = setTimeout(() => loadKey(m, n), 0); // picked from a list, so no clicks on the way to wait out
 }
+const keyHere = (n) => n === P.key || !n || !!(P.shifted && P.shifted.n === n); // its buffers are loaded: no wait
 async function loadKey(m, n) {
   if (P.keyJob && P.keyJob.n !== n) { fetch(`/api/jobs/${P.keyJob.id}/cancel`, { method: "POST" }).catch(() => {}); P.keyJob = null; } // nobody wants it now
   const still = () => P.song === m && P.keyWant === n;
-  const say = (text, err) => { if (still()) { P.keyNote = text; P.keyErr = !!err; paintKey(); } };
-  if (n === P.key) return say("");
-  if (!n || (P.shifted && P.shifted.n === n)) { say(""); return applyKey(n); }
-  say("Changing key…");
+  const say = (prog, err) => { if (still()) { P.keyProg = prog; P.keyNote = err || ""; P.keyErr = !!err; paintKey(); } };
+  if (n === P.key) return say(null);
+  if (keyHere(n)) { say(null); return applyKey(n); }
+  say(0);
   try {
     // cancelled: by a newer choice (then stop), or from elsewhere (then ask again)
-    while (!(await keyRendered(m.id, n, (p) => say(p ? `Changing key… ${Math.round(p * 100)}%` : "Changing key…"), (id) => { if (still()) P.keyJob = { n, id }; })))
+    while (!(await keyRendered(m.id, n, (p) => say(p), (id) => { if (still()) P.keyJob = { n, id }; })))
       if (!still()) return;
     if (!still()) return;
+    say(1); // rendered; the files are loading
     const bufs = Object.fromEntries(await Promise.all(trackNames(m).filter((k) => k !== "drums").map(async (k) =>
       [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n))).arrayBuffer())])));
     if (!still()) return;
-    P.shifted = { n, bufs }; P.keyNote = ""; applyKey(n);
-  } catch (e) { say(e instanceof TypeError ? "Couldn’t reach the server." : e.message, true); }
+    P.shifted = { n, bufs }; P.keyProg = null; applyKey(n);
+    document.querySelectorAll(".keyctl").forEach((box) => box.pick.close()); // its list stayed open to show it coming along
+  } catch (e) { say(null, e instanceof TypeError ? "Couldn’t reach the server." : e.message); }
   finally { if (P.song === m && P.keyJob && P.keyJob.n === n) P.keyJob = null; }
 }
 // Key n's buffers in place: the shifted tracks and the original drums, or all the originals for 0. While playing, the
@@ -1747,28 +1765,34 @@ function swapSources() {
   setTimeout(() => oldBus.disconnect(), 600);
   P.bus.gain.setValueAtTime(0, ac.currentTime); P.bus.gain.setTargetAtTime(stemVol, at, 0.015);
 }
-// Both controls (Studio's transport row, Practice's bar): − value + and the key that gives, then the note.
+// Both controls (Studio's header, Practice's bar): a list of the keys, +6 at the top to −6, each with how far it is
+// from the original. Picking one that isn't rendered yet keeps the list open, its row counting up to ready; the button
+// says so too. The far ones are under a heading that says they can sound processed; the note says so once chosen.
+function keyItems(m, want) {
+  const items = [];
+  for (let n = KEYS; n >= -KEYS; n--) {
+    const k = m && keyAfter(m.key, n), name = k ? keyName(k) : n ? `${keySign(n)} semitones` : "Original key";
+    const busy = n === want && P.keyProg != null, pct = busy ? `${Math.round(P.keyProg * 100)}%` : "";
+    items.push({ v: n, t: name, side: busy ? pct : n ? keySign(n) : "original", g: Math.abs(n) >= KEY_WARN ? "Can sound processed" : "",
+      btn: busy ? `${name} · ${pct}` : n && k ? `${name} (${keySign(n)})` : name, full: busy ? `Changing key… ${pct}` : n && k ? `Originally ${keyName(m.key)}` : "" });
+  }
+  return items;
+}
 function paintKey() {
-  const m = P.song, n = P.keyWant, k = m && keyAfter(m.key, n);
-  const note = P.keyNote || (Math.abs(n) >= KEY_WARN ? `${KEY_WARN} or more semitones can sound processed.` : "");
+  const n = P.keyWant, items = keyItems(P.song, n);
+  const note = P.keyErr ? P.keyNote : Math.abs(n) >= KEY_WARN ? `${KEY_WARN} or more semitones can sound processed.` : "";
   document.querySelectorAll(".keyctl").forEach((box) => {
-    const [down, val, up] = box.querySelector(".kstep").children, name = box.querySelector(".kname"), msg = box.note;
-    val.textContent = keySign(n); down.disabled = n <= -KEYS; up.disabled = n >= KEYS;
-    name.textContent = k ? keyName(k) : ""; name.title = k && n ? `Originally ${keyName(m.key)}` : "";
-    msg.textContent = msg.title = note; msg.classList.toggle("err", P.keyErr && !!P.keyNote); msg.classList.toggle("warn", !P.keyNote && !!note);
+    box.pick.set(items, n);
+    box.note.textContent = box.note.title = note; box.note.classList.toggle("err", P.keyErr); box.note.classList.toggle("warn", !P.keyErr && !!note);
   });
 }
 (function initKey() {
   for (const box of document.querySelectorAll(".keyctl")) {
-    const step = el("span", "kstep"), down = el("button", "btn sm icon"), val = el("output", "kval"), up = el("button", "btn sm icon");
-    down.type = up.type = "button"; down.title = "Lower the key a semitone"; up.title = "Raise the key a semitone";
-    for (const b of [down, up]) b.setAttribute("aria-label", b.title);
-    down.append(icon("minus")); up.append(icon("plus")); val.title = "Semitones from the original key";
-    down.onclick = () => setKey(P.keyWant - 1); up.onclick = () => setKey(P.keyWant + 1);
-    step.append(down, val, up);
+    const btn = el("button", "pick keypick"); btn.type = "button";
     box.note = box.dataset.note ? $(box.dataset.note) : el("span", "knote"); // the Studio's goes under the title
-    box.append(el("span", null, "Key"), step, el("span", "kname"));
+    box.append(el("span", null, "Key"), btn);
     if (!box.dataset.note) box.append(box.note);
+    box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n), minWidth: 240 });
   }
   paintKey();
 })();
@@ -2161,7 +2185,7 @@ function initSing() {
   const setBtn = $("#micSetBtn"), pop = $("#micSet");
   setBtn.append(icon("settings"));
   setBtn.onclick = (e) => { e.stopPropagation(); showMicSet(pop.hidden); };
-  document.addEventListener("click", (e) => { if (!pop.hidden && !pop.contains(e.target)) showMicSet(false); });
+  document.addEventListener("click", (e) => { if (!pop.hidden && !e.composedPath().includes(pop)) showMicSet(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showMicSet(false); setBtn.focus(); } });
   $("#gate").value = S.gate; $("#echo").checked = S.echo;
   $("#gate").oninput = (e) => { S.gate = +e.target.value; save(); };
