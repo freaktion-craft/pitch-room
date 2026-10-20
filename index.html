@@ -437,6 +437,12 @@ input[type="range"]:disabled { opacity: 0.4; }
 .export-state { margin: 0; font-size: 13px; }
 .export-state:empty { display: none; }
 .back { display: flex; width: fit-content; margin-bottom: 20px; }
+/* back to the library, and in the Studio the song's Save at the other end of the line */
+.backbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.backbar .back { margin-bottom: 0; }
+#pSave:disabled { opacity: 0.4; }
+#pSave:not(:disabled) { background: var(--ink); color: var(--on-ink); }
+#pSave:not(:disabled):hover { background: var(--ink-strong); }
 .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; } /* 16 px to the list with the group's 12 */
 #sJobs { display: grid; gap: 8px; }
 #sJobs:empty { display: none; }
@@ -708,7 +714,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <h1 class="title">Practice any song</h1>
       <p class="lede">Split a song into tracks and practice it phrase by phrase, with your pitch on screen.</p>
     </div>
-    <a class="btn sm back" id="sBack" href="#stems" hidden>Library</a>
+    <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)" hidden>Save</button></div>
     <p class="server-off" id="sServer" hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
@@ -1199,6 +1205,7 @@ Object.assign(ICONS, {
   close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
   plus: '<path d="M12 4V20M20 12H4"/>', // PlusSign
   tick: '<path d="M5 14L8.5 17.5L19 6.5"/>', // Tick02
+  save: '<path d="M8 22V19C8 17.1144 8 16.1716 8.58579 15.5858C9.17157 15 10.1144 15 12 15C13.8856 15 14.8284 15 15.4142 15.5858C16 16.1716 16 17.1144 16 19V22"/><path d="M10 7H14"/><path d="M3 11.8584C3 7.28199 3 4.99376 4.38674 3.54394C4.43797 3.49038 4.49038 3.43797 4.54394 3.38674C5.99376 2 8.28199 2 12.8584 2C13.943 2 14.4655 2.00376 14.9628 2.18936C15.4417 2.3681 15.8429 2.70239 16.6452 3.37099L18.8411 5.20092C19.9027 6.08561 20.4335 6.52795 20.7168 7.13266C21 7.73737 21 8.42833 21 9.81025V13C21 16.7497 21 18.6246 20.0451 19.9389C19.7367 20.3634 19.3634 20.7367 18.9389 21.0451C17.6246 22 15.7497 22 12 22C8.25027 22 6.3754 22 5.06107 21.0451C4.6366 20.7367 4.26331 20.3634 3.95491 19.9389C3 18.6246 3 16.7497 3 13V11.8584Z"/>', // FloppyDisk
   chevronDown: '<path d="M18 9.00005C18 9.00005 13.5811 15 12 15C10.4188 15 6 9 6 9"/>', // ArrowDown01
   mic: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C15.8824 18 18.7174 15.3914 19 12M12 22H15M12 22H9"/><path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6V11C16 13.2091 14.2091 15 12 15C9.79086 15 8 13.2091 8 11V6Z"/>', // Mic02
   micOff: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C14.0193 18 15.443 17.4658 16.5665 16.5665M12 22H15M12 22H9M19 12C18.93 12.8406 18.7031 13.6331 18.3497 14.3497"/><path d="M8.3535 4.3535C8.98114 2.96566 10.3778 2 12 2C14.2091 2 16 3.79086 16 6V11C16 11.309 15.965 11.6098 15.8987 11.8987M8 8V11C8 13.2091 9.79086 15 12 15C12.8492 15 13.6365 14.7354 14.2841 14.2841"/><path d="M2 2L22 22"/>', // MicOff02
@@ -1609,6 +1616,7 @@ async function openSong(m) {
   for (const name of trackNames(m)) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
   P.keep = keepOf(m); P.tsel = P.mark = null;
+  applyMix(m.mix); savedMix = JSON.stringify(mixNow()); // the saved mix, which Save compares with
   renderTracks(); autoSplit(m);
   P.keyWant = savedKey(m.id); paintKey();
   if (P.keyWant) loadKey(m, P.keyWant); // alongside the originals, so a key already rendered is there as they are
@@ -1698,6 +1706,7 @@ function applyGains() {
       g.setValueAtTime(t.vol, Math.max(now, at(b))); g.linearRampToValueAtTime(0, at(b) + KEEP_FADE);
     }
   }
+  paintSave(); // a change to the mix makes Save live
 }
 function playSong() {
   if (!P.song || !Object.keys(P.buffers).length) return;
@@ -1928,7 +1937,7 @@ function renderTracks() {
     if (grouped && (name === "lead" || name === "backing")) { if (open) box.append(trackRow(name, [name], true)); continue; }
     box.append(trackRow(name, [name]));
   }
-  paintKeeps();
+  paintKeeps(); paintSave();
 }
 const VOCAL_TRACKS = ["vocals", "lead", "backing"];
 function trackRow(name, members, sub, open) {
@@ -1963,7 +1972,7 @@ function trackRow(name, members, sub, open) {
     label = el("div", "name-row"); label.append(nm, opts);
     last = el("span"); // no download for the click alone
     const bpb = bpbButton(); bpb.set([2, 3, 4, 6].map((k) => ({ v: k, t: k + "/4" })), t.bpb);
-    const sh = mkBtn("Shift accent", () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = `Accent on ${t.offset + 1}`; });
+    const sh = mkBtn("Shift accent", () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = `Accent on ${t.offset + 1}`; paintSave(); });
     sh.className = "tog"; sh.textContent = t.offset ? `Accent on ${t.offset + 1}` : "Shift accent";
     opts.append(bpb.btn, sh);
     if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
@@ -2185,6 +2194,32 @@ async function saveKeep(next) {
     if (P.song === m) { P.keep = j.keep; applyGains(); paintKeeps(); }
   } catch (e) { $("#pExportState").textContent = e.message; }
 }
+// The song's mix as you've set it: each track's volume, mute and solo, and the click's. Save (or Ctrl+S) keeps it with
+// the song and it's put back when the song opens; the button is live while there's something new to save.
+const r2 = (v) => Math.round(v * 100) / 100;
+function mixNow() {
+  const tracks = {}, c = P.tracks.click || {};
+  for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") tracks[n] = { vol: r2(t.vol), mute: t.mute, solo: t.solo };
+  return { tracks, click: { mute: !!c.mute, solo: !!c.solo, vol: r2(c.vol || 0), bpb: c.bpb, offset: c.offset } };
+}
+function applyMix(mix) {
+  for (const [n, t] of Object.entries((mix && mix.tracks) || {})) if (n !== "click" && P.tracks[n]) Object.assign(P.tracks[n], { vol: +t.vol, mute: !!t.mute, solo: !!t.solo });
+  if (mix && mix.click && P.tracks.click) Object.assign(P.tracks.click, mix.click);
+}
+let savedMix = "";
+function paintSave() { $("#pSave").disabled = !P.song || JSON.stringify(mixNow()) === savedMix; }
+async function saveMix() {
+  const m = P.song, mix = mixNow();
+  $("#pSave").disabled = true;
+  try {
+    const r = await fetch(`/api/library/${m.id}/mix`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mix }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Couldn’t save the mix.");
+    m.mix = j.mix;
+    if (P.song === m) savedMix = JSON.stringify(mix);
+  } catch (e) { $("#pExportState").textContent = e.message; }
+  paintSave();
+}
 // Over each track's waveform: an × on each kept part (shown while you point at it) that lets it go, and over a stretch
 // being picked, a button that keeps it. The parts themselves are drawn on the waveform (drawTrackWaves).
 function paintKeeps() {
@@ -2291,7 +2326,11 @@ function initStems() {
   $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
   // text buttons with an icon in front of the label
   [["#sAddBtn", "plus"], ["#sBack", "back"], ["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
-    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "separate"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
+    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "separate"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
+  $("#pSave").onclick = saveMix;
+  document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page
+    if ((e.ctrlKey || e.metaKey) && e.code === "KeyS" && view === "stems" && stemsPage === "song") { e.preventDefault(); if (!$("#pSave").disabled) saveMix(); }
+  });
   initSongMenu();
   $("#pVol").value = stemVol;
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
@@ -3340,7 +3379,7 @@ function go(v) { if (location.hash !== "#" + v) location.hash = v; else route();
 // Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
 function stemsRoute(sub, extra) {
   stemsPage = !sub ? "lib" : sub === "add" ? "add" : extra === "info" ? "info" : "song";
-  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBack").hidden = stemsPage === "lib";
+  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib"; $("#pSave").hidden = stemsPage !== "song";
   $("#sLibPage").hidden = stemsPage !== "lib"; $("#sAddPage").hidden = stemsPage !== "add"; $("#sPlayer").hidden = stemsPage !== "song";
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();

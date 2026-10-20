@@ -205,6 +205,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, {"job": stems.start_video(parts[2])})
             if parts[3] == "split":
                 return self._json(200, {"job": stems.start_split(parts[2])})
+            if parts[3] == "mix":
+                body = json.loads(self._body(100_000) or b"{}")
+                return self._json(200, {"mix": stems.set_mix(parts[2], body.get("mix") if isinstance(body, dict) else None)})
             if parts[3] == "keep":
                 body = json.loads(self._body(100_000) or b"{}")
                 return self._json(200, {"keep": stems.set_keep(parts[2], body.get("keep") if isinstance(body, dict) else None)})

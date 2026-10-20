@@ -823,6 +823,36 @@ def set_keep(song_id: str, keep) -> dict:
     return out
 
 
+def set_mix(song_id: str, mix) -> dict:
+    """Save a song's mix as set in the Studio: {tracks: {name: {vol, mute, solo}}, click: {mute, solo, vol, bpb,
+    offset}}, for its own tracks; volumes 0…1.5. Returns what was saved."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not isinstance(mix, dict) or not isinstance(mix.get("tracks"), dict):
+        raise ValueError("Send the mix as {tracks: {name: {vol, mute, solo}}, click: {…}}.")
+    names = set(_tracks(folder, meta))
+
+    def one(t, extra=()):
+        if not isinstance(t, dict):
+            raise ValueError("Each track's mix is {vol, mute, solo}.")
+        try:
+            out = {"vol": round(min(1.5, max(0.0, float(t.get("vol", 1)))), 2), "mute": bool(t.get("mute")), "solo": bool(t.get("solo"))}
+        except (TypeError, ValueError):
+            raise ValueError("A track's volume is a number.") from None
+        return out | {k: t[k] for k in extra if k in t}
+
+    out = {"tracks": {n: one(t) for n, t in mix["tracks"].items() if n in names}}
+    if isinstance(mix.get("click"), dict):
+        c = one(mix["click"])
+        bpb = mix["click"].get("bpb", 4)
+        c["bpb"] = bpb if bpb in (2, 3, 4, 6) else 4
+        off = mix["click"].get("offset", 0)
+        c["offset"] = off if isinstance(off, int) and 0 <= off < c["bpb"] else 0
+        out["click"] = c
+    _update_meta(folder, mix=out)
+    return out
+
+
 def _parts_mask(n: int, ranges: list) -> np.ndarray:
     """Per sample: 1 inside the parts, 0 outside, ramping over FADE at their edges."""
     m = np.zeros(n, dtype=np.float32)
