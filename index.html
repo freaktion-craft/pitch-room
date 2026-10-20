@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Pitch Room</title>
+<title>Stem</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 /* Layout: off-white canvas, left-aligned 780px column, numbered segmented nav,
@@ -337,12 +337,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
 
 </style>
-<script>/* apply a saved theme before first paint */ try { const t = JSON.parse(localStorage.getItem("pitchroom:theme")); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script>/* apply a saved theme before first paint */ try { const t = JSON.parse(localStorage.getItem("stem:theme") ?? localStorage.getItem("pitchroom:theme")); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
 <div class="app" id="app">
   <header>
-    <a class="brand" href="#stems">Pitch Room</a>
+    <a class="brand" href="#stems">Stem</a>
     <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="meter"><i id="meter"></i></span></button>
     <button class="chipbtn themebtn" id="themeBtn" type="button" aria-label="Dark mode"></button>
   </header>
@@ -398,7 +398,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   </main>
   <main id="vStems" aria-label="Stems" hidden>
     <div class="intro" id="sIntro">
-      <h1 class="title">Stems</h1>
+      <h1 class="title">Sing along with any song</h1>
       <p class="lede">Split a song into vocals, drums, bass and the rest, then sing along with it: note bars from the original singer, phrase by phrase, and your own pitch on top. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
     </div>
     <a class="btn sm back" id="sBack" href="#stems" hidden>← Library</a>
@@ -491,9 +491,9 @@ const KO = ["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La�
 const BLACK = new Set([1,3,6,8,10]);
 
 // ---------- settings ----------
-const store = {
-  get(k, d) { try { const v = localStorage.getItem("pitchroom:" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem("pitchroom:" + k, JSON.stringify(v)); } catch (e) {} },
+const store = { // falls back to what the app saved under its old name, Pitch Room
+  get(k, d) { try { const v = localStorage.getItem("stem:" + k) ?? localStorage.getItem("pitchroom:" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("stem:" + k, JSON.stringify(v)); } catch (e) {} },
 };
 // names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
 // treated as silent; vol: the keyboard's piano

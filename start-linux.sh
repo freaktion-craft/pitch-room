@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pitch Room — Linux: run ./start-linux.sh (or double-click if your file manager allows).
+# Stem — Linux: run ./start-linux.sh (or double-click if your file manager allows).
 cd "$(dirname "$0")" || exit 1
 
 PY=""

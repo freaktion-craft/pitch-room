@@ -1,5 +1,5 @@
 @echo off
-rem Pitch Room - Windows: double-click to start. First run sets up Python packages (1-2 min).
+rem Stem - Windows: double-click to start. First run sets up Python packages (1-2 min).
 chcp 65001 >nul
 cd /d "%~dp0"
 

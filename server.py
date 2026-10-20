@@ -1,4 +1,4 @@
-"""Local server for Pitch Room: serves the page and the song library (stems, beats, melody, exports).
+"""Local server for Stem: serves the page and the song library (stems, beats, melody, exports).
 
 Normally started by launch.py (via the start-* launchers). Direct use:
 
@@ -141,7 +141,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _get_api(self, path):
         if path == "/api/health":
-            return self._json(200, {"ok": True, "app": "pitch-room"})
+            return self._json(200, {"ok": True, "app": "stem"})
         if path == "/api/stems/status":
             return self._json(200, {"installed": stems.installed(), "models": stems.MODELS, **stems.gpu_status(),
                                     "install": stems.get_job(stems._install_job["id"]) if stems._install_job else None})
@@ -223,5 +223,5 @@ def serve(port: int) -> ThreadingHTTPServer:
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5178
-    print(f"Pitch Room: http://localhost:{port}")
+    print(f"Stem: http://localhost:{port}")
     serve(port).serve_forever()

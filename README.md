@@ -1,4 +1,4 @@
-# Pitch Room
+# Stem
 
 A local app for learning songs by singing them. Split a song into stems, then sing along: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
 

@@ -1,4 +1,4 @@
-"""One-click start for Pitch Room.
+"""One-click start for Stem.
 
 Run by the start-* launchers with the project's .venv Python:
 installs missing packages, picks a free port (or reuses a copy that is already
@@ -35,7 +35,7 @@ def ensure_packages():
 def is_ours(port):
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=0.6) as r:
-            return json.load(r).get("app") == "pitch-room"
+            return json.load(r).get("app") == "stem"
     except Exception:  # noqa: BLE001
         return False
 
@@ -106,7 +106,7 @@ def main():
         if is_ours(port):
             break
         time.sleep(0.1)
-    print(f"\nPitch Room is running: {url}\nClose this window to stop it.\n", flush=True)
+    print(f"\nStem is running: {url}\nClose this window to stop it.\n", flush=True)
     if not args.no_browser:
         open_page(url)
     try:

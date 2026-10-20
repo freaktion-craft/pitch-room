@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pitch Room — macOS: double-click to start. First run sets up Python packages (1–2 min).
+# Stem — macOS: double-click to start. First run sets up Python packages (1–2 min).
 cd "$(dirname "$0")" || exit 1
 
 PY=""
