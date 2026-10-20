@@ -305,6 +305,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
    key have fixed widths and the note takes no room of its own, so nothing moves as they change. */
 .keyctl { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .kstep { display: flex; align-items: center; gap: 4px; }
+.kstep .btn { color: rgba(var(--fg), 0.8); } /* like the seek buttons beside it */
+.kstep .btn:hover { color: var(--ink); }
+.kstep .btn.icon .ico { width: 16px; height: 16px; }
 .keyctl .kval { width: 28px; margin: 0; text-align: center; font: 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
 .keyctl .btn:disabled { opacity: 0.35; pointer-events: none; }
 .kname { width: 64px; white-space: nowrap; color: rgba(var(--fg), 0.6); }
