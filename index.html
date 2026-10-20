@@ -156,6 +156,7 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
 @media (prefers-reduced-motion: reduce) { .ring.spin { animation: none; } }
 .pick-list [aria-selected="true"] .ico { visibility: visible; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
+input[type="range"].hot { accent-color: var(--voice); } /* the handle under the pointer, or held (sliderTips) */
 /* a slider's level over its handle while you move it (sliderTips) */
 .slider-tip { position: fixed; z-index: 40; transform: translate(-50%, -100%); height: 20px; padding: 0 8px; display: grid; place-items: center;
   border-radius: 4px; background: var(--ink); color: var(--on-ink); font: 11px var(--mono); font-variant-numeric: tabular-nums; pointer-events: none; }
@@ -984,14 +985,23 @@ function resetOnDblClick(input, def) {
     tip.hidden = false;
     tip.style.left = thumbX(s) + "px"; tip.style.top = s.getBoundingClientRect().top - 4 + "px";
   }
+  const onHandle = (s, e) => Math.abs(e.clientX - thumbX(s)) <= THUMB / 2 + (e.pointerType === "touch" ? 8 : 2);
   document.addEventListener("pointerdown", (e) => {
     const s = e.target.closest && e.target.closest('input[type="range"]');
     if (!s || s.disabled) return;
-    if (Math.abs(e.clientX - thumbX(s)) > THUMB / 2 + (e.pointerType === "touch" ? 8 : 2)) { e.preventDefault(); return; } // not the handle
+    if (!onHandle(s, e)) { e.preventDefault(); return; } // not the handle
     held = s; show(s);
   }, true);
+  // over the handle (and while it's held): the pointer cursor, and the slider in the accent colour; the plain cursor
+  // over the rest of it
+  const hot = (s, on) => { s.style.cursor = on ? "pointer" : "default"; s.classList.toggle("hot", on); };
+  document.addEventListener("pointermove", (e) => {
+    const s = e.target.closest && e.target.closest('input[type="range"]');
+    if (s) hot(s, held === s || (!s.disabled && onHandle(s, e)));
+  }, { passive: true });
+  document.addEventListener("pointerout", (e) => { if (e.target.matches?.('input[type="range"]') && held !== e.target) hot(e.target, false); }, true);
   document.addEventListener("input", (e) => { if (e.target === held || (e.target.matches?.('input[type="range"]') && e.target === document.activeElement && keyTimer)) show(e.target); }, true);
-  for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, () => { if (held) { held = null; show(null); } }, true);
+  for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, (e) => { if (held) { const s = held; held = null; show(null); hot(s, e.type === "pointerup" && onHandle(s, e)); } }, true);
   document.addEventListener("keydown", (e) => {
     const s = e.target;
     if (!s.matches || !s.matches('input[type="range"]') || !/^(Arrow|Page|Home|End)/.test(e.key)) return;
