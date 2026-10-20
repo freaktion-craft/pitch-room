@@ -323,23 +323,24 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* the playhead's time while you drag it: a flag at the top of the waveform, the line hanging from it (drawWave) */
 .ph-flag { position: absolute; top: 0; z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 8px; display: grid; place-items: center;
   border-radius: 4px; background: var(--voice); color: var(--on-voice); font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
-/* kept-whole parts: an × in each one's top right corner, shown while you point at the part */
 .wave-wrap { position: relative; }
 /* the playhead, over the waveform (its rounded corners would clip it at the ends); thicker while you can grab it, hanging
    from the flag while you drag it */
 .ph-line { position: absolute; left: 0; top: 0; bottom: 0; z-index: 2; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--voice); pointer-events: none; }
 .ph-line.wide { width: 4px; margin-left: -2px; border-radius: 2px; }
 .ph-line.hang { top: 20px; }
-#pParts .part { position: absolute; top: 0; bottom: 0; pointer-events: none; }
-#pParts .x { position: absolute; top: 8px; right: 4px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
+/* A track's kept parts, over its waveform (drawn on it by drawTrackWaves): an × in each one's top right corner, shown
+   while you point at the part, and over a stretch being picked, its "Keep playing here" in its middle (paintKeeps) */
+.twrap { position: relative; grid-column: 1 / -1; }
+.tparts { position: absolute; inset: 0; pointer-events: none; }
+.tparts .part { position: absolute; top: 0; bottom: 0; }
+.tparts .x { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
   background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--ring); pointer-events: auto; opacity: 0; transition: opacity 0.15s; }
-#pParts .x .ico { width: 12px; height: 12px; }
-#pParts .part.hover .x, #pParts .x:focus-visible { opacity: 1; }
-@media (hover: none) { #pParts .x { opacity: 1; } }
-/* the dragged span's "Keep vocals here", in its middle (left set by paintSel) */
-#pParts .sel { position: absolute; top: 0; bottom: 0; pointer-events: none; }
-#pParts .keep { position: absolute; top: 50%; transform: translate(-50%, -50%); height: 28px; padding: 0 12px; border: 0; border-radius: 6px; white-space: nowrap;
-  background: var(--ink); color: var(--on-ink); font-size: 12.5px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
+.tparts .x .ico { width: 10px; height: 10px; }
+.tparts .part.hover .x, .tparts .x:focus-visible { opacity: 1; }
+@media (hover: none) { .tparts .x { opacity: 1; } }
+.tparts .keep { position: absolute; top: 50%; transform: translate(-50%, -50%); height: 24px; padding: 0 10px; border: 0; border-radius: 6px; white-space: nowrap;
+  background: var(--ink); color: var(--on-ink); font-size: 12px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
 .transport-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
 /* Key change, in the Studio's header and in Practice's bar: a dropdown of the keys, then a note in whatever room is
@@ -394,7 +395,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) calc(var(--c-btn) * 2) var(--c-vol) var(--c-btn); align-items: center; gap: 12px; padding: 8px 0; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
 .track { row-gap: 8px; }
-.track .twave { grid-column: 1 / -1; display: block; width: 100%; height: 28px; cursor: pointer; } /* as wide as the song's waveform */
+.track .twave { display: block; width: 100%; height: 28px; cursor: pointer; } /* as wide as the song's waveform (.twrap spans the row) */
 /* the Vocals row's open/close button, after its name */
 .disclose { display: inline-grid; place-items: center; width: 24px; height: 24px; margin: -4px 0 -4px 4px; padding: 0; border: 0; border-radius: 6px;
   vertical-align: middle; background: transparent; color: var(--muted); }
@@ -503,7 +504,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   .track { grid-template-columns: 24px minmax(70px, 1fr) auto auto; row-gap: 4px; }
   .track > :nth-child(5) { grid-row: 1; grid-column: 4; } /* the download button */
   .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
-  .track .twave { grid-row: 3; }
+  .track .twrap { grid-row: 3; }
   .yt { flex-direction: column; }
   .yt input, .yt .btn { width: 100%; justify-content: center; }
   .mix { margin-right: 0; }
@@ -769,7 +770,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
           <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
-      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
+      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <div class="seek" role="group" aria-label="Move through the song">
@@ -1228,8 +1229,8 @@ function icon(name) {
 const stemColor = (k) => C["stem-" + k] || C.muted;
 const STEM_NOTES = { vocals: "lead and backing voices", lead: "the main voice", backing: "harmonies, doubles and chops", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
 const TRACK_TITLES = { lead: "Lead vocal", backing: "Backing vocals" };
-// raw: lead and backing as separated; buffers holds them as heard (see splitBuffers)
-const P = { song: null, buffers: {}, raw: {}, tracks: {}, playing: false, startAt: 0, offset: 0, sources: [], peaks: null, bus: null, clickNext: 0 };
+// keep: each track's kept parts (keepParts); tsel: a stretch being picked on a track's waveform; mark: one started with J
+const P = { song: null, buffers: {}, keep: {}, tsel: null, mark: null, tracks: {}, playing: false, startAt: 0, offset: 0, sources: [], peaks: null, bus: null, clickNext: 0 };
 // The player's tracks: the stems, with vocals as lead + backing once the song has been split.
 const trackNames = (m) => (m.split ? m.stems.flatMap((n) => (n === "vocals" ? ["lead", "backing"] : [n])) : m.stems);
 const fmtTime = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`; };
@@ -1430,7 +1431,7 @@ async function renderInfo(id) {
 let infoVox = null, infoSrc = null;
 async function hearAt(s, t0, t1, btn) {
   ensureCtx();
-  const file = s.split && !(s.unsplit || []).some(([a, b]) => t0 >= a && t0 < b) ? "lead" : "vocals", n = s.shift || 0;
+  const file = s.split ? "lead" : "vocals", n = s.shift || 0;
   if (!infoVox || infoVox.id !== s.id || infoVox.file !== file || infoVox.n !== n) {
     btn.disabled = true;
     try {
@@ -1607,7 +1608,8 @@ async function openSong(m) {
   $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
   for (const name of trackNames(m)) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
-  renderTracks(); paintSel(); autoSplit(m);
+  P.keep = keepOf(m); P.tsel = P.mark = null;
+  renderTracks(); autoSplit(m);
   P.keyWant = savedKey(m.id); paintKey();
   if (P.keyWant) loadKey(m, P.keyWant); // alongside the originals, so a key already rendered is there as they are
   const loaded = await Promise.all(trackNames(m).map(async (name) => {
@@ -1617,8 +1619,6 @@ async function openSong(m) {
   if (P.song !== m) return;
   P.buffers = Object.fromEntries(loaded);
   P.orig = { ...P.buffers }; // as decoded, for key 0
-  P.raw = { lead: P.buffers.lead, backing: P.buffers.backing };
-  splitBuffers();
   if (P.shifted && P.shifted.n === P.keyWant) applyKey(P.keyWant); // the remembered key came in first
   computePeaks(); P.peaksAt = performance.now(); // the waveform rises in from here
   meta();
@@ -1626,7 +1626,7 @@ async function openSong(m) {
 }
 function closeSong() {
   pauseSong();
-  P.song = null; P.buffers = {}; P.raw = {}; P.peaks = null; P.sel = null;
+  P.song = null; P.buffers = {}; P.peaks = null; P.keep = {}; P.tsel = P.mark = null;
   clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
@@ -1678,8 +1678,26 @@ function audible(name) {
   const t = P.tracks[name], anySolo = Object.values(P.tracks).some((x) => x.solo);
   return anySolo ? t.solo : !t.mute;
 }
+// Each track's gain: its volume while it can be heard, else 0, except that a muted track's kept parts (keepParts) still
+// play while nothing is soloed: its gain then follows them, rising and falling over KEEP_FADE at their edges, scheduled
+// from where the song is (playSong runs this again from wherever it starts).
+const KEEP_FADE = 0.03;
 function applyGains() {
-  for (const [name, t] of Object.entries(P.tracks)) if (t.gain) t.gain.gain.setTargetAtTime(audible(name) ? t.vol : 0, ac.currentTime, 0.015);
+  const now = ac ? ac.currentTime : 0, anySolo = Object.values(P.tracks).some((x) => x.solo);
+  for (const [name, t] of Object.entries(P.tracks)) {
+    const g = t.gain && t.gain.gain;
+    if (!g) continue;
+    g.cancelScheduledValues(now);
+    const parts = name !== "click" && t.mute && !anySolo && P.playing ? (P.keep[name] || []) : [];
+    if (!parts.length) { g.setTargetAtTime(audible(name) ? t.vol : 0, now, 0.015); continue; }
+    const pos = songPos(), at = (s) => P.startAt + (s - P.offset); // the context time song second s plays at
+    g.setTargetAtTime(parts.some(([a, b]) => pos >= a && pos < b) ? t.vol : 0, now, 0.015);
+    for (const [a, b] of parts) {
+      if (b <= pos) continue;
+      if (a > pos) { g.setValueAtTime(0, Math.max(now, at(a) - KEEP_FADE)); g.linearRampToValueAtTime(t.vol, Math.max(now, at(a))); }
+      g.setValueAtTime(t.vol, Math.max(now, at(b))); g.linearRampToValueAtTime(0, at(b) + KEEP_FADE);
+    }
+  }
 }
 function playSong() {
   if (!P.song || !Object.keys(P.buffers).length) return;
@@ -1697,6 +1715,7 @@ function playSong() {
   }
   const cg = ac.createGain(); cg.gain.value = audible("click") ? P.tracks.click.vol : 0; cg.connect(P.bus); P.tracks.click.gain = cg;
   P.startAt = at; P.playing = true; renderStart();
+  applyGains(); // muted tracks' kept parts, from here
   recBegin(at);
   const beats = P.song.beats || []; P.clickNext = beats.findIndex((b) => b >= P.offset); if (P.clickNext < 0) P.clickNext = beats.length;
   paintPlay($("#pPlay"), true);
@@ -1793,13 +1812,7 @@ function drawWave() {
   if (!r.width) return;
   if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(96 * d); }
   const x = c.getContext("2d"), W = r.width, H = 96; x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
-  const X = (t) => (t / (songDur() || 1)) * W, prog = playheadShown(W);
-  if (P.song && P.song.split) { // parts with the vocals kept whole, and the selection
-    x.fillStyle = C.voice; // the accent, like the playhead
-    for (const [a, b] of P.song.unsplit || []) { x.globalAlpha = 0.14; x.fillRect(X(a), 0, X(b) - X(a), H); x.globalAlpha = 0.8; x.fillRect(X(a), 0, X(b) - X(a), 3); }
-    if (P.sel) { x.fillStyle = C.ink; x.globalAlpha = 0.1; x.fillRect(X(P.sel.a), 0, X(P.sel.b) - X(P.sel.a), H); }
-    x.globalAlpha = 1;
-  }
+  const prog = playheadShown(W);
   x.fillStyle = C.ink;
   const rise = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
   if (P.peaks) {
@@ -1868,6 +1881,13 @@ function drawTrackWaves(prog, rise) {
     if (!r.width) continue;
     if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(TWAVE_H * d); }
     const x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, r.width, TWAVE_H);
+    // under the bars: its kept parts in the accent (a line along their top), and a stretch being picked or marked
+    const X = (t) => (t / (songDur() || 1)) * r.width;
+    x.fillStyle = C.voice;
+    for (const [a, b] of keepParts(name)) { x.globalAlpha = 0.16; x.fillRect(X(a), 0, X(b) - X(a), TWAVE_H); x.globalAlpha = 0.8; x.fillRect(X(a), 0, X(b) - X(a), 2); }
+    const live = P.tsel && P.tsel.name === name ? [P.tsel.a, P.tsel.b] : P.mark && P.mark.name === name ? [P.mark.a, songPos()].sort((p, q) => p - q) : null;
+    if (live) { x.fillStyle = C.ink; x.globalAlpha = 0.12; x.fillRect(X(live[0]), 0, X(live[1]) - X(live[0]), TWAVE_H); }
+    x.globalAlpha = 1;
     const group = name === "voices"; // the Vocals row while closed: lead and backing as one
     x.fillStyle = stemColor(group ? "lead" : name);
     const peaks = P.trackPeaks && (group ? voicesPeaks() : P.trackPeaks[name]), on = group ? audible("lead") || audible("backing") : audible(name);
@@ -1908,6 +1928,7 @@ function renderTracks() {
     if (grouped && (name === "lead" || name === "backing")) { if (open) box.append(trackRow(name, [name], true)); continue; }
     box.append(trackRow(name, [name]));
   }
+  paintKeeps();
 }
 const VOCAL_TRACKS = ["vocals", "lead", "backing"];
 function trackRow(name, members, sub, open) {
@@ -1956,10 +1977,10 @@ function trackRow(name, members, sub, open) {
   }
   const ms = el("div", "ms"); ms.append(m, s);
   row.append(dot, label, ms, v, last);
-  if (name !== "click" && !(group && open)) { // its waveform under it (drawTrackWaves); a click there jumps like one on the song's
-    const w = el("canvas", "twave"); w.dataset.name = name; w.setAttribute("aria-hidden", "true");
-    w.onpointerdown = (e) => { const r = w.getBoundingClientRect(); seekSong(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur()); };
-    row.append(w);
+  if (name !== "click" && !(group && open)) { // its waveform under it (drawTrackWaves), where its kept parts are picked (keepPicker)
+    const wrap = el("div", "twrap"), w = el("canvas", "twave"), parts = el("div", "tparts");
+    w.dataset.name = parts.dataset.name = name; w.setAttribute("aria-hidden", "true");
+    wrap.append(w, parts); row.append(wrap); keepPicker(w, name);
   }
   return row;
 }
@@ -1983,7 +2004,12 @@ async function saveDownload(r, fallback) {
   return name;
 }
 function exportAudible() {
-  const tracks = trackNames(P.song).filter((n) => audible(n)).map((n) => ({ name: n, gain: P.tracks[n].vol }));
+  // as heard: the audible tracks, and the muted ones' kept parts (only: where they play)
+  const anySolo = Object.values(P.tracks).some((x) => x.solo);
+  const tracks = trackNames(P.song).flatMap((n) => {
+    const t = P.tracks[n], parts = !anySolo && t.mute ? P.keep[n] || [] : [];
+    return audible(n) ? [{ name: n, gain: t.vol }] : parts.length ? [{ name: n, gain: t.vol, only: parts }] : [];
+  });
   const c = P.tracks.click, click = audible("click") && P.song.beats && P.song.beats.length ? { gain: c.vol, offset: c.offset, beatsPerBar: c.bpb } : null;
   exportMix(tracks, click, $("#pExport"));
 }
@@ -2059,7 +2085,6 @@ function applyKey(n) {
   const bufs = (n && P.shifted && P.shifted.n === n && P.shifted.bufs) || {};
   P.key = n;
   P.buffers = Object.fromEntries(Object.entries(P.orig).map(([k, b]) => [k, bufs[k] || b]));
-  P.raw = { lead: P.buffers.lead, backing: P.buffers.backing }; splitBuffers();
   if (P.playing) swapSources();
   if (K.on && K.song === P.song) songEvs();
   paintKey();
@@ -2123,102 +2148,132 @@ async function autoSplit(m) {
   catch (e) { delete splitting[m.id]; } // the lead model isn't installed: stay with one vocal track
   if (P.song === m) renderTracks();
 }
-// Where the split is wrong, parts of the song can keep their vocals whole: there all the vocals play on the backing
-// track and the lead is silent, so they stay in when the lead is muted (the server does the same for exports; the
-// note bars in Practice follow all the vocals there). 30 ms crossfades at the edges.
-function splitBuffers() {
-  if (P.raw.lead && P.raw.backing) Object.assign(P.buffers, splitPair(P.raw.lead, P.raw.backing, (P.song && P.song.unsplit) || []));
-}
-// {lead, backing} as heard: the lead and backing as separated (l, b), with the kept-whole parts moved into the backing.
-function splitPair(l, b, parts) {
-  if (!parts.length) return { lead: l, backing: b };
-  const n = Math.min(l.length, b.length), sr = l.sampleRate, fade = 0.03 * sr;
-  const L = ac.createBuffer(l.numberOfChannels, n, sr), B = ac.createBuffer(l.numberOfChannels, n, sr);
-  for (let c = 0; c < l.numberOfChannels; c++) {
-    const lo = L.getChannelData(c), bo = B.getChannelData(c), li = l.getChannelData(c);
-    lo.set(li.subarray(0, n)); bo.set(b.getChannelData(Math.min(c, b.numberOfChannels - 1)).subarray(0, n));
-    for (const [a, z] of parts) {
-      const s0 = a * sr, s1 = z * sr;
-      for (let i = Math.max(0, Math.floor(s0 - fade)); i < Math.min(n, Math.ceil(s1 + fade)); i++) {
-        const m = Math.min(1, Math.max(0, 1 - Math.max(s0 - i, i - s1) / fade));
-        bo[i] += m * li[i]; lo[i] = (1 - m) * li[i];
-      }
-    }
+// Kept parts: stretches of a track that play even while it's muted (P.keep: {track: [[a, b], …]}, song seconds), so a
+// muted lead can still sing the bits you'd rather leave to it. Picked by dragging over a track's waveform, or with J
+// and K as the song plays; the Vocals row's go to lead and backing both. Saved with the song as soon as they're made.
+// Songs that kept their vocals whole in parts ("unsplit": the lead moved into the backing there) have those as the lead's.
+const keepOf = (m) => (m.keep && typeof m.keep === "object" ? m.keep : m.unsplit && m.unsplit.length ? { lead: m.unsplit } : {});
+const keepMembers = (name) => (name === "voices" ? ["lead", "backing"] : [name]);
+function mergeParts(parts) {
+  const out = [];
+  for (const [a, b] of [...parts].sort((x, y) => x[0] - y[0])) {
+    if (out.length && a <= out[out.length - 1][1]) out[out.length - 1][1] = Math.max(out[out.length - 1][1], b);
+    else out.push([a, b]);
   }
-  return { lead: L, backing: B };
+  return out;
 }
-// Over the waveform (no line of its own, so nothing below moves): the dragged span with a button that keeps its vocals,
-// and each kept part with an × (shown while you point at it) that lets it go.
-function paintSel() {
-  const on = !!(P.song && P.song.split), parts = (on && P.song.unsplit) || [], dur = songDur() || 1, box = $("#pParts");
-  $("#pWave").setAttribute("aria-label", on ? "Song overview — click to jump, drag over a part to keep its vocals" : "Song overview — click to jump");
-  const span = (cls, a, b) => { const d = el("div", cls); d.style.left = (a / dur) * 100 + "%"; d.style.width = ((b - a) / dur) * 100 + "%"; return d; };
-  box.innerHTML = "";
-  parts.forEach(([a, b], i) => {
-    const part = span("part", a, b), x = el("button", "x");
-    x.type = "button"; x.title = `Stop keeping the vocals at ${fmtTime(a)}–${fmtTime(b)}`; x.setAttribute("aria-label", x.title); x.append(icon("close"));
-    x.onclick = () => saveUnsplit(parts.filter((_, k) => k !== i));
-    part.append(x); box.append(part);
-  });
-  if (on && P.sel) {
-    const keep = el("button", "keep", "Keep vocals here"), w = $("#pWave").clientWidth;
-    keep.type = "button"; keep.title = "Their vocals stay in even with the lead muted";
-    keep.onclick = () => saveUnsplit([...parts, [P.sel.a, P.sel.b]]);
-    box.append(span("sel", P.sel.a, P.sel.b), keep);
-    const half = keep.offsetWidth / 2; // in the middle of the span, kept inside the waveform
-    keep.style.left = Math.max(half + 4, Math.min(w - half - 4, ((P.sel.a + P.sel.b) / 2 / dur) * w)) + "px";
-  }
+// a row's parts (the Vocals row's: where either of its two has one)
+const keepParts = (name) => mergeParts(keepMembers(name).flatMap((k) => P.keep[k] || []));
+function addKeep(name, a, b) {
+  const next = { ...P.keep };
+  for (const k of keepMembers(name)) next[k] = mergeParts([...(next[k] || []), [a, b]]);
+  saveKeep(next);
 }
-async function saveUnsplit(parts) {
+function dropKeep(name, a, b) { // a part as its row shows it: out of each of the row's tracks
+  const next = { ...P.keep };
+  for (const k of keepMembers(name)) next[k] = (next[k] || []).filter(([x, y]) => y <= a || x >= b);
+  saveKeep(next);
+}
+async function saveKeep(next) {
   const m = P.song;
+  P.keep = next; P.tsel = null; applyGains(); paintKeeps(); // heard at once; the server tidies them and saves
   try {
-    const r = await fetch(`/api/library/${m.id}/unsplit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unsplit: parts }) });
+    const r = await fetch(`/api/library/${m.id}/keep`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keep: next }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Couldn’t save that.");
-    m.unsplit = j.unsplit; T.band = null; // takes' band in another key had the old parts
-    if (P.song === m) { P.sel = null; splitBuffers(); computePeaks(); if (P.playing) seekSong(songPos()); }
+    m.keep = j.keep;
+    if (P.song === m) { P.keep = j.keep; applyGains(); paintKeeps(); }
   } catch (e) { $("#pExportState").textContent = e.message; }
-  paintSel(); drawWave();
 }
-// The waveform: a click jumps there (and drops a selection); a drag selects a span. Pointing at a kept part shows its ×.
+// Over each track's waveform: an × on each kept part (shown while you point at it) that lets it go, and over a stretch
+// being picked, a button that keeps it. The parts themselves are drawn on the waveform (drawTrackWaves).
+function paintKeeps() {
+  const dur = songDur() || 1;
+  const span = (cls, a, b) => { const d = el("div", cls); d.style.left = (a / dur) * 100 + "%"; d.style.width = ((b - a) / dur) * 100 + "%"; return d; };
+  for (const box of document.querySelectorAll("#pTracks .tparts")) {
+    const name = box.dataset.name, w = box.clientWidth;
+    box.replaceChildren();
+    for (const [a, b] of keepParts(name)) {
+      const part = span("part", a, b), x = el("button", "x");
+      x.type = "button"; x.title = `Stop playing ${fmtTime(a)}–${fmtTime(b)} while muted`; x.setAttribute("aria-label", x.title); x.append(icon("close"));
+      x.onclick = () => dropKeep(name, a, b);
+      part.append(x); box.append(part);
+    }
+    if (P.tsel && P.tsel.name === name) {
+      const keep = el("button", "keep", "Keep playing here"), { a, b } = P.tsel;
+      keep.type = "button"; keep.title = "This stretch plays even while the track is muted";
+      keep.onclick = () => addKeep(name, a, b);
+      box.append(keep);
+      const half = keep.offsetWidth / 2; // in the middle of the stretch, kept inside the waveform
+      keep.style.left = Math.max(half + 4, Math.min(w - half - 4, ((a + b) / 2 / dur) * w)) + "px";
+    }
+  }
+}
+// A track's waveform: a click jumps there (and lets a picked stretch go), a drag picks a stretch, pointing at a kept
+// part shows its ×. Using it makes the track the one J and K mark on.
+function keepPicker(c, name) {
+  const tAt = (e) => { const r = c.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur(); };
+  const hover = (i) => c.nextElementSibling.querySelectorAll(".part").forEach((p, k) => p.classList.toggle("hover", k === i));
+  let drag = null;
+  c.addEventListener("pointerdown", (e) => { if (!P.song) return; c.setPointerCapture(e.pointerId); P.keepTarget = name; drag = { x: e.clientX, t: tAt(e), moved: false }; });
+  c.addEventListener("pointermove", (e) => {
+    const t = tAt(e);
+    hover(keepParts(name).findIndex(([a, b]) => t >= a && t <= b));
+    if (!drag || (!drag.moved && Math.abs(e.clientX - drag.x) < 5)) return;
+    drag.moved = true;
+    P.tsel = { name, a: Math.min(drag.t, t), b: Math.max(drag.t, t) }; paintKeeps();
+  });
+  c.addEventListener("pointerleave", () => hover(-1));
+  c.addEventListener("pointerup", (e) => {
+    const d = drag; drag = null;
+    if (!d) return;
+    if (d.moved) { if (P.tsel && P.tsel.b - P.tsel.a < 0.2) { P.tsel = null; paintKeeps(); } return; } // too short to keep
+    if (P.tsel) { P.tsel = null; paintKeeps(); }
+    seekSong(tAt(e));
+  });
+  c.addEventListener("pointercancel", () => { drag = null; });
+}
+// J starts a kept part where the song is, K ends it there (it shows on the track as it grows): on the track whose
+// waveform you last used, else the vocals. Escape lets a mark or a picked stretch go.
+function keepTarget() {
+  const rows = [...document.querySelectorAll("#pTracks .tparts")].map((b) => b.dataset.name);
+  return [P.keepTarget, "voices", "lead", "vocals"].find((n) => n && rows.includes(n)) || rows[0];
+}
+document.addEventListener("keydown", (e) => {
+  if (!(view === "stems" && stemsPage === "song" && P.song) || e.target.closest("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === "KeyJ") { const name = keepTarget(); if (name) { e.preventDefault(); P.mark = { name, a: songPos() }; } }
+  else if (e.code === "KeyK" && P.mark) {
+    e.preventDefault();
+    const { name, a } = P.mark, b = songPos(); P.mark = null;
+    if (Math.abs(b - a) >= 0.2) addKeep(name, Math.min(a, b), Math.max(a, b));
+  } else if (e.key === "Escape" && (P.mark || P.tsel)) { P.mark = null; P.tsel = null; paintKeeps(); }
+});
+// The song's waveform: a click jumps there; within a few pixels of the playhead you can grab it (it thickens) and drag
+// it, its time on a flag at its top.
 function initWave() {
   const wave = $("#pWave"), wrap = $("#pWaveWrap");
   const tAt = (e) => { const r = wave.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur(); };
-  const hover = (i) => document.querySelectorAll("#pParts .part").forEach((p, k) => p.classList.toggle("hover", k === i));
-  // the playhead: within a few pixels of it you can grab it (it thickens) and drag it, its time on a flag at its top
   const onHead = (e) => { const r = wave.getBoundingClientRect(); return Math.abs(e.clientX - (r.left + (songPos() / (songDur() || 1)) * r.width)) <= (e.pointerType === "touch" ? 14 : 6); };
   const endScrub = () => { const s = P.scrub; P.scrub = null; if (s && s.wasPlaying) playSong(); };
   wrap.addEventListener("pointermove", (e) => {
-    const t = tAt(e);
-    hover(((P.song && P.song.unsplit) || []).findIndex(([a, b]) => t >= a && t <= b));
     P.phHover = !!P.song && (!!P.scrub || (e.target === wave && onHead(e)));
     wave.style.cursor = P.phHover ? "ew-resize" : "";
   });
-  wrap.addEventListener("pointerleave", () => { hover(-1); if (!P.scrub) P.phHover = false; });
-  let drag = null;
+  wrap.addEventListener("pointerleave", () => { if (!P.scrub) P.phHover = false; });
+  let down = false;
   wave.addEventListener("pointerdown", (e) => {
     if (!P.song) return;
     wave.setPointerCapture(e.pointerId);
     if (onHead(e)) { P.scrub = { wasPlaying: P.playing }; pauseSong(); return; }
-    drag = { x: e.clientX, t: tAt(e), moved: false };
+    down = true;
   });
-  wave.addEventListener("pointermove", (e) => {
-    if (P.scrub) { P.offset = tAt(e); return; } // paused while you drag, so the song's position is the offset
-    if (!drag || !P.song.split || (!drag.moved && Math.abs(e.clientX - drag.x) < 5)) return;
-    drag.moved = true;
-    const t = tAt(e);
-    P.sel = { a: Math.min(drag.t, t), b: Math.max(drag.t, t) };
-    paintSel(); drawWave();
-  });
+  wave.addEventListener("pointermove", (e) => { if (P.scrub) P.offset = tAt(e); }); // paused while you drag, so the song's position is the offset
   wave.addEventListener("pointerup", (e) => {
     if (P.scrub) { endScrub(); return; }
-    const d = drag; drag = null;
-    if (!d || d.moved) return;
-    if (P.sel) { P.sel = null; paintSel(); }
-    seekSong(tAt(e));
+    if (down) seekSong(tAt(e));
+    down = false;
   });
-  wave.addEventListener("pointercancel", () => { drag = null; endScrub(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && P.sel && view === "stems") { P.sel = null; paintSel(); drawWave(); } });
+  wave.addEventListener("pointercancel", () => { down = false; endScrub(); });
 }
 function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };
@@ -2903,7 +2958,6 @@ async function takeBand(n) {
   }
   if (P.song !== m) throw new Error("The song changed.");
   const bufs = { ...P.orig, ...(shifted || {}) };
-  if (bufs.lead && bufs.backing) Object.assign(bufs, splitPair(bufs.lead, bufs.backing, m.unsplit || []));
   T.band = { id: m.id, n, bufs };
   return bufs;
 }

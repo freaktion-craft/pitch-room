@@ -7,7 +7,7 @@ Songs live in ./library/<id>/ :
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
-    meta.json       title, duration, bpm, beat times, key, stems, model, unsplit (parts where the vocals stay whole)
+    meta.json       title, duration, bpm, beat times, key, stems, model, keep (parts of tracks that play while muted)
     keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
     takes/          you, singing along in Practice: <take>.flac and <take>.json (when, which part, key, scores)
 
@@ -718,10 +718,7 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
 
 
 # ---------- lead and backing vocals ----------
-# The player shows the vocal stem as two tracks, lead and backing. Where the split is wrong, parts of the song can be
-# left unsplit (meta "unsplit": [[t0, t1], …]): there all the vocals play on the backing track, so they stay in when
-# the lead is muted, the lead is silent, and the note bars in Practice follow all the vocals.
-FADE = 0.03  # s: crossfade at the edges of an unsplit part
+# The player shows the vocal stem as two tracks, lead and backing.
 _split_lock = threading.Lock()
 
 
@@ -784,12 +781,15 @@ def start_split(song_id: str) -> str:
     return _split_jobs[song_id]
 
 
-def set_unsplit(song_id: str, ranges: list) -> list:
-    """Save the parts left unsplit: sorted, clipped to the song, overlapping ones joined. Returns them."""
-    folder = _song_dir(song_id)
-    dur = float(_read_meta(folder)["duration"])
+# Kept parts (meta "keep": {track: [[t0, t1], …]}): stretches of a track that play even while it's muted, so a muted
+# lead can still sing the bits left to it. The page plays them; export() and the takes' mixes take them as "only".
+FADE = 0.03  # s: fade at the edges of a kept part
+
+
+def _parts(dur: float, ranges) -> list:
+    """Stretches as [[start, end], …] in seconds: sorted, clipped to the song, at least 0.2 s, ones that touch joined."""
     parts = []
-    for r in ranges:
+    for r in ranges or []:
         try:
             a, b = sorted((float(r[0]), float(r[1])))
         except (TypeError, ValueError, IndexError):
@@ -803,12 +803,28 @@ def set_unsplit(song_id: str, ranges: list) -> list:
             out[-1][1] = max(out[-1][1], b)
         else:
             out.append([a, b])
-    _update_meta(folder, unsplit=out)
     return out
 
 
-def _unsplit_mask(n: int, ranges: list) -> np.ndarray:
-    """Per sample: 1 inside the unsplit parts, 0 outside, ramping over FADE at their edges."""
+def set_keep(song_id: str, keep) -> dict:
+    """Save a song's kept parts, {track: parts} for its own tracks (each tidied by _parts; tracks without any left out).
+    Songs that kept their vocals whole in parts ("unsplit", from before) have those taken over as the lead's by the
+    page; saving clears them. Returns what was saved."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not isinstance(keep, dict):
+        raise ValueError("Send the kept parts as {track: [[start, end], …]}.")
+    names = set(_tracks(folder, meta)) | {"vocals"}
+    out = {}
+    for name, ranges in keep.items():
+        if name in names and (parts := _parts(float(meta["duration"]), ranges)):
+            out[name] = parts
+    _update_meta(folder, keep=out, unsplit=[])
+    return out
+
+
+def _parts_mask(n: int, ranges: list) -> np.ndarray:
+    """Per sample: 1 inside the parts, 0 outside, ramping over FADE at their edges."""
     m = np.zeros(n, dtype=np.float32)
     for a, b in ranges:
         i0, i1 = max(0, int((a - FADE) * SR)), min(n, int((b + FADE) * SR) + 1)
@@ -818,16 +834,11 @@ def _unsplit_mask(n: int, ranges: list) -> np.ndarray:
     return m
 
 
-def _vocal_parts(folder: str, ranges: list, key: int = 0) -> dict:
-    """{lead, backing}, (2, n) each, in that key, with the unsplit parts moved into backing."""
+def _vocal_parts(folder: str, key: int = 0) -> dict:
+    """{lead, backing}, (2, n) each, in that key, cut to the same length."""
     lead, back = _decode_stereo(_track_path(folder, "lead", key)), _decode_stereo(_track_path(folder, "backing", key))
     n = min(lead.shape[1], back.shape[1])
-    lead, back = lead[:, :n], back[:, :n]
-    if ranges:
-        m = _unsplit_mask(n, ranges)
-        lead, back = lead * (1 - m), back + m * lead
-    return {"lead": lead, "backing": back}
-
+    return {"lead": lead[:, :n], "backing": back[:, :n]}
 
 def _tracks(folder: str, meta: dict) -> list[str]:
     """The player's tracks: the stems, with vocals as lead + backing once split."""
@@ -1110,8 +1121,8 @@ def _click_track(beats: list[float], dur: float, offset: int, beats_per_bar: int
 
 
 def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple[bytes, str]:
-    """tracks: [{name, gain}] of audible tracks; click: {gain, offset, beatsPerBar} or None; key: semitones up or down,
-    as played. Returns (mp3 bytes, filename)."""
+    """tracks: [{name, gain, only?}] of the tracks heard (only: a muted track's kept parts, where alone it plays); click:
+    {gain, offset, beatsPerBar} or None; key: semitones up or down, as played. Returns (mp3 bytes, filename)."""
     folder, key = _song_dir(song_id), _semitones(key)
     meta = _read_meta(folder)
     names, vocal = _tracks(folder, meta), None
@@ -1126,10 +1137,12 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple
         if name not in names or gain <= 0:
             continue
         if name in ("lead", "backing"):
-            vocal = vocal or _vocal_parts(folder, meta.get("unsplit") or [], key)
+            vocal = vocal or _vocal_parts(folder, key)
             wav = vocal[name] * gain
         else:
             wav = _decode_stereo(_track_path(folder, name, key)) * gain
+        if "only" in t:  # a muted track: just its kept parts
+            wav = wav * _parts_mask(wav.shape[1], _parts(float(meta["duration"]), t["only"]))
         mix = wav if mix is None else mix[:, : wav.shape[1]] + wav[:, : mix.shape[1]]
         used.append(name)
     if click and meta.get("beats") and float(click.get("gain", 1)) > 0:
@@ -1340,7 +1353,7 @@ def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
     out, vocal = np.zeros((2, n), dtype=np.float32), None
     for t, g in parts:
         if t in ("lead", "backing"):
-            vocal = vocal or _vocal_parts(folder, meta.get("unsplit") or [], key)
+            vocal = vocal or _vocal_parts(folder, key)
             wav = vocal[t]
         else:
             wav = _decode_stereo(_track_path(folder, t, key))
