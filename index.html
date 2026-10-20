@@ -1289,7 +1289,7 @@ function jobStarted(id, text) { addMsg(""); jobCard(id).querySelector(".top span
 async function openSong(m) {
   closeSong();
   ensureCtx();
-  P.song = m; P.offset = 0;
+  P.song = m; P.offset = 0; P.ph = null;
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
   const meta = () => { $("#pMeta").textContent = [...songFacts(m), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].join(" · "); };
@@ -1427,6 +1427,7 @@ function pauseSong() {
   paintPlay($("#pPlay"), false); renderStart();
 }
 function seekSong(t) {
+  playheadJump(); // from where the line is now
   const was = P.playing; pauseSong(); P.offset = Math.max(0, Math.min(songDur(), t)); if (was) playSong(); drawWave();
 }
 // Go to end: the playhead at the very end, stopped there as when the song runs out (Play then starts it over).
@@ -1478,7 +1479,7 @@ function drawWave() {
   if (!r.width) return;
   if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(96 * d); }
   const x = c.getContext("2d"), W = r.width, H = 96; x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
-  const prog = songDur() ? songPos() / songDur() : 0, X = (t) => (t / (songDur() || 1)) * W;
+  const X = (t) => (t / (songDur() || 1)) * W, prog = playheadShown(W);
   if (P.song && P.song.split) { // parts with the vocals kept whole, and the selection
     x.fillStyle = stemColor("lead");
     for (const [a, b] of P.song.unsplit || []) { x.globalAlpha = 0.14; x.fillRect(X(a), 0, X(b) - X(a), H); x.globalAlpha = 0.8; x.fillRect(X(a), 0, X(b) - X(a), 3); }
@@ -1513,6 +1514,24 @@ function drawWave() {
     flag.style.left = Math.max(half, Math.min(W - half, prog * W)) + "px"; // kept over the waveform
   }
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
+}
+// Where the playhead is drawn, as a fraction of the song: where the song is, except just after a jump (a click on the
+// waveform, ±5 s…), when the line springs over to it: a little overshoot, settled in about 0.2 s. The sound itself
+// jumps at once. A jump mid-spring carries on from where the line is, at its speed.
+const PH_W = 34, PH_Z = 0.7; // the spring's natural frequency (rad/s) and damping ratio
+function playheadJump() {
+  if (P.scrub || matchMedia("(prefers-reduced-motion: reduce)").matches) { P.ph = null; return; }
+  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: P.ph ? P.ph.v : 0, t: performance.now() };
+}
+function playheadShown(W) {
+  const to = songDur() ? songPos() / songDur() : 0, s = P.ph;
+  if (!s || P.scrub) { P.ph = null; return to; }
+  const now = performance.now();
+  if (now - s.t > 250) { P.ph = null; return to; } // a jump made where the waveform wasn't drawn (Practice): nothing to show
+  const dt = Math.min(0.05, (now - s.t) / 1000) / 4; s.t = now;
+  for (let i = 0; i < 4; i++) { s.v += (-PH_W * PH_W * (s.x - to) - 2 * PH_Z * PH_W * s.v) * dt; s.x += s.v * dt; } // semi-implicit Euler
+  if (Math.abs(s.x - to) * W < 0.5 && Math.abs(s.v) * W < 30) { P.ph = null; return to; }
+  return s.x;
 }
 requestAnimationFrame(function waveLoop() { if (view === "stems" && stemsPage === "song" && P.song) drawWave(); requestAnimationFrame(waveLoop); });
 
