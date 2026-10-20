@@ -607,6 +607,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <button class="chipbtn iconchip" id="micSetBtn" type="button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="micSet"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
     <div class="pop" id="micSet" role="dialog" aria-label="Settings" hidden>
+      <label>Language <button class="pick" id="lang" type="button"></button></label>
       <label>Input <button class="pick" id="micDev" type="button"></button></label>
       <p class="hint" id="micDevHint" hidden>Turn on the mic to see each input’s name.</p>
       <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" data-tip="pos" aria-label="Mic sensitivity"></label>
@@ -681,7 +682,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <p class="lede">Split a song into tracks and practice it phrase by phrase, with your pitch on screen.</p>
     </div>
     <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)" hidden>Save</button></div>
-    <p class="server-off" id="sServer" hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
+    <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
     <section class="group" id="sLibPage">
@@ -693,7 +694,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <div id="sAddPage" hidden>
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
-      <p class="muted">Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
+      <p class="muted" data-html>Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
       <div class="row-actions"><button class="btn dark" id="sInstallBtn" type="button">Install stem tools</button><span class="muted" id="sInstallState"></span></div>
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
@@ -792,6 +793,41 @@ const oct = (m) => Math.floor(Math.round(m) / 12) - 1;
 const absName = (m) => (S.names === "ko" ? KO : EN)[pc(m)] + oct(m);
 const clock = () => performance.now() / 1000;
 
+// ---------- language ----------
+// The page is written in English. In Korean, tr() gives a string's entry in KO_TEXT (keyed by the English, at the end
+// of this script), {placeholders} filled in from vars. The server speaks English only: what it says (job stages,
+// errors) goes through tr() too, the messages with something of their own in them (a reason, a device) by pattern.
+let lang = "en"; // until initLang: what's built at startup is built in English, then switched like the rest
+const locale = () => (lang === "ko" ? "ko-KR" : "en-US");
+function tr(en, vars) {
+  let s = en;
+  if (lang === "ko" && typeof en === "string") s = KO_TEXT[en] ?? (vars ? null : fromServer(en)) ?? en;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)) : s;
+}
+let serverPats = null;
+function fromServer(en) {
+  serverPats ??= Object.keys(KO_SERVER).filter((k) => /\{\w+\}/.test(k)).map((k) => {
+    const names = [], re = k.split(/\{(\w+)\}/).map((p, i) => (i % 2 ? (names.push(p), "(.*?)") : p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("");
+    return [new RegExp("^" + re + "$", "s"), names, KO_SERVER[k]];
+  });
+  for (const [re, names, ko] of serverPats) {
+    const m = re.exec(en);
+    if (m) return ko.replace(/\{(\w+)\}/g, (x, k) => { const v = m[names.indexOf(k) + 1]; return KO_TEXT[v] ?? v; });
+  }
+  return null;
+}
+// Text that stays up until something replaces it (a status, an error, a label): said in the current language, its
+// English kept so a switch can say it again in the other one, if it's still what the node shows. For nodes that stay
+// on the page; what's built afresh (tracks, takes, the library's rows) is drawn again on a switch instead (setLang).
+// The page's own text is registered here too (initLang). node -> {"" for its text, or an attribute: [English, vars, as shown]}
+const said = new Map();
+function say(node, en, vars, attr) {
+  const t = en ? tr(en, vars) : "";
+  if (attr) node.setAttribute(attr, t); else node.textContent = t;
+  said.set(node, { ...said.get(node), [attr || ""]: [en, vars, t] });
+  return node;
+}
+
 // ---------- audio ----------
 let ac = null, analyser = null, tbuf = null, master = null, noiseBuf = null;
 let micStream = null, micNode = null, micBus = null, micOn = false, testOsc = null, testOffset = 0;
@@ -884,15 +920,15 @@ function playKey(m) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.v
 async function startMic() {
   if (micOn) return true;
   if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    notice("The mic doesn’t work from this address. Open the app at http://localhost instead."); return false;
+    notice(tr("The mic doesn’t work from this address. Open the app at http://localhost instead.")); return false;
   }
   ensureCtx();
   try {
     micStream = await openMic();
   } catch (e) {
-    notice(e && e.name === "NotAllowedError"
+    notice(tr(e && e.name === "NotAllowedError"
       ? "Microphone access is blocked. Allow it from the mic icon in the address bar, then try again."
-      : "No microphone found. Check it’s connected, then try again.");
+      : "No microphone found. Check it’s connected, then try again."));
     return false;
   }
   stopTest();
@@ -922,8 +958,8 @@ async function restartMic() {
 }
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
-let micPick = null, namesPick = null, octPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
-const OCT_ITEMS = [{ v: -1, t: "octave down" }, { v: 0, t: "as sung" }, { v: 1, t: "octave up" }];
+let micPick = null, namesPick = null, octPick = null, langPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
+const octItems = () => [{ v: -1, t: tr("octave down") }, { v: 0, t: tr("as sung") }, { v: 1, t: tr("octave up") }];
 // The click's beats per bar, in the Studio's click row. One dropdown, made once and moved into each new row (every
 // makePick adds its own list and listeners for good).
 let bpbPick = null;
@@ -941,10 +977,10 @@ async function listMics() {
   const real = ins.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications"); // not the OS's aliases
   const by = (a, b) => (a.g || "").localeCompare(b.g || "", undefined, { numeric: true }) || a.t.localeCompare(b.t, undefined, { numeric: true });
   const items = real.map((d, i) => {
-    const [t, g] = d.label ? splitInput(d.label) : [`Microphone ${i + 1}`, ""];
+    const [t, g] = d.label ? splitInput(d.label) : [tr("Microphone {n}", { n: i + 1 }), ""];
     return { v: d.deviceId, t, g, full: d.label || t };
   }).sort(by);
-  micPick.set([{ v: "", t: "System default" }, ...items], real.some((d) => d.deviceId === S.mic) ? S.mic : "");
+  micPick.set([{ v: "", t: tr("System default") }, ...items], real.some((d) => d.deviceId === S.mic) ? S.mic : "");
   $("#micDevHint").hidden = !ins.some((d) => !d.label);
 }
 // An input's name and its device's: Windows writes "Mic | Line 1/2(Audient EVO4)", the device in the last brackets
@@ -964,7 +1000,8 @@ function splitInput(label) {
 // not t}); onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v
 // (to show how it's coming along in its row); foot: a line under the list (text, or a function giving its nodes). The list lives in the panel the button is
 // in, so a click on it counts as inside that panel; Escape closes the list only. Changing the items while it's open
-// redraws it in place, focus and scroll kept.
+// redraws it in place, focus and scroll kept. name is English (tr'd where it's shown); the items come translated.
+const picks = []; // every dropdown, relabelled on a language switch
 function progRing(p) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   s.setAttribute("viewBox", "0 0 16 16"); s.setAttribute("class", "ring" + (p ? "" : " spin")); s.setAttribute("aria-hidden", "true");
@@ -973,7 +1010,7 @@ function progRing(p) {
 }
 function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   const list = el("div", "pick-list"), label = el("span");
-  list.setAttribute("role", "listbox"); list.setAttribute("aria-label", name); list.hidden = true;
+  list.setAttribute("role", "listbox"); say(list, name, null, "aria-label"); list.hidden = true;
   btn.append(label); btn.setAttribute("aria-haspopup", "listbox"); btn.setAttribute("aria-expanded", "false");
   (btn.closest(".pop") || document.body).append(list);
   let items = [], value = "";
@@ -981,7 +1018,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   function paint() {
     const it = items.find((x) => x.v === value) || items[0];
     label.textContent = it ? it.btn || it.t : ""; btn.title = it ? it.full || it.t : "";
-    btn.setAttribute("aria-label", `${name}: ${label.textContent}`);
+    btn.setAttribute("aria-label", `${tr(name)}: ${label.textContent}`);
   }
   function show(on) {
     const again = on && !list.hidden, focused = again && list.contains(document.activeElement) ? document.activeElement.dataset.v : null, top = list.scrollTop;
@@ -1036,12 +1073,15 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   document.addEventListener("click", (e) => { const path = e.composedPath(); if (!list.hidden && !path.includes(list) && !path.includes(btn)) show(false); });
   addEventListener("resize", () => show(false));
   addEventListener("scroll", () => show(false), { passive: true }); // it's fixed in place; the button isn't
-  return {
+  const pick = {
     set(next, v) { items = next; value = v; paint(); if (!list.hidden) show(true); },
     get value() { return value; },
     btn,
     close() { show(false); },
+    relabel() { paint(); if (!list.hidden) show(true); }, // its name and footnote in the new language
   };
+  picks.push(pick);
+  return pick;
 }
 function stopMic() {
   recOff(); // no recording without the mic
@@ -1084,7 +1124,7 @@ function mkBtn(label, fn, primary) {
 }
 // Double-click a slider to put it back where it started (runs its own oninput, so everything that listens updates)
 function resetOnDblClick(input, def) {
-  input.title = "Double-click to reset";
+  input.title = tr("Double-click to reset"); // (again on a language switch: setLang)
   input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
 }
 // Every slider: only its handle can be grabbed (a press elsewhere on it doesn't jump the level there), and while it's
@@ -1220,16 +1260,17 @@ async function stemsRefresh() {
   stemsStatus = st;
   $("#sServer").hidden = !!st || !!err;
   $("#sErr").hidden = !err;
-  if (err) $("#sErr").textContent = `The server is running, but checking the stem tools failed: ${err}. The terminal window has the details.`;
+  if (err) say($("#sErr"), "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err });
   $("#sInstall").hidden = !st || st.installed;
   $("#sAdd").hidden = !st || !st.installed;
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
   if (st && st.installed) {
-    $("#sDevice").textContent = st.restartNeeded ? "Restart the app (close its window and open it again) to switch to the GPU."
-      : { mps: "Runs on your Apple GPU — about 30 s for a 4-minute song.", cuda: `Runs on your NVIDIA GPU${st.deviceName ? " (" + st.deviceName + ")" : ""} — usually under a minute.`, cpu: "Runs on the CPU — a 4-minute song can take several minutes." }[st.device] || "";
+    say($("#sDevice"), st.restartNeeded ? "Restart the app (close its window and open it again) to switch to the GPU."
+      : { mps: "Runs on your Apple GPU — about 30 s for a 4-minute song.", cuda: "Runs on your NVIDIA GPU{name} — usually under a minute.", cpu: "Runs on the CPU — a 4-minute song can take several minutes." }[st.device] || "",
+      { name: st.deviceName ? " (" + st.deviceName + ")" : "" });
     $("#sGpu").hidden = !st.gpuUnused || st.restartNeeded;
     if (st.gpuUnused && st.driverOld) {
-      $("#sGpu").querySelector("span").textContent = "This PC has an NVIDIA graphics card, but its driver is too old for GPU separation. Update the NVIDIA driver (nvidia.com/drivers), restart the app, then come back here.";
+      say($("#sGpu").querySelector("span"), "This PC has an NVIDIA graphics card, but its driver is too old for GPU separation. Update the NVIDIA driver (nvidia.com/drivers), restart the app, then come back here.");
       $("#sGpuBtn").hidden = true;
     }
   }
@@ -1246,7 +1287,7 @@ async function renderLibrary() {
   if (first) {
     const a = el("a", "first"), plus = el("span", "plus"), text = el("span");
     a.href = "#stems/add"; plus.append(icon("plus"));
-    text.append(el("b", null, "Add your first song"), el("small", null, "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice."));
+    text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.")));
     a.append(plus, text); box.append(a);
   }
   if (!lib.length) return;
@@ -1260,7 +1301,7 @@ async function renderLibrary() {
     row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
     const acts = el("div", "song-actions");
     const more = mkBtn("", () => songMenu(more, m));
-    more.classList.add("icon"); more.title = "More"; more.setAttribute("aria-label", "More for " + m.title);
+    more.classList.add("icon"); more.title = tr("More"); more.setAttribute("aria-label", tr("More for {title}", { title: m.title }));
     more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false"); more.append(icon("more"));
     acts.append(more); row.append(info, acts); box.append(row);
   });
@@ -1268,9 +1309,9 @@ async function renderLibrary() {
 // Key names spelled the usual way for each key (D♭ major, C♯ minor).
 const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
 const KEY_MINOR = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"];
-const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${k.mode}` : "");
-const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : "no steady beat", keyName(m.key)].filter(Boolean);
-const libLine = (m) => [...songFacts(m), `${trackNames(m).length} tracks`, new Date(m.created * 1000).toLocaleDateString()].join(" · ");
+const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${tr(k.mode)}` : ""); // G♯ minor, G♯ 단조
+const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : tr("no steady beat"), keyName(m.key)].filter(Boolean);
+const libLine = (m) => [...songFacts(m), tr("{n} tracks", { n: trackNames(m).length }), new Date(m.created * 1000).toLocaleDateString(locale())].join(" · ");
 // Songs added before keys were read get theirs from /info, which works it out once (about a second) and saves it.
 const keyJobs = new Map();
 function keyOf(m) {
@@ -1286,7 +1327,7 @@ function songMenu(btn, m) {
   closeMenu();
   const menu = $("#songMenu"), del = $("#mDelete");
   menuSong = m; menuBtn = btn; btn.setAttribute("aria-expanded", "true"); btn.classList.add("open");
-  del.dataset.armed = ""; del.querySelector("span").textContent = "Delete";
+  del.dataset.armed = ""; del.querySelector("span").textContent = tr("Delete");
   menu.hidden = false;
   const r = btn.getBoundingClientRect();
   menu.style.top = `${r.bottom + 4}px`; menu.style.left = `${Math.max(8, r.right - menu.offsetWidth)}px`;
@@ -1304,7 +1345,7 @@ function initSongMenu() {
   $("#mRename").onclick = () => { const m = menuSong, row = menuBtn.closest(".row"); closeMenu(); renameSong(row, m); };
   $("#mDelete").onclick = async () => {
     const b = $("#mDelete"), m = menuSong;
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.querySelector("span").textContent = "Really delete?"; return; }
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.querySelector("span").textContent = tr("Really delete?"); return; }
     closeMenu();
     await fetch(`/api/library/${m.id}/delete`, { method: "POST" });
     if (P.song && P.song.id === m.id) closeSong();
@@ -1318,7 +1359,7 @@ function initSongMenu() {
 // selected. Enter or leaving the field saves; Escape, an empty title or the same one changes nothing.
 function renameSong(row, m) {
   const link = row.querySelector(".song a"), title = link.querySelector("b"), more = row.querySelector(".song-actions .btn");
-  const f = el("textarea", "rename"); f.rows = 1; f.maxLength = 200; f.spellcheck = false; f.value = m.title; f.setAttribute("aria-label", "Song title");
+  const f = el("textarea", "rename"); f.rows = 1; f.maxLength = 200; f.spellcheck = false; f.value = m.title; f.setAttribute("aria-label", tr("Song title"));
   const mirror = () => { title.textContent = f.value + "\u200b"; }; // the title underneath, sizing the row (never quite empty)
   link.after(f); mirror(); f.focus(); f.select();
   let done = false;
@@ -1332,10 +1373,10 @@ function renameSong(row, m) {
     if (!save) return;
     const r = await fetch(`/api/library/${m.id}/rename`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: t }) }).catch(() => null);
     const j = r ? await r.json().catch(() => ({})) : {};
-    if (r && r.ok) { songRenamed(m.id, j.title); title.textContent = j.title; more.setAttribute("aria-label", "More for " + j.title); return; }
+    if (r && r.ok) { songRenamed(m.id, j.title); title.textContent = j.title; more.setAttribute("aria-label", tr("More for {title}", { title: j.title })); return; }
     title.textContent = old;
     const small = row.querySelector(".song small"); // the error, for a moment, where the song's details are
-    small.textContent = j.error || "Couldn’t rename the song. Is the app still running?"; small.style.color = "var(--bad)";
+    small.textContent = tr(j.error || "Couldn’t rename the song. Is the app still running?"); small.style.color = "var(--bad)";
     setTimeout(() => { small.textContent = libLine(m); small.style.color = ""; }, 4000);
   };
   f.oninput = () => { if (/[\r\n]/.test(f.value)) f.value = f.value.replace(/[\r\n]+/g, " "); mirror(); }; // a pasted line break
@@ -1355,42 +1396,48 @@ function songRenamed(id, title) {
 }
 
 // Info page (#stems/<id>/info): key, tempo, length, the vocal range and how it sits against yours.
+let infoShown = null; // {id, s, m, n}: the song the Info page shows (n: in its key then), drawn again on a language switch
 async function renderInfo(id) {
   const wait = $("#iWait");
+  infoShown = null;
   $("#iTitle").textContent = ""; $("#iSub").replaceChildren(); $("#iFacts").replaceChildren(); $("#iRange").replaceChildren();
-  $("#iActs").hidden = true; wait.hidden = false; wait.textContent = "Reading the song…";
+  $("#iActs").hidden = true; wait.hidden = false; say(wait, "Reading the song…");
   let s, lib;
   try {
     const r = await fetch(`/api/library/${id}/info`, { cache: "no-store" });
     s = await r.json();
     if (!r.ok) throw new Error(s.error || "Couldn’t read this song.");
     lib = await (await fetch("/api/library", { cache: "no-store" })).json();
-  } catch (e) { wait.textContent = e.message; return; }
+  } catch (e) { say(wait, e.message); return; }
   if (location.hash !== `#stems/${id}/info`) return;
-  const m = lib.find((x) => x.id === id) || s;
-  wait.hidden = true;
+  infoShown = { id, s, m: lib.find((x) => x.id === id) || s, n: savedKey(id) }; // the key Studio and Practice play it in: the notes here move with it
+  drawInfo();
+}
+function drawInfo() {
+  const { id, m, n } = infoShown, s = { ...infoShown.s }; // a copy: the vocal range is moved to the song's key below
+  $("#iWait").hidden = true;
+  $("#iSub").replaceChildren(); $("#iFacts").replaceChildren(); $("#iRange").replaceChildren();
   $("#iTitle").textContent = s.title;
   const sub = $("#iSub"), src = s.source || "";
-  if (/^https?:\/\//.test(src)) { const a = el("a", null, "Source"); a.href = src; a.target = "_blank"; a.rel = "noopener"; sub.append(a, " · "); }
-  sub.append(`Added ${new Date(s.created * 1000).toLocaleDateString()} · ${{ htdemucs: "4 stems", htdemucs_6s: "6 stems" }[s.model] || s.model}`);
+  if (/^https?:\/\//.test(src)) { const a = el("a", null, tr("Source")); a.href = src; a.target = "_blank"; a.rel = "noopener"; sub.append(a, " · "); }
+  sub.append(tr("Added {date} · {model}", { date: new Date(s.created * 1000).toLocaleDateString(locale()), model: tr({ htdemucs: "4 stems", htdemucs_6s: "6 stems" }[s.model] || s.model) }));
   const fact = (label, value, note) => {
     const d = el("div"); const dd = el("dd", null, value);
     if (note) dd.append(el("small", null, note));
-    d.append(el("dt", null, label), dd); $("#iFacts").append(d);
+    d.append(el("dt", null, tr(label)), dd); $("#iFacts").append(d);
   };
-  const n = savedKey(id); // the key Studio and Practice play it in: the notes here move with it
-  if (s.key && n) fact("Key", keyName(keyAfter(s.key, n)), `${Math.abs(n)} semitone${Math.abs(n) > 1 ? "s" : ""} ${n > 0 ? "up" : "down"} from ${keyName(s.key)}`);
+  if (s.key && n) fact("Key", keyName(keyAfter(s.key, n)), tr(`{n} semitone${Math.abs(n) > 1 ? "s" : ""} ${n > 0 ? "up" : "down"} from {key}`, { n: Math.abs(n), key: keyName(s.key) }));
   else if (s.key) {
     const k = s.key, rel = k.mode === "major" ? { pc: (k.pc + 9) % 12, mode: "minor" } : { pc: (k.pc + 3) % 12, mode: "major" };
     const close = k.alt && k.r - k.alt.r < 0.05 && !(k.alt.pc === rel.pc && k.alt.mode === rel.mode);
-    fact("Key", keyName(k), close ? `could also be ${keyName(k.alt)}` : `relative ${rel.mode}: ${keyName(rel)}`);
-  } else fact("Key", "–", s.key === null ? "no pitched tracks" : "not read yet");
-  fact("Tempo", s.bpm ? `${s.bpm} BPM` : "–", s.bpm ? null : "no steady beat found");
+    fact("Key", keyName(k), close ? tr("could also be {key}", { key: keyName(k.alt) }) : tr(`relative ${rel.mode}: {key}`, { key: keyName(rel) }));
+  } else fact("Key", "–", tr(s.key === null ? "no pitched tracks" : "not read yet"));
+  fact("Tempo", s.bpm ? `${s.bpm} BPM` : "–", s.bpm ? null : tr("no steady beat found"));
   fact("Length", fmtTime(s.duration));
   const v = s.vocals && { ...s.vocals, lo: s.vocals.lo + n, hi: s.vocals.hi + n, mostly: s.vocals.mostly && s.vocals.mostly.map((x) => x + n) };
   s.vocals = v; s.shift = n;
-  if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, `${v.hi - v.lo} semitones${v.mostly ? ` · mostly ${absName(v.mostly[0])}–${absName(v.mostly[1])}` : ""}`);
-  fact("Tracks", String(trackNames(s).length), trackNames(s).join(", "));
+  if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, tr("{n} semitones", { n: v.hi - v.lo }) + (v.mostly ? tr(" · mostly {lo}–{hi}", { lo: absName(v.mostly[0]), hi: absName(v.mostly[1]) }) : ""));
+  fact("Tracks", String(trackNames(s).length), trackNames(s).map((k) => tr(k)).join(", "));
   if (v) renderInfoRange(s);
   $("#iOpen").href = `#stems/${id}`;
   $("#iSing").hidden = !s.stems.includes("vocals");
@@ -1433,21 +1480,21 @@ function renderInfoRange(s) {
   const axis = el("div", "rbar axis"), ticks = el("div", "lane");
   for (let x = Math.ceil(lo); x <= hi; x++) if (x % 12 === 0) { const t = el("span", null, absName(x)); t.style.left = at(x); ticks.append(t); }
   axis.append(el("span"), ticks, el("output"));
-  box.append(el("div", "group-label minor", "Where the melody sits"));
+  box.append(el("div", "group-label minor", tr("Where the melody sits")));
   const bars = el("div", "rbars");
-  bars.append(bar("Song", `${absName(v.lo)}–${absName(v.hi)}`, [[v.lo, v.hi, "full"], ...(v.mostly ? [[v.mostly[0], v.mostly[1], "core"]] : [])]));
+  bars.append(bar(tr("Song"), `${absName(v.lo)}–${absName(v.hi)}`, [[v.lo, v.hi, "full"], ...(v.mostly ? [[v.mostly[0], v.mostly[1], "core"]] : [])]));
   bars.append(axis); box.append(bars);
   // hear the extremes: the vocal track at that moment, or the bare note on the piano
   const listen = el("div", "listen");
   for (const [name, m, at] of [["Lowest", v.lo, v.loAt], ["Highest", v.hi, v.hiAt]]) {
     const row = el("div", "listen-row");
-    row.append(el("span", "lbl", name), el("b", null, absName(m)));
+    row.append(el("span", "lbl", tr(name)), el("b", null, absName(m)));
     if (at) {
       const hear = mkBtn("", () => hearAt(s, at[0], at[1], hear));
-      hear.title = "Play that moment of the vocal track"; hear.append(icon("play"), `In the song · ${fmtTime(at[0])}`);
+      hear.title = tr("Play that moment of the vocal track"); hear.append(icon("play"), tr("In the song · {t}", { t: fmtTime(at[0]) }));
       row.append(hear);
     }
-    row.append(mkBtn("Piano", () => playKey(m)));
+    row.append(mkBtn(tr("Piano"), () => playKey(m)));
     listen.append(row);
   }
   box.append(listen);
@@ -1457,8 +1504,8 @@ function jobCard(id) {
   if (!card) {
     card = el("div", "job"); card.id = "job-" + id;
     const top = el("div", "top"); top.append(el("span"));
-    const bar = el("div", "bar"); bar.append(el("i")); bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-label", "Progress");
-    const x = el("button", "x"); x.type = "button"; x.title = "Cancel"; x.append(icon("close"));
+    const bar = el("div", "bar"); bar.append(el("i")); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
+    const x = el("button", "x"); x.type = "button"; say(x, "Cancel", null, "title"); x.append(icon("close"));
     x.onclick = () => cancelJob(id);
     card.append(top, bar, x); $("#sJobs").prepend(card);
   }
@@ -1469,7 +1516,7 @@ function jobCard(id) {
 async function cancelJob(id) {
   const card = jobCard(id), x = card.querySelector(".x");
   if (card.classList.contains("err")) return dropJob(id);
-  card.classList.add("stopping"); x.disabled = true; card.querySelector(".top span").textContent = "Cancelling…";
+  card.classList.add("stopping"); x.disabled = true; say(card.querySelector(".top span"), "Cancelling…");
   try {
     const r = await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
     if (!r.ok) dropJob(id); // the server doesn't know it any more (it was restarted): nothing is left to stop
@@ -1487,26 +1534,26 @@ function watchJob(id, kind, forSong) {
     try { j = await (await fetch("/api/jobs/" + id, { cache: "no-store" })).json(); } catch (e) { return; }
     if (kind === "gpu") {
       $("#sGpuBar").hidden = false; $("#sGpuBar i").style.width = Math.round(j.progress * 100) + "%";
-      $("#sGpuState").textContent = j.status === "error" ? j.error : j.status === "done" ? "Done — restart the app to use the GPU." : j.stage;
+      say($("#sGpuState"), j.status === "error" ? j.error : j.status === "done" ? "Done — restart the app to use the GPU." : j.stage);
       $("#sGpuBtn").disabled = j.status !== "error";
     } else if (kind === "install") {
       $("#sInstallBar").hidden = false; $("#sInstallLog").hidden = false;
       $("#sInstallBar i").style.width = Math.round(j.progress * 100) + "%";
-      $("#sInstallState").textContent = j.status === "error" ? j.error : j.stage;
+      say($("#sInstallState"), j.status === "error" ? j.error : j.stage);
       $("#sInstallLog").textContent = (j.log || []).join("\n");
       $("#sInstallBtn").disabled = j.status === "running" || j.status === "queued";
     } else if (kind === "video") {
-      if (P.song && P.song.id === forSong) videoWait(j.status === "error" ? j.error : `${j.stage}… ${Math.round(j.progress * 100)}%`, j.status === "error");
+      if (P.song && P.song.id === forSong) videoWait(j.status === "error" ? j.error : "{stage}… {pct}%", j.status === "error", { stage: tr(j.stage), pct: Math.round(j.progress * 100) });
     } else if (kind === "split") {
-      splitting[forSong] = j.status === "queued" ? "waiting to split into lead and backing…" : `splitting into lead and backing… ${Math.round(j.progress * 100)}%`;
+      splitting[forSong] = j.status === "queued" ? ["waiting to split into lead and backing…"] : ["splitting into lead and backing… {pct}%", { pct: Math.round(j.progress * 100) }];
       const note = $('#pTracks .track[data-name="vocals"] .name small');
-      if (note && P.song && P.song.id === forSong) note.textContent = splitting[forSong];
+      if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
     } else {
       const card = jobCard(id), x = card.querySelector(".x"), pct = Math.round(j.progress * 100);
       const stopping = (j.cancel || card.classList.contains("stopping")) && j.status !== "error";
-      card.querySelector(".top span").textContent = j.status === "error" ? j.error : stopping ? "Cancelling…" : j.stage;
+      say(card.querySelector(".top span"), j.status === "error" ? j.error : stopping ? "Cancelling…" : j.stage);
       card.classList.toggle("err", j.status === "error");
-      x.title = j.status === "error" ? "Clear" : "Cancel"; x.disabled = stopping;
+      say(x, j.status === "error" ? "Clear" : "Cancel", null, "title"); x.disabled = stopping;
       card.querySelector(".bar i").style.width = pct + "%"; card.querySelector(".bar").setAttribute("aria-valuenow", pct);
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
@@ -1517,7 +1564,7 @@ function watchJob(id, kind, forSong) {
       if (kind === "split") {
         delete splitting[forSong];
         if (P.song && P.song.id === forSong) {
-          if (j.status === "error") { $("#pExportState").textContent = "Couldn’t split the vocals: " + j.error; renderTracks(); }
+          if (j.status === "error") { say($("#pExportState"), "Couldn’t split the vocals: {why}", { why: j.error }); renderTracks(); }
           else {
             libCache.delete(forSong); // its tracks changed: read them afresh
             if (location.hash === "#stems/" + forSong) openSongById(forSong);
@@ -1559,9 +1606,9 @@ async function submitFile(file) {
     jobStarted(id, "Uploading…");
   } catch (err) { addMsg(err.message, true); }
 }
-function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; p.textContent = text || ""; p.style.color = err ? "var(--bad)" : ""; }
+function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
 // The new song's progress shows in the library, where it will land.
-function jobStarted(id, text) { addMsg(""); jobCard(id).querySelector(".top span").textContent = text; watchJob(id, "separate"); if (view === "stems" && stemsPage === "add") go("stems"); }
+function jobStarted(id, text) { addMsg(""); say(jobCard(id).querySelector(".top span"), text); watchJob(id, "separate"); if (view === "stems" && stemsPage === "add") go("stems"); }
 
 // player
 async function openSong(m) {
@@ -1570,12 +1617,10 @@ async function openSong(m) {
   P.song = m; P.offset = 0; P.ph = null;
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
-  // under the title, after the key: tempo, length and tracks
-  const meta = () => { $("#pMeta").textContent = [m.bpm ? `${m.bpm} BPM` : "", fmtTime(m.duration), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].filter(Boolean).join(" · "); };
-  meta(); keyOf(m).then(() => { if (P.song === m) { meta(); paintKey(); } });
+  paintMeta(); keyOf(m).then(() => { if (P.song === m) { paintMeta(); paintKey(); } });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
-  box.classList.remove("ready"); box.style.aspectRatio = ""; wait.classList.remove("err"); wait.textContent = "Loading video…";
+  box.classList.remove("ready"); box.style.aspectRatio = ""; wait.classList.remove("err"); say(wait, "Loading video…");
   if (m.video) v.src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
   showVideo = false; paintVideo();
   $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
@@ -1595,8 +1640,13 @@ async function openSong(m) {
   P.orig = { ...P.buffers }; // as decoded, for key 0
   if (P.shifted && P.shifted.n === P.keyWant) applyKey(P.keyWant); // the remembered key came in first
   computePeaks(); P.peaksAt = performance.now(); // the waveform rises in from here
-  meta();
+  paintMeta();
   drawWave();
+}
+// under the Studio's title, after the key: tempo, length and tracks
+function paintMeta() {
+  const m = P.song;
+  if (m) $("#pMeta").textContent = [m.bpm ? `${m.bpm} BPM` : "", fmtTime(m.duration), Object.keys(P.buffers).length ? tr("{n} tracks", { n: trackNames(m).length }) : tr("loading tracks…")].filter(Boolean).join(" · ");
 }
 function closeSong() {
   pauseSong();
@@ -1605,9 +1655,9 @@ function closeSong() {
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
 }
-function videoWait(text, err) {
+function videoWait(text, err, vars) {
   const box = $("#pVideoBox"), wait = $("#pVideoWait");
-  box.hidden = false; box.classList.remove("ready"); wait.textContent = text; wait.classList.toggle("err", !!err);
+  box.hidden = false; box.classList.remove("ready"); say(wait, text, vars); wait.classList.toggle("err", !!err);
 }
 async function videoFetched(songId, ok) {
   if (!P.song || P.song.id !== songId) return;
@@ -1627,9 +1677,10 @@ function paintVideo() {
   const has = !!(P.song && P.song.video);
   $("#pVideoBox").hidden = !has || !showVideo;
   $("#pVideoBtn").hidden = !has;
-  $("#pVideoBtn").replaceChildren(icon(showVideo ? "videoOff" : "video"), showVideo ? "Hide video" : "Show video");
+  paintVideoBtn();
   if ($("#pVideoBox").hidden) $("#pVideo").pause();
 }
+const paintVideoBtn = () => $("#pVideoBtn").replaceChildren(icon(showVideo ? "videoOff" : "video"), tr(showVideo ? "Hide video" : "Show video"));
 // The video follows the stems player, which owns the clock: started, paused and nudged back whenever it drifts.
 function syncVideo() {
   const v = $("#pVideo");
@@ -1695,7 +1746,7 @@ function playSong() {
   const beats = P.song.beats || []; P.clickNext = beats.findIndex((b) => b >= P.offset); if (P.clickNext < 0) P.clickNext = beats.length;
   paintPlay($("#pPlay"), true);
 }
-function paintPlay(b, playing) { ppTo(b.querySelector(".pp"), playing ? 1 : 0); b.setAttribute("aria-label", playing ? "Pause" : "Play"); }
+function paintPlay(b, playing) { ppTo(b.querySelector(".pp"), playing ? 1 : 0); b.setAttribute("aria-label", tr(playing ? "Pause" : "Play")); }
 // Play ⇄ pause: the triangle is two halves (corners listed in the same order as the bars') that square off into the
 // pause bars and back. Coordinates are the shapes' cores; the round-joined stroke adds 1.25 all round.
 const PP = {
@@ -1913,20 +1964,20 @@ function trackRow(name, members, sub, open) {
   dot.style.color = `var(--stem-${group ? "lead" : name}, var(--muted))`;
   const bpm = P.song.bpm, isClick = name === "click";
   const title = group ? "Vocals" : sub ? (name === "lead" ? "Lead" : "Backing") : isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : TRACK_TITLES[name] || name[0].toUpperCase() + name.slice(1);
-  const note = group ? "lead and backing" : isClick ? (bpm ? `click · ${t.bpb}/4 · follows the song’s beat` : "click") : STEM_NOTES[name] || "";
-  const nm = el("div", "name"); nm.append(document.createTextNode(title));
+  const note = group ? "lead and backing" : isClick ? (bpm ? tr("click · {bpb}/4 · follows the song’s beat", { bpb: t.bpb }) : "click") : STEM_NOTES[name] || "";
+  const nm = el("div", "name"); nm.append(document.createTextNode(tr(title)));
   if (group) { // opens and closes the lead and backing rows
     const tog = el("button", "disclose"); tog.type = "button"; tog.setAttribute("aria-expanded", String(open));
-    tog.title = open ? "Show the vocals as one track" : "Show lead and backing vocals apart"; tog.setAttribute("aria-label", tog.title);
+    tog.title = tr(open ? "Show the vocals as one track" : "Show lead and backing vocals apart"); tog.setAttribute("aria-label", tog.title);
     tog.append(icon("chevronDown")); tog.onclick = () => { store.set("voicesOpen", !open); renderTracks(); };
     nm.append(tog);
   }
-  nm.append(el("small", null, note));
-  if (isClick && bpm) nm.title = `Detected tempo ${bpm} BPM`;
+  nm.append(el("small", null, tr(note)));
+  if (isClick && bpm) nm.title = tr("Detected tempo {bpm} BPM", { bpm });
   const all = (k) => ts.every((x) => x[k]);
-  const m = el("button", "tog m", "M"); m.type = "button"; m.title = name === "click" ? "Click on/off" : "Mute"; m.setAttribute("aria-pressed", String(all("mute")));
-  const s = el("button", "tog s", "S"); s.type = "button"; s.title = "Solo"; s.setAttribute("aria-pressed", String(all("solo")));
-  const v = document.createElement("input"); v.type = "range"; v.min = 0; v.max = 1.5; v.step = 0.01; v.setAttribute("aria-label", (group ? "vocals" : name) + " volume");
+  const m = el("button", "tog m", "M"); m.type = "button"; m.title = tr(name === "click" ? "Click on/off" : "Mute"); m.setAttribute("aria-pressed", String(all("mute")));
+  const s = el("button", "tog s", "S"); s.type = "button"; s.title = tr("Solo"); s.setAttribute("aria-pressed", String(all("solo")));
+  const v = document.createElement("input"); v.type = "range"; v.min = 0; v.max = 1.5; v.step = 0.01; v.setAttribute("aria-label", tr("{name} volume", { name: tr(group ? "vocals" : name) }));
   v.value = ts.reduce((a, x) => a + x.vol, 0) / ts.length;
   m.onclick = () => { const to = !all("mute"); ts.forEach((x) => (x.mute = to)); applyGains(); renderTracks(); };
   s.onclick = () => { const to = !all("solo"); ts.forEach((x) => (x.solo = to)); applyGains(); renderTracks(); };
@@ -1938,15 +1989,16 @@ function trackRow(name, members, sub, open) {
     label = el("div", "name-row"); label.append(nm, opts);
     last = el("span"); // no download for the click alone
     const bpb = bpbButton(); bpb.set([2, 3, 4, 6].map((k) => ({ v: k, t: k + "/4" })), t.bpb);
-    const sh = mkBtn("Shift accent", () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = `Accent on ${t.offset + 1}`; paintSave(); });
-    sh.className = "tog"; sh.textContent = t.offset ? `Accent on ${t.offset + 1}` : "Shift accent";
+    const accentOn = () => tr("Accent on {n}", { n: t.offset + 1 });
+    const sh = mkBtn(tr("Shift accent"), () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = accentOn(); paintSave(); });
+    sh.className = "tog"; sh.textContent = t.offset ? accentOn() : tr("Shift accent");
     opts.append(bpb.btn, sh);
-    if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
+    if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = tr("no steady beat found"); }
   } else if (!group && !VOCAL_TRACKS.includes(name)) {
     last = el("span"); // only the vocals have a download of their own; the band comes with the song's export
   } else {
-    if (name === "vocals" && splitting[P.song.id]) nm.querySelector("small").textContent = splitting[P.song.id];
-    last = el("button", "dl"); last.type = "button"; last.title = `Download ${group ? "the vocals" : TRACK_TITLES[name] || name} only (MP3)`; last.setAttribute("aria-label", last.title);
+    if (name === "vocals" && splitting[P.song.id]) nm.querySelector("small").textContent = tr(...splitting[P.song.id]);
+    last = el("button", "dl"); last.type = "button"; last.title = tr("Download {what} only (MP3)", { what: tr(group ? "the vocals" : TRACK_TITLES[name] || name) }); last.setAttribute("aria-label", last.title);
     last.append(icon("download"));
     last.onclick = () => exportMix(members.map((k) => ({ name: k, gain: 1 })), null, last);
   }
@@ -1961,13 +2013,13 @@ function trackRow(name, members, sub, open) {
 }
 async function exportMix(tracks, click, btn) {
   const state = $("#pExportState");
-  if (!tracks.length && !click) { state.textContent = "Turn on at least one track."; return; }
-  btn.disabled = true; state.textContent = "Mixing the MP3…";
+  if (!tracks.length && !click) { say(state, "Turn on at least one track."); return; }
+  btn.disabled = true; say(state, "Mixing the MP3…");
   try {
     const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click, key: P.key }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
-    state.textContent = "Saved “" + (await saveDownload(r, "export.mp3")) + "” to your downloads.";
-  } catch (e) { state.textContent = e.message; }
+    say(state, "Saved “{name}” to your downloads.", { name: await saveDownload(r, "export.mp3") });
+  } catch (e) { say(state, e.message); }
   btn.disabled = false;
 }
 // A file the server sent as a download, saved under the name it gave (Content-Disposition). Returns that name.
@@ -2050,7 +2102,7 @@ async function loadKey(m, n) {
     if (!still()) return;
     P.shifted = { n, bufs }; P.keyProg = null; applyKey(n);
     document.querySelectorAll(".keyctl").forEach((box) => box.pick.close()); // its list stayed open to show it coming along
-  } catch (e) { say(null, e instanceof TypeError ? "Couldn’t reach the server." : e.message); }
+  } catch (e) { say(null, e instanceof TypeError ? "Couldn’t reach the server." : e.message); } // kept in English: paintKey translates
   finally { if (P.song === m && P.keyJob && P.keyJob.n === n) P.keyJob = null; }
 }
 // Key n's buffers in place: the shifted tracks and the original drums, or all the originals for 0. While playing, the
@@ -2081,21 +2133,22 @@ function swapSources() {
 // Lower −1 to −6, each with how far it is from the original: in grey where it sounds natural, fainter from
 // KEY_WARN on, which the list's footnote explains (and the note beside the control, once chosen). Picking one that
 // isn't rendered yet keeps the list open, a ring filling up where its tick will be; the button counts too.
-const keyFoot = () => [el("b", null, `±${KEY_WARN}`), " or more semitones can sound processed."];
+const keyFoot = () => { const [a, b] = tr("{n} or more semitones can sound processed.").split("{n}"); return [a, el("b", null, `±${KEY_WARN}`), b]; };
 function keyItems(m, want) {
   const items = [];
   for (let n = KEYS; n >= -KEYS; n--) {
-    const k = m && keyAfter(m.key, n), name = k ? keyName(k) : n ? `${keySign(n)} semitones` : "Original key";
+    const k = m && keyAfter(m.key, n), name = k ? keyName(k) : n ? tr("{n} semitones", { n: keySign(n) }) : tr("Original key");
     const busy = n === want && P.keyProg != null, pct = busy ? `${Math.round(P.keyProg * 100)}%` : "";
-    items.push({ v: n, t: name, side: n ? keySign(n) : "original", tone: !n ? "" : Math.abs(n) >= KEY_WARN ? "faint" : "accent", prog: busy ? P.keyProg : null,
-      g: n > 0 ? "Higher" : n < 0 ? "Lower" : "",
-      btn: busy ? `${name} · ${pct}` : n && k ? `${name} (${keySign(n)})` : name, full: busy ? `Changing key… ${pct}` : n && k ? `Originally ${keyName(m.key)}` : "" });
+    items.push({ v: n, t: name, side: n ? keySign(n) : tr("original"), tone: !n ? "" : Math.abs(n) >= KEY_WARN ? "faint" : "accent", prog: busy ? P.keyProg : null,
+      g: n > 0 ? tr("Higher") : n < 0 ? tr("Lower") : "",
+      btn: busy ? `${name} · ${pct}` : n && k ? `${name} (${keySign(n)})` : name,
+      full: busy ? tr("Changing key… {pct}", { pct }) : n && k ? tr("Originally {key}", { key: keyName(m.key) }) : "" });
   }
   return items;
 }
 function paintKey() {
   const n = P.keyWant, items = keyItems(P.song, n);
-  const note = P.keyErr ? P.keyNote : Math.abs(n) >= KEY_WARN ? `${KEY_WARN} or more semitones can sound processed.` : "";
+  const note = P.keyErr ? tr(P.keyNote) : Math.abs(n) >= KEY_WARN ? tr("{n} or more semitones can sound processed.", { n: KEY_WARN }) : "";
   document.querySelectorAll(".keyctl").forEach((box) => {
     box.pick.set(items, n);
     box.note.textContent = box.note.title = note; box.note.classList.toggle("err", P.keyErr); box.note.classList.toggle("warn", !P.keyErr && !!note);
@@ -2114,11 +2167,11 @@ function paintKey() {
 
 // Lead and backing vocals. A song added before they were split gets split when it opens (about a minute); its vocal
 // track says so meanwhile, then the song reopens with the two tracks. Without the lead model it keeps one vocal track.
-const splitting = {}, splitTried = new Set(); // song id -> what its vocal track says while the split runs; tried once per visit
+const splitting = {}, splitTried = new Set(); // song id -> what its vocal track says while the split runs ([English, vars]); tried once per visit
 async function autoSplit(m) {
   if (m.split || !m.stems.includes("vocals") || splitTried.has(m.id)) return;
   splitTried.add(m.id);
-  splitting[m.id] = "splitting into lead and backing…";
+  splitting[m.id] = ["splitting into lead and backing…"];
   try { watchJob(await postJob(`/api/library/${m.id}/split`), "split", m.id); }
   catch (e) { delete splitting[m.id]; } // the lead model isn't installed: stay with one vocal track
   if (P.song === m) renderTracks();
@@ -2158,7 +2211,7 @@ async function saveKeep(next) {
     if (!r.ok) throw new Error(j.error || "Couldn’t save that.");
     m.keep = j.keep;
     if (P.song === m) { P.keep = j.keep; applyGains(); paintKeeps(); }
-  } catch (e) { $("#pExportState").textContent = e.message; }
+  } catch (e) { say($("#pExportState"), e.message); }
 }
 // The song's mix as you've set it: each track's volume, mute and solo, and the click's. Save (or Ctrl+S) keeps it with
 // the song and it's put back when the song opens; the button is live while there's something new to save.
@@ -2183,7 +2236,7 @@ async function saveMix() {
     if (!r.ok) throw new Error(j.error || "Couldn’t save the mix.");
     m.mix = j.mix;
     if (P.song === m) savedMix = JSON.stringify(mix);
-  } catch (e) { $("#pExportState").textContent = e.message; }
+  } catch (e) { say($("#pExportState"), e.message); }
   paintSave();
 }
 // Over each track's waveform: an × on each kept part (shown while you point at it) that lets it go, and over a stretch
@@ -2196,13 +2249,13 @@ function paintKeeps() {
     box.replaceChildren();
     for (const [a, b] of keepParts(name)) {
       const part = span("part", a, b), x = el("button", "x");
-      x.type = "button"; x.title = `Stop playing ${fmtTime(a)}–${fmtTime(b)} while muted`; x.setAttribute("aria-label", x.title); x.append(icon("close"));
+      x.type = "button"; x.title = tr("Stop playing {a}–{b} while muted", { a: fmtTime(a), b: fmtTime(b) }); x.setAttribute("aria-label", x.title); x.append(icon("close"));
       x.onclick = () => dropKeep(name, a, b);
       part.append(x); box.append(part);
     }
     if (P.tsel && P.tsel.name === name) {
-      const keep = el("button", "keep", "Keep playing here"), { a, b } = P.tsel;
-      keep.type = "button"; keep.title = "This stretch plays even while the track is muted";
+      const keep = el("button", "keep", tr("Keep playing here")), { a, b } = P.tsel;
+      keep.type = "button"; keep.title = tr("This stretch plays even while the track is muted");
       keep.onclick = () => addKeep(name, a, b);
       box.append(keep);
       const half = keep.offsetWidth / 2; // in the middle of the stretch, kept inside the waveform
@@ -2277,8 +2330,8 @@ function initWave() {
   wave.addEventListener("pointercancel", () => { down = false; endScrub(); });
 }
 function initStems() {
-  $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };
-  $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { $("#sGpuState").textContent = e.message; $("#sGpuBtn").disabled = false; } };
+  $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { say($("#sInstallState"), e.message); $("#sInstallBtn").disabled = false; } };
+  $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { say($("#sGpuState"), e.message); $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
   $("#s6").checked = store.get("sixStems", false);
   $("#s6").onchange = (e) => store.set("sixStems", e.target.checked);
@@ -2304,7 +2357,7 @@ function initStems() {
   const v = $("#pVideo");
   v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
   v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));
-  v.addEventListener("error", () => { if (!v.getAttribute("src")) return; $("#pVideoWait").classList.add("err"); $("#pVideoWait").textContent = "Couldn’t load the video."; });
+  v.addEventListener("error", () => { if (!v.getAttribute("src")) return; $("#pVideoWait").classList.add("err"); say($("#pVideoWait"), "Couldn’t load the video."); });
   $("#sFile").onchange = (e) => { submitFile(e.target.files[0]); e.target.value = ""; };
   const drop = $("#sDrop");
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
@@ -2435,7 +2488,7 @@ function renderPhrases() {
   K.phrases.forEach((p, i) => {
     const b = el("button"); b.type = "button"; b.tabIndex = -1;
     b.style.left = (p.t0 / dur) * 100 + "%"; b.style.width = ((p.t1 - p.t0) / dur) * 100 + "%";
-    b.title = `Phrase ${i + 1} · ${fmtTime(p.t0)}`; b.setAttribute("aria-label", b.title);
+    b.title = tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) }); b.setAttribute("aria-label", b.title);
     b.dataset.i = i; strip.append(b);
   });
   strip.append(el("i", "head"));
@@ -2444,7 +2497,7 @@ function renderPhrases() {
 function paintPhrases() {
   const n = K.phrases.length, key = `${K.ph}|${K.loop}`;
   const w = Math.max(2, String(n).length); // 01 / 31: zero-padded, so the strip beside it doesn't shift
-  setText("kPh", n ? `Phrase ${K.ph == null ? "–".repeat(w) : String(K.ph + 1).padStart(w, "0")} / ${n}` : "No phrases");
+  setText("kPh", n ? tr("Phrase {n} / {total}", { n: K.ph == null ? "–".repeat(w) : String(K.ph + 1).padStart(w, "0"), total: n }) : tr("No phrases"));
   $("#kPrev").disabled = !n || K.ph === 0; $("#kNext").disabled = !n || K.ph == null || K.ph === n - 1;
   $("#kLoop").disabled = !n;
   if (K.painted === key) return;
@@ -2469,14 +2522,15 @@ function renderCountIn(sn) {
   let e = null;
   if (K.on && K.cue != null) {
     const p = K.phrases[K.cue];
-    if (p && sn < p.t0) e = { kind: `Phrase ${K.cue + 1}`, t: p.t0, counts: p.counts, cue: true }; else K.cue = null;
+    if (p && sn < p.t0) e = { kind: tr("Phrase {n}", { n: K.cue + 1 }), t: p.t0, counts: p.counts, cue: true }; else K.cue = null;
   }
   if (!e && K.on) e = K.entries.find((x) => sn >= x.from + 0.5 && sn < x.t);
   if (!e) { box.hidden = true; return; }
   let n = 0;
   e.counts.forEach((c, i) => { if (sn >= c) n = e.counts.length - i; });
   box.hidden = false;
-  setText("countLbl", n || e.cue ? e.kind : `${e.kind} · vocals in ${Math.ceil(e.t - sn)} s`);
+  const kind = e.cue ? e.kind : tr(e.kind); // Intro, Break (a phrase's comes translated)
+  setText("countLbl", n || e.cue ? kind : tr("{kind} · vocals in {s} s", { kind, s: Math.ceil(e.t - sn) }));
   setText("countNum", n ? String(n) : "");
   const dots = $("#countDots"), N = e.counts.length, done = n ? N - n + 1 : 0, key = `${N}/${done}`;
   if (dots.dataset.key === key) return;
@@ -2494,10 +2548,10 @@ function songView(snap) {
 // lead vocal and reads its melody: about a minute) and shows any error. A melody that's ready arrives in a moment, so
 // the button only says so after half a second, rather than flashing a long label.
 async function singSong(m, btn) {
-  const lbl = btn && (btn.querySelector(".txt") || btn), was = lbl && lbl.textContent;
-  const say = (text) => { if (lbl) lbl.textContent = text; };
+  const lbl = btn && (btn.querySelector(".txt") || btn), was = "Practice"; // what both its buttons say
+  const show = (text) => { if (lbl) say(lbl, text); };
   if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
-  const slow = setTimeout(() => say("Reading the melody… (up to a minute the first time)"), 500);
+  const slow = setTimeout(() => show("Reading the melody… (up to a minute the first time)"), 500);
   let mel;
   try {
     if (!P.song || P.song.id !== m.id) await openSong(m);
@@ -2505,25 +2559,25 @@ async function singSong(m, btn) {
     mel = await r.json();
     if (!r.ok) throw new Error(mel.error || "Couldn’t read the melody.");
   } catch (e) {
-    $("#pExportState").textContent = e.message; say(e.message);
-    setTimeout(() => say(was), 4000);
+    say($("#pExportState"), e.message); show(e.message);
+    setTimeout(() => show(was), 4000);
     return;
   } finally { clearTimeout(slow); if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
-  say(was);
+  show(was);
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = 0; K.on = true; // bars as sung; "Bars" moves them an octave
   K.entries = songEntries(K.notes, m.beats, m.bpm);
   K.phrases = songPhrases(K.notes, m.beats, m.bpm, songDur()); K.cue = null; setLoop(false); renderPhrases();
   songEvs(); songView(true);
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
   renderTracks(); applyGains();
-  octPick.set(OCT_ITEMS, K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
+  octPick.set(octItems(), K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute)); $("#kClickVol").value = P.tracks.click.vol;
   $("#kClick").disabled = $("#kClickVol").disabled = !(m.beats && m.beats.length);
   setText("playTitle", m.title);
   loadTakes(m);
   go("practice");
 }
-function showMicSet(on) { if (!on) { micPick?.close(); namesPick?.close(); } $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
+function showMicSet(on) { if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); } $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
 function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").hidden = true; }
@@ -2535,7 +2589,7 @@ function songToggle() {
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
 function initSing() {
   octPick = makePick($("#kOct"), "Octave of the note bars", (v) => { K.oct = v; songEvs(); });
-  octPick.set(OCT_ITEMS, K.oct);
+  octPick.set(octItems(), K.oct);
   $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
   $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== guideName() && n !== "click") t.vol = K.bandVol; applyGains(); };
   resetOnDblClick($("#kGuide"), 0.5); resetOnDblClick($("#kBand"), 1);
@@ -2576,6 +2630,7 @@ function initSing() {
   if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
   namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m))); });
   namesPick.set([{ v: "en", t: "C D E (C4)" }, { v: "ko", t: "Do Re Mi" }], S.names);
+  langPick = makePick($("#lang"), "Language", setLang); // set by setLang
 }
 
 // ---------- takes: you, recorded in Practice ----------
@@ -2620,7 +2675,7 @@ async function setRec(on) {
   if (on === R.armed) return;
   if (!on) { recOff(); return; }
   if (!micOn && !(await startMic())) return; // the notice says why
-  try { await recInit(); } catch (e) { notice("This browser can’t record takes. A current Chrome, Edge or Firefox can."); return; }
+  try { await recInit(); } catch (e) { notice(tr("This browser can’t record takes. A current Chrome, Edge or Firefox can.")); return; }
   if (!micOn || view !== "practice") return; // turned off, or left, meanwhile
   R.armed = true;
   if (P.playing) recBegin(Math.max(ac.currentTime + 0.05, P.startAt));
@@ -2633,7 +2688,7 @@ function recOff() {
   paintRec();
 }
 function recLatency() {
-  const tr = micStream && micStream.getAudioTracks()[0], s = (tr && tr.getSettings && tr.getSettings()) || {};
+  const tk = micStream && micStream.getAudioTracks()[0], s = (tk && tk.getSettings && tk.getSettings()) || {};
   return Math.min(1, Math.max(0, (ac.baseLatency || 0) + (ac.outputLatency || 0) + (+s.latency || 0)));
 }
 // A take starts with the song (at: a context time the song has started by)…
@@ -2689,7 +2744,7 @@ function wavFile(x, sr) {
 function paintRec() {
   const b = $("#kRec");
   b.setAttribute("aria-pressed", String(R.armed)); b.classList.toggle("on", !!R.cap);
-  b.title = R.armed ? "Stop recording (R)" : "Record yourself as you sing (R)";
+  b.title = tr(R.armed ? "Stop recording (R)" : "Record yourself as you sing (R)");
 }
 
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
@@ -2721,7 +2776,7 @@ async function takeSave(c, wav) {
     if (!r.ok) throw new Error(j.error || "Couldn’t save the take.");
     saved = j;
   } catch (e) {
-    t.saving = false; t.failed = e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message;
+    t.saving = false; t.failed = e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message; // English: takeRow translates
     t.retry = () => takeSave(c, wav); // the recording stays here until it's saved or dismissed
   }
   if (T.song !== c.song) return;
@@ -2729,18 +2784,18 @@ async function takeSave(c, wav) {
   renderTakes();
 }
 
-// Dates in English, like the rest of the page, whatever the system's language
-const longDate = (d) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
+// Dates in the page's language, whatever the system's
+const longDate = (d) => d.toLocaleDateString(locale(), { weekday: "short", month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
 const daysAgo = (d) => { const a = new Date(d), b = new Date(); a.setHours(12, 0, 0, 0); b.setHours(12, 0, 0, 0); return Math.round((b - a) / 864e5); };
-const dayName = (d) => ["Today", "Yesterday"][daysAgo(d)] || longDate(d);
-const fmtLen = (d) => (d < 59.5 ? `${Math.round(d)} s` : fmtTime(d));
+const dayName = (d) => tr(["Today", "Yesterday"][daysAgo(d)]) || longDate(d);
+const fmtLen = (d) => (d < 59.5 ? tr("{n} s", { n: Math.round(d) }) : fmtTime(d));
 // The part of the song a take is of: the phrases whose middle it covers, or its times where it has none.
 function takePart(t) {
   const end = t.start + t.duration, ps = [];
   K.phrases.forEach((p, i) => { const mid = (p.t0 + p.t1) / 2; if (mid >= t.start && mid <= end) ps.push(i + 1); });
   const range = `${fmtTime(t.start)}–${fmtTime(end)}`, len = fmtLen(t.duration);
   if (!ps.length) return { what: range, more: len };
-  return { what: ps.length === 1 ? `Phrase ${ps[0]}` : `Phrases ${ps[0]}–${ps[ps.length - 1]}`, more: `${range} · ${len}` };
+  return { what: ps.length === 1 ? tr("Phrase {n}", { n: ps[0] }) : tr("Phrases {a}–{b}", { a: ps[0], b: ps[ps.length - 1] }), more: `${range} · ${len}` };
 }
 // Takes by day, newest first.
 function renderTakes() {
@@ -2772,29 +2827,29 @@ function takeRow(t) {
   row.dataset.id = t.id;
   const play = el("button", "tk-play");
   play.type = "button";
-  if (t.failed) { play.append(icon("retry")); play.title = "Try saving it again"; play.setAttribute("aria-label", play.title); play.onclick = t.retry; }
+  if (t.failed) { play.append(icon("retry")); play.title = tr("Try saving it again"); play.setAttribute("aria-label", play.title); play.onclick = t.retry; }
   else { play.append(ppIcon()); play.disabled = !!t.saving; play.onclick = () => listenTake(t); }
   const what = el("span", "tk-part");
-  what.append(el("b", null, t.saving ? "Saving take…" : t.failed ? "Couldn’t save this take" : part.what), el("small", null, t.failed || part.more));
+  what.append(el("b", null, t.saving ? tr("Saving take…") : t.failed ? tr("Couldn’t save this take") : part.what), el("small", null, t.failed ? tr(t.failed) : part.more));
   const dl = el("button", "dl"), del = el("button", "dl tk-del");
   dl.type = del.type = "button"; dl.append(icon("download")); del.append(icon("trash"));
   dl.disabled = !!(t.saving || t.failed); del.disabled = !!t.saving;
-  dl.title = "Download as WAV, mixed as set above"; dl.setAttribute("aria-label", "Download this take as WAV");
-  del.title = t.failed ? "Dismiss" : "Delete this take"; del.setAttribute("aria-label", del.title);
+  dl.title = tr("Download as WAV, mixed as set above"); dl.setAttribute("aria-label", tr("Download this take as WAV"));
+  del.title = tr(t.failed ? "Dismiss" : "Delete this take"); del.setAttribute("aria-label", del.title);
   dl.onclick = () => takeWav(t);
   del.onclick = () => takeDelete(t);
   row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what,
-    el("span", "tk-confirm", "Really delete?"), dl, del, el("i", "tk-prog"));
+    el("span", "tk-confirm", tr("Really delete?")), dl, del, el("i", "tk-prog"));
   return row;
 }
 const takeRowOf = (id) => document.querySelector(`#tkList .take[data-id="${id}"]`);
 // A word on a take where its part's times are (what's happening, or an error for a few seconds); text null puts them back.
-function takeNote(id, text, err) {
+function takeNote(id, text, err, vars) {
   const s = takeRowOf(id)?.querySelector(".tk-part small");
   if (!s) return;
   clearTimeout(s.timer);
   if (!("was" in s.dataset)) s.dataset.was = s.textContent;
-  s.textContent = text ?? s.dataset.was; s.classList.toggle("err", !!err);
+  s.textContent = text == null ? s.dataset.was : tr(text, vars); s.classList.toggle("err", !!err);
   if (text == null) delete s.dataset.was;
   if (err) s.timer = setTimeout(() => takeNote(id, null), 4000);
 }
@@ -2803,7 +2858,7 @@ function takeNote(id, text, err) {
 function disarmTakes() {
   document.querySelectorAll("#tkList .take.armed").forEach((r) => {
     r.classList.remove("armed");
-    const b = r.querySelector(".tk-del"); b.title = "Delete this take"; b.setAttribute("aria-label", b.title);
+    const b = r.querySelector(".tk-del"); b.title = tr("Delete this take"); b.setAttribute("aria-label", b.title);
   });
 }
 async function takeDelete(t) {
@@ -2811,7 +2866,7 @@ async function takeDelete(t) {
   if (t.failed) { T.list = T.list.filter((x) => x !== t); renderTakes(); return; }
   if (!row.classList.contains("armed")) {
     disarmTakes(); row.classList.add("armed");
-    del.title = "Click again to delete"; del.setAttribute("aria-label", "Really delete this take?");
+    del.title = tr("Click again to delete"); del.setAttribute("aria-label", tr("Really delete this take?"));
     return;
   }
   disarmTakes(); del.disabled = true;
@@ -2843,7 +2898,7 @@ async function listenTake(t) {
   const pos = T.at && T.at.id === t.id ? T.at.pos : 0, p = { id: t.id, take: t };
   T.play = p; paintListen();
   // usually a moment; a take in a key not played yet waits for its tracks to be made (about 10 s)
-  const slow = setTimeout(() => takeNote(t.id, t.key === P.key ? "Loading…" : `Getting the band in key ${keySign(t.key)}…`), 400);
+  const slow = setTimeout(() => takeNote(t.id, t.key === P.key ? "Loading…" : "Getting the band in key {n}…", false, { n: keySign(t.key) }), 400);
   let voice, bufs;
   try { [voice, bufs] = await Promise.all([takeVoice(t), takeBand(t.key)]); }
   catch (e) {
@@ -2900,7 +2955,7 @@ function paintListen() {
     const id = row.dataset.id, on = !!T.play && T.play.id === id, paused = !on && !!T.at && T.at.id === id, b = row.querySelector(".tk-play");
     row.classList.toggle("playing", on); row.classList.toggle("paused", paused);
     ppTo(b.querySelector(".pp"), on ? 1 : 0);
-    b.title = on ? "Pause" : paused ? "Play on" : "Play this take with the band"; b.setAttribute("aria-label", b.title);
+    b.title = tr(on ? "Pause" : paused ? "Play on" : "Play this take with the band"); b.setAttribute("aria-label", b.title);
     const t = T.list.find((x) => x.id === id), bar = row.querySelector(".tk-prog");
     if (paused) bar.style.transform = `scaleX(${(T.at.pos / t.duration).toFixed(4)})`;
     else if (!on) bar.style.transform = "scaleX(0)";
@@ -3144,36 +3199,36 @@ function renderHud(now, m) {
   const tgt = activeNote(now), tm = tgt ? Math.round(tgt.midi) : null;
   if (m == null) {
     setText("noteBig", "–");
-    setText("noteSub", micOn || testOsc ? (tgt ? `target ${absName(tm)} · sing now` : "Waiting for sound") : "Mic is off");
+    setText("noteSub", micOn || testOsc ? (tgt ? tr("target {note} · sing now", { note: absName(tm) }) : tr("Waiting for sound")) : tr("Mic is off"));
     $("#needle").style.left = "50%"; $("#needle").style.background = C.muted;
   } else {
     const ref = tgt ? tgt.midi : Math.round(m), c = (m - ref) * 100;
     setText("noteBig", absName(m));
     const hz = mf(m).toFixed(1) + " Hz";
-    const off = Math.abs(c) >= 50 ? `${Math.abs(c / 100).toFixed(1)} st ${c > 0 ? "sharp" : "flat"}` : `${c > 0 ? "+" : ""}${Math.round(c)}¢`;
-    setText("noteSub", tgt ? `target ${absName(tm)} · ${off}` : `${hz} · ${off}`);
+    const off = Math.abs(c) >= 50 ? tr(c > 0 ? "{n} st sharp" : "{n} st flat", { n: Math.abs(c / 100).toFixed(1) }) : `${c > 0 ? "+" : ""}${Math.round(c)}¢`;
+    setText("noteSub", tgt ? tr("target {note} · {off}", { note: absName(tm), off }) : `${hz} · ${off}`);
     const k = Math.max(-1, Math.min(1, c / 60));
     const n = $("#needle"); n.style.left = (50 + k * 46) + "%";
     n.style.background = Math.abs(c) <= 10 ? C.good : Math.abs(c) <= 25 ? C.warn : C.bad;
   }
   renderKeys(tm, m);
-  const rec = R.cap ? `Recording ${fmtTime(Math.max(0, songPos() - R.cap.start))}` : "Practice";
-  setText("hudRep", `${rec} · ${K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung"}`);
+  const rec = R.cap ? tr("Recording {t}", { t: fmtTime(Math.max(0, songPos() - R.cap.start)) }) : tr("Practice");
+  setText("hudRep", `${rec} · ${tr(K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung")}`);
   $("#hudRep").classList.toggle("rec", !!R.cap);
-  setText("hudHow", `Grey line: the original singer. ${ACCENTS[accent]}: you.`);
+  setText("hudHow", tr("Grey line: the original singer. {colour}: you.", { colour: tr(ACCENTS[accent]) }));
 }
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
 function renderMic() {
   const b = $("#micBtn");
   if (!b.querySelector(".ico")) { const on = icon("mic"), off = icon("micOff"); on.classList.add("if-on"); off.classList.add("if-off"); $(".mic-ico").append(on, off); }
   b.classList.toggle("on", micOn);
-  b.setAttribute("aria-pressed", String(micOn)); b.title = micOn ? "Turn the mic off" : "Turn the mic on";
+  b.setAttribute("aria-pressed", String(micOn)); b.title = tr(micOn ? "Turn the mic off" : "Turn the mic on");
 }
 // Why the mic didn't start: over the stage in Practice, else in a panel under the mic chip, for a few seconds.
 function notice(msg) {
   const practice = view === "practice", box = practice ? $("#overlay") : $("#micNote");
-  box.replaceChildren(el(practice ? "h2" : "b", null, "Can’t use the microphone"), el("p", null, msg));
-  if (practice) box.append(el("p", null, "The song still plays — you just won’t see your own pitch."));
+  box.replaceChildren(el(practice ? "h2" : "b", null, tr("Can’t use the microphone")), el("p", null, msg));
+  if (practice) box.append(el("p", null, tr("The song still plays — you just won’t see your own pitch.")));
   box.hidden = false;
   clearTimeout(notice.timer); notice.timer = setTimeout(() => { box.hidden = true; }, 4000);
 }
@@ -3274,7 +3329,216 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-renderMic(); initStems(); initSing(); route();
+// ---------- language switch ----------
+// The page's own text and labels, registered with say()'s in English: each text node, title, aria-label and
+// placeholder with an entry in KO_TEXT (a text node keeps the spaces around it: [before, after]), and an element
+// marked data-html as a whole, for a sentence with a link or code in it (keyed by its text; its English HTML kept).
+function initLang() {
+  (function scan(node) {
+    for (const n of node.childNodes) {
+      if (n.nodeType === 3) {
+        const k = n.nodeValue.trim();
+        if (KO_TEXT[k]) said.set(n, { "": [k, null, n.nodeValue, n.nodeValue.split(k)] });
+      } else if (n.nodeType === 1 && n.tagName !== "SCRIPT") {
+        for (const a of ["title", "aria-label", "placeholder"]) { const v = n.getAttribute(a); if (KO_TEXT[v]) said.set(n, { ...said.get(n), [a]: [v, null, v] }); }
+        if (n.hasAttribute("data-html")) said.set(n, { ...said.get(n), html: [n.textContent.replace(/\s+/g, " ").trim(), null, n.innerHTML, n.innerHTML] });
+        else scan(n);
+      }
+    }
+  })(document.body);
+  setLang(store.get("lang", /^ko\b/i.test(navigator.language || "") ? "ko" : "en"));
+}
+// Everything said, again in the language now chosen, where it still shows what was said (else something has put
+// other text there since, and says that again itself)
+function resay() {
+  for (const [n, at] of said) {
+    if (!n.isConnected) { said.delete(n); continue; }
+    for (const [a, e] of Object.entries(at)) {
+      const [en, vars, was, pad] = e;
+      if (!en || (a === "html" ? n.innerHTML : a ? n.getAttribute(a) : n.textContent) !== was) continue;
+      if (a === "html") { n.innerHTML = lang === "ko" ? KO_TEXT[en] : pad; e[2] = n.innerHTML; continue; }
+      const t = pad ? pad[0] + tr(en) + pad[1] : tr(en, vars);
+      if (a) n.setAttribute(a, t); else n.textContent = t;
+      e[2] = t;
+    }
+  }
+}
+// English or Korean, from the settings: the page says everything again in it, in place (the view, the open song and
+// what's playing stay as they are). What's drawn from data is drawn again; the rest is said again (resay).
+const LANGS = [{ v: "en", t: "English" }, { v: "ko", t: "한국어" }]; // each named in its own
+function setLang(v) {
+  lang = v === "ko" ? "ko" : "en";
+  store.set("lang", lang); document.documentElement.lang = lang;
+  langPick.set(LANGS, lang);
+  resay(); closeMenu();
+  for (const p of picks) p.relabel();
+  octPick.set(octItems(), K.oct); paintKey(); listMics();
+  document.querySelectorAll('input[type="range"]').forEach((s) => { if (s.ondblclick) s.title = tr("Double-click to reset"); });
+  renderMic(); paintRec(); paintPlay($("#pPlay"), P.playing); renderStart();
+  if (P.song) { paintMeta(); renderTracks(); paintVideoBtn(); }
+  if (K.song) { renderPhrases(); renderTakes(); }
+  if ($("#sLib").children.length) renderLibrary();
+  if (infoShown) drawInfo();
+}
+
+// ---------- Korean ----------
+// Every string the page shows, by its English. Sentences in 해요체, buttons and labels as short nouns. Terms, the way
+// Korean musicians say them: 키, 반음, 장조/단조, 소절 (a phrase), 반주 (the band), 리드/백킹 보컬, 메트로놈 (the click),
+// 음정 바 (Practice's note bars), 테이크, 스템. Note letters stay as they are (G♯ 단조).
+// What the server says (stems.py, server.py): job stages and errors. {x} in these stands for anything, matched by pattern.
+const KO_SERVER = {
+  "Waiting": "기다리는 중", "Done": "완료", "Cancelled": "취소됨",
+  "Unknown job.": "없는 작업이에요.", "Unknown song.": "없는 곡이에요.", "Unknown take.": "없는 테이크예요.", "Not found.": "찾을 수 없어요.",
+  "Something went wrong. Check the terminal window for details.": "문제가 생겼어요. 자세한 내용은 터미널 창을 확인하세요.",
+  "Please send a file under {n} MB.": "{n} MB보다 작은 파일을 보내 주세요.",
+  "Installing PyTorch for your NVIDIA GPU ({idx}, ≈2–3 GB)…": "NVIDIA GPU용 PyTorch 설치하는 중 ({idx}, ≈2–3 GB)…",
+  "Downloading and installing (≈1–2 GB, a few minutes)…": "내려받아 설치하는 중 (≈1–2 GB, 몇 분 걸려요)…",
+  "No CUDA build of PyTorch matched this system. Separation will keep using the CPU.": "이 시스템에 맞는 CUDA용 PyTorch가 없어요. 분리는 계속 CPU로 해요.",
+  "Installing Demucs, librosa and yt-dlp…": "Demucs, librosa, yt-dlp 설치하는 중…",
+  "Installing failed. The last lines of the log above say why.": "설치하지 못했어요. 위 로그의 마지막 줄에 이유가 있어요.",
+  "Send the new title as text.": "새 제목을 텍스트로 보내 주세요.", "A song needs a title.": "곡 제목을 입력하세요.",
+  "Paste a full link that starts with https://": "https://로 시작하는 전체 링크를 붙여넣으세요.",
+  "Couldn’t read that audio.": "그 오디오를 읽지 못했어요.",
+  "MP3 encoding failed: {why}": "MP3로 인코딩하지 못했어요: {why}",
+  "Couldn’t download that link. {why}": "그 링크를 내려받지 못했어요. {why}",
+  "The download finished but no audio file was saved.": "내려받기는 끝났지만 오디오 파일이 저장되지 않았어요.",
+  "This song wasn’t added from a link, so there’s no video to get.": "링크로 추가한 곡이 아니라서 받을 영상이 없어요.",
+  "Getting the video": "영상 받는 중", "Couldn’t get the video. {why}": "영상을 받지 못했어요. {why}", "That link has no video.": "그 링크에는 영상이 없어요.",
+  "Stem tools aren’t installed yet.": "스템 도구가 아직 설치되지 않았어요.",
+  "Waiting for the previous song to finish": "앞 곡이 끝나길 기다리는 중", "Getting the audio": "오디오 받는 중", "Reading the audio": "오디오 읽는 중",
+  "The audio is shorter than 3 seconds.": "오디오가 3초보다 짧아요.", "Songs up to 20 minutes, please.": "20분까지의 곡만 넣을 수 있어요.",
+  "Loading the separation model ({model})": "분리 모델 불러오는 중 ({model})", "Separating on {dev}": "{dev}로 분리하는 중",
+  "Finding the beat": "박자 찾는 중", "Finding the key": "키 찾는 중", "Reading the vocal melody": "보컬 멜로디 읽는 중", "Saving tracks": "트랙 저장하는 중",
+  "Downloading the lead-vocal model (first time only, ≈200 MB)": "리드 보컬 모델 내려받는 중 (처음 한 번만, ≈200 MB)",
+  "Taking out backing vocals and chops": "백킹 보컬과 보컬 찹 걸러내는 중",
+  "The lead-vocal model returned {sr} Hz audio.": "리드 보컬 모델이 {sr} Hz 오디오를 돌려줬어요.",
+  "This song has no vocal track.": "이 곡에는 보컬 트랙이 없어요.", "The lead-vocal model isn’t installed.": "리드 보컬 모델이 설치되지 않았어요.",
+  "Each part is a start and an end in seconds.": "구간마다 시작과 끝을 초 단위로 보내 주세요.",
+  "Send the kept parts as {track: [[start, end], …]}.": "남길 구간을 {track: [[start, end], …]} 형식으로 보내 주세요.",
+  "Send the mix as {tracks: {name: {vol, mute, solo}}, click: {…}}.": "믹스를 {tracks: {name: {vol, mute, solo}}, click: {…}} 형식으로 보내 주세요.",
+  "Each track's mix is {vol, mute, solo}.": "트랙마다 믹스는 {vol, mute, solo} 형식이에요.", "A track's volume is a number.": "트랙 볼륨은 숫자여야 해요.",
+  "This song has no vocal track to practice with.": "이 곡에는 연습할 보컬 트랙이 없어요.",
+  "The key change is a whole number of semitones.": "키는 반음 단위로만 바꿀 수 있어요.",
+  "The key goes up or down by {n} semitones at most.": "키는 최대 {n}반음까지 올리거나 내릴 수 있어요.",
+  "This copy of ffmpeg can’t change the key (it has no rubberband filter).": "이 ffmpeg로는 키를 바꿀 수 없어요 (rubberband 필터가 없어요).",
+  "Changing the key failed: {why}": "키를 바꾸지 못했어요: {why}", "Changing key": "키 바꾸는 중",
+  "Turn on at least one track to export.": "내보내려면 트랙을 하나 이상 켜세요.",
+  "That take is gone.": "그 테이크는 이제 없어요.", "The take came without its {key}.": "테이크에 {key} 값이 없어요.", "The take's {key} is out of range.": "테이크의 {key} 값이 범위를 벗어났어요.",
+  "Send the take as a WAV file.": "테이크를 WAV 파일로 보내 주세요.", "Send the take as 16-bit PCM.": "테이크를 16비트 PCM으로 보내 주세요.",
+  "Takes under {n} seconds aren’t kept.": "{n}초보다 짧은 테이크는 남기지 않아요.", "Saving the take failed: {why}": "테이크를 저장하지 못했어요: {why}",
+  "Each volume is a number.": "볼륨은 숫자여야 해요.", "Each volume is between 0 and 4.": "볼륨은 0에서 4 사이여야 해요.",
+  "4 stems": "스템 4개", "6 stems": "스템 6개", "6 stems (+ guitar, piano)": "스템 6개 (+ 기타, 피아노)",
+};
+const KO_TEXT = Object.assign(Object.create(null), {
+  // header and settings
+  "Microphone": "마이크", "Turn the mic on": "마이크 켜기", "Turn the mic off": "마이크 끄기", "Settings": "설정", "Language": "언어",
+  "Input": "입력", "System default": "시스템 기본값", "Microphone {n}": "마이크 {n}", "Turn on the mic to see each input’s name.": "마이크를 켜면 입력 장치 이름이 보여요.",
+  "Mic sensitivity": "마이크 감도", "Filter out speaker sound": "스피커 소리 걸러내기", "Note names": "음 이름", "Accent colour": "강조 색",
+  "Blue": "파랑", "Violet": "보라", "Pink": "분홍", "Coral": "코랄", "Orange": "주황", "Amber": "앰버", "Green": "초록", "Teal": "청록",
+  "Double-click to reset": "더블클릭하면 처음 값으로",
+  "Can’t use the microphone": "마이크를 쓸 수 없어요", "The song still plays — you just won’t see your own pitch.": "곡은 계속 재생돼요. 내 음정만 보이지 않아요.",
+  "The mic doesn’t work from this address. Open the app at http://localhost instead.": "이 주소에서는 마이크가 작동하지 않아요. http://localhost에서 앱을 여세요.",
+  "Microphone access is blocked. Allow it from the mic icon in the address bar, then try again.": "마이크 사용이 막혀 있어요. 주소창의 마이크 아이콘에서 허용한 뒤 다시 해 보세요.",
+  "No microphone found. Check it’s connected, then try again.": "마이크를 찾지 못했어요. 연결돼 있는지 확인한 뒤 다시 해 보세요.",
+  // library and adding a song
+  "Stems": "스템", "Practice any song": "어떤 곡이든 연습하세요",
+  "Split a song into tracks and practice it phrase by phrase, with your pitch on screen.": "곡을 트랙별로 나누고, 화면에서 내 음정을 보며 한 소절씩 연습하세요.",
+  "Library": "라이브러리", "Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",
+  "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요. 트랙별로 나뉘어 바로 연습할 수 있어요.",
+  "More": "더 보기", "More for {title}": "{title} 더 보기", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
+  "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
+  "no steady beat": "일정한 박자 없음", "{n} tracks": "트랙 {n}개", "major": "장조", "minor": "단조",
+  "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":
+    "Python 서버가 필요해요. OS에 맞는 <code>start-…</code> 파일로 앱을 시작한 뒤 <b>http://localhost:5178</b>에서 다시 여세요.",
+  "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
+  "One-time setup": "처음 한 번 설치",
+  "Stem separation uses Demucs (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.":
+    "스템 분리에는 <a href=\"https://github.com/facebookresearch/demucs\" target=\"_blank\" rel=\"noopener\">Demucs</a>(PyTorch), 박자 분석에는 librosa, YouTube 링크에는 yt-dlp를 써요. 연습 화면의 음정 바는 리드 보컬만으로 만드는데, 이 리드 보컬은 카라오케 모델(audio-separator)이 백킹 보컬과 보컬 찹에서 떼어 내요. 모두 합쳐 1–2 GB를 내려받아 이 앱의 폴더에 설치해요.",
+  "Install stem tools": "스템 도구 설치", "Add a song": "새 곡 추가", "Paste a YouTube link": "YouTube 링크 붙여넣기", "YouTube link": "YouTube 링크", "Separate": "분리",
+  "or choose an audio file · drop it here": "또는 오디오 파일 선택 · 여기로 끌어다 놓기",
+  "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
+  "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
+  "This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).":
+    "이 PC에는 NVIDIA 그래픽 카드가 있지만 지금은 CPU로 분리하고 있어요. GPU로 바꾸면 몇 배 빨라져요 (≈2–3 GB 다운로드).",
+  "This PC has an NVIDIA graphics card, but its driver is too old for GPU separation. Update the NVIDIA driver (nvidia.com/drivers), restart the app, then come back here.":
+    "이 PC에는 NVIDIA 그래픽 카드가 있지만 드라이버가 오래돼서 GPU로 분리할 수 없어요. NVIDIA 드라이버를 업데이트하고 (nvidia.com/drivers) 앱을 다시 시작한 뒤 여기로 돌아오세요.",
+  "Use my NVIDIA GPU": "NVIDIA GPU 쓰기", "Done — restart the app to use the GPU.": "완료. GPU를 쓰려면 앱을 다시 시작하세요.",
+  "Restart the app (close its window and open it again) to switch to the GPU.": "GPU로 바꾸려면 앱을 다시 시작하세요 (창을 닫았다가 다시 여세요).",
+  "Runs on your Apple GPU — about 30 s for a 4-minute song.": "Apple GPU에서 돌아가요. 4분짜리 곡에 30초쯤 걸려요.",
+  "Runs on your NVIDIA GPU{name} — usually under a minute.": "NVIDIA GPU{name}에서 돌아가요. 보통 1분이 안 걸려요.",
+  "Runs on the CPU — a 4-minute song can take several minutes.": "CPU에서 돌아가요. 4분짜리 곡이면 몇 분 걸릴 수 있어요.",
+  "Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.": "사용할 권리가 있는 오디오만 쓰세요. YouTube에서 내려받으면 YouTube 서비스 약관에 어긋날 수 있어요.",
+  "Starting…": "시작하는 중…", "Uploading…": "올리는 중…", "Progress": "진행률", "Cancel": "취소", "Clear": "지우기", "Cancelling…": "취소하는 중…",
+  "The server didn’t answer properly.": "서버가 제대로 답하지 않았어요.", "That didn’t work.": "잘 안 됐어요.", "Couldn’t reach the server.": "서버에 연결하지 못했어요.",
+  "Couldn’t reach the server. Is the app still running?": "서버에 연결하지 못했어요. 앱이 아직 실행 중인가요?",
+  // Info
+  "Studio": "스튜디오", "Practice": "연습", "Reading the song…": "곡 읽는 중…", "Couldn’t read this song.": "이 곡을 읽지 못했어요.",
+  "Source": "원본", "Added {date} · {model}": "{date} 추가 · {model}",
+  "Key": "키", "Tempo": "템포", "Length": "길이", "Vocal range": "보컬 음역", "Tracks": "트랙",
+  "{n} semitone up from {key}": "{key}에서 {n}반음 위", "{n} semitones up from {key}": "{key}에서 {n}반음 위",
+  "{n} semitone down from {key}": "{key}에서 {n}반음 아래", "{n} semitones down from {key}": "{key}에서 {n}반음 아래",
+  "could also be {key}": "{key}일 수도 있어요", "relative major: {key}": "나란한조: {key}", "relative minor: {key}": "나란한조: {key}",
+  "no pitched tracks": "음정 있는 트랙 없음", "not read yet": "아직 읽지 않음", "no steady beat found": "일정한 박자를 찾지 못했어요",
+  "{n} semitones": "{n}반음", " · mostly {lo}–{hi}": " · 주로 {lo}–{hi}",
+  "lead": "리드 보컬", "backing": "백킹 보컬", "vocals": "보컬", "drums": "드럼", "bass": "베이스", "guitar": "기타", "piano": "피아노", "other": "나머지",
+  "Where the melody sits": "멜로디 음역", "Song": "곡", "Lowest": "최저음", "Highest": "최고음",
+  "Play that moment of the vocal track": "보컬 트랙에서 그 순간 듣기", "In the song · {t}": "곡에서 · {t}", "Piano": "피아노",
+  // Studio
+  "Save": "저장", "Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)": "이 곡의 믹스 저장: 볼륨, 음소거, 솔로, 메트로놈 (Ctrl+S)",
+  "Volume": "볼륨", "Export what you hear (MP3)": "들리는 그대로 내보내기 (MP3)", "Get video": "영상 받기", "Hide video": "영상 숨기기", "Show video": "영상 보기",
+  "Loading video…": "영상 불러오는 중…", "Getting the video…": "영상 받는 중…", "Couldn’t load the video.": "영상을 불러오지 못했어요.",
+  "Song overview — click to jump": "곡 전체 파형: 클릭하면 그 위치로 이동", "Play": "재생", "Pause": "일시정지",
+  "Move through the song": "곡 안에서 이동", "Go to start": "처음으로", "Go to start (Home)": "처음으로 (Home)", "Go to end": "끝으로", "Go to end (End)": "끝으로 (End)",
+  "Back 5 seconds": "5초 뒤로", "Forward 5 seconds": "5초 앞으로", "−5 s": "−5초", "+5 s": "+5초", "loading tracks…": "트랙 불러오는 중…",
+  "Vocals": "보컬", "Lead": "리드", "Backing": "백킹", "Lead vocal": "리드 보컬", "Backing vocals": "백킹 보컬", "Drums": "드럼", "Bass": "베이스", "Guitar": "기타", "Other": "나머지", "Click": "메트로놈",
+  "lead and backing": "리드와 백킹", "lead and backing voices": "리드와 백킹 보컬", "the main voice": "메인 보컬", "harmonies, doubles and chops": "화음, 더블링, 보컬 찹",
+  "kit and percussion": "드럼 세트와 타악기", "bass line": "베이스 라인", "guitars": "기타 소리", "piano and keys": "피아노와 건반", "everything else": "그 밖의 모든 소리",
+  "click": "메트로놈", "follows the detected beat": "찾아낸 박자를 따라가요", "click · {bpb}/4 · follows the song’s beat": "메트로놈 · {bpb}/4 · 곡의 박자를 따라가요",
+  "Detected tempo {bpm} BPM": "찾아낸 템포 {bpm} BPM",
+  "Show the vocals as one track": "보컬을 한 트랙으로 보기", "Show lead and backing vocals apart": "리드 보컬과 백킹 보컬 따로 보기",
+  "Mute": "음소거", "Solo": "솔로", "Click on/off": "메트로놈 켜기/끄기", "{name} volume": "{name} 볼륨",
+  "Beats per bar": "마디당 박자 수", "Shift accent": "악센트 옮기기", "Accent on {n}": "{n}박에 악센트",
+  "Download {what} only (MP3)": "{what}만 내려받기 (MP3)", "the vocals": "보컬",
+  "waiting to split into lead and backing…": "리드와 백킹으로 나누길 기다리는 중…", "splitting into lead and backing…": "리드와 백킹으로 나누는 중…",
+  "splitting into lead and backing… {pct}%": "리드와 백킹으로 나누는 중… {pct}%", "Couldn’t split the vocals: {why}": "보컬을 나누지 못했어요: {why}",
+  "Turn on at least one track.": "트랙을 하나 이상 켜세요.", "Mixing the MP3…": "MP3 믹스하는 중…", "Export failed.": "내보내지 못했어요.",
+  "Saved “{name}” to your downloads.": "“{name}” 파일을 다운로드 폴더에 저장했어요.",
+  "Couldn’t save that.": "저장하지 못했어요.", "Couldn’t save the mix.": "믹스를 저장하지 못했어요.",
+  "Stop playing {a}–{b} while muted": "음소거 중에는 {a}–{b}도 재생하지 않기", "Keep playing here": "여기는 계속 재생",
+  "This stretch plays even while the track is muted": "트랙을 음소거해도 이 구간은 재생돼요",
+  // key change
+  "Original key": "원래 키", "original": "원래", "Higher": "높은 키", "Lower": "낮은 키", "Changing key… {pct}": "키 바꾸는 중… {pct}", "Originally {key}": "원래 {key}",
+  "{n} or more semitones can sound processed.": "{n}반음 이상은 소리가 어색할 수 있어요.", "Couldn’t change the key.": "키를 바꾸지 못했어요.",
+  // Practice
+  "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "Guide vocal": "가이드 보컬", "Guide vocal volume": "가이드 보컬 볼륨",
+  "Band": "반주", "Band volume": "반주 볼륨", "Click on/off (follows the beat)": "메트로놈 켜기/끄기 (박자를 따라가요)", "Click volume": "메트로놈 볼륨",
+  "Bars": "음정 바", "Octave of the note bars": "음정 바의 옥타브", "octave down": "한 옥타브 아래", "as sung": "부른 그대로", "octave up": "한 옥타브 위",
+  "Previous phrase": "이전 소절", "Previous phrase (←)": "이전 소절 (←)", "Next phrase": "다음 소절", "Next phrase (→)": "다음 소절 (→)",
+  "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)", "Phrases": "소절", "Phrase –": "소절 –",
+  "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
+  "Intro": "전주", "Break": "간주", "{kind} · vocals in {s} s": "{kind} · {s}초 뒤 보컬",
+  "Pitch display": "음정 화면", "Waiting for sound": "소리를 기다리는 중", "Mic is off": "마이크 꺼짐", "flat": "낮음", "centre": "정확", "sharp": "높음",
+  "target {note} · sing now": "목표 {note} · 지금 부르세요", "target {note} · {off}": "목표 {note} · {off}", "{n} st sharp": "{n}반음 높음", "{n} st flat": "{n}반음 낮음",
+  "Recording {t}": "녹음 중 {t}", "bars as sung": "음정 바: 부른 그대로", "bars an octave up": "음정 바: 한 옥타브 위", "bars an octave down": "음정 바: 한 옥타브 아래",
+  "Grey line: the original singer. {colour}: you.": "회색 선: 원곡 가수. {colour}: 내 목소리.",
+  "Piano keyboard (tap to hear a note)": "피아노 건반 (누르면 소리가 나요)", "Piano samples:": "피아노 샘플:",
+  "Reading the melody… (up to a minute the first time)": "멜로디 읽는 중… (처음엔 1분쯤 걸려요)", "Couldn’t read the melody.": "멜로디를 읽지 못했어요.",
+  // takes
+  "Takes": "테이크", "How takes sound, played and downloaded": "테이크를 듣고 내려받을 때의 소리", "Your voice": "내 목소리", "Your voice volume": "내 목소리 볼륨",
+  "Band volume in takes": "테이크의 반주 볼륨", "Guide vocal volume in takes": "테이크의 가이드 보컬 볼륨", "Press record, then play.": "녹음을 켜고 재생하세요.",
+  "This browser can’t record takes. A current Chrome, Edge or Firefox can.": "이 브라우저로는 테이크를 녹음할 수 없어요. 최신 Chrome, Edge, Firefox에서는 돼요.",
+  "Stop recording (R)": "녹음 끄기 (R)", "Record yourself as you sing (R)": "부르는 동안 녹음하기 (R)",
+  "Today": "오늘", "Yesterday": "어제", "{n} s": "{n}초",
+  "Saving take…": "테이크 저장하는 중…", "Couldn’t save this take": "테이크를 저장하지 못했어요", "Couldn’t save the take.": "테이크를 저장하지 못했어요.",
+  "Try saving it again": "다시 저장해 보기", "Dismiss": "닫기", "Delete this take": "이 테이크 삭제", "Click again to delete": "한 번 더 누르면 삭제돼요",
+  "Really delete this take?": "이 테이크를 정말 삭제할까요?", "Couldn’t delete the take. Is the app still running?": "테이크를 삭제하지 못했어요. 앱이 아직 실행 중인가요?",
+  "Download as WAV, mixed as set above": "위 설정대로 믹스해서 WAV로 내려받기", "Download this take as WAV": "이 테이크를 WAV로 내려받기",
+  "Mixing the WAV…": "WAV 믹스하는 중…", "Couldn’t make the WAV.": "WAV를 만들지 못했어요.",
+  "Loading…": "불러오는 중…", "Getting the band in key {n}…": "{n} 키 반주 준비하는 중…", "The song changed.": "곡이 바뀌었어요.",
+  "Play on": "이어서 재생", "Play this take with the band": "반주와 함께 이 테이크 듣기",
+}, KO_SERVER);
+
+renderMic(); initStems(); initSing(); initLang(); route();
 requestAnimationFrame(() => { resize(); loop(); });
 })();
 </script>
