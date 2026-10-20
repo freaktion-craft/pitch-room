@@ -382,6 +382,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 /* the icon gets room on both sides (wider first column, more left padding); the right side lines up with .mix above */
 .track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 12px; padding: 8px 0; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
+.track { row-gap: 8px; }
+.track .twave { grid-column: 1 / -1; display: block; width: 100%; height: 28px; cursor: pointer; } /* as wide as the song's waveform */
 .track .ico { width: 18px; height: 18px; }
 .track .name { font-size: 14px; min-width: 0; }
 .track .name small { display: block; color: var(--faint); font-size: 12px; }
@@ -469,8 +471,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 @media (hover: none) { #sLib .song-actions .btn { opacity: 1; } }
 @media (max-width: 760px) {
   .track { grid-template-columns: 24px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
-  .track > :last-child { grid-row: 1; grid-column: 5; }
+  .track > :nth-child(6) { grid-row: 1; grid-column: 5; } /* the download button */
   .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
+  .track .twave { grid-row: 3; }
   .yt { flex-direction: column; }
   .yt input, .yt .btn { width: 100%; justify-content: center; }
   .mix { margin-right: 0; }
@@ -1644,29 +1647,17 @@ function drawWave() {
     x.globalAlpha = 1;
   }
   x.fillStyle = C.ink;
+  const rise = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
   if (P.peaks) {
-    // Bars on whole device pixels, 2 px wide and 1 px apart (at 1×), each the loudest of the peaks it covers. A bar per
-    // peak came out under a pixel wide at fractional places, alternately crisp and smeared: a striped waveform.
-    const n = P.peaks.length, t = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
-    const bw = Math.max(1, Math.round(2 * d)), pitch = bw + Math.max(1, Math.round(d)), m = Math.floor(c.width / pitch), Hd = Math.round(H * d);
     const soloed = Object.keys(P.tracks).filter((k) => P.tracks[k].solo && P.trackPeaks && P.trackPeaks[k]);
-    x.setTransform(1, 0, 0, 1, 0, 0);
-    const bars = (peaks, played, ahead) => {
-      for (let j = 0; j < m; j++) {
-        let pk = 0;
-        for (let i = Math.floor((j * n) / m), e = Math.max(i + 1, Math.floor(((j + 1) * n) / m)); i < e; i++) if (peaks[i] > pk) pk = peaks[i];
-        const h = Math.max(1, Math.round((1 + (Math.max(1, pk * (H - 16)) - 1) * waveRise(j, m, t)) * d));
-        x.globalAlpha = (j + 0.5) / m < prog ? played : ahead;
-        x.fillRect(j * pitch, (Hd - h) >> 1, bw, h);
-      }
-    };
+    const bars = (peaks, played, ahead) => waveBars(x, c.width, Math.round(H * d), d, peaks, H - 16, prog, played, ahead, rise);
     if (!soloed.length) bars(P.peaks, 1, 0.18);
     else { // the mix faded behind the soloed tracks, each in its icon's colour
       bars(P.peaks, 0.16, 0.08);
       for (const k of soloed) { x.fillStyle = stemColor(k); bars(P.trackPeaks[k], 1, 0.4); }
     }
-    x.setTransform(d, 0, 0, d, 0, 0);
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
+  drawTrackWaves(prog, rise);
   x.globalAlpha = 1;
   const lw = P.phHover || P.scrub ? 4 : 2, top = P.scrub ? 20 : 0; // thicker while you can grab it; hangs from the flag while dragged
   x.fillStyle = C.voice;
@@ -1687,6 +1678,41 @@ function drawWave() {
     flag.style.left = Math.max(half, Math.min(W - half, prog * W)) + "px"; // kept over the waveform
   }
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
+}
+// A waveform's bars into canvas context x (cw × Hd device pixels, d of them per CSS px), each up to maxH CSS px: on whole
+// device pixels, 2 px wide and 1 px apart (at 1×), each the loudest of the peaks it covers, the ones before prog (0…1)
+// at alpha played, the rest at ahead, rising in after the song opens (rise: ms since). A bar per peak came out under a
+// pixel wide at fractional places, alternately crisp and smeared: a striped waveform. Waveforms as wide as each other
+// get their bars in the same places, so the tracks' line up with the song's.
+function waveBars(x, cw, Hd, d, peaks, maxH, prog, played, ahead, rise) {
+  const n = peaks.length, bw = Math.max(1, Math.round(2 * d)), pitch = bw + Math.max(1, Math.round(d)), m = Math.floor(cw / pitch);
+  x.setTransform(1, 0, 0, 1, 0, 0);
+  for (let j = 0; j < m; j++) {
+    let pk = 0;
+    for (let i = Math.floor((j * n) / m), e = Math.max(i + 1, Math.floor(((j + 1) * n) / m)); i < e; i++) if (peaks[i] > pk) pk = peaks[i];
+    const h = Math.max(1, Math.round((1 + (Math.max(1, pk * maxH) - 1) * waveRise(j, m, rise)) * d));
+    x.globalAlpha = (j + 0.5) / m < prog ? played : ahead;
+    x.fillRect(j * pitch, (Hd - h) >> 1, bw, h);
+  }
+  x.setTransform(d, 0, 0, d, 0, 0); x.globalAlpha = 1;
+}
+// Each track's own waveform, under its row, as wide as the song's and in line with it: in the track's colour, the
+// played part solid; faded while the track can't be heard. Each is scaled to its own loudest moment (up to 3× the
+// mix's scale, so a near-silent track stays near silent), to show where it plays rather than how loud.
+const TWAVE_H = 28;
+function drawTrackWaves(prog, rise) {
+  const d = Math.min(2, devicePixelRatio || 1);
+  for (const c of document.querySelectorAll("#pTracks .twave")) {
+    const r = c.getBoundingClientRect(), name = c.dataset.name;
+    if (!r.width) continue;
+    if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(TWAVE_H * d); }
+    const x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, r.width, TWAVE_H);
+    x.fillStyle = stemColor(name);
+    const peaks = P.trackPeaks && P.trackPeaks[name], on = audible(name);
+    if (!peaks) { x.globalAlpha = 0.3; x.fillRect(0, (TWAVE_H - 1) / 2, r.width, 1); x.globalAlpha = 1; continue; }
+    if (!peaks.scaled) { let top = 0; for (const v of peaks) if (v > top) top = v; peaks.scaled = Math.min(3, 1 / (top || 1)); }
+    waveBars(x, c.width, Math.round(TWAVE_H * d), d, peaks, (TWAVE_H - 4) * peaks.scaled, prog, on ? 1 : 0.3, on ? 0.3 : 0.12, rise);
+  }
 }
 // Where the playhead is drawn, as a fraction of the song: where the song is, except just after a jump (a click on the
 // waveform, ±5 s…). Then the line travels there on a spring, the whole way, lighting up the bars it passes: quick off
@@ -1743,7 +1769,13 @@ function renderTracks() {
       last.append(icon("download"));
       last.onclick = () => exportMix([{ name, gain: 1 }], null, last);
     }
-    row.append(dot, label, m, s, v, last); box.append(row);
+    row.append(dot, label, m, s, v, last);
+    if (name !== "click") { // its waveform under it (drawTrackWaves); a click there jumps like one on the song's
+      const w = el("canvas", "twave"); w.dataset.name = name; w.setAttribute("aria-hidden", "true");
+      w.onpointerdown = (e) => { const r = w.getBoundingClientRect(); seekSong(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur()); };
+      row.append(w);
+    }
+    box.append(row);
   }
 }
 async function exportMix(tracks, click, btn) {
