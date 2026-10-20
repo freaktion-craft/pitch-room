@@ -334,7 +334,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .tog.icon { display: inline-grid; place-items: center; padding: 0; }
 .tog.icon .ico { width: 16px; height: 16px; }
 #kClick[aria-pressed="false"] + input[type="range"] { display: none; } /* the click's volume shows only while the click is on */
-.songbar #kLeave { margin-left: auto; }
 /* Phrases: one block per line of the song; click one to jump there, Loop repeats it */
 .phrase-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
 .phrase-row output { min-width: 84px; text-align: center; }
@@ -365,6 +364,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   </header>
 
   <main id="vPractice" aria-label="Practice" hidden>
+    <button class="btn sm back" id="kLeave" type="button">← Back to song</button>
     <div class="play-bar">
       <h1 class="title" id="playTitle"></h1>
     </div>
@@ -377,7 +377,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
       <span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span>
       <label class="kfield">Bars <select id="kOct" aria-label="Octave of the note bars"><option value="-1">octave down</option><option value="0">as sung</option><option value="1">octave up</option></select></label>
-      <button class="btn sm" id="kLeave" type="button">Back to song</button>
       <div class="phrase-row">
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
