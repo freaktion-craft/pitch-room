@@ -7,8 +7,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-/* Layout: one column, settings as hairline-separated rows. Colours are OKLCH. Dark is the app's theme; the header
-   toggle switches to light. */
+/* Layout: one column, settings as hairline-separated rows. Colours are OKLCH, dark only. */
 @font-face { font-family: "Geist Pixel Square"; src: url("fonts/GeistPixel-Square.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 :root {
   --fg: 255, 255, 255; /* rgb of every translucent ink tint below */
@@ -31,20 +30,6 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: dark;
 }
-/* Light: the same tokens stepped for a white surface (tracks: same hues, the light/dark alternation flipped) */
-:root[data-theme="light"] {
-  --fg: 0, 0, 0;
-  --bg: oklch(0.975 0 0); --surface: oklch(1 0 0); --surface-2: oklch(0.96 0 0); --hover-2: oklch(0.935 0 0);
-  --ink: oklch(0.25 0 0); --ink-strong: oklch(0 0 0); --on-ink: oklch(1 0 0); --knob: oklch(1 0 0);
-  --accent: oklch(0.25 0 0); --voice: oklch(0.55 0.21 264);
-  --good: oklch(0.62 0.15 155); --warn: oklch(0.72 0.15 75); --bad: oklch(0.58 0.2 25);
-  --note-bg: oklch(0.97 0.025 75); --note-ink: oklch(0.45 0.09 70); --warn-ink: oklch(0.52 0.12 70);
-  --key-w: oklch(1 0 0); --key-b: oklch(0.27 0 0); --key-w-on: oklch(0.92 0 0); --key-b-on: oklch(0 0 0);
-  --stem-lead: oklch(0.5 0.16 262); --stem-backing: oklch(0.63 0.16 350); --stem-drums: oklch(0.5 0.156 40); --stem-bass: oklch(0.63 0.16 305);
-  --stem-guitar: oklch(0.5 0.102 85); --stem-piano: oklch(0.63 0.16 150); --stem-other: oklch(0.55 0 0);
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  color-scheme: light;
-}
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 /* Always reserve the scrollbar's space, so short pages (Stems) don't shift sideways when switching tabs */
@@ -65,14 +50,13 @@ a { color: inherit; text-decoration: none; }
 .app { max-width: 1440px; margin: 0 auto; padding-block: 24px 64px;
   padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
 
-/* Top bar: app name, mic chip, theme */
+/* Top bar: app name, mic chip, mic settings */
 header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .brand { margin-right: auto; font-size: 15px; font-weight: 500; }
 .chipbtn { height: 32px; padding: 0 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: var(--fill);
   font-size: 13px; color: rgba(var(--fg), 0.6); transition: background-color 0.15s; }
 .chipbtn:hover { background: rgba(var(--fg), 0.08); }
-.themebtn { width: 32px; padding: 0; justify-content: center; }
-.themebtn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.iconchip { width: 32px; padding: 0; justify-content: center; }
 .mic-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .mic.on .mic-dot { background: var(--good); }
 /* both labels share one cell, so the chip keeps its width when the mic turns on or off */
@@ -173,7 +157,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .keys-wrap { overflow-x: auto; margin-top: 8px; background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 12px; }
 .keys { position: relative; height: 84px; display: flex; width: max-content; }
 .key { border: 0; padding: 0; }
-/* Keys keep a light face in dark mode too, so their edges and labels use fixed dark tints */
+/* Keys have a light face on the dark app, so their edges and labels use fixed dark tints */
 .key.w { width: 26px; height: 84px; background: var(--key-w); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); border-radius: 0 0 5px 5px; margin-right: -1px;
   display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.35); padding-bottom: 4px; }
 .key.b { position: absolute; top: 0; width: 16px; height: 52px; background: var(--key-b); border-radius: 0 0 4px 4px; z-index: 1; }
@@ -389,15 +373,13 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
 
 </style>
-<script>/* apply a saved theme before first paint */ try { if (JSON.parse(localStorage.getItem("stem:appearance")) === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}</script>
 </head>
 <body>
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Stem</a>
     <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span class="mic-lbl"><span class="if-on">Mic on</span><span class="if-off">Mic off</span></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
-    <button class="chipbtn themebtn" id="micSetBtn" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="micSet" hidden></button>
-    <button class="chipbtn themebtn" id="themeBtn" type="button" aria-label="Dark mode"></button>
+    <button class="chipbtn iconchip" id="micSetBtn" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="micSet" hidden></button>
     <div class="pop" id="micSet" role="dialog" aria-label="Mic settings" hidden>
       <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
@@ -752,7 +734,7 @@ function icon(name) {
   s.innerHTML = ICONS[name] || ICONS.other;
   return s;
 }
-// each track's colour (CSS --stem-*, per theme), as read for the canvas
+// each track's colour (CSS --stem-*), as read for the canvas
 const stemColor = (k) => C["stem-" + k] || C.muted;
 const STEM_NOTES = { vocals: "lead and backing voices", lead: "the main voice", backing: "harmonies, doubles and chops", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
 const TRACK_TITLES = { lead: "Lead vocal", backing: "Backing vocals" };
@@ -1755,23 +1737,6 @@ function resize() {
 }
 new ResizeObserver(resize).observe(cv);
 readColors();
-new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-
-// theme toggle: dark unless light was picked (remembered as "appearance")
-const ICON_MOON = '<svg viewBox="0 0 16 16"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>';
-const ICON_SUN = '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.3M8 13.2v1.3M1.5 8h1.3M13.2 8h1.3M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"/></svg>';
-const isDark = () => document.documentElement.dataset.theme !== "light";
-function paintThemeBtn() {
-  const b = $("#themeBtn"), d = isDark();
-  b.innerHTML = d ? ICON_SUN : ICON_MOON;
-  b.setAttribute("aria-label", d ? "Light mode" : "Dark mode"); b.title = b.getAttribute("aria-label");
-}
-$("#themeBtn").onclick = () => {
-  if (isDark()) document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
-  store.set("appearance", isDark() ? null : "light");
-  paintThemeBtn();
-};
-paintThemeBtn();
 
 function rr(x, y, w, h, r) {
   r = Math.min(r, h / 2, w / 2);
