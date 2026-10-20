@@ -9,6 +9,7 @@ Songs live in ./library/<id>/ :
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
     meta.json       title, duration, bpm, beat times, key, stems, model, unsplit (parts where the vocals stay whole)
     keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
+    takes/          you, singing along in Practice: <take>.flac and <take>.json (when, which part, key, scores)
 
 Heavy packages (torch, demucs, librosa, yt-dlp) are optional and installed from the
 page on first use, so the base app stays small.
@@ -17,7 +18,9 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import io
 import json
+import math
 import os
 import re
 import secrets
@@ -27,6 +30,7 @@ import sys
 import tempfile
 import threading
 import time
+import wave
 
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -1144,7 +1148,7 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple
         _encode_mp3(mix.astype(np.float32), path, "320k")
         with open(path, "rb") as f:
             data = f.read()
-    safe = re.sub(r"\s+", " ", re.sub(r'[\\/:*?"<>|]+', " ", meta["title"])).strip()[:80] or "song"
+    safe = _file_title(meta)
     on = [u for u in used if u != "click"]
     off = [s for s in names if s not in on]
     if not on:
@@ -1162,4 +1166,197 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple
     if key:
         label += f" ({key:+d})"
     return data, f"{safe} - {label}.mp3"
+
+
+def _file_title(meta: dict) -> str:
+    """The song's title as the start of a file name: no characters Windows forbids, at most 80 characters."""
+    return re.sub(r"\s+", " ", re.sub(r'[\\/:*?"<>|]+', " ", meta["title"])).strip()[:80] or "song"
+
+
+# ---------- takes (Practice) ----------
+# A take is you singing along in Practice, recorded by the page from the song's own audio clock: it starts at song
+# time "start", and the page has already allowed for the delay of the speakers and the mic, so sample 0 of the take
+# goes with the band at "start". takes/<id>.flac holds the mic as recorded (mono, 16-bit, at the browser's rate);
+# takes/<id>.json says when, which stretch, which key and how it went. One json per take, so saving one never has to
+# rewrite (or lock) a file that others are in.
+TAKE_MIN = 2.0  # s: anything shorter was a Play pressed by mistake
+TAKE_GAIN = (0.25, 16.0)  # how far a take is turned down or up to match the singer (-12 dB … +24 dB)
+
+
+def _take_dir(song_id: str) -> str:
+    folder = _song_dir(song_id)
+    _read_meta(folder)  # a song that's there
+    return os.path.join(folder, "takes")
+
+
+def _take(song_id: str, tid: str) -> dict:
+    if not re.fullmatch(r"[0-9a-f]{12}", tid or ""):
+        raise ValueError("Unknown take.")
+    path = os.path.join(_take_dir(song_id), tid + ".json")
+    if not os.path.isfile(path):
+        raise ValueError("That take is gone.")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _num(info: dict, key: str, lo: float, hi: float) -> float:
+    try:
+        v = float(info.get(key))
+    except (TypeError, ValueError):
+        raise ValueError(f"The take came without its {key}.") from None
+    if not math.isfinite(v) or not lo <= v <= hi:
+        raise ValueError(f"The take's {key} is out of range.")
+    return v
+
+
+def _loud(x: np.ndarray, sr: int) -> float:
+    """How loud the loud parts of mono audio are: the 99th percentile of the RMS of its 50 ms windows. The top of the
+    range, so a take that's mostly rests still measures the singing in it."""
+    w = max(1, int(0.05 * sr))
+    n = len(x) // w
+    if not n:
+        return 0.0
+    return float(np.percentile(np.sqrt((x[: n * w].reshape(n, w).astype(np.float64) ** 2).mean(1)), 99))
+
+
+@lru_cache(maxsize=16)
+def _singer_loud(path: str, _mtime: float) -> float:
+    return _loud(_decode_stereo(path).mean(0), SR)
+
+
+def save_take(song_id: str, data: bytes, info: dict) -> dict:
+    """Keep a take. data: a 16-bit PCM WAV of the mic. info: start (song time of its first sample, s), key (semitones
+    the song played in), oct (the bars' octave, -1…1), latency (the speaker and mic delay allowed for, s), and the
+    seconds behind the scores: guide (time with a note to sing), sung (of that, time you sang), voiced (of that, time
+    your pitch was read) and tuned (of that, time within 50 cents of the note). Returns the take's json: those, plus
+    id, created, end, duration, sampleRate, inTune (% of voiced that was tuned), coverage (% of guide that was sung)
+    and gain: how much to turn the take up or down to sound as loud as the song's own singer, so "Your voice" at 100%
+    sits in the band like the original vocal (the file keeps the recording as it was)."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    try:
+        with wave.open(io.BytesIO(data)) as w:
+            ch, width, rate = w.getnchannels(), w.getsampwidth(), w.getframerate()
+            frames = w.readframes(w.getnframes())
+    except (wave.Error, EOFError):
+        raise ValueError("Send the take as a WAV file.") from None
+    if width != 2 or not 8000 <= rate <= 192000 or not ch:
+        raise ValueError("Send the take as 16-bit PCM.")
+    x = np.frombuffer(frames, dtype="<i2")[: len(frames) // (2 * ch) * ch].reshape(-1, ch).mean(1) / 32768
+    dur = len(x) / rate
+    if dur < TAKE_MIN:
+        raise ValueError(f"Takes under {TAKE_MIN:g} seconds aren’t kept.")
+    start = _num(info, "start", 0, float(meta["duration"]))
+    key = _semitones(info.get("key", 0))
+    guide, sung, voiced, tuned = (_num(info, k, 0, dur + 1) for k in ("guide", "sung", "voiced", "tuned"))
+    sung = min(sung, guide)
+    voiced = min(voiced, sung)
+    tuned = min(tuned, voiced)
+    singer = next((p for p in (os.path.join(folder, n + ".mp3") for n in ("lead", "vocals")) if os.path.isfile(p)), None)
+    loud, ref = _loud(x, rate), singer and _singer_loud(singer, os.path.getmtime(singer))
+    take = {"id": secrets.token_hex(6), "created": round(time.time(), 3), "start": round(start, 4),
+            "end": round(start + dur, 4), "duration": round(dur, 4), "key": key, "oct": int(_num(info, "oct", -1, 1)),
+            "latency": round(_num(info, "latency", 0, 2), 4), "sampleRate": rate,
+            "guide": round(guide, 2), "sung": round(sung, 2), "voiced": round(voiced, 2), "tuned": round(tuned, 2),
+            # a score from under half a second of singing says nothing
+            "inTune": round(100 * tuned / voiced, 1) if voiced >= 0.5 else None,
+            "coverage": round(100 * sung / guide, 1) if guide >= 0.5 else None,
+            "gain": round(float(np.clip(ref / loud, *TAKE_GAIN)), 3) if ref and loud > 1e-4 else 1.0}
+    out = os.path.join(folder, "takes")
+    os.makedirs(out, exist_ok=True)
+    flac, js = os.path.join(out, take["id"] + ".flac"), os.path.join(out, take["id"] + ".json")
+    pcm = np.clip(np.round(x * 32768), -32768, 32767).astype("<i2").tobytes()
+    p = subprocess.run([ffmpeg_exe(), "-v", "error", "-y", "-f", "s16le", "-ar", str(rate), "-ac", "1", "-i", "pipe:0",
+                        "-c:a", "flac", "-f", "flac", flac + ".part"], input=pcm, capture_output=True, check=False)
+    if p.returncode != 0:
+        with contextlib.suppress(OSError):
+            os.remove(flac + ".part")
+        raise RuntimeError("Saving the take failed: " + p.stderr.decode(errors="ignore")[-200:])
+    os.replace(flac + ".part", flac)
+    with open(js + ".part", "w", encoding="utf-8") as f:  # the json last: a take is listed once both are complete
+        json.dump(take, f)
+    os.replace(js + ".part", js)
+    return take
+
+
+def list_takes(song_id: str) -> list[dict]:
+    """A song's takes, newest first."""
+    d, out = _take_dir(song_id), []
+    for name in os.listdir(d) if os.path.isdir(d) else []:
+        tid, ext = os.path.splitext(name)
+        if ext != ".json" or not os.path.isfile(os.path.join(d, tid + ".flac")):
+            continue
+        try:
+            with open(os.path.join(d, name), encoding="utf-8") as f:
+                out.append(json.load(f))
+        except (OSError, ValueError):
+            continue  # damaged: leave it out rather than fail the whole list
+    return sorted(out, key=lambda t: t.get("created", 0), reverse=True)
+
+
+def delete_take(song_id: str, tid: str):
+    _take(song_id, tid)
+    d = _take_dir(song_id)
+    for ext in (".json", ".flac"):  # the json first, so a take half deleted isn't listed
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(os.path.join(d, tid + ext))
+
+
+def _gain(mix: dict, key: str, default: float) -> float:
+    try:
+        v = float(mix.get(key, default))
+    except (TypeError, ValueError):
+        raise ValueError("Each volume is a number.") from None
+    if not math.isfinite(v) or not 0 <= v <= 4:
+        raise ValueError("Each volume is between 0 and 4.")
+    return v
+
+
+def _wav(samples: np.ndarray) -> bytes:
+    """(channels, n) float32 at SR as a 16-bit PCM WAV file."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(samples.shape[0])
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes(np.round(np.clip(samples, -1, 1).T * 32767).astype("<i2").tobytes())
+    return buf.getvalue()
+
+
+def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
+    """A take as heard in Practice: your voice (times the take's gain) over the band and, if asked for, the guide
+    vocal, in the key it was sung in. mix: {voice, band, guide}, gains 0…4. The band is every track but the guide vocal
+    (the lead once split, else the vocal stem), as with Practice's Band slider, so backing vocals are in it. Returns
+    (16-bit stereo 44.1 kHz WAV, file name), the take's stretch of the song from its first sample to its last."""
+    folder = _song_dir(song_id)
+    meta, take = _read_meta(folder), _take(song_id, tid)
+    voice, band, guide = _gain(mix, "voice", 1), _gain(mix, "band", 1), _gain(mix, "guide", 0)
+    s0, n, key = int(round(take["start"] * SR)), int(round(take["duration"] * SR)), _semitones(take["key"])
+    names = _tracks(folder, meta)
+    lead = "lead" if "lead" in names else "vocals"
+    parts = [(t, g) for t, g in [(t, band) for t in names if t != lead] + [(lead, guide)] if g > 0]
+    if key and any(t != "drums" for t, _ in parts):
+        _key_ready(song_id, key)
+    out, vocal = np.zeros((2, n), dtype=np.float32), None
+    for t, g in parts:
+        if t in ("lead", "backing"):
+            vocal = vocal or _vocal_parts(folder, meta.get("unsplit") or [], key)
+            wav = vocal[t]
+        else:
+            wav = _decode_stereo(_track_path(folder, t, key))
+        seg = wav[:, s0: s0 + n]
+        out[:, : seg.shape[1]] += seg * g
+    if voice > 0:
+        raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", os.path.join(_take_dir(song_id), tid + ".flac"), "-ac", "1",
+                              "-ar", str(SR), "-f", "f32le", "pipe:1"], capture_output=True, check=False).stdout
+        v = np.frombuffer(raw, dtype=np.float32)[:n] * (voice * float(take.get("gain", 1)))
+        out[:, : len(v)] += v
+    peak = float(np.abs(out).max()) if n else 0.0
+    if peak > 0.99:  # loud gains summed: turn the whole down rather than clip
+        out *= 0.99 / peak
+    for i, k in ((slice(0, int(0.005 * SR)), 1), (slice(max(0, n - int(0.02 * SR)), n), -1)):  # no click at either end
+        m = out[:, i].shape[1]
+        out[:, i] *= np.linspace(0, 1, m, dtype=np.float32)[::k]
+    when = time.strftime("%Y-%m-%d %H-%M", time.localtime(take["created"]))
+    return _wav(out), f"{_file_title(meta)} - take {when}{f' ({key:+d})' if key else ''}.wav"
 

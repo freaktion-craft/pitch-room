@@ -1,4 +1,4 @@
-"""Local server for Stem: serves the page and the song library (stems, beats, melody, exports).
+"""Local server for Stem: serves the page and the song library (stems, beats, melody, exports, takes).
 
 Normally started by launch.py (via the start-* launchers). Direct use:
 
@@ -96,6 +96,16 @@ class Handler(SimpleHTTPRequestHandler):
         self._unread = 0
         return self.rfile.read(n)
 
+    def _attachment(self, data, content_type, filename, fallback):
+        """Send data as a download named filename (any characters; browsers that only take ASCII get fallback)."""
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        ascii_name = filename.encode("ascii", "ignore").decode() or fallback
+        self.send_header("Content-Disposition", f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}")
+        self.end_headers()
+        self.wfile.write(data)
+
     def _send_range(self):
         """Serve one byte range of a static file (206), so the browser can seek in a video. False = not a range request."""
         m = re.fullmatch(r"bytes=(\d*)-(\d*)", (self.headers.get("Range") or "").strip())
@@ -157,9 +167,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, job) if job else self._json(404, {"error": "Unknown job."})
         if path == "/api/library":
             return self._json(200, stems.library())
-        if path.startswith("/api/library/") and path.endswith("/info"):
+        if path.startswith("/api/library/") and path.endswith(("/info", "/takes")):
             try:
-                return self._json(200, stems.song_info(path.split("/")[3]))
+                song = path.split("/")[3]
+                return self._json(200, stems.song_info(song) if path.endswith("/info") else stems.list_takes(song))
             except ValueError as e:
                 return self._json(422, {"error": str(e)})
         if path.startswith("/api/melody/"):
@@ -203,14 +214,18 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == "export":
                 body = json.loads(self._body(100_000) or b"{}")
                 data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"), body.get("key") or 0)
-                self.send_response(200)
-                self.send_header("Content-Type", "audio/mpeg")
-                self.send_header("Content-Length", str(len(data)))
-                ascii_name = filename.encode("ascii", "ignore").decode() or "export.mp3"
-                self.send_header("Content-Disposition", f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}")
-                self.end_headers()
-                self.wfile.write(data)
-                return None
+                return self._attachment(data, "audio/mpeg", filename, "export.mp3")
+            if parts[3] == "takes":  # a take recorded in Practice: the WAV as the body, the rest in the query
+                info = {k: v[0] for k, v in q.items()}
+                return self._json(200, stems.save_take(parts[2], self._body(MAX_SONG), info))
+        if len(parts) == 6 and parts[1] == "library" and parts[3] == "takes":  # api/library/<id>/takes/<take>/<action>
+            if parts[5] == "delete":
+                stems.delete_take(parts[2], parts[4])
+                return self._json(200, {"ok": True})
+            if parts[5] == "wav":
+                body = json.loads(self._body(10_000) or b"{}")
+                data, filename = stems.take_wav(parts[2], parts[4], body if isinstance(body, dict) else {})
+                return self._attachment(data, "audio/wav", filename, "take.wav")
         return self._json(404, {"error": "Not found."})
 
     def do_POST(self):
