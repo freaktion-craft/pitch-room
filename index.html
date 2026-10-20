@@ -139,7 +139,8 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
 .pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; margin-left: auto; visibility: hidden; }
 .pick-list [role="option"] .side { margin-left: auto; padding-left: 16px; min-width: 56px; text-align: right; font: 12.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .pick-list [role="option"] .side + .ico { margin-left: 0; } /* 12 px after the note, as after a name */
-.pick-list [role="option"] .side.warn { color: var(--warn-ink); }
+.pick-list [role="option"] .side.warn, .pick-list .foot b { color: var(--voice); }
+.pick-list .foot b { font: 12px var(--mono); }
 .pick-list [aria-selected="true"] .ico { visibility: visible; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: rgba(var(--fg), 0.12); position: relative;
@@ -818,7 +819,7 @@ function splitInput(label) {
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
 // whole name, for its tooltip, side: a note at the row's end (warn: in the warning colour), btn: what the button says
 // when it's chosen, if not t}); onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v
-// (to show how it's coming along in its row); foot: a line under the list. The list lives in the panel the button is
+// (to show how it's coming along in its row); foot: a line under the list (text, or a function giving its nodes). The list lives in the panel the button is
 // in, so a click on it counts as inside that panel; Escape closes the list only. Changing the items while it's open
 // redraws it in place, focus and scroll kept.
 function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
@@ -853,7 +854,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
       };
       list.append(o);
     }
-    if (foot) list.append(el("p", "foot", foot));
+    if (foot) { const f = el("p", "foot"); f.append(...(typeof foot === "function" ? foot() : [foot])); list.append(f); }
     if (again) { // redrawn while open: where it was
       list.scrollTop = top;
       const f = options().find((o) => o.dataset.v === focused);
@@ -1774,10 +1775,10 @@ function swapSources() {
   P.bus.gain.setValueAtTime(0, ac.currentTime); P.bus.gain.setTargetAtTime(stemVol, at, 0.015);
 }
 // Both controls (Studio's header, Practice's bar): a list of the keys, under Higher +6 to +1, the original, then under
-// Lower −1 to −6, each with how far it is from the original; that distance is in the warning colour from KEY_WARN on,
+// Lower −1 to −6, each with how far it is from the original; that distance is in the accent colour from KEY_WARN on,
 // which the list's footnote explains (and the note beside the control, once chosen). Picking one that isn't rendered
 // yet keeps the list open, its row counting up to ready; the button says so too.
-const KEY_FOOT = `${KEY_WARN} or more semitones (in amber) can sound processed.`;
+const keyFoot = () => [el("b", null, `±${KEY_WARN}`), " or more semitones can sound processed."];
 function keyItems(m, want) {
   const items = [];
   for (let n = KEYS; n >= -KEYS; n--) {
@@ -1802,7 +1803,7 @@ function paintKey() {
     box.note = box.dataset.note ? $(box.dataset.note) : el("span", "knote"); // the Studio's goes under the title
     box.append(el("span", null, "Key"), btn);
     if (!box.dataset.note) box.append(box.note);
-    box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n), minWidth: 240, foot: KEY_FOOT });
+    box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n), minWidth: 240, foot: keyFoot });
   }
   paintKey();
 })();
