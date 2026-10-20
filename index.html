@@ -86,8 +86,9 @@ header { position: relative; }
 #accentSet { width: min-content; line-height: 20px; }
 .swatches { display: flex; gap: 4px; }
 .swatch { width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow 0.15s; }
-.swatch:hover { box-shadow: inset 0 0 0 2px rgba(var(--fg), 0.2); }
-.swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+/* the picked one: a quiet ring in its own colour, not a bright one that outshines the colours */
+.swatch:hover { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c) 25%, transparent); }
+.swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c) 50%, transparent); }
 
 .title { margin: 0; font-size: 15px; font-weight: 500; }
 .lede { margin: 0; font-size: 16px; line-height: 1.5; max-width: 62ch; text-wrap: pretty; } /* 24 px lines, like the title's */
