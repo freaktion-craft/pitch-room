@@ -1715,8 +1715,11 @@ function applyKey(n) {
 }
 // New buffers while playing: the new sources start where the old ones are by then, fading in as the old ones fade out.
 function swapSources() {
-  const oldBus = P.bus, old = P.sources, pos = songPos();
-  P.playing = false; P.offset = pos + 0.06; // playSong starts them 0.06 s from now
+  // where the old sources will be when playSong starts the new ones, 0.06 s from now (not songPos(), which holds still
+  // until a start has begun, so a swap right after Play would jump)
+  const oldBus = P.bus, old = P.sources, pos = P.offset + (ac.currentTime + 0.06 - P.startAt);
+  if (pos >= songDur() - 0.05) return; // the song is ending anyway
+  P.playing = false; P.offset = pos;
   playSong();
   const at = P.startAt;
   oldBus.gain.setTargetAtTime(0, at, 0.015); old.forEach((s) => { try { s.stop(at + 0.2); } catch (e) {} });
