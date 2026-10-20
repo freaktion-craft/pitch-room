@@ -292,6 +292,22 @@ def delete_song(song_id: str):
     shutil.rmtree(_song_dir(song_id), ignore_errors=True)
 
 
+TITLE_MAX = 200
+
+
+def rename_song(song_id: str, title) -> str:
+    """Give a song a new title. Runs of whitespace (line breaks too) become one space, since a title is a single line
+    of text, and it's cut to TITLE_MAX characters. Returns the title as saved."""
+    folder = _song_dir(song_id)
+    if not isinstance(title, str):
+        raise ValueError("Send the new title as text.")
+    title = " ".join(title.split())[:TITLE_MAX].rstrip()
+    if not title:
+        raise ValueError("A song needs a title.")
+    _update_meta(folder, title=title)
+    return title
+
+
 # ---------- separation pipeline ----------
 def start_upload(data: bytes, filename: str, model: str) -> str:
     job = _new_job("separate")

@@ -333,6 +333,14 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .song { display: grid; gap: 4px; min-width: 0; }
 .song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .song small { color: var(--faint); font-size: 12.5px; }
+/* Rename: a field over the title, in its font, size and line breaks (24 px lines: its link's 15 px × 1.6). The title
+   stays underneath, unseen, showing what's typed, so the row keeps the size the title would have and nothing moves.
+   The field's fill and ring are box-shadows, which take no room: 32 px tall, like the other fields. */
+.song:has(> .rename) > a { grid-area: 1 / 1; visibility: hidden; }
+.song:has(> .rename) b { white-space: pre-wrap; }
+.song .rename { grid-area: 1 / 1; width: 0; min-width: 100%; height: 0; min-height: 100%; margin: 0; padding: 0; border: 0; border-radius: 4px;
+  resize: none; overflow: hidden; font: 500 14px/24px var(--font); color: inherit; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--surface); box-shadow: 0 0 0 4px var(--surface), 0 0 0 5px var(--ink); outline: none; }
 .song-actions { display: flex; gap: 8px; }
 /* the ⋮ button stays faint until you point at the song (always shown in full where there's no hover) */
 #sLib .song-actions .btn { opacity: 0.3; transition: opacity 0.15s, background-color 0.15s, color 0.15s; }
@@ -546,6 +554,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
 
     <div class="menu" id="songMenu" role="menu" hidden>
       <button type="button" role="menuitem" id="mInfo"><span>Info</span></button>
+      <button type="button" role="menuitem" id="mRename"><span>Rename</span></button>
       <button type="button" role="menuitem" class="danger" id="mDelete"><span>Delete</span></button>
     </div>
   </main>
@@ -746,6 +755,7 @@ Object.assign(ICONS, {
   play: '<path d="M18.8906 12.846C18.5371 14.189 16.8667 15.138 13.5257 17.0361C10.296 18.8709 8.6812 19.7884 7.37983 19.4196C6.8418 19.2671 6.35159 18.9776 5.95624 18.5787C5 17.6139 5 15.7426 5 12C5 8.2574 5 6.3861 5.95624 5.42132C6.35159 5.02245 6.8418 4.73288 7.37983 4.58042C8.6812 4.21165 10.296 5.12907 13.5257 6.96393C16.8667 8.86197 18.5371 9.811 18.8906 11.154C19.0365 11.7084 19.0365 12.2916 18.8906 12.846Z"/>',
   more: '<path d="M11.9967 12.5V12M11.9967 6.5V6M11.9967 18.5V18M12.9967 12.5C12.9967 11.9477 12.549 11.5 11.9967 11.5C11.4444 11.5 10.9967 11.9477 10.9967 12.5C10.9967 13.0523 11.4444 13.5 11.9967 13.5C12.549 13.5 12.9967 13.0523 12.9967 12.5ZM12.9967 6.5C12.9967 5.94772 12.549 5.5 11.9967 5.5C11.4444 5.5 10.9967 5.94772 10.9967 6.5C10.9967 7.05228 11.4444 7.5 11.9967 7.5C12.549 7.5 12.9967 7.05228 12.9967 6.5ZM12.9967 18.5C12.9967 17.9477 12.549 17.5 11.9967 17.5C11.4444 17.5 10.9967 17.9477 10.9967 18.5C10.9967 19.0523 11.4444 19.5 11.9967 19.5C12.549 19.5 12.9967 19.0523 12.9967 18.5Z"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16V12"/><path d="M12.125 8.25H12M12.25 8.25C12.25 8.11193 12.1381 8 12 8C11.8619 8 11.75 8.11193 11.75 8.25C11.75 8.38807 11.8619 8.5 12 8.5C12.1381 8.5 12.25 8.38807 12.25 8.25Z"/>',
+  rename: '<path d="M15.2141 5.98239L16.6158 4.58063C17.39 3.80646 18.6452 3.80646 19.4194 4.58063C20.1935 5.3548 20.1935 6.60998 19.4194 7.38415L18.0176 8.78591M15.2141 5.98239L6.98023 14.2163C5.93493 15.2616 5.41226 15.7842 5.05637 16.4211C4.70047 17.058 4.3424 18.5619 4 20C5.43809 19.6576 6.94199 19.2995 7.57889 18.9436C8.21579 18.5877 8.73844 18.0651 9.78375 17.0198L18.0176 8.78591M15.2141 5.98239L18.0176 8.78591"/><path d="M11 20H17"/>', // PencilEdit01
   prev: '<path d="M15 6C15 6 9.00001 10.4189 9 12C8.99999 13.5812 15 18 15 18"/>', // ArrowLeft01
   next: '<path d="M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18"/>', // ArrowRight01
   toStart: '<path d="M8.06492 12.6258C8.31931 13.8374 9.67295 14.7077 12.3802 16.4481C15.3247 18.3411 16.797 19.2876 17.9895 18.9229C18.3934 18.7994 18.7654 18.5823 19.0777 18.2876C20 17.4178 20 15.6118 20 12C20 8.38816 20 6.58224 19.0777 5.71235C18.7654 5.41773 18.3934 5.20057 17.9895 5.07707C16.797 4.71243 15.3247 5.6589 12.3802 7.55186C9.67295 9.29233 8.31931 10.1626 8.06492 11.3742C7.97836 11.7865 7.97836 12.2135 8.06492 12.6258Z"/><path d="M4 4L4 20"/>', // Previous
@@ -831,7 +841,9 @@ async function renderLibrary() {
     link.href = "#stems/" + m.id; link.append(el("b", null, m.title));
     info.append(link, el("small", null, libLine(m)));
     keyOf(m).then(() => { info.querySelector("small").textContent = libLine(m); });
-    row.onclick = (e) => { if (!e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
+    // a click that starts while the title is being renamed (in its field, or beside it to finish) doesn't open the song
+    row.onpointerdown = () => { row.dataset.renaming = row.querySelector(".rename") ? "1" : ""; };
+    row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
     const acts = el("div", "song-actions");
     const more = mkBtn("", () => songMenu(more, m));
     more.classList.add("icon"); more.title = "More"; more.setAttribute("aria-label", "More for " + m.title);
@@ -853,7 +865,7 @@ function keyOf(m) {
   return keyJobs.get(m.id).then((k) => { if (k !== undefined) m.key = k; return k; });
 }
 
-// The library's ⋮ menu: Info, and Delete (which asks "Really delete?" first). One shared menu, placed under the button.
+// The library's ⋮ menu: Info, Rename, and Delete (which asks "Really delete?" first). One shared menu, placed under the button.
 let menuSong = null, menuBtn = null;
 function songMenu(btn, m) {
   if (menuBtn === btn) { closeMenu(); return; }
@@ -874,6 +886,8 @@ function closeMenu() {
 function initSongMenu() {
   $("#mInfo").prepend(icon("info")); $("#mDelete").prepend(icon("trash"));
   $("#mInfo").onclick = () => { const id = menuSong.id; closeMenu(); go(`stems/${id}/info`); };
+  $("#mRename").prepend(icon("rename"));
+  $("#mRename").onclick = () => { const m = menuSong, row = menuBtn.closest(".row"); closeMenu(); renameSong(row, m); };
   $("#mDelete").onclick = async () => {
     const b = $("#mDelete"), m = menuSong;
     if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.querySelector("span").textContent = "Really delete?"; return; }
@@ -885,6 +899,45 @@ function initSongMenu() {
   document.addEventListener("click", (e) => { if (menuBtn && !e.composedPath().some((n) => n === menuBtn || n === $("#songMenu"))) closeMenu(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuBtn) { const b = menuBtn; closeMenu(); b.focus(); } });
   for (const ev of ["scroll", "resize", "hashchange"]) addEventListener(ev, closeMenu, { passive: true });
+}
+// Rename, in place: a field over the row's title (a textarea, so a long title keeps its line breaks), all of it
+// selected. Enter or leaving the field saves; Escape, an empty title or the same one changes nothing.
+function renameSong(row, m) {
+  const link = row.querySelector(".song a"), title = link.querySelector("b"), more = row.querySelector(".song-actions .btn");
+  const f = el("textarea", "rename"); f.rows = 1; f.maxLength = 200; f.spellcheck = false; f.value = m.title; f.setAttribute("aria-label", "Song title");
+  const mirror = () => { title.textContent = f.value + "\u200b"; }; // the title underneath, sizing the row (never quite empty)
+  link.after(f); mirror(); f.focus(); f.select();
+  let done = false;
+  const finish = async (keep, refocus) => {
+    if (done) return;
+    done = true;
+    const old = m.title, t = f.value.replace(/\s+/g, " ").trim(), save = keep && t && t !== old;
+    title.textContent = save ? t : old; // the new title at once; put back if the server says no
+    f.remove();
+    if (refocus) more.focus(); // back where the keyboard came from
+    if (!save) return;
+    const r = await fetch(`/api/library/${m.id}/rename`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: t }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (r && r.ok) { songRenamed(m.id, j.title); title.textContent = j.title; more.setAttribute("aria-label", "More for " + j.title); return; }
+    title.textContent = old;
+    const small = row.querySelector(".song small"); // the error, for a moment, where the song's details are
+    small.textContent = j.error || "Couldn’t rename the song. Is the app still running?"; small.style.color = "var(--bad)";
+    setTimeout(() => { small.textContent = libLine(m); small.style.color = ""; }, 4000);
+  };
+  f.oninput = () => { if (/[\r\n]/.test(f.value)) f.value = f.value.replace(/[\r\n]+/g, " "); mirror(); }; // a pasted line break
+  f.onkeydown = (e) => {
+    if (e.isComposing || e.keyCode === 229) return; // Enter that ends an IME composition (Korean, say) only ends that
+    if (e.key === "Enter") { e.preventDefault(); finish(true, true); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false, true); }
+  };
+  f.onblur = () => finish(true);
+}
+// A new title shows wherever the song is open: the library's copy, the Studio and Practice. (Info reads the song
+// afresh each time it opens.)
+function songRenamed(id, title) {
+  for (const s of [libCache.get(id), P.song, K.song]) if (s && s.id === id) s.title = title;
+  if (P.song && P.song.id === id) $("#pTitle").textContent = title;
+  if (K.song && K.song.id === id) setText("playTitle", title);
 }
 
 // Info page (#stems/<id>/info): key, tempo, length, the vocal range and how it sits against yours.

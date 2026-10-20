@@ -29,6 +29,7 @@ Use earphones while practicing so the song doesn't leak into the mic, or turn on
 - to keep the vocals of some part in even with the lead muted, drag across it on the waveform and press **Keep vocals here** (its vocals move to the backing track); × on a shaded part lets it go,
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that track,
 - **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.
+- **Rename** (⋮ in the library) edits a song’s title right in the list.
 
 **Practice** — the melody is read from the lead vocal (pYIN pitch tracking, cut into notes), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
 

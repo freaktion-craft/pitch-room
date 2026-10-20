@@ -187,6 +187,9 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == "delete":
                 stems.delete_song(parts[2])
                 return self._json(200, {"ok": True})
+            if parts[3] == "rename":
+                body = json.loads(self._body(100_000) or b"{}")
+                return self._json(200, {"title": stems.rename_song(parts[2], body.get("title") if isinstance(body, dict) else None)})
             if parts[3] == "video":
                 return self._json(200, {"job": stems.start_video(parts[2])})
             if parts[3] == "split":
