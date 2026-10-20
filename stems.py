@@ -646,19 +646,27 @@ def _ensure_split(folder: str, job=None, share: tuple[float, float] = (0.0, 1.0)
         return True
 
 
+_split_jobs: dict[str, str] = {}  # song id -> its split job, so a page opened twice doesn't start two
+
+
 def start_split(song_id: str) -> str:
-    """Split the vocal stem of a song added before backing vocals were split off."""
+    """Split the vocal stem of a song added before backing vocals were split off. The page asks when it opens such a
+    song; a split already under way for it is returned instead of starting another."""
     folder = _song_dir(song_id)
     if not os.path.isfile(os.path.join(folder, "vocals.mp3")):
         raise ValueError("This song has no vocal track.")
     if not lead_available():
         raise ValueError("The lead-vocal model isn’t installed.")
+    running = get_job(_split_jobs.get(song_id, ""))
+    if running and running["status"] in ("queued", "running"):
+        return running["id"]
 
     def work(job):
         _ensure_split(folder, job, (0.02, 0.95))
         _set(job, songId=song_id)
 
-    return _run(_new_job("split"), work)
+    _split_jobs[song_id] = _run(_new_job("split"), work)
+    return _split_jobs[song_id]
 
 
 def set_unsplit(song_id: str, ranges: list) -> list:

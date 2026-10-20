@@ -364,7 +364,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   </header>
 
   <main id="vPractice" aria-label="Practice" hidden>
-    <button class="btn sm back" id="kLeave" type="button">← Back to song</button>
+    <button class="btn sm back" id="kLeave" type="button">← Studio</button>
     <div class="play-bar">
       <h1 class="title" id="playTitle"></h1>
     </div>
@@ -917,9 +917,9 @@ function watchJob(id, kind, forSong) {
     } else if (kind === "video") {
       if (P.song && P.song.id === forSong) videoWait(j.status === "error" ? j.error : `${j.stage}… ${Math.round(j.progress * 100)}%`, j.status === "error");
     } else if (kind === "split") {
-      splitting[forSong] = j.status === "queued" ? "Waiting…" : `Splitting… ${Math.round(j.progress * 100)}%`;
-      const b = $("#pSplit");
-      if (b && P.song && P.song.id === forSong) b.textContent = splitting[forSong];
+      splitting[forSong] = j.status === "queued" ? "waiting to split into lead and backing…" : `splitting into lead and backing… ${Math.round(j.progress * 100)}%`;
+      const note = $('#pTracks .track[data-name="vocals"] .name small');
+      if (note && P.song && P.song.id === forSong) note.textContent = splitting[forSong];
     } else {
       const card = jobCard(id), [a, b] = card.querySelectorAll(".top span");
       a.textContent = j.status === "error" ? j.error : j.stage;
@@ -934,7 +934,7 @@ function watchJob(id, kind, forSong) {
       if (kind === "split") {
         delete splitting[forSong];
         if (P.song && P.song.id === forSong) {
-          if (j.status === "error") { $("#pExportState").textContent = j.error; renderTracks(); }
+          if (j.status === "error") { $("#pExportState").textContent = "Couldn’t split the vocals: " + j.error; renderTracks(); }
           else if (location.hash === "#stems/" + forSong) openSongById(forSong);
           else P.song.stale = true; // reopened when its page comes back
         }
@@ -992,7 +992,7 @@ async function openSong(m) {
   $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
   for (const name of trackNames(m)) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
-  renderTracks(); paintSel();
+  renderTracks(); paintSel(); autoSplit(m);
   const loaded = await Promise.all(trackNames(m).map(async (name) => {
     const r = await fetch(`/library/${m.id}/${name}.mp3`);
     return [name, await ac.decodeAudioData(await r.arrayBuffer())];
@@ -1205,14 +1205,7 @@ function renderTracks() {
       opts.append(bpb, sh);
       if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
     } else {
-      if (name === "vocals" && !P.song.split) {
-        const opts = el("div", "clickopts"), sp = el("button", "tog", splitting[P.song.id] || "Split lead / backing");
-        label = el("div", "name-row"); label.append(nm, opts);
-        sp.type = "button"; sp.id = "pSplit"; sp.disabled = !!splitting[P.song.id];
-        sp.title = "Separate the backing vocals from the lead vocal (about a minute)";
-        sp.onclick = startSplit;
-        opts.append(sp);
-      }
+      if (name === "vocals" && splitting[P.song.id]) nm.querySelector("small").textContent = splitting[P.song.id];
       last = el("button", "dl"); last.type = "button"; last.title = `Download ${TRACK_TITLES[name] || name} only (MP3)`; last.setAttribute("aria-label", last.title);
       last.append(icon("download"));
       last.onclick = () => exportMix([{ name, gain: 1 }], null, last);
@@ -1241,13 +1234,16 @@ function exportAudible() {
   exportMix(tracks, click, $("#pExport"));
 }
 
-// Lead and backing vocals. Songs added before the split have one vocal track and a button to split it.
-const splitting = {}; // song id -> what its split button says while the job runs
-async function startSplit() {
-  const id = P.song.id;
-  splitting[id] = "Starting…"; renderTracks();
-  try { watchJob(await postJob(`/api/library/${id}/split`), "split", id); }
-  catch (e) { delete splitting[id]; renderTracks(); $("#pExportState").textContent = e.message; }
+// Lead and backing vocals. A song added before they were split gets split when it opens (about a minute); its vocal
+// track says so meanwhile, then the song reopens with the two tracks. Without the lead model it keeps one vocal track.
+const splitting = {}, splitTried = new Set(); // song id -> what its vocal track says while the split runs; tried once per visit
+async function autoSplit(m) {
+  if (m.split || !m.stems.includes("vocals") || splitTried.has(m.id)) return;
+  splitTried.add(m.id);
+  splitting[m.id] = "splitting into lead and backing…";
+  try { watchJob(await postJob(`/api/library/${m.id}/split`), "split", m.id); }
+  catch (e) { delete splitting[m.id]; } // the lead model isn't installed: stay with one vocal track
+  if (P.song === m) renderTracks();
 }
 // Where the split is wrong, parts of the song can keep their vocals whole: there the lead track plays all the vocals
 // and backing is silent (the server does the same for exports and the note bars in Practice). 30 ms crossfades at the edges.
