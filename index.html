@@ -184,11 +184,12 @@ input[type="range"]:disabled { opacity: 0.4; }
 .btn:hover { background: var(--hover-2); }
 .btn:active { transform: scale(0.985); }
 .btn.sm { height: 32px; padding: 0 12px; font-size: 13px; }
-/* an icon in front of a label: the icon's side gets less padding, so icon and label read as centred together */
+/* an icon in front of a label: the icon's side gets less padding, so icon and label read as centred together, and
+   6 px between them (the icon's own margin adds a little), so they read as one */
 .btn > .ico { width: 18px; height: 18px; }
 .btn.sm > .ico { width: 16px; height: 16px; }
-.btn:not(.icon):has(> .ico:first-child) { padding-left: 12px; }
-.btn.sm:not(.icon):has(> .ico:first-child) { padding-left: 8px; gap: 8px; }
+.btn:not(.icon):has(> .ico:first-child) { padding-left: 12px; gap: 6px; }
+.btn.sm:not(.icon):has(> .ico:first-child) { padding-left: 8px; gap: 6px; }
 .btn.dark { background: var(--ink); color: var(--on-ink); }
 .btn.dark:hover { background: var(--ink-strong); }
 
