@@ -36,6 +36,7 @@ Use earphones while practicing so the song doesn't leak into the mic, or turn on
 - The song is cut into **phrases**, its lines, where the singer breathes. Jump to one and it counts you in (4 3 2 1); **Loop** repeats it. ← / → move between phrases, Home / End go to the start / the end, L turns the loop on and off.
 - After an intro or a break, a count-in shows when the voice comes back.
 - The bars can move an octave up or down if the song sits outside your range.
+- **Record** (R) keeps a take each time the song plays: your voice, timed to the band (the delay of your speakers and mic is allowed for), with how much of it was in tune and how much of the melody you sang. Under the keyboard, **Takes** lists them by day; play one back over the band, download it as a WAV mixed with your own voice and band volumes, and see from a chart of your days how in tune you’ve been. Takes are kept with the song in `library/<song>/takes/`.
 
 Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp, audio-separator — about 1–2 GB, into `.venv`). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.
 
@@ -49,7 +50,7 @@ Only use audio you have the right to use; downloading from YouTube may go agains
 |---|---|
 | `index.html` | The whole app UI (one file) |
 | `server.py` | Serves the page and the library API |
-| `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export (jobs run in the background) |
+| `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export, takes (jobs run in the background) |
 | `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |
 | `launch.py` | Installs packages, finds a free port, starts the server, opens Chrome |
 | `start-*` | One-click launchers per OS |
