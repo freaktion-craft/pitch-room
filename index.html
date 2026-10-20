@@ -391,7 +391,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 /* the click's options sit beside its name, so its slider lines up with the others */
 .name-row { display: flex; align-items: center; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; min-width: 0; }
 .clickopts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
-.clickopts select { height: 28px; font-size: 12.5px; padding: 0 24px 0 8px; background-position: right 8px center; }
+.clickopts .pick { height: 28px; font-size: 12.5px; padding: 0 24px 0 8px; background-position: right 8px center; }
 .export-state { margin: 0; font-size: 13px; }
 .export-state:empty { display: none; }
 .back { display: flex; width: fit-content; margin-bottom: 20px; }
@@ -524,7 +524,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <label class="kfield">Guide vocal <input type="range" id="kGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume"></label>
       <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
       <span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span>
-      <label class="kfield">Bars <select id="kOct" aria-label="Octave of the note bars"><option value="-1">octave down</option><option value="0">as sung</option><option value="1">octave up</option></select></label>
+      <label class="kfield">Bars <button class="pick" id="kOct" type="button"></button></label>
       <div class="keyctl" role="group" aria-label="Key"></div>
       <div class="phrase-row">
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
@@ -798,7 +798,15 @@ async function restartMic() {
 }
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
-let micPick = null, namesPick = null; // the mic settings' dropdowns (makePick), made in initSing
+let micPick = null, namesPick = null, octPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
+const OCT_ITEMS = [{ v: -1, t: "octave down" }, { v: 0, t: "as sung" }, { v: 1, t: "octave up" }];
+// The click's beats per bar, in the Studio's click row. One dropdown, made once and moved into each new row (every
+// makePick adds its own list and listeners for good).
+let bpbPick = null;
+const bpbButton = () => {
+  if (!bpbPick) bpbPick = makePick(Object.assign(el("button", "pick"), { type: "button" }), "Beats per bar", (v) => { const t = P.tracks.click; t.bpb = v; t.offset %= t.bpb; renderTracks(); });
+  return bpbPick;
+};
 // The mic settings' Input menu. Until the mic has been allowed, the browser holds back the inputs' names (and often
 // the inputs), so they're numbered and a hint says how to see them. A chosen input that's gone shows as the default.
 // Inputs are listed under their device: "Mic | Line 1/2" under "Audient EVO4".
@@ -907,6 +915,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   return {
     set(next, v) { items = next; value = v; paint(); if (!list.hidden) show(true); },
     get value() { return value; },
+    btn,
     close() { show(false); },
   };
 }
@@ -1665,12 +1674,10 @@ function renderTracks() {
       const opts = el("div", "clickopts");
       label = el("div", "name-row"); label.append(nm, opts);
       last = el("span"); // no download for the click alone
-      const bpb = document.createElement("select"); bpb.setAttribute("aria-label", "Beats per bar");
-      [2, 3, 4, 6].forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = k + "/4"; bpb.append(o); });
-      bpb.value = t.bpb; bpb.onchange = () => { t.bpb = +bpb.value; t.offset %= t.bpb; renderTracks(); };
+      const bpb = bpbButton(); bpb.set([2, 3, 4, 6].map((k) => ({ v: k, t: k + "/4" })), t.bpb);
       const sh = mkBtn("Shift accent", () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = `Accent on ${t.offset + 1}`; });
       sh.className = "tog"; sh.textContent = t.offset ? `Accent on ${t.offset + 1}` : "Shift accent";
-      opts.append(bpb, sh);
+      opts.append(bpb.btn, sh);
       if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
     } else {
       if (name === "vocals" && splitting[P.song.id]) nm.querySelector("small").textContent = splitting[P.song.id];
@@ -2168,7 +2175,7 @@ async function singSong(m, btn) {
   songEvs(); songView(true);
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
   renderTracks(); applyGains();
-  $("#kOct").value = String(K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
+  octPick.set(OCT_ITEMS, K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute)); $("#kClickVol").value = P.tracks.click.vol;
   $("#kClick").disabled = $("#kClickVol").disabled = !(m.beats && m.beats.length);
   setText("playTitle", m.title);
@@ -2185,7 +2192,8 @@ function songToggle() {
 }
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
 function initSing() {
-  $("#kOct").onchange = (e) => { K.oct = +e.target.value; songEvs(); };
+  octPick = makePick($("#kOct"), "Octave of the note bars", (v) => { K.oct = v; songEvs(); });
+  octPick.set(OCT_ITEMS, K.oct);
   $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
   $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== guideName() && n !== "click") t.vol = K.bandVol; applyGains(); };
   resetOnDblClick($("#kGuide"), 0.5); resetOnDblClick($("#kBand"), 1);
