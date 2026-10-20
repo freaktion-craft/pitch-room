@@ -1488,13 +1488,19 @@ function drawWave() {
   }
   x.fillStyle = C.ink;
   if (P.peaks) {
-    const n = P.peaks.length, bw = W / n, t = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
+    // Bars on whole device pixels, 2 px wide and 1 px apart (at 1×), each the loudest of the peaks it covers. A bar per
+    // peak came out under a pixel wide at fractional places, alternately crisp and smeared: a striped waveform.
+    const n = P.peaks.length, t = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
+    const bw = Math.max(1, Math.round(2 * d)), pitch = bw + Math.max(1, Math.round(d)), m = Math.floor(c.width / pitch), Hd = Math.round(H * d);
     const soloed = Object.keys(P.tracks).filter((k) => P.tracks[k].solo && P.trackPeaks && P.trackPeaks[k]);
+    x.setTransform(1, 0, 0, 1, 0, 0);
     const bars = (peaks, played, ahead) => {
-      for (let i = 0; i < n; i++) {
-        const h = 1 + (Math.max(1, peaks[i] * (H - 16)) - 1) * waveRise(i, n, t);
-        x.globalAlpha = i / n < prog ? played : ahead;
-        x.fillRect(i * bw, (H - h) / 2, Math.max(1, bw - 0.3), h);
+      for (let j = 0; j < m; j++) {
+        let pk = 0;
+        for (let i = Math.floor((j * n) / m), e = Math.max(i + 1, Math.floor(((j + 1) * n) / m)); i < e; i++) if (peaks[i] > pk) pk = peaks[i];
+        const h = Math.max(1, Math.round((1 + (Math.max(1, pk * (H - 16)) - 1) * waveRise(j, m, t)) * d));
+        x.globalAlpha = (j + 0.5) / m < prog ? played : ahead;
+        x.fillRect(j * pitch, (Hd - h) >> 1, bw, h);
       }
     };
     if (!soloed.length) bars(P.peaks, 1, 0.18);
@@ -1502,10 +1508,11 @@ function drawWave() {
       bars(P.peaks, 0.16, 0.08);
       for (const k of soloed) { x.fillStyle = stemColor(k); bars(P.trackPeaks[k], 1, 0.4); }
     }
+    x.setTransform(d, 0, 0, d, 0, 0);
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
   x.globalAlpha = 1;
   const lw = P.phHover || P.scrub ? 4 : 2, top = P.scrub ? 20 : 0; // thicker while you can grab it; hangs from the flag while dragged
-  x.fillStyle = C.voice; x.fillRect(prog * W - lw / 2, top, lw, H - top);
+  x.fillStyle = C.voice; x.fillRect(Math.round((prog * W - lw / 2) * d) / d, top, lw, H - top); // on whole pixels: a crisp line, moving or not
   const flag = $("#pFlag");
   flag.hidden = !P.scrub;
   if (P.scrub) {
