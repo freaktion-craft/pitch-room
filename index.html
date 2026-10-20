@@ -67,7 +67,10 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .iconchip { width: 32px; padding: 0; justify-content: center; }
 /* The mic chip: a square with the mic struck through while it's off; turned on, it slides open to show the spectrum.
    Both icons share one cell. */
-.chipbtn.mic { padding: 0 8px; }
+.chipbtn.mic { padding: 0 8px; transition: background-color 0.15s, color 0.15s; }
+/* off: a light red tint, so a mic that isn't listening gets noticed */
+.chipbtn.mic:not(.on) { background: color-mix(in oklab, var(--bad) 14%, transparent); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
+.chipbtn.mic:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, transparent); }
 .mic-ico { display: inline-grid; }
 .mic-ico > .ico { grid-area: 1 / 1; width: 16px; height: 16px; }
 .mic.on .mic-ico { color: var(--ink); }
