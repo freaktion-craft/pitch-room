@@ -70,6 +70,10 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .themebtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 .mic-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .mic.on .mic-dot { background: var(--good); }
+/* both labels share one cell, so the chip keeps its width when the mic turns on or off */
+.mic-lbl { display: inline-grid; }
+.mic-lbl > span { grid-area: 1 / 1; }
+.mic.on .if-off, .mic:not(.on) .if-on { visibility: hidden; }
 /* the mic's spectrum: one bar per band of the voice range, as tall as that band is loud */
 .spec { display: inline-flex; align-items: center; gap: 2px; height: 16px; }
 .spec i { width: 3px; height: 16px; border-radius: 1.5px; background: var(--faint); transform: scaleY(0.15); }
@@ -349,7 +353,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Stem</a>
-    <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+    <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span class="mic-lbl"><span class="if-on">Mic on</span><span class="if-off">Mic off</span></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     <button class="chipbtn themebtn" id="micSetBtn" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="micSet" hidden></button>
     <button class="chipbtn themebtn" id="themeBtn" type="button" aria-label="Dark mode"></button>
     <div class="pop" id="micSet" role="dialog" aria-label="Mic settings" hidden>
@@ -1799,7 +1803,7 @@ function renderHud(now, m) {
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
 function renderMic() {
   $("#micBtn").classList.toggle("on", micOn);
-  setText("micLabel", micOn ? "Mic on" : "Turn on mic");
+  $("#micBtn").setAttribute("aria-pressed", String(micOn));
 }
 function notice(msg) {
   const ov = $("#overlay"); ov.innerHTML = "";
