@@ -58,7 +58,7 @@ a { color: inherit; text-decoration: none; }
 .app { max-width: 1440px; margin: 0 auto; padding-block: 24px 64px;
   padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
 
-/* Top bar: app name, mic chip, mic settings */
+/* Top bar: app name, mic chip, settings */
 header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .brand { margin-right: auto; font-size: 15px; font-weight: 500; }
 .chipbtn { height: 32px; padding: 0 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: var(--fill);
@@ -79,7 +79,7 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .spec i { flex: none; }
 .spec i { width: 3px; height: 16px; border-radius: 1.5px; background: var(--faint); transform: scaleY(0.15); }
 .mic.on .spec i { background: var(--ink); }
-/* mic settings, under the gear */
+/* settings (the mic's, note names, colour), under the gear */
 header { position: relative; }
 .pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(340px, calc(100vw - 32px)); padding: 16px; border-radius: 12px;
   background: var(--surface); box-shadow: 0 0 0 1px var(--line), 0 10px 28px rgba(0, 0, 0, 0.18); display: grid; gap: 12px; font-size: 13.5px; }
@@ -92,9 +92,9 @@ header { position: relative; }
 #micDev { flex: 0 1 200px; }
 #micDevHint { margin-top: -8px; }
 .iconchip .ico { width: 16px; height: 16px; }
-/* the accent colour: picked in a panel of swatches under the palette button, as wide as their row */
-#accentSet { width: min-content; line-height: 20px; }
-.swatches { display: flex; gap: 4px; }
+/* the accent colour: a row of swatches in the settings, under a hairline, spread across the panel */
+.pop-sec { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); line-height: 20px; }
+.swatches { display: flex; justify-content: space-between; margin: 0 -4px; } /* the dots, not their rings, line up with the rows above */
 .swatch { width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow 0.15s; }
 /* the picked one: a quiet ring in its own colour, not a bright one that outshines the colours */
 .swatch:hover { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c) 25%, transparent); }
@@ -446,20 +446,15 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
   <header>
     <a class="brand" href="#stems">Stem</a>
     <button class="chipbtn mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
-    <button class="chipbtn iconchip" id="micSetBtn" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="micSet"></button>
+    <button class="chipbtn iconchip" id="micSetBtn" type="button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="micSet"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
-    <div class="pop" id="micSet" role="dialog" aria-label="Mic settings" hidden>
+    <div class="pop" id="micSet" role="dialog" aria-label="Settings" hidden>
       <label>Input <button class="pick" id="micDev" type="button"></button></label>
       <p class="hint" id="micDevHint" hidden>Turn on the mic to see each input’s name.</p>
       <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
       <label>Note names <button class="pick" id="names" type="button"></button></label>
-      <p class="hint">With earphones the song doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
-    </div>
-    <button class="chipbtn iconchip" id="accentBtn" type="button" aria-label="Accent colour" title="Accent colour" aria-expanded="false" aria-controls="accentSet"></button>
-    <div class="pop" id="accentSet" role="dialog" aria-label="Accent colour" hidden>
-      <span>Accent colour</span>
-      <div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div>
+      <div class="pop-sec"><span>Accent colour</span><div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div></div>
     </div>
   </header>
 
@@ -910,7 +905,6 @@ Object.assign(ICONS, {
   tick: '<path d="M5 14L8.5 17.5L19 6.5"/>', // Tick02
   mic: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C15.8824 18 18.7174 15.3914 19 12M12 22H15M12 22H9"/><path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6V11C16 13.2091 14.2091 15 12 15C9.79086 15 8 13.2091 8 11V6Z"/>', // Mic02
   micOff: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C14.0193 18 15.443 17.4658 16.5665 16.5665M12 22H15M12 22H9M19 12C18.93 12.8406 18.7031 13.6331 18.3497 14.3497"/><path d="M8.3535 4.3535C8.98114 2.96566 10.3778 2 12 2C14.2091 2 16 3.79086 16 6V11C16 11.309 15.965 11.6098 15.8987 11.8987M8 8V11C8 13.2091 9.79086 15 12 15C12.8492 15 13.6365 14.7354 14.2841 14.2841"/><path d="M2 2L22 22"/>', // MicOff02
-  palette: '<path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C12.8417 22 14 22.1163 14 21C14 20.391 13.6832 19.9212 13.3686 19.4544C12.9082 18.7715 12.4523 18.0953 13 17C13.6667 15.6667 14.7778 15.6667 16.4815 15.6667C17.3334 15.6667 18.3334 15.6667 19.5 15.5C21.601 15.1999 22 13.9084 22 12Z"/><circle cx="9.5" cy="8.5" r="1.5"/><circle cx="16.5" cy="9.5" r="1.5"/><path d="M7.125 15H7M7.25 15C7.25 15.1381 7.13807 15.25 7 15.25C6.86193 15.25 6.75 15.1381 6.75 15C6.75 14.8619 6.86193 14.75 7 14.75C7.13807 14.75 7.25 14.8619 7.25 15Z"/>', // PaintBoard
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
   practice: '<path d="M7 6.5C7 4.01472 9.01472 2 11.5 2C13.9853 2 16 4.01472 16 6.5V11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5V6.5Z"/><path d="M11.5 19H11.0828C7.57267 19 4.57706 16.4623 4 13M11.5 19H11.9172C15.4273 19 18.4229 16.4623 19 13M11.5 19V22"/>', // Mic01
   video: '<path d="M2 11C2 7.70017 2 6.05025 3.02513 5.02513C4.05025 4 5.70017 4 9 4H10C13.2998 4 14.9497 4 15.9749 5.02513C17 6.05025 17 7.70017 17 11V13C17 16.2998 17 17.9497 15.9749 18.9749C14.9497 20 13.2998 20 10 20H9C5.70017 20 4.05025 20 3.02513 18.9749C2 17.9497 2 16.2998 2 13V11Z"/><path d="M17 8.90585L17.1259 8.80196C19.2417 7.05623 20.2996 6.18336 21.1498 6.60482C22 7.02628 22 8.42355 22 11.2181V12.7819C22 15.5765 22 16.9737 21.1498 17.3952C20.2996 17.8166 19.2417 16.9438 17.1259 15.198L17 15.0941"/><circle cx="11.5" cy="9.5" r="1.5"/>', // Video01
@@ -1929,7 +1923,7 @@ async function singSong(m, btn) {
   setText("playTitle", m.title);
   go("practice");
 }
-function showMicSet(on) { if (on) showAccent(false); else { micPick?.close(); namesPick?.close(); } $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
+function showMicSet(on) { if (!on) { micPick?.close(); namesPick?.close(); } $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
 function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").hidden = true; }
@@ -1965,7 +1959,7 @@ function initSing() {
   });
   $("#kLeave").prepend(icon("back"));
   $("#kLeave").onclick = () => { leaveSong(); go(P.song ? "stems/" + P.song.id : "stems"); };
-  // mic settings: a panel under the gear beside the mic chip; a click elsewhere or Escape closes it
+  // settings: a panel under the gear beside the mic chip; a click elsewhere or Escape closes it
   const setBtn = $("#micSetBtn"), pop = $("#micSet");
   setBtn.append(icon("settings"));
   setBtn.onclick = (e) => { e.stopPropagation(); showMicSet(pop.hidden); };
@@ -2000,8 +1994,8 @@ function resize() {
 new ResizeObserver(resize).observe(cv);
 readColors();
 
-// accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked in a
-// panel under the dot in the header, which closes like the mic settings (a click elsewhere, Escape); one panel at a time.
+// accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked from the
+// swatches in the settings.
 const ACCENTS = { blue: "Blue", violet: "Violet", pink: "Pink", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal" };
 let accent = store.get("accent", "blue");
 if (!(accent in ACCENTS)) accent = "blue";
@@ -2011,23 +2005,13 @@ function setAccent(k) {
   readColors(); // the canvas takes it from here
   for (const b of $("#swatches").children) b.setAttribute("aria-pressed", String(b.dataset.k === k));
 }
-function showAccent(on) {
-  if (on) { showMicSet(false); closeMenu(); }
-  $("#accentSet").hidden = !on; $("#accentBtn").setAttribute("aria-expanded", String(on));
-  if (on) $("#swatches [aria-pressed='true']").focus();
-}
 (function initAccent() {
-  const btn = $("#accentBtn"), pop = $("#accentSet");
-  btn.append(icon("palette"));
   for (const [k, name] of Object.entries(ACCENTS)) {
     const s = el("button", "swatch"); s.type = "button"; s.dataset.k = k; s.title = name; s.setAttribute("aria-label", name);
     s.setAttribute("aria-pressed", String(k === accent)); s.style.setProperty("--c", `var(--voice-${k})`);
     s.onclick = () => setAccent(k);
     $("#swatches").append(s);
   }
-  btn.onclick = (e) => { e.stopPropagation(); showAccent(pop.hidden); };
-  document.addEventListener("click", (e) => { if (!pop.hidden && !pop.contains(e.target)) showAccent(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showAccent(false); btn.focus(); } });
 })();
 
 function rr(x, y, w, h, r) {
