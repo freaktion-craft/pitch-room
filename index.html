@@ -1145,8 +1145,14 @@ function computePeaks() {
     peaks[i] = mx;
   }
   const top = Math.max(...peaks) || 1; for (let i = 0; i < n; i++) peaks[i] /= top;
-  P.peaks = peaks;
+  P.peaks = peaks; P.peaksAt = performance.now();
 }
+// While the tracks load the waveform is a flat line; then its bars rise out of it, sweeping left to right.
+const WAVE_RISE = 900; // ms for the whole sweep
+const waveRise = (i, n, t) => { // bar i of n, t ms after the peaks came in: 0 flat … 1 full height
+  const k = Math.min(1, Math.max(0, (t / WAVE_RISE - 0.4 * (i / n)) / 0.6));
+  return 1 - Math.pow(1 - k, 3); // ease out
+};
 function drawWave() {
   const c = $("#pWave"), r = c.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
   if (!r.width) return;
@@ -1159,17 +1165,16 @@ function drawWave() {
     if (P.sel && P.sel.part == null) { x.fillStyle = C.ink; x.globalAlpha = 0.1; x.fillRect(X(P.sel.a), 0, X(P.sel.b) - X(P.sel.a), H); }
     x.globalAlpha = 1;
   }
+  x.fillStyle = C.ink;
   if (P.peaks) {
-    const n = P.peaks.length, bw = W / n;
+    const n = P.peaks.length, bw = W / n, t = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
     for (let i = 0; i < n; i++) {
-      const h = Math.max(1, P.peaks[i] * (H - 16));
-      x.fillStyle = C.ink; x.globalAlpha = i / n < prog ? 1 : 0.18;
+      const h = 1 + (Math.max(1, P.peaks[i] * (H - 16)) - 1) * waveRise(i, n, t);
+      x.globalAlpha = i / n < prog ? 1 : 0.18;
       x.fillRect(i * bw, (H - h) / 2, Math.max(1, bw - 0.3), h);
     }
-    x.globalAlpha = 1;
-  } else {
-    x.fillStyle = C.ink; x.globalAlpha = 0.35; x.font = "13px Pretendard, system-ui, sans-serif"; x.fillText("Loading tracks…", 12, H / 2 + 4); x.globalAlpha = 1;
-  }
+  } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
+  x.globalAlpha = 1;
   x.fillStyle = C.voice; x.fillRect(prog * W - 1, 0, 2, H);
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
 }
