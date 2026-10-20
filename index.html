@@ -155,6 +155,9 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
 @media (prefers-reduced-motion: reduce) { .ring.spin { animation: none; } }
 .pick-list [aria-selected="true"] .ico { visibility: visible; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
+/* a slider's level over its handle while you move it (sliderTips) */
+.slider-tip { position: fixed; z-index: 40; transform: translate(-50%, -100%); height: 20px; padding: 0 8px; display: grid; place-items: center;
+  border-radius: 4px; background: var(--ink); color: var(--on-ink); font: 11px var(--mono); font-variant-numeric: tabular-nums; pointer-events: none; }
 .switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: rgba(var(--fg), 0.12); position: relative;
   margin: 0; cursor: pointer; transition: background-color 0.2s var(--ease); flex: none; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--knob);
@@ -503,7 +506,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <div class="pop" id="micSet" role="dialog" aria-label="Settings" hidden>
       <label>Input <button class="pick" id="micDev" type="button"></button></label>
       <p class="hint" id="micDevHint" hidden>Turn on the mic to see each input’s name.</p>
-      <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
+      <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" data-tip="pos" aria-label="Mic sensitivity"></label>
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
       <label>Note names <button class="pick" id="names" type="button"></button></label>
       <div class="pop-sec"><span>Accent colour</span><div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div></div>
@@ -965,6 +968,38 @@ function resetOnDblClick(input, def) {
   input.title = "Double-click to reset";
   input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
 }
+// Every slider: only its handle can be grabbed (a press elsewhere on it doesn't jump the level there), and while it's
+// held, or moved with the keys, a tip over the handle says the level: a volume as a percentage of full (up to 150%),
+// others (data-tip="pos") as how far along they are.
+(function sliderTips() {
+  const THUMB = 16, tip = el("output", "slider-tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
+  document.body.append(tip);
+  let held = null, keyTimer = 0;
+  const frac = (s) => { const f = (s.value - s.min) / (s.max - s.min || 1); return s.dir === "rtl" ? 1 - f : f; };
+  const thumbX = (s) => { const r = s.getBoundingClientRect(); return r.left + THUMB / 2 + frac(s) * (r.width - THUMB); };
+  function show(s) {
+    if (!s) { tip.hidden = true; return; }
+    tip.textContent = s.dataset.tip === "pos" ? `${Math.round(frac(s) * 100)}%` : `${Math.round(s.value * 100)}%`;
+    tip.hidden = false;
+    tip.style.left = thumbX(s) + "px"; tip.style.top = s.getBoundingClientRect().top - 4 + "px";
+  }
+  document.addEventListener("pointerdown", (e) => {
+    const s = e.target.closest && e.target.closest('input[type="range"]');
+    if (!s || s.disabled) return;
+    if (Math.abs(e.clientX - thumbX(s)) > THUMB / 2 + (e.pointerType === "touch" ? 8 : 2)) { e.preventDefault(); return; } // not the handle
+    held = s; show(s);
+  }, true);
+  document.addEventListener("input", (e) => { if (e.target === held || (e.target.matches?.('input[type="range"]') && e.target === document.activeElement && keyTimer)) show(e.target); }, true);
+  for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, () => { if (held) { held = null; show(null); } }, true);
+  document.addEventListener("keydown", (e) => {
+    const s = e.target;
+    if (!s.matches || !s.matches('input[type="range"]') || !/^(Arrow|Page|Home|End)/.test(e.key)) return;
+    clearTimeout(keyTimer); keyTimer = setTimeout(() => { keyTimer = 0; if (!held) show(null); }, 900);
+    requestAnimationFrame(() => show(s)); // after the key has moved it
+  }, true);
+  document.addEventListener("focusout", (e) => { if (e.target.matches?.('input[type="range"]') && !held) show(null); }, true);
+  addEventListener("scroll", () => { if (!held) show(null); }, { passive: true });
+})();
 
 // ---------- stems ----------
 // Icons: Hugeicons, stroke rounded (hugeicons.com, MIT). icons.local.js, when there is one (it stays out of git),
