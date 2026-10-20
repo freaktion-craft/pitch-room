@@ -351,17 +351,18 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .ico > * { vector-effect: non-scaling-stroke; }
 /* the song's volume and export sit in the same columns as each track's solo button, slider and download */
 .player { --c-btn: 32px; --c-vol: 160px; }
-.mix { margin-left: auto; margin-right: 12px; display: grid; grid-template-columns: var(--c-btn) var(--c-vol) var(--c-btn); gap: 12px; align-items: center; justify-items: center; }
+.mix { margin-left: auto; display: grid; grid-template-columns: var(--c-btn) var(--c-vol) var(--c-btn); gap: 12px; align-items: center; justify-items: center; }
 .mix-ico { display: flex; color: rgba(var(--fg), 0.55); }
 .mix-ico .ico { width: 18px; height: 18px; }
 .mix input { width: 100%; justify-self: start; } /* placed like the track sliders, which start-align */
 /* play ⇄ pause icon, drawn by ppTo(). A stroke in the fill colour with round joins softens the corners
    (and covers the seam where the triangle's two halves meet). */
 .pp { width: 14px; height: 16px; flex: none; fill: currentColor; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
-/* a well like the waveform's (no outline), so the transport row between them reads as evenly spaced */
-.tracks { display: grid; border-radius: 12px; background: var(--bg); }
+/* the tracks are a short, fixed list: rows on the card itself, hairlines between them, no box around them; their
+   buttons line up with the transport row's above */
+.tracks { display: grid; }
 /* the icon gets room on both sides (wider first column, more left padding); the right side lines up with .mix above */
-.track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 12px; padding: 8px 12px 8px 20px; min-height: 48px; }
+.track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 12px; padding: 8px 0; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
 .track .ico { width: 18px; height: 18px; }
 .track .name { font-size: 14px; min-width: 0; }
