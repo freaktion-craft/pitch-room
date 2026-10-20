@@ -122,20 +122,24 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
   background-image: var(--chevron);
   background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px; }
 /* A dropdown in the app's own style (the browser's list of a <select> can't be styled): a button like a select, and a
-   list like the ⋮ menu under it, the chosen one ticked, choices under group headings when they have them */
+   list like the ⋮ menu under it, the chosen one ticked at the row's end, choices under group headings when they have
+   them, and a footnote when it has one */
 .pick { display: inline-flex; align-items: center; min-width: 0; color: var(--ink); text-align: left; }
 .pick > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-list { position: fixed; z-index: 30; padding: 4px; border-radius: 10px; background: var(--surface); overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: thin; scrollbar-color: var(--ring) transparent;
   box-shadow: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.4); }
-.pick-list .grp { padding: 12px 8px 4px 32px; font-size: 12px; line-height: 16px; color: var(--faint); } /* lined up with the names, past the ticks */
+.pick-list .grp { padding: 12px 12px 4px; font-size: 12px; line-height: 16px; color: var(--faint); } /* lined up with the names */
 .pick-list .grp:first-child { padding-top: 4px; }
-.pick-list [role="option"] { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0 12px 0 8px; border: 0; border-radius: 6px;
+.pick-list .foot { margin: 4px 0 0; padding: 8px 12px 4px; border-top: 1px solid var(--line); font-size: 12px; line-height: 16px; color: var(--muted); }
+.pick-list [role="option"] { display: flex; align-items: center; gap: 12px; width: 100%; height: 32px; padding: 0 8px 0 12px; border: 0; border-radius: 6px;
   background: transparent; color: var(--ink); font-size: 13.5px; text-align: left; }
 .pick-list [role="option"]:hover, .pick-list [role="option"]:focus-visible { background: var(--fill); outline: none; }
 .pick-list [role="option"] span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; visibility: hidden; }
+.pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; margin-left: auto; visibility: hidden; }
 .pick-list [role="option"] .side { margin-left: auto; padding-left: 16px; min-width: 56px; text-align: right; font: 12.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pick-list [role="option"] .side + .ico { margin-left: 0; } /* 12 px after the note, as after a name */
+.pick-list [role="option"] .side.warn { color: var(--warn-ink); }
 .pick-list [aria-selected="true"] .ico { visibility: visible; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: rgba(var(--fg), 0.12); position: relative;
@@ -273,8 +277,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .job.err .top { align-self: center; }
 
 .player { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 16px; display: grid; gap: 16px; margin-bottom: 32px; }
-.player-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.player-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; } /* Info's title and buttons */
 .player-title { display: grid; gap: 4px; min-width: 0; }
+#sPlayer .player-title { gap: 8px; } /* the title, then the key, the facts and the buttons */
 .player-title b { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
 .player-title .muted { font-size: 13px; }
 /* the song's video, muted: the stems carry the sound, the picture is for following lyrics */
@@ -318,11 +323,11 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .knote.warn { color: var(--warn-ink); }
 .knote.err { color: var(--bad); }
-/* In the Studio the control sits with the song's actions, the tempo beside it, and its note at the end of the line
-   under the title (after "2:11 · 5 tracks"), on that one line */
-.row-actions .keyctl { flex: none; }
-.bpm { font-size: 13px; color: rgba(var(--fg), 0.6); white-space: nowrap; }
-.meta-line { display: flex; min-width: 0; white-space: nowrap; }
+/* In the Studio the control sits under the title, then the tempo, length and tracks, then its note, and the song's
+   buttons at the end of that line; on a narrow screen the buttons go to a line of their own */
+.song-facts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
+.song-facts .keyctl { flex: none; }
+.meta-line { display: flex; flex: 1 1 120px; min-width: 0; white-space: nowrap; }
 #pKeyNote { flex: 1 1 0; width: auto; min-width: 0; height: auto; max-height: none; display: block; overflow: hidden; text-overflow: ellipsis; font-size: inherit; line-height: inherit; }
 #pKeyNote:not(:empty)::before { content: " · "; color: var(--muted); white-space: pre; }
 @media (max-width: 760px) { /* too little room beside the key: the note gets a line of its own, there even when empty */
@@ -352,7 +357,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 /* play ⇄ pause icon, drawn by ppTo(). A stroke in the fill colour with round joins softens the corners
    (and covers the seam where the triangle's two halves meet). */
 .pp { width: 14px; height: 16px; flex: none; fill: currentColor; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
-.tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
+/* its edge as clear as the waveform's above the transport, so the row between reads as evenly spaced (16 px each way) */
+.tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--ring); }
 /* the icon gets room on both sides (wider first column, more left padding); the right side lines up with .mix above */
 .track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 12px; padding: 8px 12px 8px 20px; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
@@ -593,9 +599,9 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     </section>
 
     <section class="player" id="sPlayer" hidden>
-      <div class="player-head">
-        <div class="player-title"><b id="pTitle"></b><span class="muted meta-line"><span id="pMeta"></span><span class="knote" id="pKeyNote"></span></span></div>
-        <div class="row-actions"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="bpm" id="pBpm" hidden></span><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div>
+      <div class="player-title"><b id="pTitle"></b>
+        <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span id="pMeta"></span><span class="knote" id="pKeyNote"></span></span>
+          <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
@@ -810,11 +816,12 @@ function splitInput(label) {
   return [s, ""];
 }
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
-// whole name, for its tooltip, side: a note at the row's end, btn: what the button says when it's chosen, if not t});
-// onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v (to show how it's coming
-// along in its row). The list lives in the panel the button is in, so a click on it counts as inside that panel; Escape
-// closes the list only. Changing the items while it's open redraws it in place, focus and scroll kept.
-function makePick(btn, name, onPick, { stayOpen, minWidth } = {}) {
+// whole name, for its tooltip, side: a note at the row's end (warn: in the warning colour), btn: what the button says
+// when it's chosen, if not t}); onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v
+// (to show how it's coming along in its row); foot: a line under the list. The list lives in the panel the button is
+// in, so a click on it counts as inside that panel; Escape closes the list only. Changing the items while it's open
+// redraws it in place, focus and scroll kept.
+function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   const list = el("div", "pick-list"), label = el("span");
   list.setAttribute("role", "listbox"); list.setAttribute("aria-label", name); list.hidden = true;
   btn.append(label); btn.setAttribute("aria-haspopup", "listbox"); btn.setAttribute("aria-expanded", "false");
@@ -836,8 +843,9 @@ function makePick(btn, name, onPick, { stayOpen, minWidth } = {}) {
       if (it.g && it.g !== g) list.append(el("div", "grp", it.g));
       g = it.g || "";
       const o = el("button"); o.type = "button"; o.setAttribute("role", "option"); o.setAttribute("aria-selected", String(it.v === value));
-      o.dataset.v = String(it.v); o.title = it.full || it.t; o.append(icon("tick"), el("span", null, it.t));
-      if (it.side) o.append(el("small", "side", it.side));
+      o.dataset.v = String(it.v); o.title = it.full || it.t; o.append(el("span", null, it.t));
+      if (it.side) o.append(el("small", "side" + (it.warn ? " warn" : ""), it.side));
+      o.append(icon("tick"));
       o.onclick = () => {
         const keep = stayOpen && stayOpen(it.v);
         if (!keep) { show(false); btn.focus(); }
@@ -845,21 +853,22 @@ function makePick(btn, name, onPick, { stayOpen, minWidth } = {}) {
       };
       list.append(o);
     }
+    if (foot) list.append(el("p", "foot", foot));
     if (again) { // redrawn while open: where it was
       list.scrollTop = top;
       const f = options().find((o) => o.dataset.v === focused);
       if (f) f.focus();
       return;
     }
-    // under the button, right edges lined up, as tall as the window allows up to 560 px (above the button if there's no
-    // room below), and as wide as its longest row plus a scrollbar if it needs one (from the button's width, or
-    // minWidth, up to 360 px)
+    // under the button, left edges lined up (right edges where it would run off the window), as tall as the window
+    // allows up to 560 px (above the button if there's no room below), and as wide as its longest row plus a scrollbar
+    // if it needs one (from the button's width, or minWidth, up to 360 px)
     const r = btn.getBoundingClientRect(), below = innerHeight - r.bottom - 20, above = r.top - 20, up = below < 200 && above > below;
     list.style.maxHeight = Math.min(560, up ? above : below) + "px";
     list.style.width = "max-content";
     const bar = list.offsetWidth - list.clientWidth;
     const w = Math.min(Math.max(r.width, minWidth || 0, Math.ceil(list.offsetWidth) + bar + 8), 360, innerWidth - 32);
-    list.style.width = w + "px"; list.style.left = Math.max(16, r.right - w) + "px";
+    list.style.width = w + "px"; list.style.left = (r.left + w <= innerWidth - 16 ? r.left : Math.max(16, r.right - w)) + "px";
     list.style.top = up ? "" : r.bottom + 4 + "px"; list.style.bottom = up ? innerHeight - r.top + 4 + "px" : "";
     const cur = options().find((o) => o.getAttribute("aria-selected") === "true") || options()[0];
     if (cur) { cur.focus(); cur.scrollIntoView({ block: "nearest" }); }
@@ -1349,9 +1358,8 @@ async function openSong(m) {
   P.song = m; P.offset = 0; P.ph = null;
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
-  // under the title: length and tracks (the key and tempo are up with the key control)
-  const meta = () => { $("#pMeta").textContent = [fmtTime(m.duration), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].join(" · "); };
-  $("#pBpm").textContent = m.bpm ? `${m.bpm} BPM` : ""; $("#pBpm").hidden = !m.bpm;
+  // under the title, after the key: tempo, length and tracks
+  const meta = () => { $("#pMeta").textContent = [m.bpm ? `${m.bpm} BPM` : "", fmtTime(m.duration), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].filter(Boolean).join(" · "); };
   meta(); keyOf(m).then(() => { if (P.song === m) { meta(); paintKey(); } });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
@@ -1765,15 +1773,17 @@ function swapSources() {
   setTimeout(() => oldBus.disconnect(), 600);
   P.bus.gain.setValueAtTime(0, ac.currentTime); P.bus.gain.setTargetAtTime(stemVol, at, 0.015);
 }
-// Both controls (Studio's header, Practice's bar): a list of the keys, +6 at the top to −6, each with how far it is
-// from the original. Picking one that isn't rendered yet keeps the list open, its row counting up to ready; the button
-// says so too. The far ones are under a heading that says they can sound processed; the note says so once chosen.
+// Both controls (Studio's header, Practice's bar): a list of the keys, under Higher +6 to +1, the original, then under
+// Lower −1 to −6, each with how far it is from the original; that distance is in the warning colour from KEY_WARN on,
+// which the list's footnote explains (and the note beside the control, once chosen). Picking one that isn't rendered
+// yet keeps the list open, its row counting up to ready; the button says so too.
+const KEY_FOOT = `${KEY_WARN} or more semitones (in amber) can sound processed.`;
 function keyItems(m, want) {
   const items = [];
   for (let n = KEYS; n >= -KEYS; n--) {
     const k = m && keyAfter(m.key, n), name = k ? keyName(k) : n ? `${keySign(n)} semitones` : "Original key";
     const busy = n === want && P.keyProg != null, pct = busy ? `${Math.round(P.keyProg * 100)}%` : "";
-    items.push({ v: n, t: name, side: busy ? pct : n ? keySign(n) : "original", g: Math.abs(n) >= KEY_WARN ? "Can sound processed" : "",
+    items.push({ v: n, t: name, side: busy ? pct : n ? keySign(n) : "original", warn: !busy && Math.abs(n) >= KEY_WARN, g: n > 0 ? "Higher" : n < 0 ? "Lower" : "",
       btn: busy ? `${name} · ${pct}` : n && k ? `${name} (${keySign(n)})` : name, full: busy ? `Changing key… ${pct}` : n && k ? `Originally ${keyName(m.key)}` : "" });
   }
   return items;
@@ -1792,7 +1802,7 @@ function paintKey() {
     box.note = box.dataset.note ? $(box.dataset.note) : el("span", "knote"); // the Studio's goes under the title
     box.append(el("span", null, "Key"), btn);
     if (!box.dataset.note) box.append(box.note);
-    box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n), minWidth: 240 });
+    box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n), minWidth: 240, foot: KEY_FOOT });
   }
   paintKey();
 })();
