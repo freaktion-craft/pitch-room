@@ -138,9 +138,18 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px;
 .pick-list [role="option"] span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; margin-left: auto; visibility: hidden; }
 .pick-list [role="option"] .side { margin-left: auto; padding-left: 16px; min-width: 56px; text-align: right; font: 12.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.pick-list [role="option"] .side + .ico { margin-left: 0; } /* 12 px after the note, as after a name */
-.pick-list [role="option"] .side.warn, .pick-list .foot b { color: var(--voice); }
+.pick-list [role="option"] .side + .ico, .pick-list [role="option"] .side + .ring { margin-left: 0; } /* 12 px after the note, as after a name */
+.pick-list [role="option"] .side.accent { color: var(--voice); }
+.pick-list [role="option"] .side.faint, .pick-list .foot b { color: var(--faint); }
 .pick-list .foot b { font: 12px var(--mono); }
+/* how far a choice that takes a while has got, where its tick will be: a ring filling up (spinning until it knows) */
+.pick-list .ring { width: 16px; height: 16px; flex: none; margin-left: auto; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 2; }
+.ring circle:first-child { stroke: var(--ring); }
+.ring circle + circle { stroke: var(--voice); stroke-linecap: round; }
+.ring.spin { animation: ring-spin 0.9s linear infinite; }
+@keyframes ring-spin { to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) { .ring.spin { animation: none; } }
 .pick-list [aria-selected="true"] .ico { visibility: visible; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: rgba(var(--fg), 0.12); position: relative;
@@ -818,11 +827,18 @@ function splitInput(label) {
   return [s, ""];
 }
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
-// whole name, for its tooltip, side: a note at the row's end (warn: in the warning colour), btn: what the button says
-// when it's chosen, if not t}); onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v
+// whole name, for its tooltip, side: a note at the row's end (tone: "accent" or "faint" for its colour), prog: how far
+// it has got (0…1) when it takes a while, shown where its tick goes, btn: what the button says when it's chosen, if
+// not t}); onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v
 // (to show how it's coming along in its row); foot: a line under the list (text, or a function giving its nodes). The list lives in the panel the button is
 // in, so a click on it counts as inside that panel; Escape closes the list only. Changing the items while it's open
 // redraws it in place, focus and scroll kept.
+function progRing(p) {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("viewBox", "0 0 16 16"); s.setAttribute("class", "ring" + (p ? "" : " spin")); s.setAttribute("aria-hidden", "true");
+  s.innerHTML = `<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="6" pathLength="100" stroke-dasharray="${Math.max(6, p * 100)} 100"/>`;
+  return s;
+}
 function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   const list = el("div", "pick-list"), label = el("span");
   list.setAttribute("role", "listbox"); list.setAttribute("aria-label", name); list.hidden = true;
@@ -846,8 +862,8 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
       g = it.g || "";
       const o = el("button"); o.type = "button"; o.setAttribute("role", "option"); o.setAttribute("aria-selected", String(it.v === value));
       o.dataset.v = String(it.v); o.title = it.full || it.t; o.append(el("span", null, it.t));
-      if (it.side) o.append(el("small", "side" + (it.warn ? " warn" : ""), it.side));
-      o.append(icon("tick"));
+      if (it.side) o.append(el("small", "side" + (it.tone ? " " + it.tone : ""), it.side));
+      o.append(it.prog != null ? progRing(it.prog) : icon("tick"));
       o.onclick = () => {
         const keep = stayOpen && stayOpen(it.v);
         if (!keep) { show(false); btn.focus(); }
@@ -1776,16 +1792,17 @@ function swapSources() {
   P.bus.gain.setValueAtTime(0, ac.currentTime); P.bus.gain.setTargetAtTime(stemVol, at, 0.015);
 }
 // Both controls (Studio's header, Practice's bar): a list of the keys, under Higher +6 to +1, the original, then under
-// Lower −1 to −6, each with how far it is from the original; that distance is in the accent colour from KEY_WARN on,
-// which the list's footnote explains (and the note beside the control, once chosen). Picking one that isn't rendered
-// yet keeps the list open, its row counting up to ready; the button says so too.
+// Lower −1 to −6, each with how far it is from the original: in the accent colour where it sounds natural, in grey from
+// KEY_WARN on, which the list's footnote explains (and the note beside the control, once chosen). Picking one that
+// isn't rendered yet keeps the list open, a ring filling up where its tick will be; the button counts too.
 const keyFoot = () => [el("b", null, `±${KEY_WARN}`), " or more semitones can sound processed."];
 function keyItems(m, want) {
   const items = [];
   for (let n = KEYS; n >= -KEYS; n--) {
     const k = m && keyAfter(m.key, n), name = k ? keyName(k) : n ? `${keySign(n)} semitones` : "Original key";
     const busy = n === want && P.keyProg != null, pct = busy ? `${Math.round(P.keyProg * 100)}%` : "";
-    items.push({ v: n, t: name, side: busy ? pct : n ? keySign(n) : "original", warn: !busy && Math.abs(n) >= KEY_WARN, g: n > 0 ? "Higher" : n < 0 ? "Lower" : "",
+    items.push({ v: n, t: name, side: n ? keySign(n) : "original", tone: !n ? "" : Math.abs(n) >= KEY_WARN ? "faint" : "accent", prog: busy ? P.keyProg : null,
+      g: n > 0 ? "Higher" : n < 0 ? "Lower" : "",
       btn: busy ? `${name} · ${pct}` : n && k ? `${name} (${keySign(n)})` : name, full: busy ? `Changing key… ${pct}` : n && k ? `Originally ${keyName(m.key)}` : "" });
   }
   return items;
