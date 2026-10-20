@@ -229,6 +229,11 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .video-wait.err { animation: none; }
 .video.ready .video-wait { display: none; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; touch-action: pan-y; }
+/* the playhead's time while you drag it: a tooltip above the waveform, its tip on the line (--tip, from drawWave) */
+.ph-flag { position: absolute; bottom: calc(100% + 5px); z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 6px; display: grid; place-items: center;
+  border-radius: 4px; background: var(--voice); color: #fff; font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+.ph-flag::after { content: ""; position: absolute; top: 100%; left: var(--tip, 50%); transform: translateX(-50%); border: 5px solid transparent; border-bottom: 0;
+  border-top-color: var(--voice); }
 /* kept-whole parts: an × in each one's top right corner, shown while you point at the part */
 .wave-wrap { position: relative; }
 #pParts .part { position: absolute; top: 0; bottom: 0; pointer-events: none; }
@@ -475,7 +480,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button">Practice</button></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
-      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div></div>
+      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div><output class="ph-flag" id="pFlag" hidden></output></div>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
@@ -718,6 +723,7 @@ const P = { song: null, buffers: {}, raw: {}, tracks: {}, playing: false, startA
 // The player's tracks: the stems, with vocals as lead + backing once the song has been split.
 const trackNames = (m) => (m.split ? m.stems.flatMap((n) => (n === "vocals" ? ["lead", "backing"] : [n])) : m.stems);
 const fmtTime = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`; };
+const fmtClock = (t) => fmtTime(t).padStart(5, "0"); // 01:23
 let stemsStatus = null, pollers = {};
 
 async function stemsRefresh() {
@@ -1205,7 +1211,16 @@ function drawWave() {
     }
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
   x.globalAlpha = 1;
-  x.fillStyle = C.voice; x.fillRect(prog * W - 1, 0, 2, H);
+  const lw = P.phHover || P.scrub ? 4 : 2; // the playhead thickens while you can grab it
+  x.fillStyle = C.voice; x.fillRect(prog * W - lw / 2, 0, lw, H);
+  const flag = $("#pFlag");
+  flag.hidden = !P.scrub;
+  if (P.scrub) {
+    flag.textContent = `${fmtClock(songPos())} / ${fmtClock(songDur())}`;
+    const half = flag.offsetWidth / 2, fx = Math.max(half, Math.min(W - half, prog * W)); // kept over the waveform
+    flag.style.left = fx + "px";
+    flag.style.setProperty("--tip", prog * W - fx + half + "px"); // the tip stays on the line
+  }
   $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
 }
 requestAnimationFrame(function waveLoop() { if (view === "stems" && stemsPage === "song" && P.song) drawWave(); requestAnimationFrame(waveLoop); });
@@ -1339,11 +1354,25 @@ function initWave() {
   const wave = $("#pWave"), wrap = $("#pWaveWrap");
   const tAt = (e) => { const r = wave.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur(); };
   const hover = (i) => document.querySelectorAll("#pParts .part").forEach((p, k) => p.classList.toggle("hover", k === i));
-  wrap.addEventListener("pointermove", (e) => { const t = tAt(e); hover(((P.song && P.song.unsplit) || []).findIndex(([a, b]) => t >= a && t <= b)); });
-  wrap.addEventListener("pointerleave", () => hover(-1));
+  // the playhead: within a few pixels of it you can grab it (it thickens) and drag it, its time on a flag at its top
+  const onHead = (e) => { const r = wave.getBoundingClientRect(); return Math.abs(e.clientX - (r.left + (songPos() / (songDur() || 1)) * r.width)) <= (e.pointerType === "touch" ? 14 : 6); };
+  const endScrub = () => { const s = P.scrub; P.scrub = null; if (s && s.wasPlaying) playSong(); };
+  wrap.addEventListener("pointermove", (e) => {
+    const t = tAt(e);
+    hover(((P.song && P.song.unsplit) || []).findIndex(([a, b]) => t >= a && t <= b));
+    P.phHover = !!P.song && (!!P.scrub || (e.target === wave && onHead(e)));
+    wave.style.cursor = P.phHover ? "ew-resize" : "";
+  });
+  wrap.addEventListener("pointerleave", () => { hover(-1); if (!P.scrub) P.phHover = false; });
   let drag = null;
-  wave.addEventListener("pointerdown", (e) => { if (P.song) { drag = { x: e.clientX, t: tAt(e), moved: false }; wave.setPointerCapture(e.pointerId); } });
+  wave.addEventListener("pointerdown", (e) => {
+    if (!P.song) return;
+    wave.setPointerCapture(e.pointerId);
+    if (onHead(e)) { P.scrub = { wasPlaying: P.playing }; pauseSong(); return; }
+    drag = { x: e.clientX, t: tAt(e), moved: false };
+  });
   wave.addEventListener("pointermove", (e) => {
+    if (P.scrub) { P.offset = tAt(e); return; } // paused while you drag, so the song's position is the offset
     if (!drag || !P.song.split || (!drag.moved && Math.abs(e.clientX - drag.x) < 5)) return;
     drag.moved = true;
     const t = tAt(e);
@@ -1351,12 +1380,13 @@ function initWave() {
     paintSel(); drawWave();
   });
   wave.addEventListener("pointerup", (e) => {
+    if (P.scrub) { endScrub(); return; }
     const d = drag; drag = null;
     if (!d || d.moved) return;
     if (P.sel) { P.sel = null; paintSel(); }
     seekSong(tAt(e));
   });
-  wave.addEventListener("pointercancel", () => { drag = null; });
+  wave.addEventListener("pointercancel", () => { drag = null; endScrub(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && P.sel && view === "stems") { P.sel = null; paintSel(); drawWave(); } });
 }
 function initStems() {
