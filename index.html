@@ -340,7 +340,10 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .video-wait { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13.5px; color: rgba(255, 255, 255, 0.6); animation: blink 1.6s ease-in-out infinite; }
 .video-wait.err { animation: none; }
 .video.ready .video-wait { display: none; }
-#pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; }
+#pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; touch-action: pan-y; }
+.sel-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; margin-top: -4px; font-size: 13px; color: var(--muted); }
+.sel-bar span { margin-right: auto; }
+.sel-bar .btn { color: var(--ink); }
 .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .btn.round { width: 40px; padding: 0; justify-content: center; border-radius: 50%; }
@@ -754,6 +757,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
+      <div class="sel-bar" id="pSelBar" hidden><span id="pSelText"></span><button class="btn sm" id="pSelAct" type="button" hidden></button><button class="btn sm icon" id="pSelX" type="button" aria-label="Clear the selection" title="Clear the selection" hidden></button></div>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
@@ -1648,7 +1652,10 @@ Object.assign(ICONS, {
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16V12"/><path d="M12.125 8.25H12M12.25 8.25C12.25 8.11193 12.1381 8 12 8C11.8619 8 11.75 8.11193 11.75 8.25C11.75 8.38807 11.8619 8.5 12 8.5C12.1381 8.5 12.25 8.38807 12.25 8.25Z"/>',
   prev: '<path d="M15 6C15 6 9.00001 10.4189 9 12C8.99999 13.5812 15 18 15 18"/>', // ArrowLeft01
   next: '<path d="M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18"/>', // ArrowRight01
+  close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
+  backing: '<path d="M16 21C15.7668 18.0685 13.3422 15.7477 10.3085 15.5521L9.49999 15.5C9.21121 15.5076 8.94209 15.5178 8.68816 15.5298C5.68124 15.6723 3.23089 18.0974 3 21"/><path d="M12.75 9.75C12.75 11.5449 11.2949 13 9.5 13C7.70508 13 6.25 11.5449 6.25 9.75C6.25 7.95507 7.70508 6.5 9.5 6.5C11.2949 6.5 12.75 7.95507 12.75 9.75Z"/><path d="M21 17.501C20.7709 14.6314 18.4541 12.2748 15.5 11.9961"/><path d="M15.9877 9C16.8965 8.42434 17.5001 7.40788 17.5001 6.25C17.5001 4.45507 16.0496 3 14.2602 3C13.3811 3 12.5838 3.35121 12.0001 3.92139"/>', // UserMultiple
 });
+ICONS.lead = ICONS.vocals;
 ICONS.bass = ICONS.guitar; // the set has no bass guitar
 function icon(name) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1656,9 +1663,13 @@ function icon(name) {
   s.innerHTML = ICONS[name] || ICONS.other;
   return s;
 }
-const STEM_COLORS = { vocals: "#2F6BFF", drums: "#E0484E", bass: "#7A5AF8", guitar: "#D99A1E", piano: "#1FA971", other: "#8A8F98", click: "var(--ink)" };
-const STEM_NOTES = { vocals: "lead and backing voices", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
-const P = { song: null, buffers: {}, tracks: {}, playing: false, startAt: 0, offset: 0, sources: [], peaks: null, bus: null, clickNext: 0 };
+const STEM_COLORS = { vocals: "#2F6BFF", lead: "#2F6BFF", backing: "#7FA2FF", drums: "#E0484E", bass: "#7A5AF8", guitar: "#D99A1E", piano: "#1FA971", other: "#8A8F98", click: "var(--ink)" };
+const STEM_NOTES = { vocals: "lead and backing voices", lead: "the main voice", backing: "harmonies, doubles and chops", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
+const TRACK_TITLES = { lead: "Lead vocal", backing: "Backing vocals" };
+// raw: lead and backing as separated; buffers holds them as heard (see splitBuffers)
+const P = { song: null, buffers: {}, raw: {}, tracks: {}, playing: false, startAt: 0, offset: 0, sources: [], peaks: null, bus: null, clickNext: 0 };
+// The player's tracks: the stems, with vocals as lead + backing once the song has been split.
+const trackNames = (m) => (m.split ? m.stems.flatMap((n) => (n === "vocals" ? ["lead", "backing"] : [n])) : m.stems);
 const fmtTime = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`; };
 let stemsStatus = null, pollers = {};
 
@@ -1712,7 +1723,7 @@ const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A",
 const KEY_MINOR = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"];
 const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${k.mode}` : "");
 const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : "no steady beat", keyName(m.key)].filter(Boolean);
-const libLine = (m) => [...songFacts(m), `${m.stems.length} tracks`, new Date(m.created * 1000).toLocaleDateString()].join(" · ");
+const libLine = (m) => [...songFacts(m), `${trackNames(m).length} tracks`, new Date(m.created * 1000).toLocaleDateString()].join(" · ");
 // Songs added before keys were read get theirs from /info, which works it out once (about a second) and saves it.
 const keyJobs = new Map();
 function keyOf(m) {
@@ -1788,7 +1799,7 @@ async function renderInfo(id) {
   fact("Length", fmtTime(s.duration));
   const v = s.vocals;
   if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, `${v.hi - v.lo} semitones${v.mostly ? ` · mostly ${absName(v.mostly[0])}–${absName(v.mostly[1])}` : ""}`);
-  fact("Tracks", String(s.stems.length), s.stems.join(", "));
+  fact("Tracks", String(trackNames(s).length), trackNames(s).join(", "));
   if (v) renderInfoRange(v, id);
   $("#iOpen").href = `#stems/${id}`;
   $("#iSing").hidden = !s.stems.includes("vocals");
@@ -1887,6 +1898,10 @@ function watchJob(id, kind, forSong) {
       $("#sInstallBtn").disabled = j.status === "running" || j.status === "queued";
     } else if (kind === "video") {
       if (P.song && P.song.id === forSong) videoWait(j.status === "error" ? j.error : `${j.stage}… ${Math.round(j.progress * 100)}%`, j.status === "error");
+    } else if (kind === "split") {
+      splitting[forSong] = j.status === "queued" ? "Waiting…" : `Splitting… ${Math.round(j.progress * 100)}%`;
+      const b = $("#pSplit");
+      if (b && P.song && P.song.id === forSong) b.textContent = splitting[forSong];
     } else {
       const card = jobCard(id), [a, b] = card.querySelectorAll(".top span");
       a.textContent = j.status === "error" ? j.error : j.stage;
@@ -1898,6 +1913,14 @@ function watchJob(id, kind, forSong) {
       clearInterval(pollers[id]); delete pollers[id];
       if ((kind === "install" || kind === "gpu") && j.status === "done") stemsRefresh();
       if (kind === "video") videoFetched(forSong, j.status === "done");
+      if (kind === "split") {
+        delete splitting[forSong];
+        if (P.song && P.song.id === forSong) {
+          if (j.status === "error") { $("#pExportState").textContent = j.error; renderTracks(); }
+          else if (location.hash === "#stems/" + forSong) openSongById(forSong);
+          else P.song.stale = true; // reopened when its page comes back
+        }
+      }
       if (kind === "separate" && j.status === "done") {
         document.getElementById("job-" + id)?.remove();
         renderLibrary();
@@ -1941,7 +1964,7 @@ async function openSong(m) {
   P.song = m; P.offset = 0;
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
-  const meta = () => { $("#pMeta").textContent = [...songFacts(m), Object.keys(P.buffers).length ? `${m.stems.length} tracks` : "loading tracks…"].join(" · "); };
+  const meta = () => { $("#pMeta").textContent = [...songFacts(m), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].join(" · "); };
   meta(); keyOf(m).then(() => { if (P.song === m) meta(); });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
@@ -1949,22 +1972,24 @@ async function openSong(m) {
   if (m.video) v.src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
   showVideo = false; paintVideo();
   $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
-  for (const name of m.stems) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
+  for (const name of trackNames(m)) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
   P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
-  renderTracks();
-  const loaded = await Promise.all(m.stems.map(async (name) => {
+  renderTracks(); paintSel();
+  const loaded = await Promise.all(trackNames(m).map(async (name) => {
     const r = await fetch(`/library/${m.id}/${name}.mp3`);
     return [name, await ac.decodeAudioData(await r.arrayBuffer())];
   }));
   if (P.song !== m) return;
   P.buffers = Object.fromEntries(loaded);
+  P.raw = { lead: P.buffers.lead, backing: P.buffers.backing };
+  splitBuffers();
   computePeaks();
   meta();
   drawWave();
 }
 function closeSong() {
   pauseSong();
-  P.song = null; P.buffers = {}; P.peaks = null;
+  P.song = null; P.buffers = {}; P.raw = {}; P.peaks = null; P.sel = null;
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
 }
@@ -2109,7 +2134,13 @@ function drawWave() {
   if (!r.width) return;
   if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(96 * d); }
   const x = c.getContext("2d"), W = r.width, H = 96; x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
-  const prog = songDur() ? songPos() / songDur() : 0;
+  const prog = songDur() ? songPos() / songDur() : 0, X = (t) => (t / (songDur() || 1)) * W;
+  if (P.song && P.song.split) { // parts with the vocals kept whole, and the selection
+    x.fillStyle = STEM_COLORS.lead;
+    for (const [a, b] of P.song.unsplit || []) { x.globalAlpha = 0.14; x.fillRect(X(a), 0, X(b) - X(a), H); x.globalAlpha = 0.8; x.fillRect(X(a), 0, X(b) - X(a), 3); }
+    if (P.sel && P.sel.part == null) { x.fillStyle = C.ink; x.globalAlpha = 0.1; x.fillRect(X(P.sel.a), 0, X(P.sel.b) - X(P.sel.a), H); }
+    x.globalAlpha = 1;
+  }
   if (P.peaks) {
     const n = P.peaks.length, bw = W / n;
     for (let i = 0; i < n; i++) {
@@ -2132,7 +2163,7 @@ function renderTracks() {
     const row = el("div", "track" + (audible(name) ? "" : " off")); row.dataset.name = name;
     const dot = icon(name); dot.style.color = STEM_COLORS[name] || "#999";
     const bpm = P.song.bpm, isClick = name === "click";
-    const title = isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : name[0].toUpperCase() + name.slice(1);
+    const title = isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : TRACK_TITLES[name] || name[0].toUpperCase() + name.slice(1);
     const note = isClick ? (bpm ? `click · ${t.bpb}/4 · follows the song’s beat` : "click") : STEM_NOTES[name] || "";
     const nm = el("div", "name"); nm.append(document.createTextNode(title), el("small", null, note));
     if (isClick && bpm) nm.title = `Detected tempo ${bpm} BPM`;
@@ -2156,7 +2187,15 @@ function renderTracks() {
       opts.append(bpb, sh);
       if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = "no steady beat found"; }
     } else {
-      last = el("button", "dl"); last.type = "button"; last.title = `Download ${name} only (MP3)`; last.setAttribute("aria-label", last.title);
+      if (name === "vocals" && !P.song.split) {
+        const opts = el("div", "clickopts"), sp = el("button", "tog", splitting[P.song.id] || "Split lead / backing");
+        label = el("div", "name-row"); label.append(nm, opts);
+        sp.type = "button"; sp.id = "pSplit"; sp.disabled = !!splitting[P.song.id];
+        sp.title = "Separate the backing vocals from the lead vocal (about a minute)";
+        sp.onclick = startSplit;
+        opts.append(sp);
+      }
+      last = el("button", "dl"); last.type = "button"; last.title = `Download ${TRACK_TITLES[name] || name} only (MP3)`; last.setAttribute("aria-label", last.title);
       last.append(icon("download"));
       last.onclick = () => exportMix([{ name, gain: 1 }], null, last);
     }
@@ -2179,9 +2218,95 @@ async function exportMix(tracks, click, btn) {
   btn.disabled = false;
 }
 function exportAudible() {
-  const tracks = P.song.stems.filter((n) => audible(n)).map((n) => ({ name: n, gain: P.tracks[n].vol }));
+  const tracks = trackNames(P.song).filter((n) => audible(n)).map((n) => ({ name: n, gain: P.tracks[n].vol }));
   const c = P.tracks.click, click = audible("click") && P.song.beats && P.song.beats.length ? { gain: c.vol, offset: c.offset, beatsPerBar: c.bpb } : null;
   exportMix(tracks, click, $("#pExport"));
+}
+
+// Lead and backing vocals. Songs added before the split have one vocal track and a button to split it.
+const splitting = {}; // song id -> what its split button says while the job runs
+async function startSplit() {
+  const id = P.song.id;
+  splitting[id] = "Starting…"; renderTracks();
+  try { watchJob(await postJob(`/api/library/${id}/split`), "split", id); }
+  catch (e) { delete splitting[id]; renderTracks(); $("#pExportState").textContent = e.message; }
+}
+// Where the split is wrong, parts of the song can keep their vocals whole: there the lead track plays all the vocals
+// and backing is silent (the server does the same for exports and the sing-along bars). 30 ms crossfades at the edges.
+function splitBuffers() {
+  const l = P.raw.lead, b = P.raw.backing, parts = (P.song && P.song.unsplit) || [];
+  if (!l || !b) return;
+  if (!parts.length) { P.buffers.lead = l; P.buffers.backing = b; return; }
+  const n = Math.min(l.length, b.length), sr = l.sampleRate, fade = 0.03 * sr;
+  const L = ac.createBuffer(l.numberOfChannels, n, sr), B = ac.createBuffer(l.numberOfChannels, n, sr);
+  for (let c = 0; c < l.numberOfChannels; c++) {
+    const lo = L.getChannelData(c), bo = B.getChannelData(c), bi = b.getChannelData(Math.min(c, b.numberOfChannels - 1));
+    lo.set(l.getChannelData(c).subarray(0, n)); bo.set(bi.subarray(0, n));
+    for (const [a, z] of parts) {
+      const s0 = a * sr, s1 = z * sr;
+      for (let i = Math.max(0, Math.floor(s0 - fade)); i < Math.min(n, Math.ceil(s1 + fade)); i++) {
+        const m = Math.min(1, Math.max(0, 1 - Math.max(s0 - i, i - s1) / fade));
+        lo[i] += m * bi[i]; bo[i] = (1 - m) * bi[i];
+      }
+    }
+  }
+  P.buffers.lead = L; P.buffers.backing = B;
+}
+// The line under the waveform: a hint, or what's selected (a dragged span, or a part clicked on) and what to do with it.
+function paintSel() {
+  const bar = $("#pSelBar"), on = !!(P.song && P.song.split), s = P.sel, act = $("#pSelAct");
+  bar.hidden = !on;
+  $("#pWave").setAttribute("aria-label", on ? "Song overview — click to jump, drag to select a part" : "Song overview — click to jump");
+  if (!on) return;
+  act.hidden = $("#pSelX").hidden = !s;
+  if (!s) {
+    const n = (P.song.unsplit || []).length;
+    $("#pSelText").textContent = n ? `Vocals kept whole in ${n} part${n > 1 ? "s" : ""} (shaded). Drag across the waveform to add another.`
+      : "Backing vocals split wrong somewhere? Drag across that part of the waveform to keep its vocals whole.";
+    return;
+  }
+  $("#pSelText").textContent = `${fmtTime(s.a)}–${fmtTime(s.b)}` + (s.part != null ? " · vocals kept whole" : " selected");
+  act.textContent = s.part != null ? "Split again" : "Keep vocals whole here";
+}
+async function saveUnsplit(parts) {
+  const m = P.song, act = $("#pSelAct");
+  act.disabled = true;
+  try {
+    const r = await fetch(`/api/library/${m.id}/unsplit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unsplit: parts }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Couldn’t save that.");
+    m.unsplit = j.unsplit;
+    if (P.song === m) { P.sel = null; splitBuffers(); if (P.playing) seekSong(songPos()); }
+  } catch (e) { $("#pExportState").textContent = e.message; }
+  act.disabled = false; paintSel(); drawWave();
+}
+// The waveform: a click jumps there (and picks the kept-whole part under it); a drag selects a span.
+function initWave() {
+  const wave = $("#pWave");
+  const tAt = (e) => { const r = wave.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur(); };
+  let drag = null;
+  wave.addEventListener("pointerdown", (e) => { if (P.song) { drag = { x: e.clientX, t: tAt(e), moved: false }; wave.setPointerCapture(e.pointerId); } });
+  wave.addEventListener("pointermove", (e) => {
+    if (!drag || !P.song.split || (!drag.moved && Math.abs(e.clientX - drag.x) < 5)) return;
+    drag.moved = true;
+    const t = tAt(e);
+    P.sel = { a: Math.min(drag.t, t), b: Math.max(drag.t, t), part: null };
+    paintSel(); drawWave();
+  });
+  wave.addEventListener("pointerup", (e) => {
+    const d = drag; drag = null;
+    if (!d || d.moved) return;
+    const t = tAt(e), parts = P.song.unsplit || [], i = parts.findIndex(([a, b]) => t >= a && t <= b);
+    P.sel = i >= 0 ? { a: parts[i][0], b: parts[i][1], part: i } : null;
+    seekSong(t); paintSel();
+  });
+  wave.addEventListener("pointercancel", () => { drag = null; });
+  $("#pSelAct").onclick = () => {
+    const s = P.sel, parts = P.song.unsplit || [];
+    if (s) saveUnsplit(s.part != null ? parts.filter((_, i) => i !== s.part) : [...parts, [s.a, s.b]]);
+  };
+  $("#pSelX").append(icon("close"));
+  $("#pSelX").onclick = () => { P.sel = null; paintSel(); drawWave(); };
 }
 function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };
@@ -2213,7 +2338,7 @@ function initStems() {
   $("#pFwd").onclick = () => seekSong(songPos() + 5);
   $("#pSing").onclick = () => P.song && singSong(P.song, $("#pSing"));
   $("#pExport").onclick = exportAudible;
-  $("#pWave").addEventListener("click", (e) => { const r = e.currentTarget.getBoundingClientRect(); seekSong(((e.clientX - r.left) / r.width) * songDur()); });
+  initWave();
 }
 
 // ---------- sing-along (songs from the Stems library) ----------
@@ -2402,14 +2527,15 @@ async function singSong(m, btn) {
   K.entries = songEntries(K.notes, m.beats, m.bpm);
   K.phrases = songPhrases(K.notes, m.beats, m.bpm, songDur()); K.cue = null; setLoop(false); renderPhrases();
   songEvs(); songView(true);
-  if (P.tracks.vocals) { P.tracks.vocals.mute = false; P.tracks.vocals.solo = false; P.tracks.vocals.vol = K.guideVol; }
-  for (const [n, t] of Object.entries(P.tracks)) if (n !== "vocals" && n !== "click") { t.mute = false; t.solo = false; t.vol = K.bandVol; }
+  for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
   renderTracks(); applyGains();
   $("#kOct").value = String(K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute));
   $("#kClick").disabled = !(m.beats && m.beats.length);
   go("play");
 }
+// The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
+const guideName = () => (P.tracks.lead ? "lead" : "vocals");
 function leaveSong() { if (P.playing) pauseSong(); K.on = false; renderSongBar(); $("#countIn").hidden = true; }
 function renderSongBar() {
   $("#songBar").hidden = !K.on;
@@ -2424,8 +2550,8 @@ function songToggle() {
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
 function initSing() {
   $("#kOct").onchange = (e) => { K.oct = +e.target.value; songEvs(); };
-  $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; if (P.tracks.vocals) { P.tracks.vocals.vol = K.guideVol; applyGains(); } };
-  $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== "vocals" && n !== "click") t.vol = K.bandVol; applyGains(); };
+  $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
+  $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== guideName() && n !== "click") t.vol = K.bandVol; applyGains(); };
   resetOnDblClick($("#kGuide"), 0.5); resetOnDblClick($("#kBand"), 1);
   $("#kClick").onclick = () => { const c = P.tracks.click; c.mute = !c.mute; $("#kClick").setAttribute("aria-pressed", String(!c.mute)); applyGains(); };
   $("#kBack").onclick = () => seekWithin(songPos() - 5);
@@ -3002,7 +3128,7 @@ function stemsRoute(sub, extra) {
   $("#sLibPage").hidden = stemsPage !== "lib"; $("#sAddPage").hidden = stemsPage !== "add"; $("#sPlayer").hidden = stemsPage !== "song";
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
-  if (stemsPage === "song" && (!P.song || P.song.id !== sub)) openSongById(sub);
+  if (stemsPage === "song" && (!P.song || P.song.id !== sub || P.song.stale)) openSongById(sub);
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
 async function openSongById(id) {

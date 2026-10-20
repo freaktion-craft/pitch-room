@@ -182,6 +182,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, {"ok": True})
             if parts[3] == "video":
                 return self._json(200, {"job": stems.start_video(parts[2])})
+            if parts[3] == "split":
+                return self._json(200, {"job": stems.start_split(parts[2])})
+            if parts[3] == "unsplit":
+                body = json.loads(self._body(100_000) or b"{}")
+                return self._json(200, {"unsplit": stems.set_unsplit(parts[2], body.get("unsplit") or [])})
             if parts[3] == "export":
                 body = json.loads(self._body(100_000) or b"{}")
                 data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"))

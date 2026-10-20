@@ -4,9 +4,10 @@ Songs live in ./library/<id>/ :
     source.*        the original audio (upload or YouTube download)
     video.*         the picture of a YouTube video, no sound (shown above the player to follow lyrics)
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
-    lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out), for sing-along bars
+    lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
+    backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
     melody.json     the sing-along notes, from lead.mp3 (or vocals.mp3 without the lead model)
-    meta.json       title, duration, bpm, beat times, key, stems, model
+    meta.json       title, duration, bpm, beat times, key, stems, model, unsplit (parts where the vocals stay whole)
 
 Heavy packages (torch, demucs, librosa, yt-dlp) are optional and installed from the
 page on first use, so the base app stays small.
@@ -204,14 +205,44 @@ def _song_dir(song_id: str) -> str:
     return os.path.join(LIB, song_id)
 
 
+_meta_lock = threading.Lock()
+
+
+def _read_meta(folder: str) -> dict:
+    path = os.path.join(folder, "meta.json")
+    if not os.path.isfile(path):
+        raise ValueError("Unknown song.")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _update_meta(folder: str, **kw):
+    """Change some fields of meta.json, leaving the rest as they are on disk now."""
+    with _meta_lock:
+        meta = _read_meta(folder)
+        meta.update(kw)
+        with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False)
+
+
+_backfilled: set[str] = set()
+
+
 def library() -> list[dict]:
+    """Every song's meta.json, newest first, with split: whether it has lead.mp3 and backing.mp3. Songs whose lead
+    vocal was separated before backing.mp3 was saved get theirs made in the background (a few seconds each)."""
     out = []
     if os.path.isdir(LIB):
         for d in os.listdir(LIB):
-            meta = os.path.join(LIB, d, "meta.json")
-            if os.path.isfile(meta):
-                with open(meta, encoding="utf-8") as f:
-                    out.append(json.load(f))
+            folder = os.path.join(LIB, d)
+            if not os.path.isfile(os.path.join(folder, "meta.json")):
+                continue
+            meta = _read_meta(folder)
+            meta["split"] = _has_split(folder)
+            if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
+                _backfilled.add(d)
+                threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
+            out.append(meta)
     return sorted(out, key=lambda m: m.get("created", 0), reverse=True)
 
 
@@ -296,8 +327,7 @@ def _download_video(job, url: str, folder: str, p0: float, p1: float) -> str | N
 def start_video(song_id: str) -> str:
     """Fetch the video for a song added from a link before videos were saved."""
     folder = _song_dir(song_id)
-    with open(os.path.join(folder, "meta.json"), encoding="utf-8") as f:
-        meta = json.load(f)
+    meta = _read_meta(folder)
     if not re.match(r"^https?://", meta.get("source") or ""):
         raise ValueError("This song wasn’t added from a link, so there’s no video to get.")
 
@@ -309,9 +339,7 @@ def start_video(song_id: str) -> str:
             raise ValueError("Couldn’t get the video. " + str(e).split("ERROR:")[-1].strip()[:200]) from None
         if not video:
             raise ValueError("That link has no video.")
-        meta["video"] = video
-        with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False)
+        _update_meta(folder, video=video)
         _set(job, songId=song_id)
 
     return _run(_new_job("video"), work)
@@ -429,7 +457,7 @@ def _pipeline(job, src: dict, model_name: str):
                 vox = stems[names.index("vocals")]
                 lead = _lead_vocal(vox, job, (0.73, 0.86))
                 if lead is not None:
-                    _encode_mp3(lead, os.path.join(folder, "lead.mp3"))
+                    _write_split(folder, vox, lead)
                 _set(job, stage="Reading the vocal melody", progress=0.87)
                 _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None)
             _set(job, stage="Saving tracks", progress=0.9)
@@ -469,20 +497,16 @@ def song_info(song_id: str) -> dict:
     """meta.json without the beat list, plus the vocal range. Songs added before keys were read get theirs worked out
     (a few seconds) and saved the first time."""
     folder = _song_dir(song_id)
-    path = os.path.join(folder, "meta.json")
-    if not os.path.isfile(path):
-        raise ValueError("Unknown song.")
-    with open(path, encoding="utf-8") as f:
-        meta = json.load(f)
+    meta = _read_meta(folder)
     tonal = [n for n in meta.get("stems", []) if n != "drums"]
     if "key" not in meta and tonal and importlib.util.find_spec("librosa"):
         parts = [_decode_stereo(os.path.join(folder, n + ".mp3")).mean(0) for n in tonal]
         n = min(len(p) for p in parts)
         meta["key"] = _key(sum(p[:n] for p in parts))
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False)
+        _update_meta(folder, key=meta["key"])
     info = {k: v for k, v in meta.items() if k != "beats"}
     info["beatCount"] = len(meta.get("beats") or [])
+    info["split"] = _has_split(folder)
     if "vocals" in meta.get("stems", []):
         data = get_melody(song_id)
         mel = data["notes"]
@@ -568,6 +592,116 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
     return y.T.copy()
 
 
+# ---------- lead and backing vocals ----------
+# The player shows the vocal stem as two tracks, lead and backing. Where the split is wrong, parts of the song can be
+# left unsplit (meta "unsplit": [[t0, t1], …]): there the lead track carries all the vocals, backing is silent and the
+# sing-along bars follow all the vocals.
+FADE = 0.03  # s: crossfade at the edges of an unsplit part
+_split_lock = threading.Lock()
+
+
+def _has_split(folder: str) -> bool:
+    return all(os.path.isfile(os.path.join(folder, n)) for n in ("lead.mp3", "backing.mp3"))
+
+
+def _write_split(folder: str, vocals: np.ndarray, lead: np.ndarray, lead_too: bool = True):
+    n = min(vocals.shape[1], lead.shape[1])
+    if lead_too:
+        _encode_mp3(lead[:, :n], os.path.join(folder, "lead.mp3"))
+    _encode_mp3(vocals[:, :n] - lead[:, :n], os.path.join(folder, "backing.mp3"))
+
+
+def _ensure_split(folder: str, job=None, share: tuple[float, float] = (0.0, 1.0)) -> bool:
+    """lead.mp3 and backing.mp3, separating the lead vocal first if there is none yet (about a minute). False when the
+    song has no vocal stem or the lead model isn't installed."""
+    with _split_lock:
+        if _has_split(folder):
+            return True
+        vocals = os.path.join(folder, "vocals.mp3")
+        if not os.path.isfile(vocals):
+            return False
+        vox, lead_path = _decode_stereo(vocals), os.path.join(folder, "lead.mp3")
+        if os.path.isfile(lead_path):
+            _write_split(folder, vox, _decode_stereo(lead_path), lead_too=False)
+            return True
+        if job:
+            _set(job, status="queued", stage="Waiting for the previous song to finish")
+        with _work_lock:  # one model on the GPU at a time
+            if job:
+                _set(job, status="running")
+            lead = _lead_vocal(vox, job, share)
+        if lead is None:
+            return False
+        _write_split(folder, vox, lead)
+        return True
+
+
+def start_split(song_id: str) -> str:
+    """Split the vocal stem of a song added before backing vocals were split off."""
+    folder = _song_dir(song_id)
+    if not os.path.isfile(os.path.join(folder, "vocals.mp3")):
+        raise ValueError("This song has no vocal track.")
+    if not lead_available():
+        raise ValueError("The lead-vocal model isn’t installed.")
+
+    def work(job):
+        _ensure_split(folder, job, (0.02, 0.95))
+        _set(job, songId=song_id)
+
+    return _run(_new_job("split"), work)
+
+
+def set_unsplit(song_id: str, ranges: list) -> list:
+    """Save the parts left unsplit: sorted, clipped to the song, overlapping ones joined. Returns them."""
+    folder = _song_dir(song_id)
+    dur = float(_read_meta(folder)["duration"])
+    parts = []
+    for r in ranges:
+        try:
+            a, b = sorted((float(r[0]), float(r[1])))
+        except (TypeError, ValueError, IndexError):
+            raise ValueError("Each part is a start and an end in seconds.") from None
+        a, b = max(0.0, a), min(dur, b)
+        if b - a >= 0.2:
+            parts.append([round(a, 2), round(b, 2)])
+    out = []
+    for a, b in sorted(parts):
+        if out and a <= out[-1][1] + 2 * FADE:
+            out[-1][1] = max(out[-1][1], b)
+        else:
+            out.append([a, b])
+    _update_meta(folder, unsplit=out)
+    return out
+
+
+def _unsplit_mask(n: int, ranges: list) -> np.ndarray:
+    """Per sample: 1 inside the unsplit parts, 0 outside, ramping over FADE at their edges."""
+    m = np.zeros(n, dtype=np.float32)
+    for a, b in ranges:
+        i0, i1 = max(0, int((a - FADE) * SR)), min(n, int((b + FADE) * SR) + 1)
+        if i0 < i1:
+            t = np.arange(i0, i1, dtype=np.float32)
+            m[i0:i1] = np.maximum(m[i0:i1], np.clip(1 - np.maximum(a * SR - t, t - b * SR) / (FADE * SR), 0, 1))
+    return m
+
+
+def _vocal_parts(folder: str, ranges: list) -> dict:
+    """{lead, backing}, (2, n) each, with the unsplit parts moved into lead."""
+    lead, back = _decode_stereo(os.path.join(folder, "lead.mp3")), _decode_stereo(os.path.join(folder, "backing.mp3"))
+    n = min(lead.shape[1], back.shape[1])
+    lead, back = lead[:, :n], back[:, :n]
+    if ranges:
+        m = _unsplit_mask(n, ranges)
+        lead, back = lead + m * back, back * (1 - m)
+    return {"lead": lead, "backing": back}
+
+
+def _tracks(folder: str, meta: dict) -> list[str]:
+    """The player's tracks: the stems, with vocals as lead + backing once split."""
+    split = _has_split(folder)
+    return [t for n in meta["stems"] for t in (["lead", "backing"] if n == "vocals" and split else [n])]
+
+
 # ---------- melody (sing-along) ----------
 _melody_lock = threading.Lock()  # one rebuild at a time, so two pages asking at once don't both build it
 
@@ -581,33 +715,54 @@ def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | 
     return data
 
 
+def _drums_mono(folder: str) -> np.ndarray | None:
+    drums = os.path.join(folder, "drums.mp3")
+    return _decode_stereo(drums).mean(0) if os.path.isfile(drums) else None
+
+
+def _splice(data: dict, ranges: list) -> dict:
+    """The lead vocal's notes and contour, with those of all the vocals (data["full"]) inside the unsplit parts."""
+    inside = lambda t: any(a <= t < b for a, b in ranges)  # noqa: E731
+    full = data["full"]
+    notes = sorted([n for n in data["notes"] if not inside((n[0] + n[1]) / 2)] + [n for n in full["notes"] if inside((n[0] + n[1]) / 2)])
+    gaps = [[t, None] for a, b in ranges for t in (a, b)]  # break the line where the source changes
+    contour = sorted([c for c in data["contour"] if not inside(c[0])] + [c for c in full["contour"] if inside(c[0])] + gaps,
+                     key=lambda c: c[0])
+    mids = [n[2] for n in notes]
+    rng = [int(np.percentile(mids, 3)), int(np.percentile(mids, 97))] if mids else None
+    return {k: v for k, v in data.items() if k != "full"} | {"notes": notes, "contour": contour, "range": rng}
+
+
 def get_melody(song_id: str) -> dict:
     """Cached melody.json. Rebuilt when the extraction changed, or when it came from the whole vocal stem and the
-    lead model is installed now; then the lead vocal is separated first (about a minute, once per song)."""
+    lead model is installed now; then the lead vocal is separated first (about a minute, once per song). With unsplit
+    parts, those take the notes of all the vocals, read once (a few seconds) and kept in melody.json as "full"."""
+    import melody
     folder = _song_dir(song_id)
     path = os.path.join(folder, "melody.json")
     with _melody_lock:
+        data = None
         if os.path.isfile(path):
-            import melody
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
-            if data.get("v") == melody.VERSION and (data.get("lead") or not lead_available()):
-                return data
+            if data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available()):
+                data = None
         vocals = os.path.join(folder, "vocals.mp3")
-        if not os.path.isfile(vocals):
-            raise ValueError("This song has no vocal track to sing along with.")
-        lead_path = os.path.join(folder, "lead.mp3")
-        if os.path.isfile(lead_path):
-            src, lead = _decode_stereo(lead_path), True
-        else:
-            vox = _decode_stereo(vocals)
-            with _work_lock:  # one model on the GPU at a time
-                y = _lead_vocal(vox)
-            if y is not None:
-                _encode_mp3(y, lead_path)
-            src, lead = (vox if y is None else y), y is not None
-        drums = os.path.join(folder, "drums.mp3")
-        return _save_melody(folder, src.mean(0), _decode_stereo(drums).mean(0) if os.path.isfile(drums) else None, lead)
+        if data is None:
+            if not os.path.isfile(vocals):
+                raise ValueError("This song has no vocal track to sing along with.")
+            split = _ensure_split(folder)
+            src = _decode_stereo(os.path.join(folder, "lead.mp3") if split else vocals)
+            data = _save_melody(folder, src.mean(0), _drums_mono(folder), split)
+        ranges = _read_meta(folder).get("unsplit") or []
+        if not ranges or not data.get("lead"):
+            return {k: v for k, v in data.items() if k != "full"}
+        if "full" not in data:
+            full = melody.extract(_decode_stereo(vocals).mean(0), drums=_drums_mono(folder))
+            data["full"] = {"notes": full["notes"], "contour": full["contour"]}
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, separators=(",", ":"))
+        return _splice(data, ranges)
 
 
 # ---------- export ----------
@@ -629,17 +784,21 @@ def _click_track(beats: list[float], dur: float, offset: int, beats_per_bar: int
 
 
 def export(song_id: str, tracks: list[dict], click: dict | None) -> tuple[bytes, str]:
-    """tracks: [{name, gain}] of audible stems; click: {gain, offset, beatsPerBar} or None. Returns (mp3 bytes, filename)."""
+    """tracks: [{name, gain}] of audible tracks; click: {gain, offset, beatsPerBar} or None. Returns (mp3 bytes, filename)."""
     folder = _song_dir(song_id)
-    with open(os.path.join(folder, "meta.json"), encoding="utf-8") as f:
-        meta = json.load(f)
+    meta = _read_meta(folder)
+    names, vocal = _tracks(folder, meta), None
     mix = None
     used = []
     for t in tracks:
         name, gain = t.get("name"), float(t.get("gain", 1))
-        if name not in meta["stems"] or gain <= 0:
+        if name not in names or gain <= 0:
             continue
-        wav = _decode_stereo(os.path.join(folder, name + ".mp3")) * gain
+        if name in ("lead", "backing"):
+            vocal = vocal or _vocal_parts(folder, meta.get("unsplit") or [])
+            wav = vocal[name] * gain
+        else:
+            wav = _decode_stereo(os.path.join(folder, name + ".mp3")) * gain
         mix = wav if mix is None else mix[:, : wav.shape[1]] + wav[:, : mix.shape[1]]
         used.append(name)
     if click and meta.get("beats") and float(click.get("gain", 1)) > 0:
@@ -660,7 +819,7 @@ def export(song_id: str, tracks: list[dict], click: dict | None) -> tuple[bytes,
             data = f.read()
     safe = re.sub(r"\s+", " ", re.sub(r'[\\/:*?"<>|]+', " ", meta["title"])).strip()[:80] or "song"
     on = [u for u in used if u != "click"]
-    off = [s for s in meta["stems"] if s not in on]
+    off = [s for s in names if s not in on]
     if not on:
         label = "click"
     elif not off:
