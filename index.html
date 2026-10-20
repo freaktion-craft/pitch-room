@@ -428,8 +428,10 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     </div>
     <div class="songbar" id="songBar">
       <button class="btn dark round" id="startBtn" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
+      <button class="btn sm icon" id="kStart" type="button" aria-label="Go to start" title="Go to start (Home)"></button>
       <button class="btn sm" id="kBack" type="button">−5 s</button>
       <button class="btn sm" id="kFwd" type="button">+5 s</button>
+      <button class="btn sm icon" id="kEnd" type="button" aria-label="Go to end" title="Go to end (End)"></button>
       <output id="kTime">0:00 / 0:00</output>
       <label class="kfield">Guide vocal <input type="range" id="kGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume"></label>
       <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
@@ -527,8 +529,10 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div><output class="ph-flag" id="pFlag" hidden></output></div>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
+        <button class="btn sm icon" id="pStart" type="button" aria-label="Go to start" title="Go to start (Home)"></button>
         <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
         <button class="btn sm" id="pFwd" type="button" aria-label="Forward 5 seconds">+5 s</button>
+        <button class="btn sm icon" id="pEnd" type="button" aria-label="Go to end" title="Go to end (End)"></button>
         <output id="pTime">0:00 / 0:00</output>
         <div class="mix">
           <label class="mix-ico" for="pVol" title="Volume"></label>
@@ -744,6 +748,8 @@ Object.assign(ICONS, {
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16V12"/><path d="M12.125 8.25H12M12.25 8.25C12.25 8.11193 12.1381 8 12 8C11.8619 8 11.75 8.11193 11.75 8.25C11.75 8.38807 11.8619 8.5 12 8.5C12.1381 8.5 12.25 8.38807 12.25 8.25Z"/>',
   prev: '<path d="M15 6C15 6 9.00001 10.4189 9 12C8.99999 13.5812 15 18 15 18"/>', // ArrowLeft01
   next: '<path d="M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18"/>', // ArrowRight01
+  toStart: '<path d="M8.06492 12.6258C8.31931 13.8374 9.67295 14.7077 12.3802 16.4481C15.3247 18.3411 16.797 19.2876 17.9895 18.9229C18.3934 18.7994 18.7654 18.5823 19.0777 18.2876C20 17.4178 20 15.6118 20 12C20 8.38816 20 6.58224 19.0777 5.71235C18.7654 5.41773 18.3934 5.20057 17.9895 5.07707C16.797 4.71243 15.3247 5.6589 12.3802 7.55186C9.67295 9.29233 8.31931 10.1626 8.06492 11.3742C7.97836 11.7865 7.97836 12.2135 8.06492 12.6258Z"/><path d="M4 4L4 20"/>', // Previous
+  toEnd: '<path d="M15.9351 12.6258C15.6807 13.8374 14.327 14.7077 11.6198 16.4481C8.67528 18.3411 7.20303 19.2876 6.01052 18.9229C5.60662 18.7994 5.23463 18.5823 4.92227 18.2876C4 17.4178 4 15.6118 4 12C4 8.38816 4 6.58224 4.92227 5.71235C5.23463 5.41773 5.60662 5.20057 6.01052 5.07707C7.20304 4.71243 8.67528 5.6589 11.6198 7.55186C14.327 9.29233 15.6807 10.1626 15.9351 11.3742C16.0216 11.7865 16.0216 12.2135 15.9351 12.6258Z"/><path d="M20 5V19"/>', // Next
   close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
   plus: '<path d="M12 4V20M20 12H4"/>', // PlusSign
   palette: '<path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C12.8417 22 14 22.1163 14 21C14 20.391 13.6832 19.9212 13.3686 19.4544C12.9082 18.7715 12.4523 18.0953 13 17C13.6667 15.6667 14.7778 15.6667 16.4815 15.6667C17.3334 15.6667 18.3334 15.6667 19.5 15.5C21.601 15.1999 22 13.9084 22 12Z"/><circle cx="9.5" cy="8.5" r="1.5"/><circle cx="16.5" cy="9.5" r="1.5"/><path d="M7.125 15H7M7.25 15C7.25 15.1381 7.13807 15.25 7 15.25C6.86193 15.25 6.75 15.1381 6.75 15C6.75 14.8619 6.86193 14.75 7 14.75C7.13807 14.75 7.25 14.8619 7.25 15Z"/>', // PaintBoard
@@ -1226,6 +1232,9 @@ function pauseSong() {
 function seekSong(t) {
   const was = P.playing; pauseSong(); P.offset = Math.max(0, Math.min(songDur(), t)); if (was) playSong(); drawWave();
 }
+// Go to end: the playhead at the very end, stopped there as when the song runs out (Play then starts it over).
+// Go to start is seekSong(0), which keeps playing if it was.
+function seekEnd() { pauseSong(); seekSong(songDur()); }
 function clickTick(at, accent) {
   const o = ac.createOscillator(), g = ac.createGain();
   o.frequency.value = accent ? 1760 : 1175;
@@ -1508,6 +1517,9 @@ function initStems() {
   $("#pPlay").onclick = () => (P.playing ? pauseSong() : playSong());
   $("#pBack").onclick = () => seekSong(songPos() - 5);
   $("#pFwd").onclick = () => seekSong(songPos() + 5);
+  $("#pStart").append(icon("toStart")); $("#pEnd").append(icon("toEnd"));
+  $("#pStart").onclick = () => seekSong(0);
+  $("#pEnd").onclick = seekEnd;
   $("#pSing").onclick = () => P.song && singSong(P.song, $("#pSing"));
   $("#pExport").onclick = exportAudible;
   initWave();
@@ -1612,13 +1624,15 @@ function setLoop(on) {
   $("#kLoop").setAttribute("aria-pressed", String(on));
   paintPhrases();
 }
-// After a seek that isn't a phrase jump (±5 s, the strip's gaps): loop whatever phrase you landed in.
+// After a seek that isn't a phrase jump (±5 s, the strip's gaps, start and end): loop whatever phrase you landed in.
 function seekWithin(t) {
   K.hist = []; K.cue = null;
   seekSong(t);
   if (K.loop) K.ph = phraseAt(songPos()) ?? K.phrases.length - 1;
   paintPhrases();
 }
+// Go to start keeps playing if it was; go to end stops there, as when the song runs out.
+const songStart = () => seekWithin(0), songEnd = () => { pauseSong(); seekWithin(songDur()); };
 function renderPhrases() {
   const strip = $("#kStrip"), dur = songDur() || 1;
   strip.innerHTML = "";
@@ -1733,6 +1747,9 @@ function initSing() {
   resetOnDblClick($("#kClickVol"), 0.7);
   $("#kBack").onclick = () => seekWithin(songPos() - 5);
   $("#kFwd").onclick = () => seekWithin(songPos() + 5);
+  $("#kStart").append(icon("toStart")); $("#kEnd").append(icon("toEnd"));
+  $("#kStart").onclick = songStart;
+  $("#kEnd").onclick = songEnd;
   $("#kPrev").append(icon("prev")); $("#kNext").append(icon("next")); $("#kLoop").append(icon("loop"));
   $("#kPrev").onclick = () => phraseStep(-1);
   $("#kNext").onclick = () => phraseStep(1);
@@ -2068,10 +2085,14 @@ $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = () => (micOn ? stopMic() : startMic());
 document.addEventListener("keydown", (e) => {
   if (e.code === "Space" && view === "stems" && stemsPage === "song" && P.song &&!e.target.closest("input, select, button, textarea")) { e.preventDefault(); P.playing ? pauseSong() : playSong(); return; }
+  // Home / End from anywhere but fields, which keep them for their own text or value
+  if ((e.code === "Home" || e.code === "End") && view === "stems" && stemsPage === "song" && P.song && !e.target.closest("input, select, textarea") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault(); if (e.code === "Home") seekSong(0); else seekEnd(); return;
+  }
   if (view === "practice" && K.on) { // Space on a focused button presses that button; the other keys work from anywhere but fields
     if (e.target.closest("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Space" && e.target.closest("button")) return;
-    const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop) }[e.code];
+    const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), Home: songStart, End: songEnd }[e.code];
     if (act) { e.preventDefault(); act(); }
   }
 });

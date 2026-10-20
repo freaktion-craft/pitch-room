@@ -25,14 +25,14 @@ Use earphones while practicing so the song doesn't leak into the mic, or turn on
 **Library** — paste a YouTube link or drop an audio file and the song is split into vocals, drums, bass and other (or 6 stems with guitar and piano) by [Demucs](https://github.com/facebookresearch/demucs). A karaoke model then splits the vocals into the lead and the backing vocals. The beat is tracked with librosa, so a click track follows the song’s own tempo. In the player:
 
 - mute / solo / volume per track, plus the click (accent shift, 2/4–6/4),
-- waveform overview to jump around, Space to play / pause,
+- waveform overview to jump around, Space to play / pause, Home / End to go to the start / the end,
 - to keep the vocals of some part in even with the lead muted, drag across it on the waveform and press **Keep vocals here** (its vocals move to the backing track); × on a shaded part lets it go,
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that track,
 - **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.
 
 **Practice** — the melody is read from the lead vocal (pYIN pitch tracking, cut into notes), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
 
-- The song is cut into **phrases**, its lines, where the singer breathes. Jump to one and it counts you in (4 3 2 1); **Loop** repeats it. ← / → move between phrases, L turns the loop on and off.
+- The song is cut into **phrases**, its lines, where the singer breathes. Jump to one and it counts you in (4 3 2 1); **Loop** repeats it. ← / → move between phrases, Home / End go to the start / the end, L turns the loop on and off.
 - After an intro or a break, a count-in shows when the voice comes back.
 - The bars can move an octave up or down if the song sits outside your range.
 
