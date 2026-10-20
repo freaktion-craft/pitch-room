@@ -51,6 +51,11 @@ html, body { margin: 0; }
 html { scrollbar-gutter: stable; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font); -webkit-font-smoothing: antialiased; }
 [hidden] { display: none !important; }
+/* Interface text can't be selected (a stray drag highlights nothing); what someone might copy can: song titles and
+   facts, messages and errors, the install log, the server notice (it has the address), and fields */
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, .song b, #pTitle, #iTitle, #playTitle, #pMeta, #iSub, .facts dd, .server-off, .log, .job .top,
+#sAddMsg, #sInstallState, #sGpuState, #pExportState { -webkit-user-select: text; user-select: text; }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
