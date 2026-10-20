@@ -7,43 +7,43 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-/* Layout: off-white canvas, one column, settings as hairline-separated rows. Light by default; dark follows the system or the header toggle. */
+/* Layout: one column, settings as hairline-separated rows. Colours are OKLCH. Dark is the app's theme; the header
+   toggle switches to light. */
 @font-face { font-family: "Geist Pixel Square"; src: url("fonts/GeistPixel-Square.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 :root {
-  --fg: 0, 0, 0; /* rgb of every translucent ink tint below */
-  --bg: #F7F7F7; --surface: #FFFFFF; --surface-2: #F2F2F2; --hover-2: #EAEAEA; --ink: #202020; --ink-strong: #000; --on-ink: #fff; --knob: #fff;
+  --fg: 255, 255, 255; /* rgb of every translucent ink tint below */
+  --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.245 0 0); --hover-2: oklch(0.29 0 0);
+  --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0); --knob: oklch(0.87 0 0);
   --muted: rgba(var(--fg), 0.45); --faint: rgba(var(--fg), 0.3); --fill: rgba(var(--fg), 0.05); --line: rgba(var(--fg), 0.06); --ring: rgba(var(--fg), 0.12);
-  --accent: #202020; --voice: #2F6BFF;
-  --good: #1FA971; --warn: #D99A1E; --bad: #E0484E;
-  --note-bg: #FFF4E5; --note-ink: #7A4B00; --warn-ink: #9A5B00;
-  --key-w: #fff; --key-b: #2A2A2A; --key-w-on: #E6E6E6; --key-b-on: #000;
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --accent: oklch(0.94 0 0); --voice: oklch(0.68 0.17 262);
+  --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --bad: oklch(0.66 0.2 25);
+  --note-bg: oklch(0.27 0.03 75); --note-ink: oklch(0.86 0.09 80); --warn-ink: oklch(0.8 0.13 80);
+  --key-w: oklch(0.87 0 0); --key-b: oklch(0.22 0 0); --key-w-on: oklch(0.72 0 0); --key-b-on: oklch(0 0 0);
+  /* tracks: one hue each, neighbours in the list alternating light and dark so they stay apart for colour-blind eyes
+     too (checked: OKLab ΔE ≥ 8 under protan/deutan, ≥ 15 for normal vision, ≥ 3:1 on the surface); "other" is grey */
+  --stem-lead: oklch(0.66 0.15 262); --stem-backing: oklch(0.53 0.15 350); --stem-drums: oklch(0.66 0.15 40); --stem-bass: oklch(0.53 0.15 305);
+  --stem-guitar: oklch(0.66 0.134 85); --stem-piano: oklch(0.53 0.146 150); --stem-other: oklch(0.62 0 0);
+  --stem-vocals: var(--stem-lead); --stem-click: var(--ink);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --font: "Apple SD Gothic Neo", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --pixel: "Geist Pixel Square", ui-monospace, SFMono-Regular, Menlo, monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  color-scheme: light;
-}
-/* Same tokens, dark. Written twice: once for the system setting (unless the toggle forced light), once for the toggle */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --fg: 255, 255, 255;
-    --bg: #111111; --surface: #1A1A1A; --surface-2: #242424; --hover-2: #2E2E2E; --ink: #ECECEC; --ink-strong: #fff; --on-ink: #111111; --knob: #D4D4D4;
-    --accent: #ECECEC; --voice: #5B8CFF;
-    --note-bg: #2E2414; --note-ink: #F0C98A; --warn-ink: #E8B04A;
-    --key-w: #D6D6D6; --key-b: #1E1E1E; --key-w-on: #A6A6A6; --key-b-on: #000;
-    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --fg: 255, 255, 255;
-  --bg: #111111; --surface: #1A1A1A; --surface-2: #242424; --hover-2: #2E2E2E; --ink: #ECECEC; --ink-strong: #fff; --on-ink: #111111; --knob: #D4D4D4;
-  --accent: #ECECEC; --voice: #5B8CFF;
-  --note-bg: #2E2414; --note-ink: #F0C98A; --warn-ink: #E8B04A;
-  --key-w: #D6D6D6; --key-b: #1E1E1E; --key-w-on: #A6A6A6; --key-b-on: #000;
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   color-scheme: dark;
+}
+/* Light: the same tokens stepped for a white surface (tracks: same hues, the light/dark alternation flipped) */
+:root[data-theme="light"] {
+  --fg: 0, 0, 0;
+  --bg: oklch(0.975 0 0); --surface: oklch(1 0 0); --surface-2: oklch(0.96 0 0); --hover-2: oklch(0.935 0 0);
+  --ink: oklch(0.25 0 0); --ink-strong: oklch(0 0 0); --on-ink: oklch(1 0 0); --knob: oklch(1 0 0);
+  --accent: oklch(0.25 0 0); --voice: oklch(0.55 0.21 264);
+  --good: oklch(0.62 0.15 155); --warn: oklch(0.72 0.15 75); --bad: oklch(0.58 0.2 25);
+  --note-bg: oklch(0.97 0.025 75); --note-ink: oklch(0.45 0.09 70); --warn-ink: oklch(0.52 0.12 70);
+  --key-w: oklch(1 0 0); --key-b: oklch(0.27 0 0); --key-w-on: oklch(0.92 0 0); --key-b-on: oklch(0 0 0);
+  --stem-lead: oklch(0.5 0.16 262); --stem-backing: oklch(0.63 0.16 350); --stem-drums: oklch(0.5 0.156 40); --stem-bass: oklch(0.63 0.16 305);
+  --stem-guitar: oklch(0.5 0.102 85); --stem-piano: oklch(0.63 0.16 150); --stem-other: oklch(0.55 0 0);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  color-scheme: light;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -168,7 +168,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.35); padding-bottom: 5px; }
 .key.b { position: absolute; top: 0; width: 16px; height: 52px; background: var(--key-b); border-radius: 0 0 4px 4px; z-index: 1; }
 .key.guide.w { background: var(--key-w-on); }
-.key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 #777; }
+.key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }
 .key.live { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 -5px 0 var(--voice); }
 .key.b.live { box-shadow: inset 0 -5px 0 var(--voice); }
 
@@ -223,7 +223,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .player-title .muted { font-size: 13px; }
 /* the song's video, muted: the stems carry the sound, the picture is for following lyrics */
 /* the box holds its size while the video loads, so nothing below it jumps */
-.video { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 62vh; border-radius: 10px; background: #000; overflow: hidden; }
+.video { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 62vh; border-radius: 10px; background: oklch(0 0 0); overflow: hidden; }
 .video video { display: block; width: 100%; height: 100%; object-fit: contain; }
 .video-wait { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13.5px; color: rgba(255, 255, 255, 0.6); animation: blink 1.6s ease-in-out infinite; }
 .video-wait.err { animation: none; }
@@ -231,7 +231,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; touch-action: pan-y; }
 /* the playhead's time while you drag it: a flag at the top of the waveform, the line hanging from it (drawWave) */
 .ph-flag { position: absolute; top: 0; z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 6px; display: grid; place-items: center;
-  border-radius: 4px; background: var(--voice); color: #fff; font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+  border-radius: 4px; background: var(--voice); color: oklch(1 0 0); font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
 /* kept-whole parts: an × in each one's top right corner, shown while you point at the part */
 .wave-wrap { position: relative; }
 #pParts .part { position: absolute; top: 0; bottom: 0; pointer-events: none; }
@@ -269,7 +269,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .track.off .name, .track.off .ico { opacity: 0.35; }
 .tog { height: 28px; min-width: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fill); font: 500 12px var(--mono); color: rgba(var(--fg), 0.55); }
 .tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
-.tog[aria-pressed="true"].s { background: #F2C14E; color: #3A2A00; }
+.tog[aria-pressed="true"].s { background: oklch(0.84 0.14 85); color: oklch(0.3 0.06 85); }
 .tog:hover { background: rgba(var(--fg), 0.09); }
 .track input[type="range"] { width: 100%; }
 .dl { height: 28px; width: 32px; border: 0; border-radius: 6px; background: transparent; color: rgba(var(--fg), 0.45); display: inline-flex; align-items: center; justify-content: center; }
@@ -316,8 +316,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .rbar { display: grid; grid-template-columns: 48px minmax(0, 1fr) 96px; align-items: center; gap: 12px; font-size: 13px; }
 .rbar .lane { position: relative; height: 10px; border-radius: 5px; background: var(--fill); }
 .rbar .lane i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
-.rbar .full { background: color-mix(in srgb, #2F6BFF 35%, transparent); }
-.rbar .core { background: #2F6BFF; }
+.rbar .full { background: color-mix(in oklch, var(--stem-lead) 35%, transparent); }
+.rbar .core { background: var(--stem-lead); }
 .rbar output { font: 12.5px var(--mono); color: var(--muted); text-align: right; }
 .rbar.axis .lane { height: 14px; background: none; }
 .rbar.axis .lane span { position: absolute; transform: translateX(-50%); font: 11px var(--mono); color: var(--faint); }
@@ -358,7 +358,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
 
 </style>
-<script>/* apply a saved theme before first paint */ try { const t = JSON.parse(localStorage.getItem("stem:theme") ?? localStorage.getItem("pitchroom:theme")); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script>/* apply a saved theme before first paint */ try { if (JSON.parse(localStorage.getItem("stem:appearance")) === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}</script>
 </head>
 <body>
 <div class="app" id="app">
@@ -713,7 +713,8 @@ function icon(name) {
   s.innerHTML = ICONS[name] || ICONS.other;
   return s;
 }
-const STEM_COLORS = { vocals: "#2F6BFF", lead: "#2F6BFF", backing: "#7FA2FF", drums: "#E0484E", bass: "#7A5AF8", guitar: "#D99A1E", piano: "#1FA971", other: "#8A8F98", click: "var(--ink)" };
+// each track's colour (CSS --stem-*, per theme), as read for the canvas
+const stemColor = (k) => C["stem-" + k] || C.muted;
 const STEM_NOTES = { vocals: "lead and backing voices", lead: "the main voice", backing: "harmonies, doubles and chops", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
 const TRACK_TITLES = { lead: "Lead vocal", backing: "Backing vocals" };
 // raw: lead and backing as separated; buffers holds them as heard (see splitBuffers)
@@ -1186,7 +1187,7 @@ function drawWave() {
   const x = c.getContext("2d"), W = r.width, H = 96; x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
   const prog = songDur() ? songPos() / songDur() : 0, X = (t) => (t / (songDur() || 1)) * W;
   if (P.song && P.song.split) { // parts with the vocals kept whole, and the selection
-    x.fillStyle = STEM_COLORS.lead;
+    x.fillStyle = stemColor("lead");
     for (const [a, b] of P.song.unsplit || []) { x.globalAlpha = 0.14; x.fillRect(X(a), 0, X(b) - X(a), H); x.globalAlpha = 0.8; x.fillRect(X(a), 0, X(b) - X(a), 3); }
     if (P.sel) { x.fillStyle = C.ink; x.globalAlpha = 0.1; x.fillRect(X(P.sel.a), 0, X(P.sel.b) - X(P.sel.a), H); }
     x.globalAlpha = 1;
@@ -1205,7 +1206,7 @@ function drawWave() {
     if (!soloed.length) bars(P.peaks, 1, 0.18);
     else { // the mix faded behind the soloed tracks, each in its icon's colour
       bars(P.peaks, 0.16, 0.08);
-      for (const k of soloed) { x.fillStyle = STEM_COLORS[k] || C.ink; bars(P.trackPeaks[k], 1, 0.4); }
+      for (const k of soloed) { x.fillStyle = stemColor(k); bars(P.trackPeaks[k], 1, 0.4); }
     }
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
   x.globalAlpha = 1;
@@ -1226,7 +1227,7 @@ function renderTracks() {
   const box = $("#pTracks"); box.innerHTML = "";
   for (const [name, t] of Object.entries(P.tracks)) {
     const row = el("div", "track" + (audible(name) ? "" : " off")); row.dataset.name = name;
-    const dot = icon(name); dot.style.color = STEM_COLORS[name] || "#999";
+    const dot = icon(name); dot.style.color = `var(--stem-${name}, var(--muted))`;
     const bpm = P.song.bpm, isClick = name === "click";
     const title = isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : TRACK_TITLES[name] || name[0].toUpperCase() + name.slice(1);
     const note = isClick ? (bpm ? `click · ${t.bpb}/4 · follows the song’s beat` : "click") : STEM_NOTES[name] || "";
@@ -1665,6 +1666,7 @@ let W = 0, H = 0, dpr = 1, C = {};
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
   for (const k of ["surface","surface-2","ink","muted","line","accent","voice","good","warn","bad"]) C[k] = cs.getPropertyValue("--" + k).trim();
+  for (const k of ["vocals","lead","backing","drums","bass","guitar","piano","other","click"]) C["stem-" + k] = cs.getPropertyValue("--stem-" + k).trim();
 }
 function resize() {
   const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1675,26 +1677,22 @@ function resize() {
 }
 new ResizeObserver(resize).observe(cv);
 readColors();
-const mq = window.matchMedia("(prefers-color-scheme: dark)");
-(mq.addEventListener ? mq.addEventListener("change", readColors) : mq.addListener(readColors));
 new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
-// theme toggle: follows the system until clicked; picking the system's own theme goes back to following it
+// theme toggle: dark unless light was picked (remembered as "appearance")
 const ICON_MOON = '<svg viewBox="0 0 16 16"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>';
 const ICON_SUN = '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.3M8 13.2v1.3M1.5 8h1.3M13.2 8h1.3M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"/></svg>';
-const isDark = () => (document.documentElement.dataset.theme || (mq.matches ? "dark" : "light")) === "dark";
+const isDark = () => document.documentElement.dataset.theme !== "light";
 function paintThemeBtn() {
   const b = $("#themeBtn"), d = isDark();
   b.innerHTML = d ? ICON_SUN : ICON_MOON;
   b.setAttribute("aria-label", d ? "Light mode" : "Dark mode"); b.title = b.getAttribute("aria-label");
 }
 $("#themeBtn").onclick = () => {
-  const next = isDark() ? "light" : "dark", sys = mq.matches ? "dark" : "light";
-  if (next === sys) delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = next;
-  store.set("theme", next === sys ? null : next);
+  if (isDark()) document.documentElement.dataset.theme = "light"; else delete document.documentElement.dataset.theme;
+  store.set("appearance", isDark() ? null : "light");
   paintThemeBtn();
 };
-(mq.addEventListener ? mq.addEventListener("change", paintThemeBtn) : mq.addListener(paintThemeBtn));
 paintThemeBtn();
 
 function rr(x, y, w, h, r) {
