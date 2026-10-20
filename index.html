@@ -462,7 +462,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       </form>
       <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*"><span>or choose an audio file · drop it here</span></label>
       <div class="row-actions">
-        <label class="inline-field">Split into <select id="sModel"></select></label>
+        <label class="inline-field" title="6 tracks instead of 4. The piano track often picks up other instruments."><input type="checkbox" class="switch" id="s6">Also split out guitar and piano</label>
         <span class="muted" id="sDevice"></span>
       </div>
       <div class="gpu-row" id="sGpu" hidden>
@@ -762,8 +762,6 @@ async function stemsRefresh() {
   $("#sAdd").hidden = !st || !st.installed;
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
   if (st && st.installed) {
-    const sel = $("#sModel");
-    if (!sel.options.length) for (const [k, v] of Object.entries(st.models)) { const o = document.createElement("option"); o.value = k; o.textContent = v; sel.append(o); }
     $("#sDevice").textContent = st.restartNeeded ? "Restart the app (close its window and open it again) to switch to the GPU."
       : { mps: "Runs on your Apple GPU — about 30 s for a 4-minute song.", cuda: `Runs on your NVIDIA GPU${st.deviceName ? " (" + st.deviceName + ")" : ""} — usually under a minute.`, cpu: "Runs on the CPU — a 4-minute song can take several minutes." }[st.device] || "";
     $("#sGpu").hidden = !st.gpuUnused || st.restartNeeded;
@@ -1007,12 +1005,14 @@ async function postJob(url, body, headers) {
   if (!r.ok) throw new Error(j.error || "That didn’t work.");
   return j.job;
 }
+// 4 stems unless the switch asks for guitar and piano too (the 6-stem model; its piano track bleeds, so it's opt-in)
+const stemModel = () => ($("#s6").checked ? "htdemucs_6s" : "htdemucs");
 async function submitYoutube(e) {
   e.preventDefault();
   const url = $("#sYtUrl").value.trim(); if (!url) return;
   addMsg("Starting…");
   try {
-    const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: $("#sModel").value }), { "Content-Type": "application/json" });
+    const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" });
     $("#sYtUrl").value = ""; jobStarted(id, "Starting…");
   } catch (err) { addMsg(err.message, true); }
 }
@@ -1020,7 +1020,7 @@ async function submitFile(file) {
   if (!file) return;
   addMsg("Uploading…");
   try {
-    const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${$("#sModel").value}`, file);
+    const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}`, file);
     jobStarted(id, "Uploading…");
   } catch (err) { addMsg(err.message, true); }
 }
@@ -1423,6 +1423,8 @@ function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { $("#sInstallState").textContent = e.message; $("#sInstallBtn").disabled = false; } };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { $("#sGpuState").textContent = e.message; $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
+  $("#s6").checked = store.get("sixStems", false);
+  $("#s6").onchange = (e) => store.set("sixStems", e.target.checked);
   $("#pGetVideo").onclick = async () => {
     const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
     videoWait("Getting the video…");
