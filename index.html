@@ -83,7 +83,7 @@ header { position: relative; }
 .pop input[type="range"] { width: 140px; }
 .pop .hint { margin: 0; }
 /* the input menu keeps one width whatever the inputs are called (a long name ends in …); its hint sits right under it */
-#micDev { flex: 0 1 200px; min-width: 0; text-overflow: ellipsis; }
+#micDev { flex: 0 1 200px; }
 #micDevHint { margin-top: -8px; }
 .iconchip .ico { width: 16px; height: 16px; }
 /* the accent colour: picked in a panel of swatches under the palette button, as wide as their row */
@@ -109,12 +109,26 @@ header { position: relative; }
 .row + .row { border-top: 1px solid var(--line); }
 .row > span:first-child { font-size: 14px; }
 .row em { font-style: normal; color: var(--faint); font-size: 12.5px; margin-left: 8px; }
-select, input[type="number"] { height: 32px; border: 0; border-radius: 8px; background-color: var(--surface-2); padding: 0 12px; font-size: 14px; max-width: 100%; }
-select:hover, input[type="number"]:hover { background-color: var(--hover-2); }
+select, .pick, input[type="number"] { height: 32px; border: 0; border-radius: 8px; background-color: var(--surface-2); padding: 0 12px; font-size: 14px; max-width: 100%; }
+select:hover, .pick:hover, input[type="number"]:hover { background-color: var(--hover-2); }
 /* Our own chevron instead of the OS one: same 1.5px stroke and grey as the rest of the UI, centred, with room on the right */
-select { appearance: none; -webkit-appearance: none; padding-right: 32px; cursor: pointer;
+select, .pick { appearance: none; -webkit-appearance: none; padding-right: 32px; cursor: pointer;
   background-image: var(--chevron);
   background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px; }
+/* A dropdown in the app's own style (the browser's list of a <select> can't be styled): a button like a select, and a
+   list like the ⋮ menu under it, the chosen one ticked, choices under group headings when they have them */
+.pick { display: inline-flex; align-items: center; min-width: 0; color: var(--ink); text-align: left; }
+.pick > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-list { position: fixed; z-index: 30; padding: 4px; border-radius: 10px; background: var(--surface); overflow-y: auto; overscroll-behavior: contain;
+  box-shadow: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.4); }
+.pick-list .grp { padding: 12px 8px 4px 32px; font-size: 12px; line-height: 16px; color: var(--faint); } /* lined up with the names, past the ticks */
+.pick-list .grp:first-child { padding-top: 4px; }
+.pick-list [role="option"] { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0 12px 0 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--ink); font-size: 13.5px; text-align: left; }
+.pick-list [role="option"]:hover, .pick-list [role="option"]:focus-visible { background: var(--fill); outline: none; }
+.pick-list [role="option"] span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; visibility: hidden; }
+.pick-list [aria-selected="true"] .ico { visibility: visible; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: 999px; background: rgba(var(--fg), 0.12); position: relative;
   margin: 0; cursor: pointer; transition: background-color 0.2s var(--ease); flex: none; }
@@ -422,11 +436,11 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span class="mic-lbl"><span class="if-on">Mic on</span><span class="if-off">Mic off</span></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     <button class="chipbtn iconchip" id="micSetBtn" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="micSet" hidden></button>
     <div class="pop" id="micSet" role="dialog" aria-label="Mic settings" hidden>
-      <label>Input <select id="micDev"><option value="">System default</option></select></label>
+      <label>Input <button class="pick" id="micDev" type="button"></button></label>
       <p class="hint" id="micDevHint" hidden>Turn on the mic to see each input’s name.</p>
       <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
-      <label>Note names <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi</option></select></label>
+      <label>Note names <button class="pick" id="names" type="button"></button></label>
       <p class="hint">With earphones the song doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
     </div>
     <button class="chipbtn iconchip" id="accentBtn" type="button" aria-label="Accent colour" title="Accent colour" aria-expanded="false" aria-controls="accentSet"></button>
@@ -722,16 +736,89 @@ async function restartMic() {
 }
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
+let micPick = null, namesPick = null; // the mic settings' dropdowns (makePick), made in initSing
 // The mic settings' Input menu. Until the mic has been allowed, the browser holds back the inputs' names (and often
 // the inputs), so they're numbered and a hint says how to see them. A chosen input that's gone shows as the default.
+// Inputs are listed under their device: "Mic | Line 1/2" under "Audient EVO4".
 async function listMics() {
+  if (!micPick) return;
   let ins = [];
   try { ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput"); } catch (e) {}
   const real = ins.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications"); // not the OS's aliases
-  const sel = $("#micDev"), opts = [["", "System default"], ...real.map((d, i) => [d.deviceId, d.label || `Microphone ${i + 1}`])];
-  sel.replaceChildren(...opts.map(([v, t]) => { const o = el("option", null, t); o.value = v; return o; }));
-  sel.value = real.some((d) => d.deviceId === S.mic) ? S.mic : "";
+  const by = (a, b) => (a.g || "").localeCompare(b.g || "", undefined, { numeric: true }) || a.t.localeCompare(b.t, undefined, { numeric: true });
+  const items = real.map((d, i) => {
+    const [t, g] = d.label ? splitInput(d.label) : [`Microphone ${i + 1}`, ""];
+    return { v: d.deviceId, t, g, full: d.label || t };
+  }).sort(by);
+  micPick.set([{ v: "", t: "System default" }, ...items], real.some((d) => d.deviceId === S.mic) ? S.mic : "");
   $("#micDevHint").hidden = !ins.some((d) => !d.label);
+}
+// An input's name and its device's: Windows writes "Mic | Line 1/2(Audient EVO4)", the device in the last brackets
+// (which can hold brackets of their own: "Line(Yamaha SYNCROOM Driver (WDM))").
+function splitInput(label) {
+  const s = label.trim();
+  if (!s.endsWith(")")) return [s, ""];
+  for (let i = s.length - 1, depth = 0; i >= 0; i--) {
+    if (s[i] === ")") depth++;
+    else if (s[i] === "(" && --depth === 0) { const t = s.slice(0, i).trim(); return t ? [t, s.slice(i + 1, -1).trim()] : [s, ""]; }
+  }
+  return [s, ""];
+}
+// A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
+// whole name, for its tooltip}); onPick(v) when another one is chosen. The list lives in the panel the button is in, so
+// a click on it counts as inside that panel; Escape closes the list only.
+function makePick(btn, name, onPick) {
+  const list = el("div", "pick-list"), label = el("span");
+  list.setAttribute("role", "listbox"); list.setAttribute("aria-label", name); list.hidden = true;
+  btn.append(label); btn.setAttribute("aria-haspopup", "listbox"); btn.setAttribute("aria-expanded", "false");
+  (btn.closest(".pop") || document.body).append(list);
+  let items = [], value = "";
+  const options = () => [...list.querySelectorAll('[role="option"]')];
+  function paint() {
+    const it = items.find((x) => x.v === value) || items[0];
+    label.textContent = it ? it.t : ""; btn.title = it ? it.full || it.t : "";
+    btn.setAttribute("aria-label", `${name}: ${label.textContent}`);
+  }
+  function show(on) {
+    list.hidden = !on; btn.setAttribute("aria-expanded", String(on));
+    if (!on) return;
+    let g = "";
+    list.replaceChildren();
+    for (const it of items) {
+      if (it.g && it.g !== g) list.append(el("div", "grp", it.g));
+      g = it.g || "";
+      const o = el("button"); o.type = "button"; o.setAttribute("role", "option"); o.setAttribute("aria-selected", String(it.v === value));
+      o.title = it.full || it.t; o.append(icon("tick"), el("span", null, it.t));
+      o.onclick = () => { show(false); btn.focus(); if (it.v !== value) { value = it.v; paint(); onPick(value); } };
+      list.append(o);
+    }
+    // under the button, right edges lined up, as wide as its longest name (from the button's width up to 360 px) and
+    // as tall as the window allows (above the button if there's no room below)
+    list.style.width = "max-content";
+    const r = btn.getBoundingClientRect(), w = Math.min(Math.max(r.width, Math.ceil(list.offsetWidth) + 8), 360, innerWidth - 32);
+    list.style.width = w + "px"; list.style.left = Math.max(16, r.right - w) + "px";
+    const below = innerHeight - r.bottom - 20, above = r.top - 20, up = below < 200 && above > below;
+    list.style.maxHeight = Math.min(360, up ? above : below) + "px";
+    list.style.top = up ? "" : r.bottom + 4 + "px"; list.style.bottom = up ? innerHeight - r.top + 4 + "px" : "";
+    const cur = options().find((o) => o.getAttribute("aria-selected") === "true") || options()[0];
+    if (cur) { cur.focus(); cur.scrollIntoView({ block: "nearest" }); }
+  }
+  btn.onclick = () => show(list.hidden);
+  btn.addEventListener("keydown", (e) => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); show(true); } });
+  list.addEventListener("keydown", (e) => {
+    const os = options(), i = os.indexOf(document.activeElement);
+    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: os.length - 1 }[e.key];
+    if (to !== undefined) { e.preventDefault(); e.stopPropagation(); os[Math.max(0, Math.min(os.length - 1, to))].focus(); } // not Practice's Home/End
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); show(false); btn.focus(); }
+    else if (e.key === "Tab") show(false);
+  });
+  document.addEventListener("click", (e) => { if (!list.hidden && !list.contains(e.target) && !btn.contains(e.target)) show(false); });
+  addEventListener("resize", () => show(false));
+  return {
+    set(next, v) { items = next; value = v; paint(); if (!list.hidden) show(true); },
+    get value() { return value; },
+    close() { show(false); },
+  };
 }
 function stopMic() {
   if (micNode) micNode.disconnect();
@@ -803,6 +890,7 @@ Object.assign(ICONS, {
   toEnd: '<path d="M15.9351 12.6258C15.6807 13.8374 14.327 14.7077 11.6198 16.4481C8.67528 18.3411 7.20303 19.2876 6.01052 18.9229C5.60662 18.7994 5.23463 18.5823 4.92227 18.2876C4 17.4178 4 15.6118 4 12C4 8.38816 4 6.58224 4.92227 5.71235C5.23463 5.41773 5.60662 5.20057 6.01052 5.07707C7.20304 4.71243 8.67528 5.6589 11.6198 7.55186C14.327 9.29233 15.6807 10.1626 15.9351 11.3742C16.0216 11.7865 16.0216 12.2135 15.9351 12.6258Z"/><path d="M20 5V19"/>', // Next
   close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
   plus: '<path d="M12 4V20M20 12H4"/>', // PlusSign
+  tick: '<path d="M5 14L8.5 17.5L19 6.5"/>', // Tick02
   palette: '<path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C12.8417 22 14 22.1163 14 21C14 20.391 13.6832 19.9212 13.3686 19.4544C12.9082 18.7715 12.4523 18.0953 13 17C13.6667 15.6667 14.7778 15.6667 16.4815 15.6667C17.3334 15.6667 18.3334 15.6667 19.5 15.5C21.601 15.1999 22 13.9084 22 12Z"/><circle cx="9.5" cy="8.5" r="1.5"/><circle cx="16.5" cy="9.5" r="1.5"/><path d="M7.125 15H7M7.25 15C7.25 15.1381 7.13807 15.25 7 15.25C6.86193 15.25 6.75 15.1381 6.75 15C6.75 14.8619 6.86193 14.75 7 14.75C7.13807 14.75 7.25 14.8619 7.25 15Z"/>', // PaintBoard
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
   practice: '<path d="M7 6.5C7 4.01472 9.01472 2 11.5 2C13.9853 2 16 4.01472 16 6.5V11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5V6.5Z"/><path d="M11.5 19H11.0828C7.57267 19 4.57706 16.4623 4 13M11.5 19H11.9172C15.4273 19 18.4229 16.4623 19 13M11.5 19V22"/>', // Mic01
@@ -1822,7 +1910,7 @@ async function singSong(m, btn) {
   setText("playTitle", m.title);
   go("practice");
 }
-function showMicSet(on) { if (on) showAccent(false); $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
+function showMicSet(on) { if (on) showAccent(false); else { micPick?.close(); namesPick?.close(); } $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
 function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").hidden = true; }
@@ -1864,13 +1952,15 @@ function initSing() {
   setBtn.onclick = (e) => { e.stopPropagation(); showMicSet(pop.hidden); };
   document.addEventListener("click", (e) => { if (!pop.hidden && !pop.contains(e.target)) showMicSet(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showMicSet(false); setBtn.focus(); } });
-  $("#gate").value = S.gate; $("#echo").checked = S.echo; $("#names").value = S.names;
+  $("#gate").value = S.gate; $("#echo").checked = S.echo;
   $("#gate").oninput = (e) => { S.gate = +e.target.value; save(); };
   resetOnDblClick($("#gate"), 0.01);
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
-  $("#micDev").onchange = (e) => { S.mic = e.target.value; save(); restartMic(); };
+  micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); });
+  micPick.set([{ v: "", t: "System default" }], "");
   if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
-  $("#names").onchange = (e) => { S.names = e.target.value; save(); keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
+  namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m))); });
+  namesPick.set([{ v: "en", t: "C D E (C4)" }, { v: "ko", t: "Do Re Mi" }], S.names);
 }
 
 // ---------- canvas ----------
