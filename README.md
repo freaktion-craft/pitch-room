@@ -20,6 +20,8 @@ The first run creates a private Python environment in `.venv` and installs the b
 
 Use earphones while practicing so the song doesn't leak into the mic, or turn on **Filter out speaker sound** in Practice's mic settings. The mic settings also choose which **Input** to sing into, if you have more than one.
 
+The page is in English or Korean (한국어): **Language** in the settings (the gear). It starts in Korean when the browser is set to Korean.
+
 ## What's inside
 
 **Library** — paste a YouTube link or drop an audio file and the song is split into vocals, drums, bass and other (or 6 stems with guitar and piano) by [Demucs](https://github.com/facebookresearch/demucs). A karaoke model then splits the vocals into the lead and the backing vocals. The beat is tracked with librosa, so a click track follows the song’s own tempo. In the player:
