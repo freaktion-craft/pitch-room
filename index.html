@@ -288,6 +288,11 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   border-radius: 4px; background: var(--voice); color: var(--on-voice); font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
 /* kept-whole parts: an × in each one's top right corner, shown while you point at the part */
 .wave-wrap { position: relative; }
+/* the playhead, over the waveform (its rounded corners would clip it at the ends); thicker while you can grab it, hanging
+   from the flag while you drag it */
+.ph-line { position: absolute; left: 0; top: 0; bottom: 0; z-index: 2; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--voice); pointer-events: none; }
+.ph-line.wide { width: 4px; margin-left: -2px; border-radius: 2px; }
+.ph-line.hang { top: 20px; }
 #pParts .part { position: absolute; top: 0; bottom: 0; pointer-events: none; }
 #pParts .x { position: absolute; top: 8px; right: 4px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
   background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--ring); pointer-events: auto; opacity: 0; transition: opacity 0.15s; }
@@ -594,7 +599,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
         <div class="row-actions"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="bpm" id="pBpm" hidden></span><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
-      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div><output class="ph-flag" id="pFlag" hidden></output></div>
+      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <div class="seek" role="group" aria-label="Move through the song">
@@ -1561,7 +1566,10 @@ function drawWave() {
     for (let i = 0; i < k; i++) { x.globalAlpha = 0.45 * ((i + 1) / k) ** 2; x.fillRect(a + ((b - a) * i) / k, top, (b - a) / k, H - top); }
     x.globalAlpha = 1;
   }
-  x.fillRect(Math.round((prog * W - lw / 2) * d) / d, top, lw, H - top); // on whole pixels: a crisp line
+  // the line itself lies over the waveform rather than in it, so its rounded corners don't cut it at the ends
+  const head = $("#pHead");
+  head.style.transform = `translateX(${Math.round(prog * W * d) / d}px)`; // on whole pixels: a crisp line
+  head.classList.toggle("wide", lw > 2); head.classList.toggle("hang", top > 0);
   const flag = $("#pFlag");
   flag.hidden = !P.scrub;
   if (P.scrub) {
