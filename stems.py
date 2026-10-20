@@ -6,7 +6,7 @@ Songs live in ./library/<id>/ :
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
-    melody.json     the sing-along notes, from lead.mp3 (or vocals.mp3 without the lead model)
+    melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
     meta.json       title, duration, bpm, beat times, key, stems, model, unsplit (parts where the vocals stay whole)
 
 Heavy packages (torch, demucs, librosa, yt-dlp) are optional and installed from the
@@ -530,7 +530,7 @@ def song_info(song_id: str) -> dict:
     return info
 
 
-# ---------- lead vocal (sing-along) ----------
+# ---------- lead vocal ----------
 def lead_available() -> bool:
     return importlib.util.find_spec("audio_separator") is not None
 
@@ -605,7 +605,7 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
 # ---------- lead and backing vocals ----------
 # The player shows the vocal stem as two tracks, lead and backing. Where the split is wrong, parts of the song can be
 # left unsplit (meta "unsplit": [[t0, t1], …]): there the lead track carries all the vocals, backing is silent and the
-# sing-along bars follow all the vocals.
+# note bars in Practice follow all the vocals.
 FADE = 0.03  # s: crossfade at the edges of an unsplit part
 _split_lock = threading.Lock()
 
@@ -712,7 +712,7 @@ def _tracks(folder: str, meta: dict) -> list[str]:
     return [t for n in meta["stems"] for t in (["lead", "backing"] if n == "vocals" and split else [n])]
 
 
-# ---------- melody (sing-along) ----------
+# ---------- melody (Practice) ----------
 _melody_lock = threading.Lock()  # one rebuild at a time, so two pages asking at once don't both build it
 
 
@@ -760,7 +760,7 @@ def get_melody(song_id: str) -> dict:
         vocals = os.path.join(folder, "vocals.mp3")
         if data is None:
             if not os.path.isfile(vocals):
-                raise ValueError("This song has no vocal track to sing along with.")
+                raise ValueError("This song has no vocal track to practice with.")
             split = _ensure_split(folder)
             src = _decode_stereo(os.path.join(folder, "lead.mp3") if split else vocals)
             data = _save_melody(folder, src.mean(0), _drums_mono(folder), split)

@@ -1,4 +1,4 @@
-"""Lead-melody extraction from a separated vocal stem, for sing-along mode.
+"""Lead-melody extraction from a separated vocal stem, for Practice.
 
 The bars come from the vocal stem alone; the drum stem is only consulted to spot drum hits that leaked into it.
 

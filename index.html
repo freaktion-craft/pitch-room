@@ -136,7 +136,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .gauge .zone { position: absolute; top: 0; bottom: 0; left: 50%; width: 16%; transform: translateX(-50%); border-radius: 2px; background: rgba(var(--fg), 0.12); }
 .gauge .needle { position: absolute; top: -4px; width: 2px; height: 12px; margin-left: -1px; left: 50%; border-radius: 1px; background: var(--faint); transition: left 60ms linear; }
 .gauge-labels { display: flex; justify-content: space-between; width: 140px; font: 10px/1 var(--mono); color: var(--faint); }
-/* sing along: the count-in before the voice comes back after an intro or a break */
+/* Practice: the count-in before the voice comes back after an intro or a break */
 /* left of the playhead line: nothing is drawn there during an intro or break, while the coming bars arrive from the right */
 .countin { position: absolute; left: clamp(100px, 16%, 240px); top: 50%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px;
   pointer-events: none; text-align: center; }
@@ -318,7 +318,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   .mix { margin-right: 0; }
 }
 
-/* Sing-along */
+/* Practice */
 .songbar { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: -6px 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); font-size: 13px; }
 .songbar output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; }
 .kfield { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
@@ -348,7 +348,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <button class="chipbtn themebtn" id="themeBtn" type="button" aria-label="Dark mode"></button>
   </header>
 
-  <main id="vPlay" aria-label="Sing" hidden>
+  <main id="vPractice" aria-label="Practice" hidden>
     <div class="play-bar">
       <h1 class="title" id="playTitle"></h1>
       <span class="kb"><span class="keycap">Space</span>play / pause</span>
@@ -399,8 +399,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   </main>
   <main id="vStems" aria-label="Stems" hidden>
     <div class="intro" id="sIntro">
-      <h1 class="title">Sing along with any song</h1>
-      <p class="lede">Split a song into vocals, drums, bass and the rest, then sing along with it: note bars from the original singer, phrase by phrase, and your own pitch on top. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
+      <h1 class="title">Practice any song</h1>
+      <p class="lede">Split a song into vocals, drums, bass and the rest, then practice singing it: note bars from the original singer, phrase by phrase, and your own pitch on top. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
     </div>
     <a class="btn sm back" id="sBack" href="#stems" hidden>← Library</a>
     <p class="server-off" id="sServer" hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
@@ -415,7 +415,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <div id="sAddPage" hidden>
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
-      <p class="muted">Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the sing-along bars come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
+      <p class="muted">Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
       <div class="row-actions"><button class="btn dark" id="sInstallBtn" type="button">Install stem tools</button><span class="muted" id="sInstallState"></span></div>
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
@@ -446,7 +446,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <section class="panel-card info" id="sInfo" hidden>
       <div class="player-head">
         <div class="player-title"><b id="iTitle"></b><span class="muted" id="iSub"></span></div>
-        <div class="row-actions" id="iActs" hidden><a class="btn sm" id="iOpen" href="#stems">Open player</a><button class="btn sm dark" id="iSing" type="button">Sing along</button></div>
+        <div class="row-actions" id="iActs" hidden><a class="btn sm" id="iOpen" href="#stems">Open player</a><button class="btn sm dark" id="iSing" type="button">Practice</button></div>
       </div>
       <p class="muted" id="iWait">Reading the song…</p>
       <dl class="facts" id="iFacts"></dl>
@@ -456,7 +456,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
     <section class="player" id="sPlayer" hidden>
       <div class="player-head">
         <div class="player-title"><b id="pTitle"></b><span class="muted" id="pMeta"></span></div>
-        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button">Sing along</button></div>
+        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button">Practice</button></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
@@ -1242,7 +1242,7 @@ async function startSplit() {
   catch (e) { delete splitting[id]; renderTracks(); $("#pExportState").textContent = e.message; }
 }
 // Where the split is wrong, parts of the song can keep their vocals whole: there the lead track plays all the vocals
-// and backing is silent (the server does the same for exports and the sing-along bars). 30 ms crossfades at the edges.
+// and backing is silent (the server does the same for exports and the note bars in Practice). 30 ms crossfades at the edges.
 function splitBuffers() {
   const l = P.raw.lead, b = P.raw.backing, parts = (P.song && P.song.unsplit) || [];
   if (!l || !b) return;
@@ -1351,7 +1351,7 @@ function initStems() {
   initWave();
 }
 
-// ---------- sing-along (songs from the Stems library) ----------
+// ---------- practice (singing a song from the library) ----------
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
 const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1 };
@@ -1507,7 +1507,7 @@ function renderCountIn(sn) {
   const num = $("#countNum"), text = n ? String(n) : "";
   if (num.textContent !== text) { num.textContent = text; num.classList.remove("beat"); void num.offsetWidth; num.classList.toggle("beat", !!n); }
 }
-// Sing along shows the whole song's range all the time, so the view doesn't zoom in and out while you sing.
+// Practice shows the whole song's range all the time, so the view doesn't zoom in and out while you sing.
 function songView(snap) {
   let lo = K.lo - 2.5, hi = K.hi + 2.5;
   if (hi - lo < 13) { const c = (lo + hi) / 2; lo = c - 6.5; hi = c + 6.5; }
@@ -1542,7 +1542,7 @@ async function singSong(m, btn) {
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute));
   $("#kClick").disabled = !(m.beats && m.beats.length);
   setText("playTitle", m.title);
-  go("play");
+  go("practice");
 }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
@@ -1719,7 +1719,7 @@ function loop() {
   else { miss = 0; med.push(m); while (med.length > 5) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
   $("#meter").style.width = Math.min(100, (level / 0.15) * 100) + "%";
 
-  if (K.on && view === "play") {
+  if (K.on && view === "practice") {
     const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
     if (last && sn < last.t - 0.25) K.hist = []; // jumped back
     if (P.playing) K.hist.push({ t: sn, m: cur });
@@ -1754,7 +1754,7 @@ function renderHud(now, m) {
     n.style.background = Math.abs(c) <= 10 ? C.good : Math.abs(c) <= 25 ? C.warn : C.bad;
   }
   renderKeys(tm, m);
-  setText("hudRep", `Sing along · ${K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung"}`);
+  setText("hudRep", `Practice · ${K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung"}`);
   setText("hudHow", "Grey line: the original singer. Blue: you.");
 }
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
@@ -1816,18 +1816,18 @@ async function openSongById(id) {
   if (location.hash !== "#stems/" + id) return; // moved on meanwhile
   if (m) openSong(m); else location.replace("#stems");
 }
-// #stems… for the library and its pages, #play for Sing along. Sing along needs its song open, so a reload there (or
+// #stems… for the library and its pages, #practice for Practice, which needs its song open, so a reload there (or
 // an old link to a page that's gone) lands in the library.
 function route() {
   const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
-  const singing = v === "play" && K.on && P.song && K.song.id === P.song.id;
+  const singing = v === "practice" && K.on && P.song && K.song.id === P.song.id;
   if (v !== "stems" && !singing) { location.replace("#stems"); return; }
   view = v;
-  $("#vPlay").hidden = view !== "play"; $("#vStems").hidden = view !== "stems";
-  $("#micBtn").hidden = view !== "play";
+  $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems";
+  $("#micBtn").hidden = view !== "practice";
   if (view === "stems") stemsRoute(sub, extra);
-  if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "play") pauseSong();
-  if (view === "play") {
+  if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
+  if (view === "practice") {
     $("#overlay").hidden = true;
     loadSamples(); // for the keyboard
     renderStart();
@@ -1840,7 +1840,7 @@ $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = () => (micOn ? stopMic() : startMic());
 document.addEventListener("keydown", (e) => {
   if (e.code === "Space" && view === "stems" && stemsPage === "song" && P.song &&!e.target.closest("input, select, button, textarea")) { e.preventDefault(); P.playing ? pauseSong() : playSong(); return; }
-  if (view === "play" && K.on) { // Space on a focused button presses that button; the other keys work from anywhere but fields
+  if (view === "practice" && K.on) { // Space on a focused button presses that button; the other keys work from anywhere but fields
     if (e.target.closest("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Space" && e.target.closest("button")) return;
     const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop) }[e.code];

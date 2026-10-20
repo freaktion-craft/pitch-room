@@ -1,6 +1,6 @@
 # Stem
 
-A local app for learning songs by singing them. Split a song into stems, then sing along: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
+A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
 
 ## Start it
 
@@ -18,7 +18,7 @@ The first run creates a private Python environment in `.venv` and installs the b
 
 **macOS note:** if double-clicking says the file can't be opened, right-click it → **Open** once. If it says permission denied, run `chmod +x start-mac.command` in Terminal.
 
-Use earphones while singing along so the song doesn't leak into the mic, or turn on **Filter out speaker sound** in Sing along's mic settings.
+Use earphones while practicing so the song doesn't leak into the mic, or turn on **Filter out speaker sound** in Practice's mic settings.
 
 ## What's inside
 
@@ -30,7 +30,7 @@ Use earphones while singing along so the song doesn't leak into the mic, or turn
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that track,
 - **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.
 
-**Sing along** — the melody is read from the lead vocal (pYIN pitch tracking, cut into notes), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
+**Practice** — the melody is read from the lead vocal (pYIN pitch tracking, cut into notes), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
 
 - The song is cut into **phrases**, its lines, where the singer breathes. Jump to one and it counts you in (4 3 2 1); **Loop** repeats it. ← / → move between phrases, L turns the loop on and off.
 - After an intro or a break, a count-in shows when the voice comes back.
@@ -49,7 +49,7 @@ Only use audio you have the right to use; downloading from YouTube may go agains
 | `index.html` | The whole app UI (one file) |
 | `server.py` | Serves the page and the library API |
 | `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export (jobs run in the background) |
-| `melody.py` | Melody notes and pitch contour from the lead vocal, for Sing along |
+| `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |
 | `launch.py` | Installs packages, finds a free port, starts the server, opens Chrome |
 | `start-*` | One-click launchers per OS |
 
@@ -57,7 +57,7 @@ Run the server directly with `.venv/bin/python server.py` (port 5178) if you pre
 
 ## Credits
 
-- Piano (the keyboard under Sing along): [Salamander Grand Piano](https://archive.org/details/SalamanderGrandPianoV3) by Alexander Holm (CC-BY 3.0), loaded at runtime from the Tone.js sample host.
+- Piano (the keyboard under Practice): [Salamander Grand Piano](https://archive.org/details/SalamanderGrandPianoV3) by Alexander Holm (CC-BY 3.0), loaded at runtime from the Tone.js sample host.
 - Fonts: [Geist Pixel](https://github.com/vercel/geist-font) (SIL OFL 1.1, see `fonts/OFL.txt`); Pretendard loaded from jsDelivr.
 - Icons: [Hugeicons](https://hugeicons.com) (MIT).
 - Stems: [Demucs](https://github.com/facebookresearch/demucs) (htdemucs / htdemucs_6s) on PyTorch; lead and backing vocals with [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) and the BS-Roformer karaoke model by frazer & becruily; beats, key and pitch tracking with [librosa](https://librosa.org) ([Praat](https://www.fon.hum.uva.nl/praat/) through parselmouth as a fallback); downloads with [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://deno.com) as its JavaScript runtime; ffmpeg via imageio-ffmpeg.
