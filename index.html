@@ -80,9 +80,8 @@ header { position: relative; }
 .pop label { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .pop input[type="range"] { width: 140px; }
 .pop .hint { margin: 0; }
-#micSetBtn .ico { width: 16px; height: 16px; }
+.iconchip .ico { width: 16px; height: 16px; }
 /* the accent colour: a dot of it in the header, the swatches in a panel under it, as wide as their row */
-.accent-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--voice); }
 #accentSet { width: min-content; line-height: 20px; }
 .swatches { display: flex; gap: 4px; }
 .swatch { width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow 0.15s; }
@@ -415,7 +414,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <label>Note names <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi</option></select></label>
       <p class="hint">With earphones the song doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
     </div>
-    <button class="chipbtn iconchip" id="accentBtn" type="button" aria-label="Accent colour" title="Accent colour" aria-expanded="false" aria-controls="accentSet"><i class="accent-dot"></i></button>
+    <button class="chipbtn iconchip" id="accentBtn" type="button" aria-label="Accent colour" title="Accent colour" aria-expanded="false" aria-controls="accentSet"></button>
     <div class="pop" id="accentSet" role="dialog" aria-label="Accent colour" hidden>
       <span>Accent colour</span>
       <div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div>
@@ -747,6 +746,7 @@ Object.assign(ICONS, {
   next: '<path d="M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18"/>', // ArrowRight01
   close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
   plus: '<path d="M12 4V20M20 12H4"/>', // PlusSign
+  palette: '<path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C12.8417 22 14 22.1163 14 21C14 20.391 13.6832 19.9212 13.3686 19.4544C12.9082 18.7715 12.4523 18.0953 13 17C13.6667 15.6667 14.7778 15.6667 16.4815 15.6667C17.3334 15.6667 18.3334 15.6667 19.5 15.5C21.601 15.1999 22 13.9084 22 12Z"/><circle cx="9.5" cy="8.5" r="1.5"/><circle cx="16.5" cy="9.5" r="1.5"/><path d="M7.125 15H7M7.25 15C7.25 15.1381 7.13807 15.25 7 15.25C6.86193 15.25 6.75 15.1381 6.75 15C6.75 14.8619 6.86193 14.75 7 14.75C7.13807 14.75 7.25 14.8619 7.25 15Z"/>', // PaintBoard
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
   practice: '<path d="M7 6.5C7 4.01472 9.01472 2 11.5 2C13.9853 2 16 4.01472 16 6.5V11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5V6.5Z"/><path d="M11.5 19H11.0828C7.57267 19 4.57706 16.4623 4 13M11.5 19H11.9172C15.4273 19 18.4229 16.4623 19 13M11.5 19V22"/>', // Mic01
   video: '<path d="M2 11C2 7.70017 2 6.05025 3.02513 5.02513C4.05025 4 5.70017 4 9 4H10C13.2998 4 14.9497 4 15.9749 5.02513C17 6.05025 17 7.70017 17 11V13C17 16.2998 17 17.9497 15.9749 18.9749C14.9497 20 13.2998 20 10 20H9C5.70017 20 4.05025 20 3.02513 18.9749C2 17.9497 2 16.2998 2 13V11Z"/><path d="M17 8.90585L17.1259 8.80196C19.2417 7.05623 20.2996 6.18336 21.1498 6.60482C22 7.02628 22 8.42355 22 11.2181V12.7819C22 15.5765 22 16.9737 21.1498 17.3952C20.2996 17.8166 19.2417 16.9438 17.1259 15.198L17 15.0941"/><circle cx="11.5" cy="9.5" r="1.5"/>', // Video01
@@ -1794,6 +1794,7 @@ function showAccent(on) {
 }
 (function initAccent() {
   const btn = $("#accentBtn"), pop = $("#accentSet");
+  btn.append(icon("palette"));
   for (const [k, name] of Object.entries(ACCENTS)) {
     const s = el("button", "swatch"); s.type = "button"; s.dataset.k = k; s.title = name; s.setAttribute("aria-label", name);
     s.setAttribute("aria-pressed", String(k === accent)); s.style.setProperty("--c", `var(--voice-${k})`);
