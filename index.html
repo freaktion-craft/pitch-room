@@ -240,9 +240,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #pParts .x .ico { width: 12px; height: 12px; }
 #pParts .part.hover .x, #pParts .x:focus-visible { opacity: 1; }
 @media (hover: none) { #pParts .x { opacity: 1; } }
-/* the dragged span's "Keep vocals here", at its top right (kept inside the waveform when the span is at its left edge) */
+/* the dragged span's "Keep vocals here", in its middle (left set by paintSel) */
 #pParts .sel { position: absolute; top: 0; bottom: 0; pointer-events: none; }
-#pParts .keep { position: absolute; top: 7px; right: 4px; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; white-space: nowrap;
+#pParts .keep { position: absolute; top: 50%; transform: translate(-50%, -50%); height: 26px; padding: 0 10px; border: 0; border-radius: 6px; white-space: nowrap;
   background: var(--ink); color: var(--on-ink); font-size: 12.5px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
 .transport-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
@@ -1329,11 +1329,12 @@ function paintSel() {
     part.append(x); box.append(part);
   });
   if (on && P.sel) {
-    const sel = span("sel", P.sel.a, P.sel.b), keep = el("button", "keep", "Keep vocals here");
+    const keep = el("button", "keep", "Keep vocals here"), w = $("#pWave").clientWidth;
     keep.type = "button"; keep.title = "Their vocals stay in even with the lead muted";
     keep.onclick = () => saveUnsplit([...parts, [P.sel.a, P.sel.b]]);
-    if ((P.sel.b / dur) * $("#pWave").clientWidth < 140) { keep.style.right = "auto"; keep.style.left = "4px"; } // near the left edge
-    sel.append(keep); box.append(sel);
+    box.append(span("sel", P.sel.a, P.sel.b), keep);
+    const half = keep.offsetWidth / 2; // in the middle of the span, kept inside the waveform
+    keep.style.left = Math.max(half + 4, Math.min(w - half - 4, ((P.sel.a + P.sel.b) / 2 / dur) * w)) + "px";
   }
 }
 async function saveUnsplit(parts) {
