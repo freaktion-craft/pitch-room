@@ -60,19 +60,9 @@ a { color: inherit; text-decoration: none; }
 .app { max-width: 1440px; margin: 0 auto; padding-block: 24px 64px;
   padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
 
-/* Top nav: numbered segmented pill + mic chip */
+/* Top bar: app name, mic chip, theme */
 header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
-.seg { display: inline-flex; gap: 2px; background: var(--fill); border-radius: 6px; margin-right: auto; white-space: nowrap; }
-.seg a { height: 32px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: 6px; font-size: 13px; color: rgba(var(--fg), 0.45);
-  transition: color 0.22s var(--ease), background-color 0.25s var(--ease); }
-.seg a:hover { color: rgba(var(--fg), 0.7); }
-.seg a[aria-current="page"] { background: var(--bg); color: var(--ink); font-weight: 500; box-shadow: 0 0 0 1px var(--line); }
-.steps { display: flex; align-items: center; gap: 6px; margin: -40px 0 40px; font-size: 13.5px; color: var(--faint); }
-.steps a { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-radius: 6px; color: rgba(var(--fg), 0.45); transition: background-color 0.15s, color 0.15s; }
-.steps a:hover { background: var(--fill); color: rgba(var(--fg), 0.7); }
-.steps a i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font: 500 11px var(--mono); font-style: normal; box-shadow: inset 0 0 0 1px var(--ring); }
-.steps a[aria-current="step"] { color: var(--ink); font-weight: 500; }
-.steps a[aria-current="step"] i { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.brand { margin-right: auto; font-size: 15px; font-weight: 500; }
 .chipbtn { height: 32px; padding: 0 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: var(--fill);
   font-size: 13px; color: rgba(var(--fg), 0.6); transition: background-color 0.15s; }
 .chipbtn:hover { background: rgba(var(--fg), 0.08); }
@@ -83,81 +73,30 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .meter { width: 36px; height: 4px; border-radius: 2px; background: rgba(var(--fg), 0.08); overflow: hidden; }
 .meter i { display: block; height: 100%; width: 0; background: var(--ink); transition: width 60ms linear; }
 
-/* Keycap + back row */
+/* Keycap */
 .keycap { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 6px;
   box-shadow: inset 0 0 0 1px var(--ring); background: var(--surface); font-size: 12px; color: rgba(var(--fg), 0.55); line-height: 1; }
-.backkey { display: inline-flex; align-items: center; gap: 6px; }
-.backkey .lbl { font-size: 13px; color: rgba(var(--fg), 0.35); padding: 2px 6px; border-radius: 6px; transition: background-color 0.15s; }
-.backkey:hover .lbl { background: var(--fill); }
-
-/* Page shell: aside (back) + main column, like the craft pages */
-.proto { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 40px; align-items: start; }
-.proto-aside { position: sticky; top: 24px; padding-top: 1px; }
-.proto-main { display: grid; gap: 40px; min-width: 0; }
 .title { margin: 0; font-size: 15px; font-weight: 500; }
 .lede { margin: 0; font-size: 16px; line-height: 1.7; max-width: 62ch; text-wrap: pretty; }
 .muted { color: var(--muted); }
 
-/* Pick page */
+/* Page intro */
 .intro { display: grid; gap: 20px; margin-bottom: 28px; }
-.purpose-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 56px; }
-.jump { height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--fill); font-size: 13.5px; color: rgba(var(--fg), 0.7); transition: background-color 0.15s; }
-.jump:hover { background: rgba(var(--fg), 0.09); color: var(--ink); }
-.pgroup { scroll-margin-top: 24px; }
-#pickList { display: grid; gap: 48px; }
-.pgroup { display: grid; gap: 14px; }
-.pg-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.pg-head h3 { margin: 0; font-size: 15px; font-weight: 500; }
-.pg-head small { color: var(--faint); font-size: 13px; }
-.pgroup > p { margin: -6px 0 2px; color: var(--muted); font-size: 14px; max-width: 64ch; text-wrap: pretty; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 8px; }
-.card { position: relative; text-align: left; display: grid; gap: 2px; align-content: start; padding: 14px 16px; border: 0; border-radius: 14px;
-  background: var(--surface); box-shadow: 0 0 0 1px var(--line); min-width: 0; transition: box-shadow 0.3s var(--ease), transform 0.2s var(--ease); }
-.card:hover { box-shadow: 0 0 0 1px var(--ring), 0 6px 20px -12px rgba(0, 0, 0, 0.18); }
-.card:active { transform: scale(0.985); }
-.card b { font-size: 14.5px; font-weight: 500; }
-.card .lab { font-size: 13px; color: rgba(var(--fg), 0.6); }
-.card .how { font-size: 13px; color: var(--muted); }
-.card .meta { margin-top: 10px; font: 12px var(--mono); color: var(--faint); }
-
-/* Setup page */
-.exinfo { display: grid; gap: 14px; }
-.exinfo h2 { margin: 0; font-size: 15px; font-weight: 500; }
-.exinfo .meta { color: var(--faint); font-size: 13px; margin-top: -10px; }
-.exinfo .how-big { margin: 0; font-size: 20px; line-height: 1.5; letter-spacing: -0.01em; text-wrap: balance; }
-.exinfo p { margin: 0; max-width: 64ch; text-wrap: pretty; }
-.exinfo .muted { font-size: 14px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { font-size: 12.5px; padding: 3px 8px; border-radius: 6px; background: var(--fill); color: rgba(var(--fg), 0.6); white-space: nowrap; }
-.why { color: var(--muted); font-size: 14px; }
-.why sup { color: var(--faint); font: 10px var(--mono); margin-left: 1px; }
-details.refs summary { cursor: pointer; font-size: 13px; color: var(--muted); list-style: none; }
-details.refs summary::before { content: "+ "; font-family: var(--mono); }
-details.refs[open] summary::before { content: "– "; }
-details.refs ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 12.5px; color: var(--muted); }
-details.refs a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
-
 .group { display: grid; gap: 10px; }
 /* Section titles: they head the content, so they read stronger than it */
 .group-label { font-size: 15px; font-weight: 500; color: var(--ink); }
-/* Side notes (caveats, "good to know"): still above their own text, but quieter than the main sections */
 .group-label.minor { font-size: 14px; color: var(--muted); }
 .rows { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 8px 16px; flex-wrap: wrap; }
 .row + .row { border-top: 1px solid var(--line); }
 .row > span:first-child { font-size: 14px; }
 .row em { font-style: normal; color: var(--faint); font-size: 12.5px; margin-left: 6px; }
-.row em.fail { color: var(--bad); }
 select, input[type="number"] { height: 32px; border: 0; border-radius: 8px; background-color: var(--surface-2); padding: 0 10px; font-size: 14px; max-width: 100%; }
 select:hover, input[type="number"]:hover { background-color: var(--hover-2); }
 /* Our own chevron instead of the OS one: same 1.5px stroke and grey as the rest of the UI, centred, with room on the right */
 select { appearance: none; -webkit-appearance: none; padding-right: 30px; cursor: pointer;
   background-image: var(--chevron);
   background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px; }
-.range-row { display: flex; align-items: center; gap: 6px; color: var(--faint); }
-.range-row select { color: var(--ink); }
-.tempo { display: flex; align-items: center; gap: 10px; }
-.tempo output { font: 13px var(--mono); min-width: 58px; text-align: right; color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; }
 input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .switch { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 999px; background: rgba(var(--fg), 0.12); position: relative;
   margin: 0; cursor: pointer; transition: background-color 0.2s var(--ease); flex: none; }
@@ -165,14 +104,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 0.25s var(--ease); }
 .switch:checked { background: var(--ink); }
 .switch:checked::after { transform: translateX(14px); background: var(--on-ink); }
-.mic-test { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: flex-end; min-width: 0; }
-.mic-test .big-meter { width: 120px; height: 4px; border-radius: 2px; background: rgba(var(--fg), 0.08); overflow: hidden; }
-.mic-test .big-meter i { display: block; height: 100%; width: 0; background: var(--ink); transition: width 60ms linear; }
-.mic-test output { font: 15px var(--pixel); min-width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
-.mic-msg { margin: 4px 0 0; font-size: 13px; color: var(--bad); }
-.mic-msg:empty { display: none; }
 .hint { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-.credit { margin: 0; color: var(--faint); font-size: 12.5px; }
+.credit { margin: 12px 0 0; color: var(--faint); font-size: 12.5px; }
 .credit a { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 
 .btn { height: 40px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--surface-2); color: var(--ink); font-size: 14px;
@@ -182,9 +115,8 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .btn.sm { height: 32px; padding: 0 12px; font-size: 13px; }
 .btn.dark { background: var(--ink); color: var(--on-ink); }
 .btn.dark:hover { background: var(--ink-strong); }
-.go-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
-/* Practice page */
+/* Sing view */
 .play-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .play-bar .title { margin-right: auto; }
 .play-bar .kb { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
@@ -216,7 +148,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   padding: 20px; display: grid; gap: 14px; text-align: center; }
 .overlay h2 { margin: 0; font-size: 15px; font-weight: 500; }
 .overlay p { margin: 0; color: var(--muted); font-size: 14px; }
-.overlay .row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; min-height: 0; padding: 0; border: 0; }
 
 /* Keyboard */
 .keys-wrap { overflow-x: auto; margin-top: 8px; background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 10px; }
@@ -232,72 +163,20 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .key.b.live { box-shadow: inset 0 -5px 0 var(--voice); }
 
 @media (max-width: 760px) {
-  /* the tabs get their own line; they scroll sideways rather than squeeze if they still don't fit */
-  header { margin-bottom: 40px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; row-gap: 8px; }
-  .seg { grid-row: 2; grid-column: 1 / -1; justify-self: start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-  #micBtn { grid-column: 2; } #themeBtn { grid-column: 3; }
-  .proto { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .proto-aside { position: static; }
-  .seg a { padding: 0 8px; }
-  .steps { margin-top: -20px; }
+  header { margin-bottom: 40px; }
   .note-big { font-size: 34px; }
   .hud-l { top: auto; bottom: 10px; }
   .play-bar .kb { display: none; }
-  .mic-test { justify-content: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
-/* Timbre map page */
+/* Notices and the drop zone */
 .server-off { margin: 0 0 24px; padding: 12px 16px; border-radius: 10px; background: var(--note-bg); color: var(--note-ink); font-size: 14px; }
 .server-off code { font-family: var(--mono); font-size: 13px; background: rgba(var(--fg), 0.06); padding: 1px 6px; border-radius: 4px; }
-.slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 40px; }
-.slot { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
-.slot-head { display: grid; gap: 2px; }
-.slot-head b { font-weight: 500; font-size: 15px; }
-.slot-head small { color: var(--muted); font-size: 13px; }
 .drop { position: relative; display: flex; align-items: center; justify-content: center; min-height: 72px; padding: 12px; border-radius: 10px;
   border: 1px dashed rgba(var(--fg), 0.18); background: var(--bg); color: var(--muted); font-size: 13.5px; text-align: center; cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
 .drop:hover, .drop.over { border-color: var(--ink); color: var(--ink); }
 .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.drop.small { min-height: 32px; padding: 0 12px; border-radius: 6px; font-size: 13px; }
-.slot audio { width: 100%; height: 36px; }
-.trim { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
-.trim input { width: 70px; height: 30px; }
-.slot-actions, .rec-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
-#meRec.on .rec-dot { animation: blink 1s steps(2) infinite; }
-@keyframes blink { 50% { opacity: 0.2; } }
-#meTimer { font: 13px var(--mono); color: var(--muted); min-width: 40px; }
-.slot-sum { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
-.slot-sum:empty { display: none; }
-.slot-sum b { color: var(--ink); font-weight: 500; }
-.slot-sum .warn { color: var(--warn-ink); }
-.slot-sum .err { color: var(--bad); }
-
-.maps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0 0 40px; }
-.map { margin: 0; background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 14px 14px 8px; min-width: 0; }
-.map figcaption { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-.map figcaption b { font-weight: 500; font-size: 14px; }
-.map figcaption small { color: var(--faint); font-size: 12px; }
-.map svg { display: block; width: 100%; height: auto; max-width: 100%; }
-.map svg text { font-family: var(--font); }
-
-.tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.tip { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 14px 16px; display: grid; gap: 4px; }
-.tip.empty { color: var(--muted); font-size: 14px; }
-.tip b { font-weight: 500; font-size: 15px; }
-.tip .why { font-size: 13px; }
-.tip .ev { font: 11.5px var(--mono); color: var(--faint); }
-.tip .ev span { display: inline-block; padding: 1px 6px; border-radius: 4px; background: var(--fill); color: rgba(var(--fg), 0.55); margin-right: 6px; font-family: var(--font); }
-.mtable .row { min-height: 44px; }
-.mtable .row > span:first-child { display: grid; }
-.mtable .row small { color: var(--faint); font-size: 12px; }
-.mtable .vals { display: flex; gap: 18px; font: 13px var(--mono); font-variant-numeric: tabular-nums; }
-.mtable .vals span { min-width: 64px; text-align: right; }
-.mtable .vals .d { color: var(--muted); }
-.mtable .head { min-height: 36px; color: var(--faint); font-size: 12px; }
-.caveats { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); max-width: 72ch; }
-@media (max-width: 760px) { .slots, .maps { grid-template-columns: minmax(0, 1fr); } .mtable .vals { gap: 10px; } .mtable .vals span { min-width: 52px; } }
 
 /* Stems page */
 .panel-card { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 16px; display: grid; gap: 12px; margin-bottom: 24px; }
@@ -418,11 +297,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .rbar .lane i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
 .rbar .full { background: color-mix(in srgb, #2F6BFF 35%, transparent); }
 .rbar .core { background: #2F6BFF; }
-.rbar .you { background: var(--ink); }
 .rbar output { font: 12.5px var(--mono); color: var(--muted); text-align: right; }
 .rbar.axis .lane { height: 14px; background: none; }
 .rbar.axis .lane span { position: absolute; transform: translateX(-50%); font: 11px var(--mono); color: var(--faint); }
-.fine-note { margin: 0; font-size: 13.5px; }
 .listen { display: grid; gap: 8px; }
 .listen-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
 .listen-row .lbl { width: 56px; color: var(--muted); }
@@ -445,7 +322,9 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .songbar output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; }
 .kfield { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
 .kfield input[type="range"] { width: 110px; }
-.songbar #kLeave { margin-left: auto; }
+.songbar #kSet { margin-left: auto; }
+.set-row { flex-basis: 100%; display: flex; align-items: center; gap: 10px 20px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
+.set-row .hint { flex-basis: 100%; margin: 0; }
 /* Phrases: one block per line of the song; click one to jump there, Loop repeats it */
 .phrase-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
 .phrase-row output { min-width: 84px; text-align: center; }
@@ -456,144 +335,25 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .strip button[aria-current="true"] { background: rgba(var(--fg), 0.42); }
 .strip.looping button[aria-current="true"] { background: var(--ink); }
 .strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
-.song-mode .play-bar .backkey { display: none; }
-.songcard b::before { content: "♪ "; color: var(--voice); }
 
-/* Voice type */
-#vRange { display: grid; gap: 40px; }
-#vRange .intro, #vRange .vt-live { margin: 0; }
-.vt-row > span:first-child { display: grid; gap: 2px; font-size: 14px; }
-.vt-row small { color: var(--faint); font-size: 12.5px; max-width: 60ch; }
-.vt-ctl { display: flex; align-items: center; gap: 12px; }
-.vt-ctl output { font: 15px var(--pixel); min-width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
-.vt-row.on { background: var(--fill); }
-.vt-group { gap: 6px; }
-.vt-group .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
-.vt-now { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-.vt-live p { margin: 0; }
-/* Range chart: one row per voice type, the singer's range as a band across all rows */
-.vt-chart { --lw: 168px; position: relative; margin: 0; padding: 16px; border-radius: 14px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); display: grid; gap: 10px; }
-.vt-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-left: var(--lw); }
-.vt-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.vt-legend i { display: inline-block; width: 14px; height: 8px; border-radius: 4px; background: rgba(var(--fg), 0.16); }
-.vt-legend i.you { background: color-mix(in srgb, var(--voice) 18%, transparent); box-shadow: inset 2px 0 0 var(--voice), inset -2px 0 0 var(--voice); border-radius: 0; }
-.vt-plot { position: relative; display: grid; gap: 6px; }
-.vt-line { display: grid; grid-template-columns: var(--lw) minmax(0, 1fr); align-items: center; min-height: 30px; }
-.vt-line .lab { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
-.vt-line .lab small { color: var(--faint); font: 11.5px var(--mono); }
-.vt-line.best .lab { font-weight: 500; }
-.vt-track { position: relative; height: 30px; }
-.vt-bar { position: absolute; top: 11px; height: 8px; border-radius: 4px; background: rgba(var(--fg), 0.16); }
-.vt-line.best .vt-bar { background: var(--ink); }
-.vt-band { position: absolute; top: -4px; bottom: -4px; left: calc(var(--lw) + (100% - var(--lw)) * var(--a)); width: calc((100% - var(--lw)) * var(--w));
-  background: color-mix(in srgb, var(--voice) 10%, transparent); border-inline: 2px solid var(--voice); pointer-events: none; }
-.vt-band.m2 { background: color-mix(in srgb, var(--voice) 4%, transparent); border-left: 0; border-right: 2px dashed color-mix(in srgb, var(--voice) 60%, transparent); }
-.vt-legend i.you.m2 { background: color-mix(in srgb, var(--voice) 6%, transparent); box-shadow: inset -2px 0 0 color-mix(in srgb, var(--voice) 60%, transparent); }
-.vt-axis { position: relative; height: 16px; margin-left: var(--lw); font: 11px var(--mono); color: var(--faint); }
-.vt-axis span { position: absolute; transform: translateX(-50%); }
-.vt-result { margin: 4px 0 0; font-size: 16px; line-height: 1.6; max-width: 62ch; text-wrap: pretty; }
-.vt-result:empty { display: none; }
-@media (max-width: 760px) { .vt-chart { --lw: 108px; padding: 12px; } .vt-line .lab small { display: none; } }
 </style>
 <script>/* apply a saved theme before first paint */ try { const t = JSON.parse(localStorage.getItem("pitchroom:theme")); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
 <div class="app" id="app">
   <header>
-    <nav class="seg" aria-label="Sections">
-      <a href="#pick" data-tab="practice" id="tabPractice">Practice</a>
-      <a href="#range" data-tab="range">Voice type</a>
-      <a href="#timbre" data-tab="timbre">Timbre map</a>
-      <a href="#stems" data-tab="stems">Stems</a>
-    </nav>
-    <button class="chipbtn mic" id="micBtn" type="button"><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="meter"><i id="meter"></i></span></button>
+    <a class="brand" href="#stems">Pitch Room</a>
+    <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="meter"><i id="meter"></i></span></button>
     <button class="chipbtn themebtn" id="themeBtn" type="button" aria-label="Dark mode"></button>
   </header>
 
-  <nav class="steps" id="practiceSteps" aria-label="Practice steps" hidden>
-    <a href="#pick" data-view="pick"><i>1</i>Pick</a><span aria-hidden="true">›</span>
-    <a href="#setup" data-view="setup"><i>2</i>Set up</a><span aria-hidden="true">›</span>
-    <a href="#play" data-view="play"><i>3</i>Sing</a>
-  </nav>
-
-  <main id="vPick" aria-label="Pick an exercise">
-    <div class="intro">
-      <h1 class="title">Pitch Room</h1>
-      <p class="lede">Sing along with a piano and watch your pitch on screen. Pick what you want to work on and you’ll go straight to setup.</p>
-    </div>
-    <nav class="purpose-nav" id="purposeNav" aria-label="Jump to a goal"></nav>
-    <div id="pickList"></div>
-  </main>
-
-  <main id="vSetup" aria-label="Set up" hidden>
-    <div class="proto">
-      <aside class="proto-aside"><a class="backkey" href="#pick"><span class="keycap">←</span><span class="lbl">Pick</span></a></aside>
-      <div class="proto-main">
-        <section class="exinfo" id="exInfo" aria-label="About this exercise"></section>
-
-        <section class="group">
-          <div class="group-label">Range</div>
-          <div class="rows">
-            <label class="row"><span>Voice type</span><select id="voice"></select></label>
-            <div class="row"><span id="rangeLabel">Root range</span>
-              <div class="range-row"><select id="lo" aria-label="Lowest root"></select>→<select id="hi" aria-label="Highest root"></select></div>
-            </div>
-            <label class="row" id="dirField"><span>Direction</span>
-              <select id="dir"><option value="up">Going up</option><option value="down">Going down</option><option value="updown">Up, then down</option></select>
-            </label>
-          </div>
-        </section>
-
-        <section class="group">
-          <div class="group-label">Sound</div>
-          <div class="rows">
-            <div class="row"><span>Tempo</span><div class="tempo"><input type="range" id="bpm" min="40" max="160" step="2" aria-label="Tempo"><output id="bpmOut">90 BPM</output></div></div>
-            <label class="row"><span>Guide piano</span>
-              <select id="guideMode"><option value="all">Every note</option><option value="first">First note only</option><option value="none">Off (chord only)</option></select>
-            </label>
-            <label class="row"><span>Starting chord</span><input type="checkbox" class="switch" id="cue"></label>
-            <div class="row"><span>Piano volume<em id="pianoState">Loading</em></span><input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Piano volume"></div>
-          </div>
-        </section>
-
-        <section class="group">
-          <div class="group-label">Microphone</div>
-          <div class="rows">
-            <div class="row"><span>Input check</span>
-              <div class="mic-test"><button class="btn sm" id="micBtn2" type="button">Turn on mic</button><div class="big-meter" aria-hidden="true"><i id="meter2"></i></div><output id="setupNote">–</output></div>
-            </div>
-            <div class="row"><span>Sensitivity<em>lower = more sensitive</em></span><input type="range" id="gate" min="0.002" max="0.05" step="0.001" aria-label="Mic sensitivity"></div>
-            <label class="row"><span>Filter out speaker sound</span><input type="checkbox" class="switch" id="echo"></label>
-          </div>
-          <p class="mic-msg" id="micMsg"></p>
-          <p class="hint">With earphones the piano doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
-        </section>
-
-        <section class="group">
-          <div class="group-label">Display</div>
-          <div class="rows">
-            <label class="row"><span>Note names</span>
-              <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi (fixed do)</option><option value="mov">Do Re Mi (movable do)</option></select>
-            </label>
-            <label class="row"><span>Reference A4 (Hz)</span><input type="number" id="a4" min="415" max="466" step="1" style="width:84px"></label>
-            <label class="row"><span>Treat octaves as the same note</span><input type="checkbox" class="switch" id="ignoreOct"></label>
-          </div>
-        </section>
-
-        <div class="go-row"><button class="btn dark" id="goBtn" type="button">Start practice</button></div>
-        <p class="credit">Piano samples: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> · Alexander Holm, CC-BY 3.0</p>
-      </div>
-    </div>
-  </main>
-
   <main id="vPlay" aria-label="Sing" hidden>
     <div class="play-bar">
-      <a class="backkey" href="#setup"><span class="keycap">←</span><span class="lbl">Setup</span></a>
       <h1 class="title" id="playTitle"></h1>
-      <span class="kb"><span class="keycap">Space</span>start / stop</span>
-      <button class="btn dark" id="startBtn" type="button"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true" hidden><path/><path/></svg><span class="lbl">Start</span></button>
+      <span class="kb"><span class="keycap">Space</span>play / pause</span>
+      <button class="btn dark round" id="startBtn" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
     </div>
-    <div class="songbar" id="songBar" hidden>
+    <div class="songbar" id="songBar">
       <button class="btn sm" id="kBack" type="button">−5 s</button>
       <button class="btn sm" id="kFwd" type="button">+5 s</button>
       <output id="kTime">0:00 / 0:00</output>
@@ -601,7 +361,14 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
       <button class="tog m" id="kClick" type="button" aria-pressed="false" title="Click on/off">Click</button>
       <label class="kfield">Bars <select id="kOct" aria-label="Octave of the note bars"><option value="-1">octave down</option><option value="0">as sung</option><option value="1">octave up</option></select></label>
-      <button class="btn sm" id="kLeave" type="button">Back to Stems</button>
+      <button class="btn sm icon" id="kSet" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="kSettings"></button>
+      <button class="btn sm" id="kLeave" type="button">Back to song</button>
+      <div class="set-row" id="kSettings" hidden>
+        <label class="kfield">Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
+        <label class="kfield">Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
+        <label class="kfield">Note names <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi</option></select></label>
+        <p class="hint">With earphones the song doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
+      </div>
       <div class="phrase-row">
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
@@ -627,77 +394,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <div class="overlay" id="overlay" hidden></div>
     </section>
     <div class="keys-wrap" id="keysWrap"><div class="keys" id="keys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
+    <p class="credit">Piano samples: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> · Alexander Holm, CC-BY 3.0</p>
   </main>
-  <main id="vTimbre" aria-label="Timbre map" hidden>
-    <div class="intro">
-      <h1 class="title">Timbre map</h1>
-      <p class="lede">Compare a voice you want to sound like with your own, on the same note and vowel. The map shows what to change to move your dot toward the target.</p>
-    </div>
-    <p class="server-off" id="tServer" hidden>This needs the Python analysis server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
-
-    <div class="slots">
-      <section class="slot" aria-label="Target voice">
-        <div class="slot-head"><b>Target voice</b><small>Best: an unaccompanied voice holding one vowel for 2–5 seconds</small></div>
-        <label class="drop" id="refDrop"><input type="file" id="refFile" accept="audio/*,video/*"><span id="refFileName">Choose an audio file · or drop it here</span></label>
-        <audio controls id="refAudio" hidden></audio>
-        <div class="trim" id="refTrim" hidden>
-          <label>From <input type="number" id="refStart" min="0" step="0.1" value="0"></label>
-          <label>to <input type="number" id="refEnd" min="0" step="0.1"> s</label>
-          <button class="btn sm" id="refMark" type="button">3 s from playhead</button>
-        </div>
-        <div class="slot-actions"><button class="btn sm dark" id="refGo" type="button" disabled>Analyze</button><button class="btn sm" id="refNote" type="button" hidden>Play target note</button></div>
-        <div class="slot-sum" id="refSum"></div>
-      </section>
-      <section class="slot" aria-label="Your voice">
-        <div class="slot-head"><b>Your voice</b><small>Same note and vowel as the target, about 3 seconds</small></div>
-        <div class="rec-row">
-          <button class="btn sm" id="meRec" type="button"><i class="rec-dot"></i><span id="meRecLabel">Record</span></button>
-          <output id="meTimer"></output>
-          <label class="drop small"><input type="file" id="meFile" accept="audio/*,video/*"><span>Upload a file</span></label>
-        </div>
-        <audio controls id="meAudio" hidden></audio>
-        <div class="slot-actions"><button class="btn sm dark" id="meGo" type="button" disabled>Analyze</button></div>
-        <div class="slot-sum" id="meSum"></div>
-      </section>
-    </div>
-
-    <div class="maps">
-      <figure class="map">
-        <figcaption><b>Timbre</b><small>across: brightness / ring (SPR) · down: breathiness (H1–H2)</small></figcaption>
-        <svg id="mapTone" viewBox="0 0 420 320" role="img" aria-label="Timbre map"></svg>
-      </figure>
-      <figure class="map">
-        <figcaption><b>Vowel · mouth shape</b><small>across: tongue position (F2) · down: jaw opening (F1)</small></figcaption>
-        <svg id="mapVowel" viewBox="0 0 420 320" role="img" aria-label="Vowel chart"></svg>
-      </figure>
-    </div>
-
-    <section class="group">
-      <div class="group-label">Try this</div>
-      <ol class="tips" id="tips"><li class="tip empty">Analyze both voices and the biggest differences show up here first.</li></ol>
-    </section>
-
-    <section class="group">
-      <div class="group-label">Measurements</div>
-      <div class="rows mtable" id="tTable"></div>
-    </section>
-
-    <section class="group">
-      <div class="group-label minor">For a fair comparison</div>
-      <ul class="caveats">
-        <li>Compare the same note (within a semitone) and the same vowel. Almost every measure shifts with pitch and vowel.</li>
-        <li>Always record yourself with the same mic at the same distance. Volume doesn’t matter (only differences are compared), but the mic’s colour does.</li>
-        <li>Vocals pulled from a released track carry mixing (EQ, reverb, compression), so trust only the rough direction. Any accompaniment in the clip throws the analysis off.</li>
-        <li>Above about 350 Hz (around F4) vowel formants can’t be measured reliably, so the vowel chart is greyed out.</li>
-      </ul>
-      <div id="tRefs"></div>
-    </section>
-  </main>
-  <!-- three pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>) -->
   <main id="vStems" aria-label="Stems" hidden>
     <div class="intro" id="sIntro">
       <h1 class="title">Stems</h1>
-      <p class="lede">Split a song into vocals, drums, bass and the rest. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
+      <p class="lede">Split a song into vocals, drums, bass and the rest, then sing along with it: note bars from the original singer, phrase by phrase, and your own pitch on top. Turn tracks on and off, add a click that follows the beat, and export what you hear as an MP3.</p>
     </div>
     <a class="btn sm back" id="sBack" href="#stems" hidden>← Library</a>
     <p class="server-off" id="sServer" hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
@@ -778,53 +480,6 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
       <button type="button" role="menuitem" class="danger" id="mDelete"><span>Delete</span></button>
     </div>
   </main>
-  <main id="vRange" aria-label="Voice type" hidden>
-    <div class="intro">
-      <h1 class="title">Voice type</h1>
-      <p class="lede">Sing your lowest and highest comfortable notes and see which voice type your range fits. Takes about a minute.</p>
-    </div>
-
-    <section class="group">
-      <div class="group-label">Your range</div>
-      <div class="rows">
-        <div class="row vt-row"><span>Voice group<small>Usually men: bass to tenor. Usually women: alto to soprano.</small></span>
-          <div class="vt-ctl vt-group" role="group" aria-label="Voice group"><button class="btn sm" type="button" data-group="low" aria-pressed="false">Bass–tenor</button><button class="btn sm" type="button" data-group="high" aria-pressed="false">Alto–soprano</button></div>
-        </div>
-        <div class="row vt-row"><span>Lowest note<small>Slide down on “ah” and hold the lowest note that still sounds clear</small></span>
-          <div class="vt-ctl"><output id="vtLo">–</output><button class="btn sm" id="vtLoBtn" type="button">Find</button></div>
-        </div>
-        <div class="row vt-row"><span>Highest note<small id="vtHiHow"></small></span>
-          <div class="vt-ctl"><output id="vtHi">–</output><button class="btn sm" id="vtHiBtn" type="button">Find</button></div>
-        </div>
-      </div>
-      <p class="mic-msg" id="vtMsg"></p>
-    </section>
-
-    <section class="panel-card vt-live" id="vtLive" aria-live="polite" hidden>
-      <div class="vt-now"><div class="note-big" id="vtNow">–</div><div class="note-sub" id="vtNowSub">Listening</div></div>
-      <p class="muted" id="vtHint"></p>
-      <div class="row-actions"><button class="btn dark" id="vtDone" type="button">Done</button><button class="btn" id="vtCancel" type="button">Cancel</button></div>
-    </section>
-
-    <section class="group">
-      <div class="group-label">Where it fits</div>
-      <figure class="vt-chart" id="vtChart" aria-label="Typical voice type ranges with your range"></figure>
-      <p class="vt-result" id="vtResult"></p>
-      <div class="go-row"><button class="btn dark" id="vtUse" type="button" hidden></button><span class="muted" id="vtUsed"></span></div>
-    </section>
-
-    <section class="group">
-      <div class="group-label minor">Good to know</div>
-      <ul class="caveats">
-        <li>Warm up for a few minutes first. A cold voice loses a few notes at both ends.</li>
-        <li>The bars are typical ranges for trained singers. Untrained voices usually stop a few notes short at the top, so the lowest note decides here and the top only nudges it.</li>
-        <li>Range is only part of it. Teachers also listen for where your voice changes gear (the passaggio) and for its colour, so treat this as a starting point.</li>
-        <li>M1 and M2 are the two main ways the vocal folds vibrate: M1 is chest and mixed voice, M2 is head voice and falsetto. The typical tops for bass, baritone and tenor are M1 notes; for alto, mezzo and soprano they are M2 notes, so for bass to tenor only your M1 top counts.</li>
-        <li>The app tells M1 from M2 by the sound: in M2 the first harmonic gets much stronger and the high ones fade, compared with how you sounded at the bottom of the same slide. It’s a guess from sound alone (studies use a sensor on the throat to be sure), and a smooth, trained mix can fool it.</li>
-      </ul>
-      <div id="vtRefs"></div>
-    </section>
-  </main>
 </div>
 
 <script>
@@ -832,278 +487,25 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 "use strict";
 const $ = (s) => document.querySelector(s);
 const EN = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
-const KO = ["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Ti"]; // solfège (fixed or movable do)
+const KO = ["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Ti"]; // solfège (fixed do)
 const BLACK = new Set([1,3,6,8,10]);
-
-const PATTERNS = {
-  five:  { name: "5-note scale",     steps: [0,2,4,5,7,5,4,2,0] },
-  arp:   { name: "Arpeggio 1-3-5-8",  steps: [0,4,7,12,7,4,0] },
-  third: { name: "Skipping thirds",  steps: [0,4,2,5,4,7,5,2,0] },
-  nine:  { name: "9-note scale",     steps: [0,2,4,5,7,9,11,12,14,12,11,9,7,5,4,2,0], div: 0.5 },
-  down:  { name: "Descending 5-1",   steps: [7,5,4,2,0] },
-  oct:   { name: "Octave jump",      steps: [0,12,0], div: 2 },
-  hold:  { name: "Long tone",        steps: [0], div: 4 },
-};
-const VOICES = {
-  bass:     { name: "Bass",          lo: 41, hi: 50 },
-  baritone: { name: "Baritone",      lo: 45, hi: 53 },
-  tenor:    { name: "Tenor",         lo: 48, hi: 57 },
-  alto:     { name: "Alto",          lo: 53, hi: 62 },
-  mezzo:    { name: "Mezzo-soprano", lo: 55, hi: 64 },
-  soprano:  { name: "Soprano",       lo: 60, hi: 69 },
-};
-
-// ---------- curricula (research-based; see REFS) ----------
-const doi = (d) => "https://doi.org/" + d;
-const REFS = {
-  titze2006:   { cite: "Titze (2006). Voice training and therapy with a semi-occluded vocal tract. JSLHR 49, 448–459.", url: doi("10.1044/1092-4388(2006/035)"), note: "The theory behind semi-occluded exercises (lip trills, straws, humming). Solid mechanism; outcome studies are still thin." },
-  kang2019:    { cite: "Kang et al. (2019). J Voice 33(4), 420–428.", url: doi("10.1016/j.jvoice.2017.12.019"), note: "With a straw warm-up, the pressure needed to start the voice was lowest at about 10 minutes." },
-  portillo2018:{ cite: "Portillo et al. (2018). J Voice 32(2), 200–208.", note: "A 15-minute semi-occluded warm-up and an open-vowel warm-up worked about equally." },
-  elliot1995:  { cite: "Elliot, Sundberg & Gramming (1995). What happens during vocal warm-up? J Voice 9(1), 37–44.", note: "Singers feel a big benefit from warming up; the physiological effect is unclear." },
-  amir2005:    { cite: "Amir, Amir & Michaeli (2005). J Voice 19(2).", note: "Voice-quality measures improved after warm-up; pitch-matching accuracy did not." },
-  meerschman2017: { cite: "Meerschman et al. (2017). JSLHR 60(9), 2519–2536.", url: doi("10.1044/2017_JSLHR-S-17-0017"), note: "Six weeks of straw or resonance training didn’t beat controls — why warm-ups aren’t sold here as skill builders." },
-  pfordresher2007: { cite: "Pfordresher & Brown (2007). Poor-pitch singing in the absence of “tone deafness”. Music Perception 25(2), 95–115.", url: doi("10.1525/mp.2007.25.2.95"), note: "Most off-pitch singers hear fine; the problem is mapping a heard pitch to the voice. They tend to shrink large intervals." },
-  pfordresher2010: { cite: "Pfordresher et al. (2010). Imprecise singing is widespread. JASA 128(4), 2182–2190.", url: doi("10.1121/1.3478782"), note: "Many people are right on average but inconsistent from try to try." },
-  hutchins2012: { cite: "Hutchins & Peretz (2012). A frog in your throat or in your ear? J Exp Psychol Gen 141(1), 76–97.", url: doi("10.1037/a0025064"), note: "People who matched pitch 97% of the time with a slider managed 59% when singing; translating another timbre into your own voice is hard." },
-  hutchins2014: { cite: "Hutchins, Larrouy-Maestri & Peretz (2014). Atten Percept Psychophys.", url: doi("10.3758/s13414-014-0732-1"), note: "How well you match single notes predicts how well you sing melodies." },
-  granot2013:  { cite: "Granot et al. (2013). J Voice 27(3), 390.e13.", url: doi("10.1016/j.jvoice.2013.01.001"), note: "A sung guide is easier to match than piano. Treats an average error of ~46 cents as accurate singing." },
-  dallabella2007: { cite: "Dalla Bella, Giguère & Peretz (2007). Singing proficiency in the general population. JASA 121(2), 1182–1189.", note: "Pitch errors drop sharply at slower tempos." },
-  henderson1997: { cite: "Henderson & Smith (1997). Acoustical Society of America conference abstract (not peer-reviewed).", note: "Steps beat leaps and rising beats falling; falling leaps are hardest. Weak evidence." },
-  larrouy2015: { cite: "Larrouy-Maestri et al. (2015). PLOS ONE.", url: doi("10.1371/journal.pone.0135394"), note: "Untrained singers’ intervals are off by about 56 cents on average." },
-  wilson2008:  { cite: "Wilson, Lee, Callaghan & Thorpe (2008). Learning to sing in tune: Does real-time visual feedback help? J Interdiscip Music Stud 2(1–2), 157–172.", note: "Singers were less accurate while watching the display, but better than baseline after training." },
-  welch1985:   { cite: "Welch (1985). A schema theory of how children learn to sing in tune. Psychology of Music 13(1), 3–18.", note: "Knowing whether you were right or wrong is the key ingredient." },
-  salmoni1984: { cite: "Salmoni, Schmidt & Walter (1984). Psychological Bulletin 95(3), 355–386.", note: "Constant feedback helps during practice but can hurt retention (the guidance hypothesis). Limb-movement research." },
-  winstein1990: { cite: "Winstein & Schmidt (1990). JEP: Learning, Memory, and Cognition 16(4), 677–691.", note: "Fading feedback out improves retention. Limb-movement research." },
-  shea1979:    { cite: "Shea & Morgan (1979). JEP: Human Learning and Memory 5(2), 179–187.", note: "Mixed practice beats repeating one thing for retention and transfer. Limb-movement research; not yet confirmed for voice." },
-  guadagnoli2004: { cite: "Guadagnoli & Lee (2004). Challenge point. J Motor Behavior 36(2), 212–224.", url: doi("10.3200/JMBR.36.2.212-224"), note: "You learn best at a difficulty matched to your level. If it’s too hard, slow down and add guide notes." },
-  maas2008:    { cite: "Maas et al. (2008). Principles of motor learning in treatment of motor speech disorders. AJSLP 17(3), 277–298.", url: doi("10.1044/1058-0360(2008/025)"), note: "Applies motor-learning principles to speech and voice training. Few direct tests yet." },
-  stemple1994: { cite: "Stemple et al. (1994). J Voice 8, 271–278.", note: "Vocal Function Exercises: glide-based work for range and efficiency." },
-  titze2003:   { cite: "Titze, Švec & Popolo (2003). JSLHR 46(4), 919–932.", url: doi("10.1044/1092-4388(2003/072)"), note: "Estimates a safe dose of about 17 minutes of continuous voicing; rests extend it." },
-  hunter2009:  { cite: "Hunter & Titze (2009). Ann Otol Rhinol Laryngol 118(6), 449–460.", url: doi("10.1177/000348940911800608"), note: "After two hours of heavy voice use, full recovery took 12–18 hours." },
-  maxfield2015: { cite: "Maxfield, Titze, Hunter & Kapsner-Smith (2015). Logopedics Phoniatrics Vocology 40, 86–92.", url: doi("10.3109/14015439.2014.913074"), note: "Measured mouth pressure for each SOVT posture: “mm” is lowest, straw-in-water highest (about 10×). Big differences between people." },
-  andrade2014: { cite: "Andrade, Wood, Ratcliffe, Epstein, Pijper & Švec (2014). Electroglottographic study of seven semi-occluded exercises. J Voice 28, 589–595.", url: doi("10.1016/j.jvoice.2013.11.004"), note: "Humming, hand-over-mouth and straws are “steady”; lip trills, tongue trills and water bubbling are “fluctuating”." },
-  titze2020: { cite: "Titze (2020). JSLHR.", url: doi("10.1044/2020_JSLHR-20-00060"), note: "Straw diameter matters far more than length; below about 3 mm, length barely matters." },
-  kang2019b: { cite: "Kang et al. (2019). J Voice 33, 810.e5–e11.", url: doi("10.1016/j.jvoice.2018.05.002"), note: "Ten minutes of straw work lasted longer than five (lower voice-onset pressure)." },
-  kapsner2015: { cite: "Kapsner-Smith et al. (2015). JSLHR 58, 535–549.", url: doi("10.1044/2015_JSLHR-S-13-0231"), note: "Randomised trial of straw therapy (20 people with voice disorders): glides and short songs through a straw worked as well as Vocal Function Exercises." },
-  meerschman2019: { cite: "Meerschman et al. (2019). Int J Lang Commun Disord 54, 50–61.", url: doi("10.1111/1460-6984.12431"), note: "Lip-trill and straw training improved voice measures; water at 2 cm didn’t. No clear difference from the sham group." },
-  guzman2018: { cite: "Guzman et al. (2018). J Voice.", url: doi("10.1016/j.jvoice.2017.08.021"), note: "All fluctuating SOVT exercises reduced discomfort; water and raspberry felt best (84 people)." },
-  guzman2016: { cite: "Guzman et al. (2016). Logopedics Phoniatrics Vocology.", url: doi("10.1080/14015439.2016.1207097"), note: "5 cm of water felt smoothest; 10–18 cm took more effort (8 people)." },
-  granqvist2015: { cite: "Granqvist et al. (2015). Logopedics Phoniatrics Vocology 40, 113–121.", url: doi("10.3109/14015439.2014.913682"), note: "Bubble pressure pulses reach the vocal folds — a “massage” effect (2-person pilot)." },
-  manternach2019: { cite: "Manternach & Daugherty (2019). J Voice 33, 80–86.", url: doi("10.1016/j.jvoice.2017.09.017"), note: "48 choir singers: no acoustic change after 4 minutes of straw work, but 74–78% felt better." },
-  pozzali2024: { cite: "Pozzali et al. (2024). J Voice 38, 245.e17–e35.", url: doi("10.1016/j.jvoice.2021.06.009"), note: "Meta-analysis of 8 trials in voice disorders: “very low” evidence quality; no better than control on perceived voice quality." },
-  apfelbach2024: { cite: "Apfelbach & Guzmán (2024). J Voice 38, 404–425.", url: doi("10.1016/j.jvoice.2021.09.031"), note: "Review of 53 studies: immediate effects (easier onset, less effort) are consistent." },
-  hijleh2021: { cite: "Hijleh & Pinto (2021). Journal of Singing 77(3), 333–344.", note: "How to classify SOVT postures and use them in lessons (teaching guidance). No air leaking from the nose or mouth corners." },
-  petersonBarney1952: { cite: "Peterson & Barney (1952). Control methods used in a study of the vowels. JASA 24, 175–184.", url: doi("10.1121/1.1906875"), note: "Classic average formant values for American English vowels; used for the grey vowel labels." },
-  omori1996: { cite: "Omori, Kacker, Carroll, Riley & Blaugrund (1996). Singing power ratio. J Voice 10(3).", url: doi("10.1016/S0892-1997(96)80003-8"), note: "SPR (strongest peak 2–4 kHz minus 0–2 kHz) is higher in trained singers and tracks perceived “ring”." },
-  sundberg2001: { cite: "Sundberg (2001). Level and center frequency of the singer's formant. J Voice 15(2).", note: "The “singer’s formant” near 3 kHz comes from F3–F5 clustering." },
-  mainka2015: { cite: "Mainka et al. (2015). PLoS ONE.", url: doi("10.1371/journal.pone.0132241"), note: "MRI: classical singing lowered the larynx by ~8 mm and widened the lower pharynx; wider meant more high-frequency energy." },
-  sundbergNord2006: { cite: "Sundberg & Nordenberg (2006). JASA 120(1), 453–457.", url: doi("10.1121/1.2208451"), note: "Alpha ratio (1–5 kHz vs 50 Hz–1 kHz) rises with loudness, so compare at similar loudness." },
-  titze2003tw: { cite: "Titze, Bergan, Hunter & Story (2003). Twang and yawn. Logopedics Phoniatrics Vocology 28(4), 147–155.", url: doi("10.1080/14015430310018874"), note: "Twang: narrower pharynx, shorter tract, lower open quotient. Yawn: the opposite." },
-  story2001: { cite: "Story, Titze & Hoffman (2001). JASA 109(4), 1651–1667.", url: doi("10.1121/1.1352085"), note: "MRI: twangy vowels have a shorter tract and wider lip opening; yawny vowels a wider mouth cavity and longer tract." },
-  gauffin1989: { cite: "Gauffin & Sundberg (1989). JSHR 32, 556–565.", url: doi("10.1044/jshr.3203.556"), note: "The pressed–flow–breathy continuum, linking spectral measures like H1–H2 to glottal airflow." },
-  hillenbrand1994: { cite: "Hillenbrand, Cleveland & Erickson (1994). JSHR 37(4), 769–778.", url: doi("10.1044/jshr.3704.769"), note: "CPP was the best single predictor of breathiness." },
-  samlan2011: { cite: "Samlan & Story (2011). JSLHR 54(5), 1267–1283.", url: doi("10.1044/1092-4388(2011/10-0195)"), note: "CPP mainly reflects aspiration noise; H1–H2 mainly reflects open quotient." },
-  maryn2015: { cite: "Maryn & Weenink (2015). J Voice 29(1), 35–43.", url: doi("10.1016/j.jvoice.2014.06.015"), note: "Praat’s CPPS matches the original implementation almost exactly." },
-  garellek2019: { cite: "Garellek (2019). The phonetics of voice. Routledge Handbook of Phonetics, 75–106.", note: "Higher H1–H2 means less vocal-fold contact and breathier phonation." },
-  sundberg1993: { cite: "Sundberg, Titze & Scherer (1993). J Voice 7(1), 15–29.", url: doi("10.1016/S0892-1997(05)80108-0"), note: "How subglottal pressure relates to loudness and voice-source features." },
-  henrich2005: { cite: "Henrich, d'Alessandro, Doval & Castellengo (2005). JASA 117(3), 1417–1430.", url: doi("10.1121/1.1850031"), note: "Open-quotient differences between chest (M1) and head/falsetto (M2)." },
-  lindblom1971: { cite: "Lindblom & Sundberg (1971). JASA 50, 1166–1179.", note: "Opening the jaw raises F1; tongue forward raises F2; lip rounding and a lower larynx lower every formant." },
-  henrich2011: { cite: "Henrich, Smith & Wolfe (2011). JASA 129(2), 1024–1035.", url: doi("10.1121/1.3518766"), note: "Sopranos tune the first resonance to the pitch on high notes, so a high “vowel” may be deliberately modified." },
-  monsen1983: { cite: "Monsen & Engebretson (1983). JSHR 26, 89.", url: doi("10.1044/jshr.2601.89"), note: "At high pitch, formant estimates get pulled toward harmonics and become unreliable." },
-  prame1994: { cite: "Prame (1994). JASA 96(4), 1979–1984.", note: "Singers’ vibrato rate runs roughly 5.5–6.7 Hz." },
-  kondo2025: { cite: "Kondo, Kondoh & Fujii (2025). Frontiers in Psychology.", url: doi("10.3389/fpsyg.2025.1568982"), note: "10 opera singers: higher SPR got higher jury scores; vibrato ratings followed extent more than rate." },
-};
-const REF_IDS = Object.keys(REFS);
-
-const FIVE = [0, 2, 4, 5, 7, 5, 4, 2, 0];
-const MENU = {
-  sovt: {
-    name: "SOVT (semi-occluded)", short: "SOVT", who: "Anyone · tired voice too", minutes: "≈ 8 min",
-    goal: "Sing with the mouth partly closed — lips, tongue or a straw. Studies consistently find it makes starting the voice easier and singing feel less effortful; evidence that it builds skill over time is still weak.",
-    tip: "Use your own 4–5 mm straw and fresh water every time. Don’t let air leak from your nose or mouth corners, and stop if anything feels uncomfortable. Straw singing is quiet — if it isn’t picked up, lower the mic sensitivity in Setup.",
-    items: [
-      { title: "Hum long tone", label: "“mm”, one note, 4 beats", how: "Lips lightly closed on “mm” — feel them buzz", steps: [0], div: 4, bpm: 72, guide: "all", range: "low", reps: 5,
-        why: "The lightest-load SOVT posture. Vocal-fold contact looks like a normal vowel (“steady” type).", refs: ["maxfield2015", "andrade2014"] },
-      { title: "Lip trill 5-note", label: "1-2-3-4-5-4-3-2-1", how: "Keep the lips bubbling evenly. The pitch line will wobble — follow its centre", steps: [0, 2, 4, 5, 7, 5, 4, 2, 0], bpm: 100, guide: "all", range: "mid", smooth: 9,
-        why: "A lip trill is a “fluctuating” SOVT: folds and lips vibrate together. Lip-trill and straw training improved voice measures in a trial.", refs: ["meerschman2019", "andrade2014"] },
-      { title: "Straw steps", label: "1-3-5, 2 beats each", how: "All air through the straw — none from the nose or mouth corners", steps: [0, 4, 7], div: 2, bpm: 60, guide: "all", range: "low", reps: 5,
-        why: "The straw’s diameter sets the resistance. Ten minutes of straw work lasted longer than five.", refs: ["titze2020", "kang2019b", "kapsner2015"] },
-      { title: "Lip trill fifth slide", label: "Slide a fifth", how: "Slide smoothly — don’t let the trill stop at the top", steps: [[0, 7], [7, 0]], bpm: 60, guide: "first", range: "mid", smooth: 9,
-        why: "Keeps the trill going while the pitch moves. Therapy trials used glides as the next step after a plain lip trill.", refs: ["meerschman2019"] },
-      { title: "Straw octave siren", label: "Slide an octave", how: "Up and back down through the straw. Ease off if the top gets tight", steps: [[0, 12], [12, 0]], bpm: 50, guide: "first", range: "low", reps: 6,
-        why: "Up-and-down glides through a straw are the core move in straw-therapy research.", refs: ["kapsner2015", "titze2020"] },
-      { title: "Tongue trill thirds", label: "Slide a third", how: "Rolled “rrr” or a raspberry, light and easy", steps: [[0, 4], [4, 0]], bpm: 70, guide: "first", range: "mid", smooth: 9,
-        why: "All fluctuating SOVT exercises reduced discomfort, and the raspberry was among the best-liked.", refs: ["guzman2018", "andrade2014"] },
-      { title: "Bubble tube", label: "One note, then slide a fourth", how: "2–3 cm of water, wide tube, small steady bubbles. Don’t go deeper or blow harder", steps: [0, [0, 5], [5, 0]], div: 2, bpm: 60, guide: "all", range: "low", reps: 5, smooth: 11,
-        why: "Bubble pressure pulses reach the vocal folds like a massage. Deeper water takes more effort, so keep it shallow. Expect a very wobbly pitch line from the bubbling.", refs: ["granqvist2015", "guzman2016", "meerschman2019"] },
-      { title: "Straw melody hills", label: "1-3-5-8-5-3-1", how: "Sing it like a tune through the straw, drawing pitch hills", steps: [0, 4, 7, 12, 7, 4, 0], bpm: 80, guide: "none", range: "mid", reps: 4,
-        why: "Straw-therapy trials moved from glides to short songs through the straw. You only hear the starting chord.", refs: ["kapsner2015"] },
-      { title: "V-buzz scale", label: "1-2-3-4-5-4-3-2-1", how: "Top teeth on the lower lip, buzzy “vvv”. Keep the hiss small", steps: [0, 2, 4, 5, 7, 5, 4, 2, 0], bpm: 100, guide: "all", range: "mid", reps: 4,
-        why: "A voiced /v/ gives more resistance than humming — a good stand-in if lip trills are hard.", refs: ["maxfield2015", "hijleh2021"] },
-      { title: "Straw → oo → ah", label: "One note three times, 4 beats each", how: "First through the straw, then “oo”, then “ah” — keep the easy straw feeling", steps: [0, 0, 0], div: 4, bpm: 60, guide: "all", range: "mid", reps: 4,
-        why: "Carries the easy SOVT feeling into open vowels. Proposed in the research but not measured on its own.", refs: ["kapsner2015", "hijleh2021"] },
-    ],
-  },
-  basic: { name: "Basic patterns", short: "Basic", basic: true,
-    items: Object.values(PATTERNS).map((P) => ({ title: P.name, label: P.name, steps: P.steps, div: P.div, range: "full", basic: true })) },
-  warmup: {
-    name: "Daily warm-up", short: "Warm-up", who: "Everyone", minutes: "≈ 6 min",
-    goal: "A sequence to loosen up before practice. In studies, warm-ups improved voice condition but didn’t directly improve pitch accuracy — just follow along comfortably.",
-    tip: "Start with near-closed sounds like lip trills and humming, then move to open vowels like “oo” and “ah”. 5–10 minutes is plenty.",
-    items: [
-      { title: "Lip trill siren", label: "Slide a fifth", how: "Glide on a lip trill (brrr) or through a straw", steps: [[0, 7], [7, 0]], bpm: 60, guide: "all", range: "low", reps: 6,
-        why: "Lip trills and straws wake the voice up with less load on the folds. A straw warm-up worked best at around 10 minutes.", refs: ["titze2006", "kang2019"] },
-      { title: "Hummed 5-note scale", label: "1-2-3-4-5-4-3-2-1", how: "Mouth closed, hum on “ng”", steps: FIVE, bpm: 90, guide: "all", range: "low", dir: "updown",
-        why: "Humming is semi-occluded too. Semi-occluded and open-vowel warm-ups work about equally, so start with whichever feels easier.", refs: ["portillo2018", "titze2006"] },
-      { title: "Octave siren", label: "Slide an octave", how: "Light “oo”, no pushing", steps: [[0, 12], [12, 0]], bpm: 50, guide: "all", range: "low", reps: 4,
-        why: "A gentle sweep through your range. Glides are the basic move of Vocal Function Exercises.", refs: ["stemple1994"] },
-      { title: "Arpeggio", label: "1-3-5-8-5-3-1", how: "Start on “oo”, open to “ah”", steps: [0, 4, 7, 12, 7, 4, 0], bpm: 100, guide: "first", range: "low", dir: "updown", reps: 8,
-        why: "The step into open vowels. The piano plays only the first note; you find the rest.", refs: ["elliot1995"] },
-      { title: "Today’s long tone", label: "One note, 4 beats", how: "Long and steady on “ah”", steps: [0], div: 4, bpm: 60, guide: "first", range: "one", reps: 3,
-        why: "Warm-ups don’t raise pitch skill. Use how steady this long tone is as a check on today’s voice.", refs: ["amir2005", "meerschman2017"] },
-    ],
-  },
-  basics: {
-    name: "Pitch-matching basics", short: "Basics", who: "Beginners · “tone-deaf” worries", minutes: "≈ 10 min",
-    goal: "Start by matching one note and build up to short 2–3 note patterns. Most people who sing off-pitch hear fine — the weak link is turning a heard pitch into a sung one — so this strengthens that link from the easiest task up.",
-    tip: "The piano plays in the octave of the voice type you chose, so pick the right voice type in Setup first. Sliding into the note is fine at the start.",
-    items: [
-      { title: "Match one note", label: "One note, 4 beats", how: "Listen, then join the piano on “oo” and hold", steps: [0], div: 4, bpm: 50, guide: "all", range: "one", reps: 8,
-        why: "Matching a single note is the easiest task, and research finds it predicts melody singing. Slow tempos cut errors a lot.", refs: ["hutchins2014", "dallabella2007", "pfordresher2007"] },
-      { title: "Slide in", label: "Slide up 3 semitones, then hold", how: "Slide up from below and stop on the target", steps: [[-3, 0], 0], bpm: 50, guide: "all", range: "one", reps: 6,
-        why: "If you can’t land the note straight away, sliding toward it while watching the screen helps. Start here if “Match one note” is hard.", refs: ["hutchins2012", "welch1985"] },
-      { title: "Moving note", label: "One note, moving by semitones", how: "On “oo”, follow the note as it moves", steps: [0], div: 4, bpm: 50, guide: "all", range: "low", dir: "updown", reps: 6,
-        why: "The same task at changing pitches. Consistency from try to try is what untrained singers lack most.", refs: ["pfordresher2010"] },
-      { title: "Two-note step", label: "1-2-1", how: "On “la”", steps: [0, 2, 0], bpm: 60, guide: "all", range: "low", reps: 6,
-        why: "After a single note, the easiest move is a step to the neighbouring note.", refs: ["henderson1997", "dallabella2007"] },
-      { title: "Three-note step", label: "1-2-3-2-1", how: "On “la”", steps: [0, 2, 4, 2, 0], bpm: 60, guide: "all", range: "low", dir: "updown", reps: 6,
-        why: "Stepwise motion stretched to three notes.", refs: ["henderson1997"] },
-      { title: "First note only", label: "1-2-3-2-1", how: "The piano plays only the first note; find the rest yourself", steps: [0, 2, 4, 2, 0], bpm: 60, guide: "first", range: "low", reps: 6,
-        why: "A constant guide helps during practice but may not stick, so only the first note is played.", refs: ["salmoni1984", "winstein1990"] },
-    ],
-  },
-  intervals: {
-    name: "Interval ladder", short: "Intervals", who: "After the basics", minutes: "≈ 10 min",
-    goal: "Widen the interval from a second up to an octave. Steps are easier than leaps and rising easier than falling, so that’s the order. Each repetition alternates two intervals.",
-    tip: "Big leaps tend to come out too narrow: aim the top note a little high going up and the bottom note a little low going down. The evidence for this difficulty order is weak.",
-    items: [
-      { title: "Seconds up and down", label: "1-2-1 / 1-7-1", how: "On “la”", alt: [[0, 2, 0], [0, -2, 0]], bpm: 70, guide: "first", range: "low", reps: 6,
-        why: "Starts with the smallest interval, alternating up and down.", refs: ["henderson1997"] },
-      { title: "Major and minor thirds", label: "1-3-1 / 1-♭3-1", how: "On “la”, feeling the difference between the two", alt: [[0, 4, 0], [0, 3, 0]], bpm: 70, guide: "first", range: "low", reps: 6,
-        why: "Alternating two thirds a semitone apart to tell them apart.", refs: ["pfordresher2007"] },
-      { title: "Fourths and fifths up", label: "1-4-1 / 1-5-1", how: "Aim the top note slightly high", alt: [[0, 5, 0], [0, 7, 0]], bpm: 60, guide: "first", range: "low", reps: 6,
-        why: "Big leaps tend to shrink, leaving the top note flat.", refs: ["pfordresher2007", "henderson1997"] },
-      { title: "Fourths and fifths down", label: "1-5-1 / 1-4-1 (downward)", how: "Don’t let the bottom note land sharp", alt: [[0, -5, 0], [0, -7, 0]], bpm: 60, guide: "first", range: "mid", dir: "down", reps: 6,
-        why: "Falling leaps are usually the least accurate, so they come after the rising ones.", refs: ["henderson1997"] },
-      { title: "Sixths and octaves", label: "1-6-1 / 1-8-1", how: "Hear the top note in your head first", alt: [[0, 9, 0], [0, 12, 0]], bpm: 60, guide: "first", range: "low", reps: 4,
-        why: "The widest intervals.", refs: ["pfordresher2007"] },
-      { title: "Mixed, no guide", label: "1-3-5-4-2-1", how: "Hear only the starting chord, then sing", steps: [0, 4, 7, 5, 2, 0], bpm: 80, guide: "none", range: "low", reps: 6,
-        why: "No guide, mixed intervals — following motor-learning research that mixed practice transfers better to real songs.", refs: ["shea1979", "guadagnoli2004"] },
-    ],
-  },
-  fading: {
-    name: "Fading the guide", short: "Independence", who: "Intermediate", minutes: "≈ 8 min",
-    goal: "The same scale with the guide piano fading from every note, to first note only, to none. Motor-learning research finds constant feedback helps in the moment, but fading it is what makes skills stick.",
-    tip: "If you wobble a lot without the guide, turn it back on for a while. No study has tested this approach directly in singing yet.",
-    items: [
-      { title: "Guide on every note", label: "5-note scale", how: "On “la”, with the piano", steps: FIVE, bpm: 80, guide: "all", range: "low", reps: 4,
-        why: "Learn the scale with the guide first.", refs: ["welch1985"] },
-      { title: "First note only", label: "5-note scale", how: "Hear the first note, then carry on yourself", steps: FIVE, bpm: 80, guide: "first", range: "low", reps: 4,
-        why: "One step less guidance.", refs: ["winstein1990"] },
-      { title: "No guide", label: "5-note scale", how: "Hear only the starting chord, then sing", steps: FIVE, bpm: 80, guide: "none", range: "low", reps: 4,
-        why: "The piano drops out but you still see your pitch on screen — knowing whether you’re right is what makes learning happen.", refs: ["salmoni1984", "welch1985"] },
-      { title: "Major / minor alternating", label: "1-3-5-3-1 / 1-♭3-5-♭3-1", how: "Chord only, switching major and minor", alt: [[0, 4, 7, 4, 0], [0, 3, 7, 3, 0]], bpm: 80, guide: "none", range: "low", dir: "updown", reps: 8,
-        why: "Mixed patterns without a guide; the starting chord switches between major and minor too.", refs: ["shea1979"] },
-    ],
-  },
-  range: {
-    name: "Range extension", short: "Range", who: "Only after warming up", minutes: "≈ 8 min",
-    goal: "Go a semitone at a time past the edge of your comfortable range — two semitones at most — mostly with glides and light vowels.",
-    tip: "Stop at once if it hurts or tickles. Only raise your range setting by a semitone after two comfortable days in a row. Range work leans more on teaching experience than on research.",
-    items: [
-      { title: "Trill siren up", label: "Slide a fifth", how: "On a lip trill or through a straw", steps: [[0, 7], [7, 0]], bpm: 50, guide: "all", range: "up",
-        why: "Touches the top of your range with the lowest-load semi-occluded sound.", refs: ["titze2006", "kang2019"] },
-      { title: "Octave siren up", label: "Slide an octave", how: "Light “oo”", steps: [[0, 12], [12, 0]], bpm: 50, guide: "all", range: "up", reps: 4,
-        why: "Glides are the core move of Vocal Function Exercises for range and efficiency.", refs: ["stemple1994"] },
-      { title: "Arpeggio up", label: "1-3-5-3-1", how: "On “oo”, small mouth", steps: [0, 4, 7, 4, 0], bpm: 80, guide: "first", range: "up",
-        why: "From slides to distinct notes.", refs: ["stemple1994"] },
-      { title: "Arpeggio down", label: "1-3-5-3-1", how: "On “oh”, no pressing down", steps: [0, 4, 7, 4, 0], bpm: 80, guide: "first", range: "down",
-        why: "Extends the bottom of your range the same way.", refs: ["stemple1994"] },
-      { title: "Short high long tone", label: "One note, 2 beats", how: "Easy and short", steps: [0], div: 2, bpm: 60, guide: "first", range: "cap", reps: 2,
-        why: "Hold only briefly near the top. Overdoing it can take most of a day to recover from.", refs: ["titze2003", "hunter2009"] },
-      { title: "Trill siren down", label: "Slide down a fifth", how: "Lip trill or straw, relaxing as you go down", steps: [[0, -7], [-7, 0]], bpm: 50, guide: "all", range: "down",
-        why: "Reaches the bottom of your range with a low-load semi-occluded sound. The key is to relax, not press down.", refs: ["titze2006", "stemple1994"] },
-      { title: "Falling scale down", label: "5-4-3-2-1", how: "On “oh”, lighter as you go down", steps: [7, 5, 4, 2, 0], bpm: 80, guide: "first", range: "down",
-        why: "A falling scale lets you settle naturally onto low notes.", refs: ["stemple1994"] },
-      { title: "Short low long tone", label: "One note, 2 beats", how: "Easy and short, without pressing the throat", steps: [0], div: 2, bpm: 60, guide: "first", range: "floor", reps: 2,
-        why: "Hold only briefly near the bottom. Overdoing it takes time to recover from.", refs: ["titze2003", "hunter2009"] },
-    ],
-  },
-  precision: {
-    name: "Precision", short: "Precision", who: "Trained singers", minutes: "≈ 10 min",
-    goal: "Aim for the centre of the note, within ±25 cents. Untrained singers average around 50 cents off, so this gets close to what a trained ear hears as in tune.",
-    tip: "If it’s too hard, slow down or turn the guide on.",
-    items: [
-      { title: "Rock-steady long tone", label: "One note, 8 beats", how: "On “ah”, without scooping up from below", steps: [0], div: 8, bpm: 60, guide: "none", range: "low", dir: "updown", reps: 8,
-        why: "Land dead centre and stay there. Consistency on every try is the point.", refs: ["pfordresher2010", "larrouy2015"] },
-      { title: "Chromatic", label: "1-♯1-2-♯2-3 and back", how: "Make each semitone distinct", steps: [0, 1, 2, 3, 4, 3, 2, 1, 0], bpm: 70, guide: "first", range: "low", reps: 4,
-        why: "Telling the smallest interval apart precisely.", refs: ["larrouy2015"] },
-      { title: "Octave scale", label: "1 to 8 and back", how: "On “la”, no guide", steps: [0, 2, 4, 5, 7, 9, 11, 12, 11, 9, 7, 5, 4, 2, 0], bpm: 90, guide: "none", range: "low", dir: "updown", reps: 6,
-        why: "Checks that you don’t drift flat or sharp over a long scale.", refs: ["dallabella2007"] },
-      { title: "Falling leaps", label: "8-5-3-1 / 5-1", how: "Don’t let the bottom note land sharp", alt: [[12, 7, 4, 0], [7, 0]], bpm: 70, guide: "none", range: "low", dir: "down", reps: 6,
-        why: "Only falling leaps — the easiest to get wrong.", refs: ["henderson1997"] },
-      { title: "Mixed melodies", label: "Three short melodies, rotating", how: "Chord only, then sing", alt: [[0, 2, 4, 7, 4, 2, 0], [0, 4, 2, 5, 4, 7, 0], [0, 7, 5, 4, 2, 0]], bpm: 100, guide: "none", range: "low", reps: 6,
-        why: "A different melody each repetition — mixed practice is closer to real singing.", refs: ["shea1979", "maas2008"] },
-    ],
-  },
-  octave: {
-    name: "Matching across octaves", short: "Octaves", who: "Optional · singing other-gender songs", minutes: "≈ 6 min",
-    goal: "The piano plays an octave away from your range and you sing it in your own octave. Translating another octave or timbre into your voice is often the hidden reason for wrong notes.",
-    tip: "Especially useful for men singing songs by women and vice versa. The bars are always drawn in your octave.",
-    items: [
-      { title: "Same octave", label: "One note, 4 beats", how: "At the same height as the piano", steps: [0], div: 4, bpm: 60, guide: "all", range: "one", reps: 6,
-        why: "Match at the piano’s own height first.", refs: ["hutchins2012"] },
-      { title: "Guide an octave away", label: "One note, 4 beats", how: "The piano is in another octave; you sing in yours", steps: [0], div: 4, bpm: 60, guide: "all", range: "low", reps: 6, oct: "away",
-        why: "Research finds that translating a different height and timbre into your own voice is one of the hardest parts of singing.", refs: ["hutchins2012", "granot2013"] },
-      { title: "Alternating", label: "One note, 4 beats", how: "The piano switches octave every repetition", steps: [0], div: 4, bpm: 60, guide: "all", range: "low", dir: "updown", reps: 8, oct: "alt",
-        why: "Mixes both so you find your octave either way.", refs: ["hutchins2012", "shea1979"] },
-    ],
-  },
-};
-
-// What each exercise is for, in the singer's words. The pick page is organised by these.
-const PURPOSES = [
-  { name: "Warm up", when: "Five minutes before singing to wake the voice gently", ids: ["warmup:0", "warmup:1", "warmup:2", "warmup:3", "warmup:4"] },
-  { name: "SOVT (semi-occluded)", when: "Straws, lip trills and humming — singing with less strain", ids: ["sovt:0", "sovt:1", "sovt:2", "sovt:3", "sovt:4", "sovt:5", "sovt:6", "sovt:7", "sovt:8", "sovt:9"] },
-  { name: "Pitch matching", when: "When notes keep coming out wrong or flat — one note at a time", ids: ["basics:0", "basics:1", "basics:2", "basics:3", "basics:4", "basics:5"] },
-  { name: "High notes", when: "Reaching high notes without pushing", ids: ["range:0", "range:1", "range:2", "range:4"] },
-  { name: "Low notes", when: "Clear low notes without pressing down", ids: ["range:5", "range:6", "range:3", "range:7"] },
-  { name: "Scales", when: "Your everyday vocal routine", ids: ["basic:0", "basic:4", "basic:3", "basic:2", "precision:1", "precision:2"] },
-  { name: "Leaps", when: "Landing wide jumps accurately", ids: ["intervals:0", "intervals:1", "intervals:2", "intervals:3", "intervals:4", "basic:1", "basic:5", "precision:3", "intervals:5"] },
-  { name: "Long tones", when: "Holding one note long and even", ids: ["basic:6", "precision:0"] },
-  { name: "Without accompaniment", when: "Finding notes on your own, no piano help", ids: ["fading:0", "fading:1", "fading:2", "fading:3", "precision:4"] },
-  { name: "Octave matching", when: "Singing another-gender singer’s song in your key", ids: ["octave:0", "octave:1", "octave:2"] },
-];
-const purposeOf = (id) => PURPOSES.find((p) => p.ids.includes(id));
 
 // ---------- settings ----------
 const store = {
   get(k, d) { try { const v = localStorage.getItem("pitchroom:" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("pitchroom:" + k, JSON.stringify(v)); } catch (e) {} },
 };
-const S = Object.assign({ ex: "basic:0", voice: "tenor", lo: 48, hi: 57, dir: "up", bpm: 90, guideMode: "all", cue: true, vol: 0.7,
-  names: "en", a4: 440, ignoreOct: false, echo: false, gate: 0.01,
-  }, store.get("settings", {}));
-if (typeof S.guide === "boolean") { S.guideMode = S.guide ? "all" : "none"; delete S.guide; }
-["course", "stepOf", "ease", "pattern", "tol"].forEach((k) => delete S[k]);
+// names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
+// treated as silent; vol: the keyboard's piano
+const S = { names: "en", echo: false, gate: 0.01, vol: 0.7 };
+for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
 const save = () => store.set("settings", S);
+const A4 = 440;
 
-const mf = (m) => S.a4 * Math.pow(2, (m - 69) / 12);
+const mf = (m) => A4 * Math.pow(2, (m - 69) / 12);
 const pc = (m) => ((Math.round(m) % 12) + 12) % 12;
 const oct = (m) => Math.floor(Math.round(m) / 12) - 1;
 const absName = (m) => (S.names === "ko" ? KO : EN)[pc(m)] + oct(m);
-const barName = (m, root) => S.names === "mov" ? KO[((Math.round(m - root) % 12) + 12) % 12] : absName(m);
-const dev = (m, target) => { let x = m - target; if (S.ignoreOct) x -= 12 * Math.round(x / 12); return x * 100; };
 const clock = () => performance.now() / 1000;
 
 // ---------- audio ----------
@@ -1122,7 +524,6 @@ function ensureCtx() {
   if (ac.state === "suspended") ac.resume();
   return ac;
 }
-const toCtx = (t) => ac.currentTime + (t - clock());
 
 // Sampled piano: Salamander Grand Piano (Alexander Holm, CC-BY 3.0), recorded every minor third.
 const SAMPLE_BASE = "https://tonejs.github.io/audio/salamander/";
@@ -1131,7 +532,7 @@ const samples = new Map();
 let sampleState = "idle";
 async function loadSamples() {
   if (sampleState !== "idle") return;
-  sampleState = "loading"; renderPiano();
+  sampleState = "loading";
   ensureCtx();
   const jobs = [];
   for (let o = 1; o <= 7; o++) SAMPLE_NAMES.forEach((n, i) => {
@@ -1144,13 +545,12 @@ async function loadSamples() {
   });
   const res = await Promise.allSettled(jobs);
   sampleState = res.every((r) => r.status === "rejected") ? "failed" : "ready";
-  renderPiano();
 }
 function samplePiano(m, at, dur, dest, vel) {
   let best = null;
   for (const k of samples.keys()) if (best == null || Math.abs(k - m) < Math.abs(best - m)) best = k;
   const src = ac.createBufferSource(); src.buffer = samples.get(best);
-  src.playbackRate.value = Math.pow(2, (m - best) / 12) * (S.a4 / 440);
+  src.playbackRate.value = Math.pow(2, (m - best) / 12);
   const g = ac.createGain();
   g.gain.setValueAtTime(vel * 1.5, at);
   g.gain.setTargetAtTime(0, at + dur, 0.12);
@@ -1245,392 +645,16 @@ function yin(b, sr) {
   return { f: sr / (tau + (den ? (a - e) / (2 * den) : 0)), q: 1 - c };
 }
 
-// ---------- run (exercise) ----------
-let run = null, preview = null;
-function rootList(a, b, dir) {
-  const lo = Math.min(a, b), hi = Math.max(a, b), roots = [];
-  if (dir === "down") for (let r = hi; r >= lo; r--) roots.push(r);
-  else if (dir === "updown") { for (let r = lo; r <= hi; r++) roots.push(r); for (let r = hi - 1; r >= lo; r--) roots.push(r); }
-  else for (let r = lo; r <= hi; r++) roots.push(r);
-  return roots;
-}
-function parseEx(id) {
-  const [gid, k] = String(id).split(":"), grp = MENU[gid];
-  if (!grp) return null;
-  const it = grp.items[+k];
-  return it ? { gid, grp, it, idx: +k } : null;
-}
-function exCfg(it) {
-  return { name: it.title, pattern: { steps: it.steps, alt: it.alt, div: it.div },
-    bpm: S.bpm, guide: S.guideMode, cue: S.cue,
-    roots: it.range === "full" ? rootList(S.lo, S.hi, S.dir) : stepRoots(it), how: it.how || "", oct: it.oct || null, smooth: it.smooth || 5 };
-}
-function activeCfg() { return exCfg((parseEx(S.ex) || parseEx("basic:0")).it); }
-// A step can be a number (held note) or [from, to] (a glide between two offsets).
-const tgtAt = (e, t) => e.midi2 == null ? e.midi : e.midi + (e.midi2 - e.midi) * Math.max(0, Math.min(1, (t - e.t0) / (e.t1 - e.t0)));
-function buildRun(t0, cfg) {
-  const P = cfg.pattern, beat = 60 / cfg.bpm, div = P.div || 1, roots = cfg.roots;
-  const evs = [], notes = [], reps = [];
-  let t = t0;
-  const L = Math.min(S.lo, S.hi), away = L < 52 ? 12 : -12;
-  roots.forEach((root, ri) => {
-    const rep = { root, notes: [] };
-    reps.push(rep);
-    const steps = P.alt ? P.alt[ri % P.alt.length] : P.steps;
-    const flat = steps.flat(), minor = flat.includes(3) && !flat.includes(4);
-    const gs = cfg.oct === "away" || (cfg.oct === "alt" && ri % 2 === 1) ? away : 0;
-    evs.push({ kind: "cue", root, minor, gs, t0: t, t1: t + beat * 1.6, rep: ri });
-    t += beat * 2;
-    steps.forEach((s, i) => {
-      const glide = Array.isArray(s);
-      const len = beat * div * (glide ? 2 : 1) * (i === steps.length - 1 && div <= 1 && !glide ? 2 : 1);
-      const e = { kind: "note", midi: root + (glide ? s[0] : s), midi2: glide ? root + s[1] : null, first: i === 0, gs, root, t0: t, t1: t + len * 0.94, rep: ri };
-      evs.push(e); notes.push(e); rep.notes.push(e); t += len;
-    });
-    t += beat;
-  });
-  return { evs, notes, reps, end: t, bus: null, stopped: false, cfg };
-}
-
-async function startRun() {
-  ensureCtx();
-  if (!micOn && !testOsc) await startMic();
-  stopRun(true);
-  run = buildRun(clock() + 2.2, activeCfg());
-  run.bus = ac.createGain(); run.bus.gain.value = S.vol; run.bus.connect(master);
-  $("#overlay").hidden = true; renderStart();
-}
-function stopRun(silent) {
-  if (!run) return;
-  run.stopped = true;
-  const bus = run.bus;
-  if (bus) { bus.gain.setTargetAtTime(0, ac.currentTime, 0.04); setTimeout(() => bus.disconnect(), 400); }
-  run = null;
-  if (!silent) { renderStart(); renderHudRep(); }
-}
-function finishRun() {
-  const r = run; run = null;
-  setTimeout(() => { if (r.bus) r.bus.disconnect(); }, 1500);
-  const ov = $("#overlay"); ov.innerHTML = "";
-  const row = el("div", "row");
-  row.append(mkBtn("Again", startRun, true), mkBtn("Change setup", () => go("setup")), mkBtn("Another exercise", () => go("pick")));
-  ov.append(el("h2", null, "Done"), row); ov.hidden = false;
-  renderStart(); renderHudRep(clock());
-}
+// ---------- helpers ----------
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 function mkBtn(label, fn, primary) {
   const b = document.createElement("button"); b.type = "button"; b.className = "btn sm" + (primary ? " dark" : "");
   b.textContent = label; b.onclick = fn; return b;
 }
-function schedule() {
-  if (!run || run.stopped || !ac) return;
-  const now = clock();
-  for (const ev of run.evs) {
-    if (ev.sched) continue;
-    if (ev.t0 > now + 0.25) break;
-    ev.sched = true;
-    const at = Math.max(ac.currentTime, toCtx(ev.t0));
-    const gm = run.cfg.guide;
-    if (ev.kind === "cue") { if (run.cfg.cue) [0, ev.minor ? 3 : 4, 7].forEach((i) => piano(ev.root + ev.gs + i, at, ev.t1 - ev.t0, run.bus, 0.3)); }
-    else if (gm === "all" || (gm === "first" && ev.first)) piano(ev.midi + ev.gs, at, ev.midi2 == null ? ev.t1 - ev.t0 : 0.5, run.bus, 0.5);
-  }
-}
-setInterval(schedule, 40);
-
-// ---------- exercise menu ----------
-const GUIDE_LABEL = { all: "every note", first: "first note only", none: "off (chord only)" };
-// Ranges are relative to the singer's comfortable root range [L, H] (a 5-note scale on H tops out at H+7).
-// "up"/"down"/"cap" push at most 2 semitones past the comfortable edge, never further.
-function stepRoots(st) {
-  const L = Math.min(S.lo, S.hi), H = Math.max(S.lo, S.hi), mid = Math.round((L + H) / 2);
-  const offs = (st.alt ? st.alt.flat(2) : st.steps.flat()), maxO = Math.max(...offs), minO = Math.min(...offs);
-  const topRoot = H + 9 - maxO, botRoot = L - 2 - minO;
-  if (st.range === "one") return Array(st.reps || 4).fill(L + 2);
-  if (st.range === "cap") return Array(st.reps || 2).fill(topRoot - 1);
-  if (st.range === "floor") return Array(st.reps || 2).fill(botRoot + 1);
-  const span = { low: [L, L + 4], mid: [mid - 2, mid + 2], full: [L, H], up: [topRoot - 4, topRoot], down: [botRoot, botRoot + 4] }[st.range || "full"];
-  const roots = rootList(span[0], span[1], st.dir || (st.range === "down" ? "down" : "up"));
-  return st.reps ? roots.slice(0, st.reps) : roots;
-}
-function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 // Double-click a slider to put it back where it started (runs its own oninput, so everything that listens updates)
 function resetOnDblClick(input, def) {
   input.title = "Double-click to reset";
   input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
-}
-function refsBlock(ids) {
-  const used = new Set(ids);
-  const d = el("details", "refs"); d.append(el("summary", null, "Research"));
-  const ol = el("ol");
-  REF_IDS.forEach((id, k) => {
-    if (!used.has(id)) return;
-    const R = REFS[id], li = el("li"); li.value = k + 1;
-    li.append(document.createTextNode(R.cite + " "));
-    if (R.url) { const a = el("a", null, "link"); a.href = R.url; a.target = "_blank"; a.rel = "noopener"; li.append(a); }
-    li.append(document.createTextNode(" — " + R.note)); ol.append(li);
-  });
-  d.append(ol); return d;
-}
-function whyLine(it) {
-  const why = el("p", "why"); why.append(document.createTextNode(it.why + " "));
-  (it.refs || []).forEach((r) => { const n = REF_IDS.indexOf(r) + 1; if (n) why.append(el("sup", null, `[${n}]`)); });
-  return why;
-}
-function renderExInfo() {
-  const box = $("#exInfo"); box.innerHTML = "";
-  const p = parseEx(S.ex) || parseEx("basic:0");
-  $("#dirField").hidden = !(p.it && p.it.range === "full");
-  setText("rangeLabel", p.grp.basic ? "Root range" : "Comfortable range");
-  if (p.grp.basic) {
-    box.append(el("h2", null, p.it.title), el("div", "meta", `${purposeOf(S.ex)?.name || "Basic patterns"} · your settings`),
-      el("p", "how-big", p.it.steps.map((x) => KO[((x % 12) + 12) % 12] + (x >= 12 ? "′" : "")).join(" ")),
-      el("p", "muted", "Repeats a semitone higher each time within the root range. Change the tempo and guide however you like."));
-    return;
-  }
-  const it = p.it;
-  box.append(el("h2", null, it.title), el("div", "meta", `${purposeOf(S.ex)?.name || p.grp.name} · ${it.label}`), el("p", "how-big", it.how));
-  const chips = el("div", "chips");
-  [`${stepRoots(it).length} repetitions`, ...(it.oct ? [it.oct === "alt" ? "Piano alternates octaves" : "Piano plays an octave away"] : [])]
-    .forEach((x) => chips.append(el("span", "chip", x)));
-  box.append(chips, whyLine(it), el("p", "muted", p.grp.tip), refsBlock(it.refs || []));
-}
-
-// ---------- timbre map ----------
-const T = { ref: null, me: null, refBlob: null, meBlob: null };
-const TIMBRE_REFS = ["petersonBarney1952", "omori1996", "sundberg2001", "mainka2015", "sundbergNord2006", "titze2003tw", "story2001", "gauffin1989", "hillenbrand1994",
-  "samlan2011", "maryn2015", "garellek2019", "sundberg1993", "henrich2005", "lindblom1971", "henrich2011", "monsen1983", "prame1994", "kondo2025"];
-async function checkServer() {
-  let ok = false;
-  try { ok = (await fetch("/api/health", { cache: "no-store" })).ok; } catch (e) { ok = false; }
-  $("#tServer").hidden = ok;
-  return ok;
-}
-async function analyzeBlob(blob, start, end) {
-  const q = new URLSearchParams();
-  if (start != null) q.set("start", start);
-  if (end != null) q.set("end", end);
-  let r;
-  try { r = await fetch("/api/analyze?" + q, { method: "POST", body: blob }); }
-  catch (e) { checkServer(); throw new Error("Couldn’t reach the analysis server."); }
-  const j = await r.json().catch(() => ({ error: "Couldn’t read the server’s reply." }));
-  if (!r.ok) throw new Error(j.error || "Analysis failed.");
-  return j;
-}
-function setClip(which, blob, name) {
-  T[which + "Blob"] = blob; T[which] = null;
-  const a = $("#" + which + "Audio"); a.src = URL.createObjectURL(blob); a.hidden = false;
-  $("#" + which + "Go").disabled = false;
-  if (which === "ref") {
-    $("#refFileName").textContent = name || "Recording";
-    $("#refTrim").hidden = false; $("#refStart").value = 0; $("#refEnd").value = "";
-    a.onloadedmetadata = () => { if (isFinite(a.duration)) $("#refEnd").value = a.duration.toFixed(1); };
-  }
-  $("#" + which + "Sum").innerHTML = "";
-  renderTimbre();
-}
-async function runAnalysis(which) {
-  const sum = $("#" + which + "Sum"); sum.innerHTML = ""; sum.append(el("span", null, "Analyzing…"));
-  $("#" + which + "Go").disabled = true;
-  try {
-    const st = which === "ref" ? parseFloat($("#refStart").value) : NaN, en = which === "ref" ? parseFloat($("#refEnd").value) : NaN;
-    T[which] = await analyzeBlob(T[which + "Blob"], isFinite(st) ? st : null, isFinite(en) ? en : null);
-    renderSum(which);
-  } catch (err) {
-    T[which] = null; sum.innerHTML = ""; sum.append(el("span", "err", err.message));
-  }
-  $("#" + which + "Go").disabled = false;
-  renderTimbre();
-}
-function renderSum(which) {
-  const r = T[which], sum = $("#" + which + "Sum"); sum.innerHTML = "";
-  const line = el("span"); line.append(el("b", null, `${absName(r.midi)} · ${r.f0} Hz`), document.createTextNode(` · ${r.duration} s analyzed · ${Math.round(r.voicedRatio * 100)}% voiced`));
-  sum.append(line);
-  r.warnings.forEach((w) => sum.append(el("span", "warn", w)));
-  if (which === "ref") { const b = $("#refNote"); b.hidden = false; b.textContent = `Play target note ${absName(r.midi)}`; }
-}
-
-// recording "my voice"
-let rec = null, recChunks = [], recT0 = 0, recTimer = 0;
-async function toggleRec() {
-  if (rec) { rec.stop(); return; }
-  if (!micOn && !(await startMic())) { $("#meSum").innerHTML = ""; $("#meSum").append(el("span", "err", $("#micMsg").textContent || "Couldn’t turn on the mic.")); return; }
-  recChunks = [];
-  const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
-  try { rec = new MediaRecorder(micStream, type ? { mimeType: type } : undefined); }
-  catch (e) { $("#meSum").innerHTML = ""; $("#meSum").append(el("span", "err", "This browser can’t record. Upload a file instead.")); return; }
-  rec.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
-  rec.onstop = () => {
-    clearInterval(recTimer);
-    const blob = new Blob(recChunks, { type: rec.mimeType || "audio/webm" }); rec = null;
-    $("#meRec").classList.remove("on"); $("#meRecLabel").textContent = "Record again";
-    setClip("me", blob); runAnalysis("me");
-  };
-  rec.start(); recT0 = clock();
-  $("#meRec").classList.add("on"); $("#meRecLabel").textContent = "Stop";
-  recTimer = setInterval(() => { const t = clock() - recT0; $("#meTimer").textContent = t.toFixed(1) + " s"; if (t >= 8 && rec) rec.stop(); }, 100);
-}
-
-// maps
-const SVGNS = "http://www.w3.org/2000/svg";
-function sv(tag, attrs, text) { const n = document.createElementNS(SVGNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; return n; }
-// o.px / o.py map a value to 0..1 (left→right, top→bottom)
-function drawMap(svg, o) {
-  svg.innerHTML = "";
-  const W = 420, H = 320, L = 14, R = 14, Tp = 14, B = 34, pw = W - L - R, ph = H - Tp - B;
-  const X = (k) => L + Math.max(0, Math.min(1, k)) * pw, Y = (k) => Tp + Math.max(0, Math.min(1, k)) * ph;
-  // colours go through style= so the CSS tokens apply and follow theme changes without a redraw
-  svg.append(sv("rect", { x: L, y: Tp, width: pw, height: ph, rx: 10, style: "fill: var(--bg); stroke: var(--line)" }));
-  svg.append(sv("line", { x1: X(0.5), y1: Tp + 6, x2: X(0.5), y2: Tp + ph - 6, style: "stroke: rgba(var(--fg), 0.08)", "stroke-dasharray": "3 4" }));
-  svg.append(sv("line", { x1: L + 6, y1: Y(0.5), x2: L + pw - 6, y2: Y(0.5), style: "stroke: rgba(var(--fg), 0.08)", "stroke-dasharray": "3 4" }));
-  const small = { "font-size": 11, style: "fill: rgba(var(--fg), 0.38)" };
-  if (o.quads) {
-    const pos = [[X(0) + 10, Y(0) + 18, "start"], [X(1) - 10, Y(0) + 18, "end"], [X(0) + 10, Y(1) - 10, "start"], [X(1) - 10, Y(1) - 10, "end"]];
-    o.quads.forEach((q, i) => svg.append(sv("text", { x: pos[i][0], y: pos[i][1], "text-anchor": pos[i][2], ...small }, q)));
-    if (o.center) svg.append(sv("text", { x: X(0.5), y: Y(0.5) - 6, "text-anchor": "middle", ...small }, o.center));
-  }
-  (o.landmarks || []).forEach((m) => {
-    svg.append(sv("text", { x: X(o.px(m)), y: Y(o.py(m)) + 4, "text-anchor": "middle", "font-size": 13, style: "fill: rgba(var(--fg), 0.22)" }, m.t));
-  });
-  svg.append(sv("text", { x: L, y: H - 10, ...small }, o.xLabel[0]));
-  svg.append(sv("text", { x: W - R, y: H - 10, "text-anchor": "end", ...small }, o.xLabel[1]));
-  svg.append(sv("text", { x: W / 2, y: H - 10, "text-anchor": "middle", ...small }, o.yLabel));
-  const pts = o.pts.filter(Boolean);
-  if (pts.length === 2) {
-    const [a, b] = pts; // me → ref
-    const ax = X(o.px(a)), ay = Y(o.py(a)), bx = X(o.px(b)), by = Y(o.py(b));
-    const d = Math.hypot(bx - ax, by - ay);
-    if (d > 18) {
-      const ux = (bx - ax) / d, uy = (by - ay) / d, ex = bx - ux * 12, ey = by - uy * 12;
-      svg.append(sv("line", { x1: ax + ux * 9, y1: ay + uy * 9, x2: ex, y2: ey, style: "stroke: var(--ink)", "stroke-width": 1.5 }));
-      svg.append(sv("path", { d: `M${ex + ux * 2},${ey + uy * 2} L${ex - ux * 7 - uy * 4},${ey - uy * 7 + ux * 4} L${ex - ux * 7 + uy * 4},${ey - uy * 7 - ux * 4} Z`, style: "fill: var(--ink)" }));
-    }
-  }
-  pts.forEach((p) => {
-    const kx = o.px(p), ky = o.py(p), out = kx < 0 || kx > 1 || ky < 0 || ky > 1;
-    const x = X(kx), y = Y(ky), r = p.r || 7;
-    svg.append(sv("circle", { cx: x, cy: y, r, style: `fill: ${p.color}; stroke: var(--surface)`, "stroke-width": 2, opacity: p.opacity ?? 1 }));
-    if (out) svg.append(sv("circle", { cx: x, cy: y, r: r + 4, fill: "none", style: `stroke: ${p.color}`, "stroke-dasharray": "2 2" }));
-    const right = x < L + pw - 60;
-    svg.append(sv("text", { x: x + (right ? r + 6 : -r - 6), y: y + 4, "text-anchor": right ? "start" : "end", "font-size": 12, "font-weight": 500, style: `fill: ${p.color}` }, p.label + (out ? " (off chart)" : "")));
-  });
-  if (!pts.length) svg.append(sv("text", { x: X(0.5), y: Y(0.5) + 20, "text-anchor": "middle", "font-size": 12.5, style: "fill: rgba(var(--fg), 0.35)" }, o.empty));
-  if (o.disabled) {
-    svg.append(sv("rect", { x: L, y: Tp, width: pw, height: ph, rx: 10, style: "fill: color-mix(in srgb, var(--bg) 82%, transparent)" }));
-    svg.append(sv("text", { x: X(0.5), y: Y(0.5) + 4, "text-anchor": "middle", "font-size": 12.5, style: "fill: rgba(var(--fg), 0.5)" }, o.disabled));
-  }
-}
-const VOWELS = [ // Peterson & Barney (1952) men's averages (F1, F2 in Hz); scaled up ~15% for higher voices
-  { t: "ee", F1: 270, F2: 2290 }, { t: "eh", F1: 530, F2: 1840 }, { t: "a", F1: 660, F2: 1720 }, { t: "ah", F1: 730, F2: 1090 },
-  { t: "uh", F1: 640, F2: 1190 }, { t: "aw", F1: 570, F2: 840 }, { t: "oo", F1: 300, F2: 870 } ];
-function renderMaps() {
-  const ref = T.ref, me = T.me;
-  const toneP = (r, label, color) => r && r.spr != null && r.h1h2 != null
-    ? { spr: r.spr, h: r.h1h2, label, color, r: 5 + Math.max(0, Math.min(1, ((r.cpps ?? 10) - 4) / 18)) * 5 } : null;
-  drawMap($("#mapTone"), {
-    px: (p) => (p.spr + 40) / 40, py: (p) => (16 - p.h) / 24,
-    quads: ["Airy & soft", "Airy-bright pop", "Heavy & dark", "Bright & firm · twang, belt"], center: "Balanced",
-    xLabel: ["← darker", "brighter, more ring →"], yLabel: "up: breathier · down: firmer",
-    pts: [toneP(me, "You", "var(--voice)"), toneP(ref, "Target", "var(--ink)")], empty: "Analyze both voices to place the dots",
-  });
-  const big = (ref && ref.f0 > 180) || (me && me.f0 > 180), k = big ? 1.15 : 1;
-  const high = (ref && ref.f0 > 350) || (me && me.f0 > 350);
-  const vowelP = (r, label, color) => r && r.F1 && r.F2 ? { F1: r.F1, F2: r.F2, label, color } : null;
-  drawMap($("#mapVowel"), {
-    px: (p) => (2900 - p.F2) / 2300, py: (p) => (p.F1 - 220) / 800,
-    landmarks: VOWELS.map((v) => ({ t: v.t, F1: v.F1 * k, F2: v.F2 * k })),
-    xLabel: ["← tongue forward (ee, eh)", "tongue back, lips round (oh, oo) →"], yLabel: "up: jaw closed · down: jaw open",
-    pts: [vowelP(me, "You", "var(--voice)"), vowelP(ref, "Target", "var(--ink)")], empty: "Grey labels: approximate English vowels",
-    disabled: high ? "Too high (above ~350 Hz) to measure vowel shape reliably" : null,
-  });
-}
-
-const n1 = (x) => (Math.round(Math.abs(x) * 10) / 10).toString();
-const pct = (x) => Math.round(Math.abs(x) * 100) + "%";
-function tipsFor(ref, me) {
-  const out = [], add = (score, title, why, ev, refs) => out.push({ score, title, why, ev, refs });
-  const dPitch = me.midi - ref.midi;
-  if (Math.abs(dPitch) > 1) add(100, "Re-record on the same note first", `The target is ${absName(ref.midi)} and you sang ${absName(me.midi)}. A different note shifts the other measures too, so the comparison won’t hold. Use “Play target note” above to match it.`, "Required", []);
-  const dS = me.spr - ref.spr;
-  if (dS <= -3) add(-dS, "Brighter, more ring: add a little twang", `Your ring (SPR) is ${n1(dS)} dB below the target. Think of a bright, narrow “nya / nyeh”, with a slight smile — but keep the throat open.`, "Moderate evidence · cue from teaching practice", ["omori1996", "sundberg2001", "titze2003tw"]);
-  if (dS >= 3) add(dS, "Less edge: a bit more space", `Your ring (SPR) is ${n1(dS)} dB above the target. Ease off the twang, open the throat slightly as in a yawn, and round the lips a little.`, "Moderate evidence", ["story2001", "titze2003tw"]);
-  const dH = me.h1h2 - ref.h1h2;
-  if (dH >= 3) add(dH, "Less air, clearer tone", `Your breathiness (H1–H2) is ${n1(dH)} dB above the target. Start the note with a cleaner closure — a light “uh-oh” style onset helps.`, "Strong evidence · cue from teaching practice", ["gauffin1989", "hillenbrand1994", "garellek2019"]);
-  if (dH <= -3) add(-dH, "Release the squeeze, let more air flow", `Your H1–H2 is ${n1(dH)} dB below the target (more pressed). Let go of the squeeze and ride the note on a sigh-like flow of air.`, "Moderate evidence", ["gauffin1989", "sundberg1993"]);
-  if (ref.cpps != null && me.cpps != null && Math.abs(dH) < 3 && me.cpps - ref.cpps <= -2)
-    add(ref.cpps - me.cpps, "Less leaky air", `Your clarity (CPPS) is ${n1(me.cpps - ref.cpps)} dB below the target — air is leaking as noise. Start a little softer and cleaner and focus the tone.`, "Moderate evidence", ["samlan2011", "hillenbrand1994"]);
-  if (ref.F1 && me.F1 && ref.F2 && me.F2 && ref.f0 <= 350 && me.f0 <= 350) {
-    const r1 = me.F1 / ref.F1 - 1, r2 = me.F2 / ref.F2 - 1, r3 = ref.F3 && me.F3 ? me.F3 / ref.F3 - 1 : 0;
-    if (r1 <= -0.06 && r2 <= -0.06 && r3 <= -0.04) add(Math.abs(r1 + r2) * 40, "You’re darker: relax the lips and larynx", "F1, F2 and F3 are all below the target — the larynx is pushed down or the lips are very rounded. Round the lips less and let the larynx sit comfortably.", "Moderate evidence", ["lindblom1971"]);
-    else if (r1 >= 0.06 && r2 >= 0.06 && r3 >= 0.04) add((r1 + r2) * 40, "You’re brighter and thinner: a hint of yawn", "F1, F2 and F3 are all above the target. Lower the larynx slightly as in a yawn and round the lips a little.", "Moderate evidence", ["lindblom1971", "mainka2015"]);
-    else {
-      if (r1 <= -0.1) add(-r1 * 40, "Open the jaw more", `F1 is ${pct(r1)} below the target. Drop the jaw for a taller mouth.`, "Strong evidence", ["lindblom1971"]);
-      if (r1 >= 0.1) add(r1 * 40, "Close the jaw slightly", `F1 is ${pct(r1)} above the target. Close the jaw a little for a narrower vowel.`, "Strong evidence", ["lindblom1971"]);
-      if (r2 <= -0.1) add(-r2 * 40, "Tongue forward", `F2 is ${pct(r2)} below the target. Bring the tongue forward and spread the lips slightly (toward “ee / eh”).`, "Strong evidence", ["lindblom1971"]);
-      if (r2 >= 0.1) add(r2 * 40, "Tongue back, lips rounder", `F2 is ${pct(r2)} above the target. Move the tongue back or round the lips (toward “oh / oo”).`, "Strong evidence", ["lindblom1971"]);
-    }
-  }
-  if (ref.vibratoRate && !me.vibratoRate) add(6, "Let the vibrato in", `The target has vibrato at ${ref.vibratoRate} Hz, ±${Math.round(ref.vibratoExtent)} cents; yours is straight. Release the throat and jaw and let the pitch wave naturally.`, "Strong evidence for the measure · cue from teaching practice", ["prame1994", "kondo2025"]);
-  if (!ref.vibratoRate && me.vibratoRate) add(5, "Go straight-tone", `The target is a straight tone; yours wavers at ${me.vibratoRate} Hz. Keep the pitch on one line.`, "Teaching practice", []);
-  if (ref.vibratoRate && me.vibratoRate) {
-    const de = me.vibratoExtent - ref.vibratoExtent;
-    if (de <= -20) add(-de / 6, "Wider vibrato", `Your vibrato is ${Math.round(-de)} cents narrower than the target. Relax and let the pitch swing more.`, "Moderate evidence · cue from teaching practice", ["kondo2025"]);
-    if (de >= 20) add(de / 6, "Narrower vibrato", `Your vibrato is ${Math.round(de)} cents wider than the target. Hold the centre of the note more firmly.`, "Teaching practice", ["prame1994"]);
-    if (me.vibratoRate > 7 && me.vibratoRate - ref.vibratoRate > 0.8) add(4, "Slower vibrato", `Your vibrato is fast at ${me.vibratoRate} Hz. Relax and slow down the breath support.`, "Teaching practice", []);
-  }
-  if (ref.f0 > 300 && dH >= 4 && me.alpha - ref.alpha <= -3) add(dH + 1, "The target uses a heavier mix", "On this high note you’re closer to falsetto (higher H1–H2, less high-frequency energy). Add a little chest weight, as if speak-singing.", "Moderate evidence · cue from teaching practice", ["henrich2005"]);
-  out.sort((a, b) => b.score - a.score);
-  if (!out.length) add(0, "Very close to the target", "The main differences are within rough thresholds (3 dB, 10%, 20 cents). Try comparing on another vowel or note.", "", []);
-  return out;
-}
-function renderTips() {
-  const ol = $("#tips"); ol.innerHTML = "";
-  if (!T.ref || !T.me) { ol.append(el("li", "tip empty", "Analyze both voices and the biggest differences show up here first.")); return; }
-  tipsFor(T.ref, T.me).forEach((t) => {
-    const li = el("li", "tip"); li.append(el("b", null, t.title), el("p", "why", t.why));
-    if (t.ev || t.refs.length) {
-      const ev = el("div", "ev"); if (t.ev) ev.append(el("span", null, t.ev));
-      t.refs.forEach((r) => { const n = REF_IDS.indexOf(r) + 1; if (n) ev.append(document.createTextNode(`[${n}] `)); });
-      li.append(ev);
-    }
-    ol.append(li);
-  });
-}
-const MEASURES = [
-  ["Pitch", "f0", (r) => r.f0 && `${absName(r.midi)} ${Math.round(r.f0)}`, (a, b) => `${(b.midi - a.midi) >= 0 ? "+" : ""}${(b.midi - a.midi).toFixed(1)} st`],
-  ["Ring", "SPR, dB", (r) => r.spr], ["Brightness", "alpha ratio, dB", (r) => r.alpha], ["Brightness centre", "spectral centroid, Hz", (r) => r.centroid],
-  ["Breathiness", "H1–H2, dB (higher = breathier)", (r) => r.h1h2], ["Clarity", "CPPS, dB", (r) => r.cpps], ["Harmonics-to-noise", "HNR, dB", (r) => r.hnr],
-  ["Jaw opening", "F1, Hz", (r) => r.F1], ["Tongue position", "F2, Hz", (r) => r.F2], ["F3", "Hz", (r) => r.F3],
-  ["Vibrato rate", "Hz", (r) => r.vibratoRate ?? "none"], ["Vibrato extent", "± cents", (r) => r.vibratoExtent],
-];
-function renderTable() {
-  const box = $("#tTable"); box.innerHTML = "";
-  const head = el("div", "row head"); head.append(el("span", null, "")); const hv = el("div", "vals");
-  ["Target", "You", "Diff"].forEach((x) => hv.append(el("span", null, x))); head.append(hv); box.append(head);
-  MEASURES.forEach(([name, sub, get, diff]) => {
-    const row = el("div", "row"), lab = el("span"); lab.append(document.createTextNode(name), el("small", null, sub)); row.append(lab);
-    const a = T.ref ? get(T.ref) : null, b = T.me ? get(T.me) : null, v = el("div", "vals");
-    let d = "–";
-    if (T.ref && T.me) {
-      if (diff) d = diff(T.ref, T.me);
-      else if (typeof a === "number" && typeof b === "number") { const x = Math.round((b - a) * 10) / 10; d = (x > 0 ? "+" : "") + x; }
-    }
-    v.append(el("span", null, a ?? "–"), el("span", null, b ?? "–"), el("span", "d", d)); row.append(v); box.append(row);
-  });
-}
-function renderTimbre() { renderMaps(); renderTips(); renderTable(); }
-function initTimbre() {
-  ["ref", "me"].forEach((w) => {
-    $("#" + w + "File").onchange = (e) => { const f = e.target.files[0]; if (f) { setClip(w, f, f.name); if (w === "me") runAnalysis("me"); } };
-    $("#" + w + "Go").onclick = () => runAnalysis(w);
-  });
-  const drop = $("#refDrop");
-  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
-  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) setClip("ref", f, f.name); });
-  $("#refMark").onclick = () => { const t = $("#refAudio").currentTime || 0; $("#refStart").value = t.toFixed(1); $("#refEnd").value = (t + 3).toFixed(1); };
-  $("#refNote").onclick = () => { if (T.ref) playKey(Math.round(T.ref.midi)); };
-  $("#meRec").onclick = toggleRec;
-  $("#tRefs").append(refsBlock(TIMBRE_REFS));
-  renderTimbre();
 }
 
 // ---------- stems ----------
@@ -1653,6 +677,7 @@ Object.assign(ICONS, {
   prev: '<path d="M15 6C15 6 9.00001 10.4189 9 12C8.99999 13.5812 15 18 15 18"/>', // ArrowLeft01
   next: '<path d="M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18"/>', // ArrowRight01
   close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
+  settings: '<path d="M15.5 12C15.5 13.933 13.933 15.5 12 15.5C10.067 15.5 8.5 13.933 8.5 12C8.5 10.067 10.067 8.5 12 8.5C13.933 8.5 15.5 10.067 15.5 12Z"/><path d="M21.011 14.0965C21.5329 13.9558 21.7939 13.8854 21.8969 13.7508C22 13.6163 22 13.3998 22 12.9669V11.0332C22 10.6003 22 10.3838 21.8969 10.2493C21.7938 10.1147 21.5329 10.0443 21.011 9.90358C19.0606 9.37759 17.8399 7.33851 18.3433 5.40087C18.4817 4.86799 18.5509 4.60156 18.4848 4.44529C18.4187 4.28902 18.2291 4.18134 17.8497 3.96596L16.125 2.98673C15.7528 2.77539 15.5667 2.66972 15.3997 2.69222C15.2326 2.71472 15.0442 2.90273 14.6672 3.27873C13.208 4.73448 10.7936 4.73442 9.33434 3.27864C8.95743 2.90263 8.76898 2.71463 8.60193 2.69212C8.43489 2.66962 8.24877 2.77529 7.87653 2.98663L6.15184 3.96587C5.77253 4.18123 5.58287 4.28891 5.51678 4.44515C5.45068 4.6014 5.51987 4.86787 5.65825 5.4008C6.16137 7.3385 4.93972 9.37763 2.98902 9.9036C2.46712 10.0443 2.20617 10.1147 2.10308 10.2492C2 10.3838 2 10.6003 2 11.0332V12.9669C2 13.3998 2 13.6163 2.10308 13.7508C2.20615 13.8854 2.46711 13.9558 2.98902 14.0965C4.9394 14.6225 6.16008 16.6616 5.65672 18.5992C5.51829 19.1321 5.44907 19.3985 5.51516 19.5548C5.58126 19.7111 5.77092 19.8188 6.15025 20.0341L7.87495 21.0134C8.24721 21.2247 8.43334 21.3304 8.6004 21.3079C8.76746 21.2854 8.95588 21.0973 9.33271 20.7213C10.7927 19.2644 13.2088 19.2643 14.6689 20.7212C15.0457 21.0973 15.2341 21.2853 15.4012 21.3078C15.5682 21.3303 15.7544 21.2246 16.1266 21.0133L17.8513 20.034C18.2307 19.8187 18.4204 19.711 18.4864 19.5547C18.5525 19.3984 18.4833 19.132 18.3448 18.5991C17.8412 16.6616 19.0609 14.6226 21.011 14.0965Z"/>', // Settings02
   backing: '<path d="M16 21C15.7668 18.0685 13.3422 15.7477 10.3085 15.5521L9.49999 15.5C9.21121 15.5076 8.94209 15.5178 8.68816 15.5298C5.68124 15.6723 3.23089 18.0974 3 21"/><path d="M12.75 9.75C12.75 11.5449 11.2949 13 9.5 13C7.70508 13 6.25 11.5449 6.25 9.75C6.25 7.95507 7.70508 6.5 9.5 6.5C11.2949 6.5 12.75 7.95507 12.75 9.75Z"/><path d="M21 17.501C20.7709 14.6314 18.4541 12.2748 15.5 11.9961"/><path d="M15.9877 9C16.8965 8.42434 17.5001 7.40788 17.5001 6.25C17.5001 4.45507 16.0496 3 14.2602 3C13.3811 3 12.5838 3.35121 12.0001 3.92139"/>', // UserMultiple
 });
 ICONS.lead = ICONS.vocals;
@@ -1824,10 +849,9 @@ async function hearAt(id, t0, t1, btn) {
   infoSrc = ac.createBufferSource(); infoSrc.buffer = infoVox.buf; infoSrc.connect(g); infoSrc.start(now, a, d);
 }
 function stopHear() { if (infoSrc) { try { infoSrc.stop(); } catch (e) {} infoSrc = null; } }
-// The melody's range (lighter: all of it, solid: where it mostly sits) above yours from the Voice type test.
+// The melody's range: lighter for all of it, solid for where it mostly sits.
 function renderInfoRange(v, id) {
-  const box = $("#iRange"), you = VT.lo != null && VT.hi != null ? { lo: VT.lo, hi: VT.hi } : null;
-  const lo = Math.min(v.lo, you ? you.lo : v.lo) - 2, hi = Math.max(v.hi, you ? you.hi : v.hi) + 2;
+  const box = $("#iRange"), lo = v.lo - 2, hi = v.hi + 2;
   const at = (x) => `${((x - lo) / (hi - lo)) * 100}%`;
   const bar = (name, text, spans) => {
     const row = el("div", "rbar"), lane = el("div", "lane");
@@ -1837,10 +861,9 @@ function renderInfoRange(v, id) {
   const axis = el("div", "rbar axis"), ticks = el("div", "lane");
   for (let x = Math.ceil(lo); x <= hi; x++) if (x % 12 === 0) { const t = el("span", null, absName(x)); t.style.left = at(x); ticks.append(t); }
   axis.append(el("span"), ticks, el("output"));
-  box.append(el("div", "group-label minor", you ? "The song against your range" : "Where the melody sits"));
+  box.append(el("div", "group-label minor", "Where the melody sits"));
   const bars = el("div", "rbars");
   bars.append(bar("Song", `${absName(v.lo)}–${absName(v.hi)}`, [[v.lo, v.hi, "full"], ...(v.mostly ? [[v.mostly[0], v.mostly[1], "core"]] : [])]));
-  if (you) bars.append(bar("You", `${absName(you.lo)}–${absName(you.hi)}`, [[you.lo, you.hi, "you"]]));
   bars.append(axis); box.append(bars);
   // hear the extremes: the vocal track at that moment, or the bare note on the piano
   const listen = el("div", "listen");
@@ -1856,20 +879,6 @@ function renderInfoRange(v, id) {
     listen.append(row);
   }
   box.append(listen);
-  if (!you) {
-    const p = el("p", "muted fine-note"), a = el("a", null, "Voice type"); a.href = "#range";
-    p.append("Find your range on the ", a, " tab to see how this song sits against it."); box.append(p); return;
-  }
-  // how many semitones of the melody fall outside your range, as written and an octave either way
-  const out = (o) => Math.max(0, you.lo - (v.lo + 12 * o)) + Math.max(0, v.hi + 12 * o - you.hi);
-  const best = [-1, 1].reduce((b, o) => (out(o) < out(b) ? o : b), 0);
-  const st = (n) => `${n} semitone${n > 1 ? "s" : ""}`;
-  const msg = out(0) === 0 ? "The whole melody sits inside your range."
-    : [v.hi > you.hi && `the top goes ${st(v.hi - you.hi)} above your highest note`, v.lo < you.lo && `the bottom goes ${st(you.lo - v.lo)} below your lowest`]
-      .filter(Boolean).join(", and ").replace(/^./, (c) => c.toUpperCase()) + ".";
-  const p = el("p", "fine-note", msg);
-  if (best !== 0) p.append(` An octave ${best < 0 ? "down" : "up"} it fits ${out(best) === 0 ? "entirely" : "better"}; Sing along can show the bars there.`);
-  box.append(p);
 }
 function jobCard(id) {
   let card = document.getElementById("job-" + id);
@@ -2510,7 +1519,6 @@ async function singSong(m, btn) {
   const say = (text) => { if (lbl) lbl.textContent = text; };
   if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
   say("Reading the melody… (up to a minute the first time)");
-  if (run) stopRun(true);
   let mel;
   try {
     if (!P.song || P.song.id !== m.id) await openSong(m);
@@ -2532,16 +1540,12 @@ async function singSong(m, btn) {
   $("#kOct").value = String(K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute));
   $("#kClick").disabled = !(m.beats && m.beats.length);
+  setText("playTitle", m.title);
   go("play");
 }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
-function leaveSong() { if (P.playing) pauseSong(); K.on = false; renderSongBar(); $("#countIn").hidden = true; }
-function renderSongBar() {
-  $("#songBar").hidden = !K.on;
-  $("#vPlay").classList.toggle("song-mode", K.on);
-  if (K.on) setText("playTitle", K.song.title);
-}
+function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").hidden = true; }
 function songToggle() {
   if (P.playing) { pauseSong(); return; }
   if (!micOn && !testOsc) startMic();
@@ -2567,197 +1571,14 @@ function initSing() {
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
   });
   $("#kLeave").onclick = () => { leaveSong(); go(P.song ? "stems/" + P.song.id : "stems"); };
-}
-
-// ---------- voice type ----------
-// Typical ranges of trained singers (the usual choral and opera figures). Keys match VOICES, so a result can set up Practice.
-// The tops are M1 (chest/mix) notes for the low group and M2 (head voice) notes for the high group.
-const VT_TYPES = [
-  { key: "bass", group: "low", lo: 40, hi: 64 }, { key: "baritone", group: "low", lo: 45, hi: 69 }, { key: "tenor", group: "low", lo: 48, hi: 72 },
-  { key: "alto", group: "high", lo: 53, hi: 77 }, { key: "mezzo", group: "high", lo: 57, hi: 81 }, { key: "soprano", group: "high", lo: 60, hi: 84 },
-];
-const VT_AXIS = { low: [38, 79], high: [50, 86], all: [38, 86] }; // D2–G5, D3–D6, D2–D6
-// hi: top held note; hiMech: "M1" | "M2" | null (couldn't tell); hiM1: highest held M1 note; flip: where the slide switched to M2
-const VT = Object.assign({ lo: null, hi: null, hiMech: null, hiM1: null, flip: null, group: null }, store.get("range", {}));
-let vtJob = null, vtSet = null, vtSpec = null;
-const noteHz = (m) => `${absName(m)} · ${mf(m).toFixed(0)} Hz`;
-const vtSave = () => store.set("range", { lo: VT.lo, hi: VT.hi, hiMech: VT.hiMech, hiM1: VT.hiM1, flip: VT.flip, group: VT.group });
-const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
-
-// M1 or M2 from the sound alone. In M2 the folds stay open longer each cycle, so the first harmonic grows against the
-// second (H1–H2 up) and the high harmonics fade (alpha ratio down). Both are compared with the same voice at the bottom
-// of the same slide, which is surely M1, so the mic and the vowel cancel out.
-function vtFeatures(f0) {
-  if (!vtSpec || vtSpec.length !== analyser.frequencyBinCount) vtSpec = new Float32Array(analyser.frequencyBinCount);
-  analyser.getFloatFrequencyData(vtSpec);
-  const bw = ac.sampleRate / analyser.fftSize;
-  const peak = (f) => { let p = -Infinity; for (let i = Math.max(1, Math.round((f - f0 * 0.3) / bw)); i <= Math.round((f + f0 * 0.3) / bw) && i < vtSpec.length; i++) p = Math.max(p, vtSpec[i]); return p; };
-  let low = 1e-12, high = 1e-12;
-  for (let i = 1; i < vtSpec.length; i++) { const f = i * bw, p = Math.pow(10, vtSpec[i] / 10); if (f >= 50 && f < 1000) low += p; else if (f >= 1000 && f < 5000) high += p; }
-  return { h12: peak(f0) - peak(2 * f0), alpha: 10 * Math.log10(high / low) };
-}
-const VT_M2_H12 = 6, VT_M2_ALPHA = 4; // dB past the baseline on both cues
-
-// Within the chosen group the lowest note decides: it barely moves with training, while the top keeps growing.
-// The top only nudges the result when it goes past a type's top.
-function vtFit(lo, hi, group) {
-  const types = VT_TYPES.filter((t) => t.group === group);
-  return types.map((t) => ({ t, d: Math.abs(lo - t.lo) + (hi == null ? 0 : 0.25 * Math.max(0, hi - t.hi)) })).sort((a, b) => a.d - b.d);
-}
-// The top note that fits the group's typical ranges: an M1 top for bass–tenor, and whatever the slide reached for alto–soprano.
-// When the mechanism couldn't be told, a top far above every bass–tenor top is assumed to be falsetto and left out.
-function vtTop() {
-  if (VT.hi == null) return { top: null };
-  if (VT.group !== "low") return { top: VT.hi };
-  if (VT.hiMech === "M2") return { top: VT.hiM1, dropped: VT.hi, why: "m2" };
-  if (VT.hiMech == null && VT.hi > 74) return { top: null, dropped: VT.hi, why: "guess" };
-  return { top: VT.hi };
-}
-async function vtStart(which) {
-  vtStop(false);
-  if (!(await startMic())) return; // notice() has put the reason in #vtMsg
-  vtJob = { which, win: [], best: null, bestM1: null, calib: [], base: null, run: 0, flip: null, t0: clock() };
-  renderRange();
-}
-function vtStop(keep) {
-  const j = vtJob;
-  if (!j) return;
-  if (keep && j.best != null) {
-    if (j.which === "lo") VT.lo = Math.round(j.best);
-    else {
-      VT.hi = Math.round(j.best.m);
-      VT.hiMech = j.base ? (j.best.m2 ? "M2" : "M1") : null;
-      VT.hiM1 = j.bestM1 == null ? null : Math.round(j.bestM1);
-      VT.flip = j.flip == null ? null : Math.round(j.flip);
-    }
-    vtSet = null; vtSave();
-  }
-  vtJob = null; renderRange();
-}
-// Runs every frame from the main loop. A note counts once it has been held steady (within about a semitone) for half a second.
-function vtTick(now, m) {
-  const j = vtJob, hi = j.which === "hi";
-  let m2 = false;
-  if (hi && m != null) {
-    const fe = vtFeatures(mf(m));
-    if (!j.base) {
-      j.calib.push(fe);
-      if (j.calib.length >= 30) j.base = { h12: median(j.calib.map((c) => c.h12)), alpha: median(j.calib.map((c) => c.alpha)) };
-    } else {
-      m2 = fe.h12 - j.base.h12 >= VT_M2_H12 && j.base.alpha - fe.alpha >= VT_M2_ALPHA;
-      j.run = m2 ? j.run + 1 : 0;
-      if (j.run === 6 && j.flip == null) j.flip = m; // a switch that lasts ~0.1 s, not a single odd frame
-    }
-  }
-  j.win.push({ t: now, m, m2 });
-  while (j.win.length && j.win[0].t < now - 0.5) j.win.shift();
-  if (now - j.t0 > 0.5 && j.win.every((s) => s.m != null)) {
-    const ms = j.win.map((s) => s.m).sort((a, b) => a - b);
-    if (ms[ms.length - 1] - ms[0] <= 1.2) {
-      const held = ms[ms.length >> 1];
-      if (!hi) { if (j.best == null || held < j.best) j.best = held; }
-      else {
-        const isM2 = j.win.filter((s) => s.m2).length > j.win.length / 2;
-        if (j.best == null || held > j.best.m) j.best = { m: held, m2: isM2 };
-        if (j.base && !isM2 && (j.bestM1 == null || held > j.bestM1)) j.bestM1 = held;
-      }
-    }
-  }
-  setText("vtNow", m == null ? "–" : absName(m) + (hi && j.base && m != null ? (m2 ? " M2" : " M1") : ""));
-  const bm = hi ? j.best && j.best.m : j.best;
-  setText("vtNowSub", hi && !j.base ? "Start on a comfortable low note: learning how your M1 sounds"
-    : bm == null ? "Hold a note for half a second"
-    : `${hi ? "Highest" : "Lowest"} so far: ${noteHz(Math.round(bm))}${hi ? (j.best.m2 ? " · M2" : " · M1") : ""}${hi && j.flip != null ? ` · switched to M2 around ${absName(Math.round(j.flip))}` : ""}`);
-}
-const vtTopHow = () => VT.group === "high" ? "Start low and slide up slowly into head voice (M2), as high as feels free."
-  : "Start on a comfortable low note and slide up slowly, as high as you can, falsetto included. The app tells chest and mix (M1) from head voice and falsetto (M2) by the sound.";
-function renderRange() {
-  const j = vtJob;
-  $("#vtLive").hidden = !j;
-  document.querySelectorAll(".vt-group .btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.group === VT.group)));
-  $("#vtHiHow").textContent = vtTopHow();
-  for (const w of ["lo", "hi"]) {
-    const btn = $(w === "lo" ? "#vtLoBtn" : "#vtHiBtn"), on = !!(j && j.which === w);
-    btn.textContent = on ? "Listening…" : VT[w] == null ? "Find" : "Redo"; btn.disabled = on;
-    btn.closest(".vt-row").classList.toggle("on", on);
-  }
-  $("#vtLo").textContent = VT.lo == null ? "–" : noteHz(VT.lo);
-  $("#vtHi").textContent = VT.hi == null ? "–" : noteHz(VT.hi) + (VT.hiMech ? " · " + VT.hiMech : "");
-  if (j) {
-    $("#vtHint").textContent = j.which === "lo"
-      ? "Slide down slowly on “ah”. At the bottom, hold the note, then press Done."
-      : `${vtTopHow()} Sing on “ah”. At the top, hold the note, then press Done.`;
-    setText("vtNow", "–"); setText("vtNowSub", j.which === "hi" ? "Start on a comfortable low note: learning how your M1 sounds" : "Hold a note for half a second");
-  }
-  renderRangeChart();
-}
-function renderRangeChart() {
-  const lo = VT.lo, hi = VT.hi, { top, dropped, why } = vtTop();
-  const fit = lo != null && VT.group ? vtFit(lo, top, VT.group) : null, best = fit ? fit[0].t.key : null;
-  const [x0, x1] = VT_AXIS[VT.group || "all"], X = (m) => (Math.max(x0, Math.min(x1, m)) - x0) / (x1 - x0);
-  // the singer's band: lowest note to the top that counts; anything above it (M2 for bass–tenor) is drawn fainter
-  const a = lo ?? hi, b = top ?? (lo != null ? lo : hi), extra = dropped != null && lo != null ? dropped : null;
-
-  const legend = el("div", "vt-legend"), l1 = el("span");
-  l1.append(el("i"), "Typical range"); legend.append(l1);
-  if (a != null) { const l2 = el("span"); l2.append(el("i", "you"), `You: ${absName(Math.min(a, b))}${a !== b ? "–" + absName(Math.max(a, b)) : ""}`); legend.append(l2); }
-  if (extra != null) { const l3 = el("span"); l3.append(el("i", "you m2"), `${why === "m2" ? "M2" : "Probably falsetto"}, left out: up to ${absName(extra)}`); legend.append(l3); }
-  const plot = el("div", "vt-plot");
-  VT_TYPES.filter((t) => !VT.group || t.group === VT.group).forEach((t) => {
-    const name = VOICES[t.key].name, line = el("div", "vt-line" + (t.key === best ? " best" : ""));
-    const lab = el("div", "lab"); lab.append(el("span", null, name), el("small", null, `${absName(t.lo)}–${absName(t.hi)}`));
-    const track = el("div", "vt-track"), bar = el("div", "vt-bar");
-    bar.style.left = X(t.lo) * 100 + "%"; bar.style.width = (X(t.hi) - X(t.lo)) * 100 + "%";
-    bar.title = `${name}: typically ${absName(t.lo)}–${absName(t.hi)}`;
-    track.append(bar); line.append(lab, track); plot.append(line);
-  });
-  const band = (from, to, cls) => {
-    const d = el("div", cls); d.style.setProperty("--a", X(Math.min(from, to))); d.style.setProperty("--w", Math.max(0.004, Math.abs(X(to) - X(from))));
-    plot.append(d);
-  };
-  if (a != null) band(a, b, "vt-band");
-  if (extra != null) band(b, extra, "vt-band m2");
-  const axis = el("div", "vt-axis");
-  for (let m = Math.ceil(x0 / 12) * 12; m <= x1; m += 12) { const s = el("span", null, absName(m)); s.style.left = X(m) * 100 + "%"; axis.append(s); }
-  const box = $("#vtChart"); box.innerHTML = ""; box.append(legend, plot, axis);
-
-  const res = $("#vtResult"), use = $("#vtUse"), used = $("#vtUsed");
-  use.hidden = true; used.textContent = "";
-  if (!VT.group) { res.textContent = "Choose a voice group to see where your range fits."; return; }
-  if (lo == null || hi == null) { res.textContent = lo == null && hi == null ? "Find both notes to see where your range fits." : `Now find your ${lo == null ? "lowest" : "highest"} note.`; return; }
-  const nm = (f) => VOICES[f.t.key].name.toLowerCase(), plural = (f) => nm(f) === "bass" ? "basses" : nm(f) + "s";
-  const parts = [];
-  if (top != null) {
-    const span = top - lo, oc = Math.floor(span / 12), st = span % 12;
-    const spanTxt = oc ? `${oc} octave${oc > 1 ? "s" : ""}${st ? ` and ${st} semitone${st > 1 ? "s" : ""}` : ""}` : `${span} semitone${span === 1 ? "" : "s"}`;
-    parts.push(`Your range is ${absName(lo)}–${absName(top)} (${spanTxt}).`);
-  }
-  if (why === "m2") parts.push(`Your top note, ${absName(dropped)}, sounded like M2 (falsetto), so it’s left out${top != null ? `; your highest M1 note was ${absName(top)}` : ""}.`);
-  if (why === "guess") parts.push(`Your top note, ${absName(dropped)}, is far above where even tenors top out, so it was probably falsetto and is left out. Redo the highest note to let the app check.`);
-  if (VT.flip != null) parts.push(`Your voice switched from M1 to M2 around ${absName(VT.flip)}.`);
-  const [f0, f1] = fit;
-  parts.push(`The lowest note decides here: ${absName(lo)} is closest to where ${plural(f0)} usually bottom out (${absName(f0.t.lo)}), so you fit ${nm(f0)} best${f1.d - f0.d < 1.5 ? `, with ${nm(f1)} close behind` : ""}.`);
-  if (top != null && top - lo < 10) parts.push("That’s a narrow range, so this is a rough guess. Try again after warming up.");
-  if (VT.group === "high" && VT.hiMech === "M1") parts.push("Your top note sounded like chest voice (M1). Alto to soprano tops are head-voice notes, so try going higher in head voice.");
-  res.textContent = parts.join(" ");
-  const k = f0.t.key, v = VOICES[k];
-  if (S.voice === k) used.textContent = `Practice ${vtSet === k ? "now uses" : "already uses"} ${v.name}.`;
-  else {
-    use.hidden = false; use.textContent = `Use ${v.name} for practice`;
-    use.onclick = () => { S.voice = k; S.lo = v.lo; S.hi = v.hi; vtSet = k; syncControls(); centerKeys(); changed(true); renderRangeChart(); };
-  }
-}
-function initRange() {
-  document.querySelectorAll(".vt-group .btn").forEach((b) => { b.onclick = () => { VT.group = b.dataset.group; vtSet = null; vtSave(); renderRange(); }; });
-  $("#vtLoBtn").onclick = () => vtStart("lo");
-  $("#vtHiBtn").onclick = () => vtStart("hi");
-  $("#vtCancel").onclick = () => vtStop(false);
-  $("#vtDone").onclick = () => {
-    if (vtJob && vtJob.best == null) { setText("vtNowSub", "Nothing steady yet. Hold one note for half a second, or press Cancel."); return; }
-    vtStop(true);
-  };
-  $("#vtRefs").append(refsBlock(["henrich2005"]));
-  renderRange();
+  // mic settings
+  $("#kSet").append(icon("settings"));
+  $("#kSet").onclick = () => { const s = $("#kSettings"); s.hidden = !s.hidden; $("#kSet").setAttribute("aria-expanded", String(!s.hidden)); };
+  $("#gate").value = S.gate; $("#echo").checked = S.echo; $("#names").value = S.names;
+  $("#gate").oninput = (e) => { S.gate = +e.target.value; save(); };
+  resetOnDblClick($("#gate"), 0.01);
+  $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
+  $("#names").onchange = (e) => { S.names = e.target.value; save(); keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
 }
 
 // ---------- canvas ----------
@@ -2802,11 +1623,13 @@ function rr(x, y, w, h, r) {
 }
 let vLo = 50, vHi = 64;
 const GUT = 44;
-function draw(now, cur, hist, evs, shift, guide) {
+// now: song time at the hit line; cur: your pitch; hist: your recent pitch; evs: the bars; guide: the original singer's
+// pitch line ({pts, shift})
+function draw(now, cur, hist, evs, guide) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = C.surface; g.fillRect(0, 0, W, H);
   const hitX = Math.round(GUT + (W - GUT) * 0.24), pps = (W - hitX) / 4.4;
-  const X = (t) => hitX + (t + shift - now) * pps;
+  const X = (t) => hitX + (t - now) * pps;
   const top = 8, bot = H - 8, ppS = (bot - top) / (vHi - vLo), Y = (m) => bot - (m - vLo) * ppS;
 
   // lanes
@@ -2823,32 +1646,14 @@ function draw(now, cur, hist, evs, shift, guide) {
   // past shade
   g.globalAlpha = 0.35; g.fillStyle = C["surface-2"]; g.fillRect(GUT + 1, 0, hitX - GUT - 1, H); g.globalAlpha = 1;
 
-  // cue markers + bars
+  // bars
   g.save(); g.beginPath(); g.rect(GUT + 1, 0, W - GUT - 1, H); g.clip();
   const bh = Math.max(8, Math.min(ppS * 0.78, 24));
   for (const e of evs) {
     const x0 = X(e.t0), x1 = X(e.t1);
     if (x1 < GUT || x0 > W + 4) continue;
-    if (e.kind === "cue") {
-      g.fillStyle = C.muted; g.globalAlpha = 0.5; g.fillRect(Math.round(x0), 0, 1, H); g.globalAlpha = 1;
-      g.font = "400 11px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "top"; g.fillStyle = C.muted;
-      g.fillText("chord · " + absName(e.root), x0 + 5, H - 20);
-      continue;
-    }
-    const active = now >= e.t0 && now <= e.t1 && !shift;
+    const active = now >= e.t0 && now <= e.t1;
     const edge = active ? C.accent : C.muted;
-    if (e.midi2 != null) {
-      const ya = Y(e.midi), yb = Y(e.midi2);
-      g.lineCap = "round";
-      g.beginPath(); g.moveTo(x0, ya); g.lineTo(x1, yb);
-      g.lineWidth = bh + (active ? 4 : 2.5); g.strokeStyle = edge; g.stroke();
-      g.lineWidth = bh; g.strokeStyle = C["surface-2"]; g.stroke();
-      if (x1 - x0 > 40) {
-        g.fillStyle = C.ink; g.font = "500 11px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "middle";
-        g.fillText(barName(e.midi, e.root) + (e.midi2 > e.midi ? " ↗ " : " ↘ ") + barName(e.midi2, e.root), x0 + 2, (ya + yb) / 2 - bh / 2 - 8);
-      }
-      continue;
-    }
     const y = Y(e.midi) - bh / 2, w = Math.max(4, x1 - x0 - 2);
     rr(x0, y, w, bh, 6);
     g.fillStyle = C["surface-2"]; g.fill();
@@ -2858,7 +1663,7 @@ function draw(now, cur, hist, evs, shift, guide) {
     g.stroke();
     if (w > 26 && bh >= 12) {
       g.fillStyle = C.ink; g.font = "500 11px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "middle";
-      g.fillText(barName(e.midi, e.root), x0 + 7, y + bh / 2 + 0.5);
+      g.fillText(absName(e.midi), x0 + 7, y + bh / 2 + 0.5);
     }
   }
   // original singer's pitch, faint, behind your own line
@@ -2896,29 +1701,22 @@ function draw(now, cur, hist, evs, shift, guide) {
 }
 
 // ---------- main loop ----------
-const hist = [];
-window.__histDefault = hist;
 let med = [], cur = null, miss = 0, level = 0;
 function loop() {
-  const now = clock();
   let m = null;
   if (ac && (micOn || testOsc)) {
     if (testOsc) {
-      const tn = K.on ? songPos() : now, tgt = activeNote(tn) || lastTarget;
-      if (tgt) testOsc.frequency.setTargetAtTime(mf(tgtAt(tgt, tn) + testOffset / 100), ac.currentTime, 0.03);
+      const tgt = activeNote(songPos()) || lastTarget;
+      if (tgt) testOsc.frequency.setTargetAtTime(mf(tgt.midi + testOffset / 100), ac.currentTime, 0.03);
     }
     analyser.getFloatTimeDomainData(tbuf);
     let s = 0; for (let i = 0; i < tbuf.length; i++) s += tbuf[i] * tbuf[i];
     level = Math.sqrt(s / tbuf.length);
-    if (level > S.gate) { const r = yin(tbuf, ac.sampleRate); if (r && r.f > 60 && r.f < 1500) m = 69 + 12 * Math.log2(r.f / S.a4); }
+    if (level > S.gate) { const r = yin(tbuf, ac.sampleRate); if (r && r.f > 60 && r.f < 1500) m = 69 + 12 * Math.log2(r.f / A4); }
   } else level = 0;
   if (m == null) { if (++miss > 3) { med = []; cur = null; } }
-  else { miss = 0; med.push(m); while (med.length > (run ? run.cfg.smooth : 5)) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
-  hist.push({ t: now, m: cur });
-  while (hist.length && hist[0].t < now - 4) hist.shift();
-  if (vtJob) vtTick(now, cur);
-
-  if (run && !run.stopped && now > run.end) finishRun();
+  else { miss = 0; med.push(m); while (med.length > 5) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
+  $("#meter").style.width = Math.min(100, (level / 0.15) * 100) + "%";
 
   if (K.on && view === "play") {
     const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
@@ -2926,59 +1724,26 @@ function loop() {
     if (P.playing) K.hist.push({ t: sn, m: cur });
     while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
     songView();
-    draw(sn, cur, K.hist, K.evs, 0, { pts: K.contour, shift: K.oct * 12 });
+    draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 });
     setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
     renderHud(sn, cur); renderCountIn(sn);
-    requestAnimationFrame(loop);
-    return;
   }
-
-  let evs, shift = 0;
-  if (run) evs = run.evs;
-  else { if (!preview) preview = buildRun(0, activeCfg()); evs = preview.evs; shift = 0; }
-  const viewNow = run ? now : 0 - 0.6; // preview sits still: first notes just right of the hit line
-  updateView(viewNow, evs, now);
-  draw(run ? now : viewNow, cur, run ? hist : hist.map((h) => ({ t: h.t - now + viewNow, m: h.m })), evs, shift);
-  renderHud(now, cur);
   requestAnimationFrame(loop);
 }
 let lastTarget = null;
-function activeNote(now) {
-  if (K.on) { const e = songNote(now); if (e) lastTarget = e; return e; }
-  if (!run) return null;
-  for (const e of run.notes) { if (e.t0 > now + 0.05) break; if (now <= e.t1) { lastTarget = e; return e; } }
-  return null;
-}
-function updateView(vnow, evs, now, hist = window.__histDefault) {
-  let lo = Infinity, hi = -Infinity;
-  for (const e of evs) {
-    if (e.kind !== "note" || e.t1 < vnow - 1.2 || e.t0 > vnow + 4.4) continue;
-    lo = Math.min(lo, e.midi, e.midi2 ?? e.midi); hi = Math.max(hi, e.midi, e.midi2 ?? e.midi);
-  }
-  for (let i = hist.length - 1; i >= 0 && hist[i].t > now - 1.2; i--) {
-    const m = hist[i].m; if (m == null) continue; lo = Math.min(lo, m); hi = Math.max(hi, m);
-  }
-  if (lo === Infinity) { lo = (vLo + vHi) / 2 - 6; hi = lo + 12; }
-  lo -= 2.5; hi += 2.5;
-  if (hi - lo < 13) { const c = (lo + hi) / 2; lo = c - 6.5; hi = c + 6.5; }
-  vLo += (lo - vLo) * 0.07; vHi += (hi - vHi) * 0.07;
-}
+function activeNote(t) { const e = songNote(t); if (e) lastTarget = e; return e; }
 
 // ---------- UI ----------
 let shown = {};
 const setText = (id, v) => { if (shown[id] !== v) { shown[id] = v; document.getElementById(id).textContent = v; } };
 function renderHud(now, m) {
-  const lv = Math.min(100, (level / 0.15) * 100) + "%";
-  $("#meter").style.width = lv; $("#meter2").style.width = lv;
-  setText("setupNote", m == null ? "–" : `${absName(m)} · ${mf(m).toFixed(0)} Hz`);
-  if (view !== "play") return;
-  const tgt = activeNote(now), tm = tgt ? Math.round(tgtAt(tgt, now)) : null;
+  const tgt = activeNote(now), tm = tgt ? Math.round(tgt.midi) : null;
   if (m == null) {
     setText("noteBig", "–");
     setText("noteSub", micOn || testOsc ? (tgt ? `target ${absName(tm)} · sing now` : "Waiting for sound") : "Mic is off");
     $("#needle").style.left = "50%"; $("#needle").style.background = C.muted;
   } else {
-    const ref = tgt ? tgtAt(tgt, now) : Math.round(m), c = dev(m, ref);
+    const ref = tgt ? tgt.midi : Math.round(m), c = (m - ref) * 100;
     setText("noteBig", absName(m));
     const hz = mf(m).toFixed(1) + " Hz";
     const off = Math.abs(c) >= 50 ? `${Math.abs(c / 100).toFixed(1)} st ${c > 0 ? "sharp" : "flat"}` : `${c > 0 ? "+" : ""}${Math.round(c)}¢`;
@@ -2988,46 +1753,19 @@ function renderHud(now, m) {
     n.style.background = Math.abs(c) <= 10 ? C.good : Math.abs(c) <= 25 ? C.warn : C.bad;
   }
   renderKeys(tm, m);
-  renderHudRep(now);
+  setText("hudRep", `Sing along · ${K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung"}`);
+  setText("hudHow", "Grey line: the original singer. Blue: you.");
 }
-function renderHudRep(now) {
-  if (K.on) {
-    setText("hudRep", `Sing along · ${K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung"}`);
-    setText("hudHow", "Grey line: the original singer. Blue: you.");
-    return;
-  }
-  const cfg = run ? run.cfg : (preview ? preview.cfg : activeCfg());
-  setText("hudHow", cfg.how || "");
-  if (!run) { setText("hudRep", `${cfg.name} · ready`); return; }
-  const e = activeNote(now) || run.notes.find((n) => n.t1 >= now) || run.notes[run.notes.length - 1];
-  setText("hudRep", `${cfg.name} · ${e.rep + 1}/${run.reps.length} · root ${absName(run.reps[e.rep].root)}`);
-}
-function renderStart() {
-  const b = $("#startBtn");
-  b.querySelector(".pp").toggleAttribute("hidden", !K.on); // an <svg> has no .hidden property
-  b.querySelector(".lbl").hidden = K.on; b.classList.toggle("round", K.on);
-  if (K.on) { paintPlay(b, P.playing); return; }
-  b.removeAttribute("aria-label");
-  b.querySelector(".lbl").textContent = run ? "Stop" : "Start";
-}
-function renderPiano() {
-  const el = document.getElementById("pianoState");
-  el.textContent = sampleState === "ready" ? "grand piano" : sampleState === "failed" ? "samples failed, using synth" : "loading samples";
-  el.classList.toggle("fail", sampleState === "failed");
-}
+function renderStart() { paintPlay($("#startBtn"), P.playing); }
 function renderMic() {
   $("#micBtn").classList.toggle("on", micOn);
   setText("micLabel", micOn ? "Mic on" : "Turn on mic");
-  setText("micBtn2", micOn ? "Turn off mic" : "Turn on mic");
-  if (micOn) { setText("micMsg", ""); setText("vtMsg", ""); }
 }
 function notice(msg) {
-  setText("micMsg", msg); setText("vtMsg", msg);
-  if (view !== "play") return;
   const ov = $("#overlay"); ov.innerHTML = "";
-  ov.append(el("h2", null, "Can’t use the microphone"), el("p", null, msg), el("p", null, K.on ? "The song still plays — you just won’t see your own pitch." : "You can still hear the guide piano."));
+  ov.append(el("h2", null, "Can’t use the microphone"), el("p", null, msg), el("p", null, "The song still plays — you just won’t see your own pitch."));
   ov.hidden = false;
-  setTimeout(() => { if (run || K.on) ov.hidden = true; }, 4000);
+  setTimeout(() => { ov.hidden = true; }, 4000);
 }
 
 // keyboard
@@ -3053,73 +1791,13 @@ function renderKeys(tm, m) {
   if (gN !== kGuide) { keyEls.get(kGuide)?.classList.remove("guide"); keyEls.get(gN)?.classList.add("guide"); kGuide = gN; }
   if (lN !== kLive) { keyEls.get(kLive)?.classList.remove("live"); keyEls.get(lN)?.classList.add("live"); kLive = lN; }
 }
-function centerKeys() {
-  const wrap = $("#keysWrap"), el = keyEls.get(S.lo);
-  if (el) wrap.scrollLeft = el.offsetLeft - wrap.clientWidth / 2 + 120;
+function centerKeys() { // the song's middle note in the middle
+  const wrap = $("#keysWrap"), el = keyEls.get(K.on ? Math.round((K.lo + K.hi) / 2) : 60);
+  if (el) wrap.scrollLeft = el.offsetLeft - wrap.clientWidth / 2;
 }
 
-// controls
-function fillSelect(sel, items, val) { sel.innerHTML = ""; for (const [v, t] of items) { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.append(o); } sel.value = String(val); }
-function noteItems() { const a = []; for (let m = 36; m <= 76; m++) a.push([m, absName(m)]); return a; }
-function syncControls() {
-  fillSelect($("#voice"), [...Object.entries(VOICES).map(([k, v]) => [k, `${v.name} (${absName(v.lo)}–${absName(v.hi)})`]), ["custom", "Custom"]], S.voice);
-  fillSelect($("#lo"), noteItems(), S.lo); fillSelect($("#hi"), noteItems(), S.hi);
-  $("#dir").value = S.dir; $("#bpm").value = S.bpm; $("#bpmOut").textContent = S.bpm + " BPM";
-  $("#guideMode").value = S.guideMode; $("#cue").checked = S.cue; $("#vol").value = S.vol;
-  $("#names").value = S.names; $("#a4").value = S.a4;
-  $("#ignoreOct").checked = S.ignoreOct; $("#echo").checked = S.echo; $("#gate").value = S.gate;
-}
-function changed(restart) { save(); preview = null; renderExInfo(); if (restart && run) startRun(); }
-function pickEx(id) {
-  if (run) stopRun();
-  if (K.on) leaveSong();
-  S.ex = id;
-  const p = parseEx(S.ex);
-  if (p && !p.it.basic) { S.bpm = p.it.bpm; S.guideMode = p.it.guide; }
-  syncControls(); changed(false); renderPick(); go("setup");
-}
-async function renderSongsOnPick() {
-  let lib = [];
-  try { lib = (await (await fetch("/api/library", { cache: "no-store" })).json()).filter((m) => m.stems.includes("vocals")); } catch (e) { lib = []; }
-  document.getElementById("puSongs")?.remove(); document.getElementById("jumpSongs")?.remove();
-  if (!lib.length) return;
-  const sec = el("section", "pgroup"); sec.id = "puSongs";
-  const head = el("div", "pg-head"); head.append(el("h3", null, "Your songs"), el("small", null, "Sing along to songs you split on the Stems tab"));
-  const cards = el("div", "cards");
-  lib.forEach((m) => {
-    const b = el("button", "card songcard"); b.type = "button";
-    b.append(el("b", null, m.title), el("span", "how", "Note bars from the original vocal, which plays as a guide"), el("span", "meta", `${fmtTime(m.duration)}${m.bpm ? " · " + Math.round(m.bpm) + " BPM" : ""}`));
-    b.onclick = () => singSong(m, b);
-    cards.append(b);
-  });
-  sec.append(head, cards); $("#pickList").prepend(sec);
-  const j = el("button", "jump", "Your songs"); j.type = "button"; j.id = "jumpSongs";
-  j.onclick = () => sec.scrollIntoView({ behavior: "smooth", block: "start" });
-  $("#purposeNav").prepend(j);
-}
-function renderPick() {
-  const nav = $("#purposeNav"), box = $("#pickList"); nav.innerHTML = ""; box.innerHTML = "";
-  PURPOSES.forEach((pu, k) => {
-    const sec = el("section", "pgroup"); sec.id = "pu" + k;
-    const head = el("div", "pg-head"); head.append(el("h3", null, pu.name), el("small", null, pu.when));
-    sec.append(head);
-    const cards = el("div", "cards");
-    pu.ids.forEach((id) => {
-      const p = parseEx(id); if (!p) return;
-      const it = p.it, b = el("button", "card"); b.type = "button";
-      b.append(el("b", null, it.title));
-      if (!it.basic) b.append(el("span", "how", it.how), el("span", "meta", `${it.label} · ${it.bpm} BPM`));
-      else b.append(el("span", "how", "Set the tempo, range and guide yourself"), el("span", "meta", it.steps.map((x) => KO[((x % 12) + 12) % 12] + (x >= 12 ? "′" : "")).join(" ")));
-      b.onclick = () => pickEx(id);
-      cards.append(b);
-    });
-    sec.append(cards); box.append(sec);
-    const j = el("button", "jump", pu.name); j.type = "button";
-    j.onclick = () => sec.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-    nav.append(j);
-  });
-}
-let view = "pick", lastPractice = "pick", stemsPage = "lib";
+// ---------- routes ----------
+let view = "stems", stemsPage = "lib";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
 // Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
 function stemsRoute(sub, extra) {
@@ -3137,54 +1815,28 @@ async function openSongById(id) {
   if (location.hash !== "#stems/" + id) return; // moved on meanwhile
   if (m) openSong(m); else location.replace("#stems");
 }
+// #stems… for the library and its pages, #play for Sing along. Sing along needs its song open, so a reload there (or
+// an old link to a page that's gone) lands in the library.
 function route() {
-  const [v, sub, extra] = (location.hash || "#pick").slice(1).split("/");
-  view = ["pick", "setup", "play", "range", "timbre", "stems"].includes(v) ? v : "pick";
-  $("#vPick").hidden = view !== "pick"; $("#vSetup").hidden = view !== "setup"; $("#vPlay").hidden = view !== "play"; $("#vRange").hidden = view !== "range"; $("#vTimbre").hidden = view !== "timbre"; $("#vStems").hidden = view !== "stems";
-  if (view === "range") renderRange(); else vtStop(false);
+  const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
+  const singing = v === "play" && K.on && P.song && K.song.id === P.song.id;
+  if (v !== "stems" && !singing) { location.replace("#stems"); return; }
+  view = v;
+  $("#vPlay").hidden = view !== "play"; $("#vStems").hidden = view !== "stems";
+  $("#micBtn").hidden = view !== "play";
   if (view === "stems") stemsRoute(sub, extra);
-  if (P.playing && !(view === "stems" && stemsPage === "song") && !(view === "play" && K.on)) pauseSong();
-  if (view !== "timbre" && rec) rec.stop();
-  if (view === "timbre") { checkServer(); renderTimbre(); }
-  const practice = ["pick", "setup", "play"].includes(view);
-  if (practice) { lastPractice = view; $("#tabPractice").setAttribute("href", "#" + view); }
-  const tab = practice ? "practice" : view;
-  document.querySelectorAll(".seg a").forEach((a) => { if (a.dataset.tab === tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
-  $("#practiceSteps").hidden = !practice;
-  document.querySelectorAll("#practiceSteps a").forEach((a) => { if (a.dataset.view === view) a.setAttribute("aria-current", "step"); else a.removeAttribute("aria-current"); });
-  if (view !== "play" && run) stopRun();
-  renderSongBar();
-  if (view === "pick") renderSongsOnPick();
+  if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "play") pauseSong();
   if (view === "play") {
-    $("#overlay").hidden = true; preview = null;
-    setText("playTitle", K.on ? K.song.title : activeCfg().name);
+    $("#overlay").hidden = true;
+    loadSamples(); // for the keyboard
     renderStart();
     requestAnimationFrame(() => { resize(); centerKeys(); });
   }
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
-$("#voice").onchange = (e) => {
-  S.voice = e.target.value; const v = VOICES[S.voice];
-  if (v) { S.lo = v.lo; S.hi = v.hi; $("#lo").value = S.lo; $("#hi").value = S.hi; centerKeys(); }
-  changed(true);
-};
-$("#lo").onchange = (e) => { S.lo = +e.target.value; S.voice = "custom"; $("#voice").value = "custom"; changed(true); };
-$("#hi").onchange = (e) => { S.hi = +e.target.value; S.voice = "custom"; $("#voice").value = "custom"; changed(true); };
-$("#dir").onchange = (e) => { S.dir = e.target.value; changed(true); };
-$("#bpm").oninput = (e) => { S.bpm = +e.target.value; $("#bpmOut").textContent = S.bpm + " BPM"; changed(false); };
-$("#bpm").onchange = () => { if (run) startRun(); };
-$("#guideMode").onchange = (e) => { S.guideMode = e.target.value; changed(false); };
-$("#cue").onchange = (e) => { S.cue = e.target.checked; save(); };
-$("#vol").oninput = (e) => { S.vol = +e.target.value; save(); if (run && run.bus) run.bus.gain.setTargetAtTime(S.vol, ac.currentTime, 0.03); };
-$("#names").onchange = (e) => { S.names = e.target.value; save(); const lo = S.lo, hi = S.hi; fillSelect($("#lo"), noteItems(), lo); fillSelect($("#hi"), noteItems(), hi); syncControls(); };
-$("#a4").onchange = (e) => { const v = +e.target.value; if (v >= 415 && v <= 466) { S.a4 = v; save(); } else e.target.value = S.a4; };
-$("#ignoreOct").onchange = (e) => { S.ignoreOct = e.target.checked; save(); };
-$("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
-$("#gate").oninput = (e) => { S.gate = +e.target.value; save(); };
-$("#startBtn").onclick = () => (K.on ? songToggle() : run ? stopRun() : startRun());
-$("#goBtn").onclick = () => { if (K.on) leaveSong(); go("play"); startRun(); };
-$("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
+$("#startBtn").onclick = songToggle;
+$("#micBtn").onclick = () => (micOn ? stopMic() : startMic());
 document.addEventListener("keydown", (e) => {
   if (e.code === "Space" && view === "stems" && stemsPage === "song" && P.song &&!e.target.closest("input, select, button, textarea")) { e.preventDefault(); P.playing ? pauseSong() : playSong(); return; }
   if (view === "play" && K.on) { // Space on a focused button presses that button; the other keys work from anywhere but fields
@@ -3192,15 +1844,11 @@ document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target.closest("button")) return;
     const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop) }[e.code];
     if (act) { e.preventDefault(); act(); }
-    return;
   }
-  if (e.code !== "Space" || view !== "play" || e.target.closest("input, select, button, .key")) return;
-  e.preventDefault(); run ? stopRun() : startRun();
 });
 
-syncControls(); renderMic(); renderStart(); renderPiano(); renderExInfo(); renderPick(); initTimbre(); initStems(); initSing(); initRange(); route();
-loadSamples();
-requestAnimationFrame(() => { resize(); centerKeys(); loop(); });
+renderMic(); initStems(); initSing(); route();
+requestAnimationFrame(() => { resize(); loop(); });
 })();
 </script>
 </body>

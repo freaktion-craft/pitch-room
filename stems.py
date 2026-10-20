@@ -27,9 +27,9 @@ import tempfile
 import threading
 import time
 
-import numpy as np
+from functools import lru_cache
 
-from analyze import ffmpeg_exe
+import numpy as np
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(ROOT, "library")
@@ -261,6 +261,16 @@ def start_youtube(url: str, model: str) -> str:
         raise ValueError("Paste a full link that starts with https://")
     job = _new_job("separate")
     return _run(job, _pipeline, {"kind": "url", "url": url}, model)
+
+
+@lru_cache(maxsize=1)
+def ffmpeg_exe() -> str:
+    """System ffmpeg if installed, else the static binary shipped with imageio-ffmpeg."""
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
 
 
 def _decode_stereo(path: str) -> np.ndarray:

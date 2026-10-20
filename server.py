@@ -1,4 +1,4 @@
-"""Local server for Pitch Room: serves the page and runs voice analysis.
+"""Local server for Pitch Room: serves the page and the song library (stems, beats, melody, exports).
 
 Normally started by launch.py (via the start-* launchers). Direct use:
 
@@ -50,10 +50,8 @@ def _prefer_newer_vc_runtime():
 _prefer_newer_vc_runtime()
 
 import stems  # noqa: E402  (after the runtime fix above)
-from analyze import analyze, decode  # noqa: E402
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-MAX_UPLOAD = 40 * 1024 * 1024
 MAX_SONG = 400 * 1024 * 1024
 
 
@@ -211,22 +209,7 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception:  # noqa: BLE001
                 traceback.print_exc()
                 return self._json(500, {"error": "Something went wrong. Check the terminal window for details."})
-        if url.path != "/api/analyze":
-            return self._json(404, {"error": "Not found."})
-        n = int(self.headers.get("Content-Length") or 0)
-        if n <= 0 or n > MAX_UPLOAD:
-            return self._json(413, {"error": "Please upload a file under 40 MB."})
-        q = parse_qs(url.query)
-        num = lambda k: float(q[k][0]) if k in q and q[k][0] not in ("", "NaN") else None  # noqa: E731
-        try:
-            data, self._unread = self.rfile.read(n), 0
-            samples = decode(data, num("start"), num("end"))
-            return self._json(200, analyze(samples))
-        except ValueError as e:
-            return self._json(422, {"error": str(e)})
-        except Exception:  # noqa: BLE001
-            traceback.print_exc()
-            return self._json(500, {"error": "Something went wrong during analysis. Check the terminal window for details."})
+        return self._json(404, {"error": "Not found."})
 
     def log_message(self, fmt, *args):
         # only log API calls; static files (and send_error's HTTPStatus args) stay quiet

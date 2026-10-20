@@ -27,7 +27,7 @@ def ensure_packages():
     missing = [mod for mod in NEEDED if importlib.util.find_spec(mod) is None]
     if not missing:
         return
-    print("First run: installing the analysis tools (1–2 minutes)…", flush=True)
+    print("First run: installing the base tools (1–2 minutes)…", flush=True)
     req = os.path.join(ROOT, "requirements.txt")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", req])
 
