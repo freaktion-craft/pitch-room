@@ -229,6 +229,14 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .video-wait.err { animation: none; }
 .video.ready .video-wait { display: none; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--bg); cursor: pointer; touch-action: pan-y; }
+/* kept-whole parts: an × in each one's top right corner, shown while you point at the part */
+.wave-wrap { position: relative; }
+#pParts .part { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+#pParts .x { position: absolute; top: 7px; right: 4px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--ring); pointer-events: auto; opacity: 0; transition: opacity 0.15s; }
+#pParts .x .ico { width: 12px; height: 12px; }
+#pParts .part.hover .x, #pParts .x:focus-visible { opacity: 1; }
+@media (hover: none) { #pParts .x { opacity: 1; } }
 .sel-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; margin-top: -4px; font-size: 13px; color: var(--muted); }
 .sel-bar span { margin-right: auto; }
 .sel-bar .btn { color: var(--ink); }
@@ -466,7 +474,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
         <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button">Practice</button></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
-      <canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas>
+      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div></div>
       <div class="sel-bar" id="pSelBar" hidden><span id="pSelText"></span><button class="btn sm" id="pSelAct" type="button" hidden></button><button class="btn sm icon" id="pSelX" type="button" aria-label="Clear the selection" title="Clear the selection" hidden></button></div>
       <div class="transport-row">
         <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
@@ -742,6 +750,7 @@ async function renderLibrary() {
   const box = $("#sLib");
   let lib = [];
   try { lib = await (await fetch("/api/library", { cache: "no-store" })).json(); } catch (e) { lib = []; }
+  libCache = new Map(lib.map((m) => [m.id, m]));
   box.innerHTML = "";
   if (!lib.length) { box.append(el("div", "row empty", "No songs yet. Add one with Add song.")); return; }
   lib.forEach((m) => {
@@ -940,8 +949,11 @@ function watchJob(id, kind, forSong) {
         delete splitting[forSong];
         if (P.song && P.song.id === forSong) {
           if (j.status === "error") { $("#pExportState").textContent = "Couldn’t split the vocals: " + j.error; renderTracks(); }
-          else if (location.hash === "#stems/" + forSong) openSongById(forSong);
-          else P.song.stale = true; // reopened when its page comes back
+          else {
+            libCache.delete(forSong); // its tracks changed: read them afresh
+            if (location.hash === "#stems/" + forSong) openSongById(forSong);
+            else P.song.stale = true; // reopened when its page comes back
+          }
         }
       }
       if (kind === "separate" && j.status === "done") {
@@ -1167,7 +1179,7 @@ function drawWave() {
   if (P.song && P.song.split) { // parts with the vocals kept whole, and the selection
     x.fillStyle = STEM_COLORS.lead;
     for (const [a, b] of P.song.unsplit || []) { x.globalAlpha = 0.14; x.fillRect(X(a), 0, X(b) - X(a), H); x.globalAlpha = 0.8; x.fillRect(X(a), 0, X(b) - X(a), 3); }
-    if (P.sel && P.sel.part == null) { x.fillStyle = C.ink; x.globalAlpha = 0.1; x.fillRect(X(P.sel.a), 0, X(P.sel.b) - X(P.sel.a), H); }
+    if (P.sel) { x.fillStyle = C.ink; x.globalAlpha = 0.1; x.fillRect(X(P.sel.a), 0, X(P.sel.b) - X(P.sel.a), H); }
     x.globalAlpha = 1;
   }
   x.fillStyle = C.ink;
@@ -1255,8 +1267,9 @@ async function autoSplit(m) {
   catch (e) { delete splitting[m.id]; } // the lead model isn't installed: stay with one vocal track
   if (P.song === m) renderTracks();
 }
-// Where the split is wrong, parts of the song can keep their vocals whole: there the lead track plays all the vocals
-// and backing is silent (the server does the same for exports and the note bars in Practice). 30 ms crossfades at the edges.
+// Where the split is wrong, parts of the song can keep their vocals whole: there all the vocals play on the backing
+// track and the lead is silent, so they stay in when the lead is muted (the server does the same for exports; the
+// note bars in Practice follow all the vocals there). 30 ms crossfades at the edges.
 function splitBuffers() {
   const l = P.raw.lead, b = P.raw.backing, parts = (P.song && P.song.unsplit) || [];
   if (!l || !b) return;
@@ -1264,33 +1277,46 @@ function splitBuffers() {
   const n = Math.min(l.length, b.length), sr = l.sampleRate, fade = 0.03 * sr;
   const L = ac.createBuffer(l.numberOfChannels, n, sr), B = ac.createBuffer(l.numberOfChannels, n, sr);
   for (let c = 0; c < l.numberOfChannels; c++) {
-    const lo = L.getChannelData(c), bo = B.getChannelData(c), bi = b.getChannelData(Math.min(c, b.numberOfChannels - 1));
-    lo.set(l.getChannelData(c).subarray(0, n)); bo.set(bi.subarray(0, n));
+    const lo = L.getChannelData(c), bo = B.getChannelData(c), li = l.getChannelData(c);
+    lo.set(li.subarray(0, n)); bo.set(b.getChannelData(Math.min(c, b.numberOfChannels - 1)).subarray(0, n));
     for (const [a, z] of parts) {
       const s0 = a * sr, s1 = z * sr;
       for (let i = Math.max(0, Math.floor(s0 - fade)); i < Math.min(n, Math.ceil(s1 + fade)); i++) {
         const m = Math.min(1, Math.max(0, 1 - Math.max(s0 - i, i - s1) / fade));
-        lo[i] += m * bi[i]; bo[i] = (1 - m) * bi[i];
+        bo[i] += m * li[i]; lo[i] = (1 - m) * li[i];
       }
     }
   }
   P.buffers.lead = L; P.buffers.backing = B;
 }
-// The line under the waveform: a hint, or what's selected (a dragged span, or a part clicked on) and what to do with it.
+// The line under the waveform: a hint, or the dragged span and the button that keeps its vocals whole. Each kept-whole
+// part gets an × over the waveform (shown while you point at the part) that splits it again.
 function paintSel() {
   const bar = $("#pSelBar"), on = !!(P.song && P.song.split), s = P.sel, act = $("#pSelAct");
   bar.hidden = !on;
   $("#pWave").setAttribute("aria-label", on ? "Song overview — click to jump, drag to select a part" : "Song overview — click to jump");
+  renderParts();
   if (!on) return;
   act.hidden = $("#pSelX").hidden = !s;
   if (!s) {
     const n = (P.song.unsplit || []).length;
-    $("#pSelText").textContent = n ? `Vocals kept whole in ${n} part${n > 1 ? "s" : ""} (shaded). Drag across the waveform to add another.`
-      : "Backing vocals split wrong somewhere? Drag across that part of the waveform to keep its vocals whole.";
+    $("#pSelText").textContent = n ? `Vocals kept whole in ${n} shaded part${n > 1 ? "s" : ""}, which stay in with the lead muted. × on a part splits it again.`
+      : "Backing vocals split wrong somewhere? Drag across that part of the waveform to keep its vocals whole: they’ll stay in even with the lead muted.";
     return;
   }
-  $("#pSelText").textContent = `${fmtTime(s.a)}–${fmtTime(s.b)}` + (s.part != null ? " · vocals kept whole" : " selected");
-  act.textContent = s.part != null ? "Split again" : "Keep vocals whole here";
+  $("#pSelText").textContent = `${fmtTime(s.a)}–${fmtTime(s.b)} selected`;
+  act.textContent = "Keep vocals whole here";
+}
+function renderParts() {
+  const box = $("#pParts"), parts = (P.song && P.song.split && P.song.unsplit) || [], dur = songDur() || 1;
+  box.innerHTML = "";
+  parts.forEach(([a, b], i) => {
+    const part = el("div", "part"), x = el("button", "x");
+    part.style.left = (a / dur) * 100 + "%"; part.style.width = ((b - a) / dur) * 100 + "%";
+    x.type = "button"; x.title = `Split ${fmtTime(a)}–${fmtTime(b)} again`; x.setAttribute("aria-label", x.title); x.append(icon("close"));
+    x.onclick = () => saveUnsplit(parts.filter((_, k) => k !== i));
+    part.append(x); box.append(part);
+  });
 }
 async function saveUnsplit(parts) {
   const m = P.song, act = $("#pSelAct");
@@ -1304,31 +1330,30 @@ async function saveUnsplit(parts) {
   } catch (e) { $("#pExportState").textContent = e.message; }
   act.disabled = false; paintSel(); drawWave();
 }
-// The waveform: a click jumps there (and picks the kept-whole part under it); a drag selects a span.
+// The waveform: a click jumps there; a drag selects a span. Pointing at a kept-whole part shows its ×.
 function initWave() {
-  const wave = $("#pWave");
+  const wave = $("#pWave"), wrap = $("#pWaveWrap");
   const tAt = (e) => { const r = wave.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur(); };
+  const hover = (i) => [...$("#pParts").children].forEach((p, k) => p.classList.toggle("hover", k === i));
+  wrap.addEventListener("pointermove", (e) => { const t = tAt(e); hover(((P.song && P.song.unsplit) || []).findIndex(([a, b]) => t >= a && t <= b)); });
+  wrap.addEventListener("pointerleave", () => hover(-1));
   let drag = null;
   wave.addEventListener("pointerdown", (e) => { if (P.song) { drag = { x: e.clientX, t: tAt(e), moved: false }; wave.setPointerCapture(e.pointerId); } });
   wave.addEventListener("pointermove", (e) => {
     if (!drag || !P.song.split || (!drag.moved && Math.abs(e.clientX - drag.x) < 5)) return;
     drag.moved = true;
     const t = tAt(e);
-    P.sel = { a: Math.min(drag.t, t), b: Math.max(drag.t, t), part: null };
+    P.sel = { a: Math.min(drag.t, t), b: Math.max(drag.t, t) };
     paintSel(); drawWave();
   });
   wave.addEventListener("pointerup", (e) => {
     const d = drag; drag = null;
     if (!d || d.moved) return;
-    const t = tAt(e), parts = P.song.unsplit || [], i = parts.findIndex(([a, b]) => t >= a && t <= b);
-    P.sel = i >= 0 ? { a: parts[i][0], b: parts[i][1], part: i } : null;
-    seekSong(t); paintSel();
+    if (P.sel) { P.sel = null; paintSel(); }
+    seekSong(tAt(e));
   });
   wave.addEventListener("pointercancel", () => { drag = null; });
-  $("#pSelAct").onclick = () => {
-    const s = P.sel, parts = P.song.unsplit || [];
-    if (s) saveUnsplit(s.part != null ? parts.filter((_, i) => i !== s.part) : [...parts, [s.a, s.b]]);
-  };
+  $("#pSelAct").onclick = () => { if (P.sel) saveUnsplit([...(P.song.unsplit || []), [P.sel.a, P.sel.b]]); };
   $("#pSelX").append(icon("close"));
   $("#pSelX").onclick = () => { P.sel = null; paintSel(); drawWave(); };
 }
@@ -1864,11 +1889,16 @@ function stemsRoute(sub, extra) {
   else if (stemsPage === "song") renderTracks(); // volumes changed in Practice show on the track sliders
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
+// The song as the library list last read it opens at once, so its page appears whole. Otherwise (a reload, a link,
+// tracks just split) the page stays hidden until the server answers, rather than showing up empty and then filling in.
+let libCache = new Map();
 async function openSongById(id) {
+  if (libCache.has(id)) { openSong(libCache.get(id)); return; }
+  $("#sPlayer").hidden = true;
   let m = null;
   try { m = (await (await fetch("/api/library", { cache: "no-store" })).json()).find((x) => x.id === id); } catch (e) { m = null; }
   if (location.hash !== "#stems/" + id) return; // moved on meanwhile
-  if (m) openSong(m); else location.replace("#stems");
+  if (m) { openSong(m); $("#sPlayer").hidden = false; } else location.replace("#stems");
 }
 // #stems… for the library and its pages, #practice for Practice, which needs its song open, so a reload there (or
 // an old link to a page that's gone) lands in the library.

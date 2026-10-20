@@ -604,8 +604,8 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
 
 # ---------- lead and backing vocals ----------
 # The player shows the vocal stem as two tracks, lead and backing. Where the split is wrong, parts of the song can be
-# left unsplit (meta "unsplit": [[t0, t1], …]): there the lead track carries all the vocals, backing is silent and the
-# note bars in Practice follow all the vocals.
+# left unsplit (meta "unsplit": [[t0, t1], …]): there all the vocals play on the backing track, so they stay in when
+# the lead is muted, the lead is silent, and the note bars in Practice follow all the vocals.
 FADE = 0.03  # s: crossfade at the edges of an unsplit part
 _split_lock = threading.Lock()
 
@@ -704,13 +704,13 @@ def _unsplit_mask(n: int, ranges: list) -> np.ndarray:
 
 
 def _vocal_parts(folder: str, ranges: list) -> dict:
-    """{lead, backing}, (2, n) each, with the unsplit parts moved into lead."""
+    """{lead, backing}, (2, n) each, with the unsplit parts moved into backing."""
     lead, back = _decode_stereo(os.path.join(folder, "lead.mp3")), _decode_stereo(os.path.join(folder, "backing.mp3"))
     n = min(lead.shape[1], back.shape[1])
     lead, back = lead[:, :n], back[:, :n]
     if ranges:
         m = _unsplit_mask(n, ranges)
-        lead, back = lead + m * back, back * (1 - m)
+        lead, back = lead * (1 - m), back + m * lead
     return {"lead": lead, "backing": back}
 
 
