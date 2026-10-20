@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    rect { fill: #202020; } path { stroke: #fff; }
+    @media (prefers-color-scheme: dark) { rect { fill: #ECECEC; } path { stroke: #202020; } }
+  </style>
+  <rect width="32" height="32" rx="8"/>
+  <path d="M21 10.6C20 8.7 18.2 7.6 16 7.6C12.9 7.6 10.8 9.4 10.8 11.8C10.8 17 21.2 14.8 21.2 20.2C21.2 22.7 19.1 24.4 16 24.4C13.6 24.4 11.7 23.4 10.8 21.4" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
