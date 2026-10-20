@@ -223,14 +223,13 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .yt .btn { flex: none; }
 .job { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px; border-radius: 10px; background: var(--bg); font-size: 13.5px; }
 .job > .top, .job > .bar { grid-column: 1; }
-.job .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.job .top { min-width: 0; }
 /* cancel (or, once it has failed, clear away): beside both rows */
 .job .x { grid-column: 2; grid-row: 1 / span 2; align-self: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px;
   background: transparent; color: var(--muted); display: grid; place-items: center; }
 .job .x:hover { background: var(--fill); color: var(--ink); }
 .job .x:disabled { opacity: 0.4; pointer-events: none; }
 .job .x .ico { width: 16px; height: 16px; }
-.job .top span:last-child { font: 12.5px var(--mono); color: var(--muted); }
 .job.err { color: var(--bad); }
 .job.err .bar { display: none; }
 .job.err .x { grid-row: 1; }
@@ -962,8 +961,8 @@ function jobCard(id) {
   let card = document.getElementById("job-" + id);
   if (!card) {
     card = el("div", "job"); card.id = "job-" + id;
-    const top = el("div", "top"); top.append(el("span"), el("span"));
-    const bar = el("div", "bar"); bar.append(el("i"));
+    const top = el("div", "top"); top.append(el("span"));
+    const bar = el("div", "bar"); bar.append(el("i")); bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-label", "Progress");
     const x = el("button", "x"); x.type = "button"; x.title = "Cancel"; x.append(icon("close"));
     x.onclick = () => cancelJob(id);
     card.append(top, bar, x); $("#sJobs").prepend(card);
@@ -1008,13 +1007,12 @@ function watchJob(id, kind, forSong) {
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = splitting[forSong];
     } else {
-      const card = jobCard(id), [a, b] = card.querySelectorAll(".top span"), x = card.querySelector(".x");
+      const card = jobCard(id), x = card.querySelector(".x"), pct = Math.round(j.progress * 100);
       const stopping = (j.cancel || card.classList.contains("stopping")) && j.status !== "error";
-      a.textContent = j.status === "error" ? j.error : stopping ? "Cancelling…" : j.stage;
-      b.textContent = j.status === "error" ? "" : Math.round(j.progress * 100) + "%";
+      card.querySelector(".top span").textContent = j.status === "error" ? j.error : stopping ? "Cancelling…" : j.stage;
       card.classList.toggle("err", j.status === "error");
       x.title = j.status === "error" ? "Clear" : "Cancel"; x.disabled = stopping;
-      card.querySelector(".bar i").style.width = Math.round(j.progress * 100) + "%";
+      card.querySelector(".bar i").style.width = pct + "%"; card.querySelector(".bar").setAttribute("aria-valuenow", pct);
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
