@@ -71,8 +71,18 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
 .themebtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 .mic-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .mic.on .mic-dot { background: var(--good); }
-.meter { width: 36px; height: 4px; border-radius: 2px; background: rgba(var(--fg), 0.08); overflow: hidden; }
-.meter i { display: block; height: 100%; width: 0; background: var(--ink); transition: width 60ms linear; }
+/* the mic's spectrum: one bar per band of the voice range, as tall as that band is loud */
+.spec { display: inline-flex; align-items: center; gap: 2px; height: 16px; }
+.spec i { width: 3px; height: 16px; border-radius: 1.5px; background: var(--faint); transform: scaleY(0.15); }
+.mic.on .spec i { background: var(--ink); }
+/* mic settings, under the gear */
+header { position: relative; }
+.pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(340px, calc(100vw - 32px)); padding: 14px 16px; border-radius: 12px;
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line), 0 10px 28px rgba(0, 0, 0, 0.18); display: grid; gap: 12px; font-size: 13.5px; }
+.pop label { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.pop input[type="range"] { width: 140px; }
+.pop .hint { margin: 0; }
+#micSetBtn .ico { width: 16px; height: 16px; }
 
 /* Keycap */
 .keycap { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 6px;
@@ -120,7 +130,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 /* Sing view */
 .play-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .play-bar .title { margin-right: auto; }
-.play-bar .kb { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
+.kb { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--fg), 0.35); }
 .stage { position: relative; background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); overflow: hidden;
   height: clamp(320px, 62vh, 640px); }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -167,7 +177,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   header { margin-bottom: 40px; }
   .note-big { font-size: 34px; }
   .hud-l { top: auto; bottom: 10px; }
-  .play-bar .kb { display: none; }
+  .kb { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
@@ -323,9 +333,10 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 .songbar output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; }
 .kfield { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
 .kfield input[type="range"] { width: 110px; }
-.songbar #kSet { margin-left: auto; }
-.set-row { flex-basis: 100%; display: flex; align-items: center; gap: 10px 20px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
-.set-row .hint { flex-basis: 100%; margin: 0; }
+.tog.icon { display: inline-grid; place-items: center; padding: 0; }
+.tog.icon .ico { width: 16px; height: 16px; }
+.tog[aria-pressed="false"] + input[type="range"] { opacity: 0.4; } /* the click's volume while the click is off */
+.songbar #kLeave { margin-left: auto; }
 /* Phrases: one block per line of the song; click one to jump there, Loop repeats it */
 .phrase-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
 .phrase-row output { min-width: 84px; text-align: center; }
@@ -344,37 +355,37 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Stem</a>
-    <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="meter"><i id="meter"></i></span></button>
+    <button class="chipbtn mic" id="micBtn" type="button" hidden><i class="mic-dot"></i><span id="micLabel">Turn on mic</span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+    <button class="chipbtn themebtn" id="micSetBtn" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="micSet" hidden></button>
     <button class="chipbtn themebtn" id="themeBtn" type="button" aria-label="Dark mode"></button>
+    <div class="pop" id="micSet" role="dialog" aria-label="Mic settings" hidden>
+      <label>Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
+      <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
+      <label>Note names <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi</option></select></label>
+      <p class="hint">With earphones the song doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
+    </div>
   </header>
 
   <main id="vPractice" aria-label="Practice" hidden>
     <div class="play-bar">
       <h1 class="title" id="playTitle"></h1>
-      <span class="kb"><span class="keycap">Space</span>play / pause</span>
       <button class="btn dark round" id="startBtn" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
     </div>
     <div class="songbar" id="songBar">
+      <span class="kb"><span class="keycap">Space</span>play / pause</span>
       <button class="btn sm" id="kBack" type="button">−5 s</button>
       <button class="btn sm" id="kFwd" type="button">+5 s</button>
       <output id="kTime">0:00 / 0:00</output>
       <label class="kfield">Guide vocal <input type="range" id="kGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume"></label>
       <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
-      <button class="tog m" id="kClick" type="button" aria-pressed="false" title="Click on/off">Click</button>
+      <span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span>
       <label class="kfield">Bars <select id="kOct" aria-label="Octave of the note bars"><option value="-1">octave down</option><option value="0">as sung</option><option value="1">octave up</option></select></label>
-      <button class="btn sm icon" id="kSet" type="button" aria-label="Mic settings" title="Mic settings" aria-expanded="false" aria-controls="kSettings"></button>
       <button class="btn sm" id="kLeave" type="button">Back to song</button>
-      <div class="set-row" id="kSettings" hidden>
-        <label class="kfield">Mic sensitivity <input type="range" id="gate" min="0.002" max="0.05" step="0.001" dir="rtl" aria-label="Mic sensitivity"></label>
-        <label class="kfield">Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
-        <label class="kfield">Note names <select id="names"><option value="en">C D E (C4)</option><option value="ko">Do Re Mi</option></select></label>
-        <p class="hint">With earphones the song doesn’t leak into the mic. Without them, turn on “Filter out speaker sound”.</p>
-      </div>
       <div class="phrase-row">
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
-        <button class="tog m" id="kLoop" type="button" aria-pressed="false" title="Repeat this phrase (L)">Loop</button>
+        <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L)"></button>
         <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
       </div>
     </div>
@@ -678,6 +689,7 @@ Object.assign(ICONS, {
   prev: '<path d="M15 6C15 6 9.00001 10.4189 9 12C8.99999 13.5812 15 18 15 18"/>', // ArrowLeft01
   next: '<path d="M9.00005 6C9.00005 6 15 10.4189 15 12C15 13.5812 9 18 9 18"/>', // ArrowRight01
   close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
+  loop: '<path d="M16.3884 3L17.3913 3.97574C17.8393 4.41165 18.0633 4.62961 17.9844 4.81481C17.9056 5 17.5888 5 16.9552 5H9.19422C5.22096 5 2 8.13401 2 12C2 13.4872 2.47668 14.8662 3.2895 16"/><path d="M7.61156 21L6.60875 20.0243C6.16074 19.5883 5.93673 19.3704 6.01557 19.1852C6.09441 19 6.4112 19 7.04478 19H14.8058C18.779 19 22 15.866 22 12C22 10.5128 21.5233 9.13383 20.7105 8"/>', // Repeat
   settings: '<path d="M15.5 12C15.5 13.933 13.933 15.5 12 15.5C10.067 15.5 8.5 13.933 8.5 12C8.5 10.067 10.067 8.5 12 8.5C13.933 8.5 15.5 10.067 15.5 12Z"/><path d="M21.011 14.0965C21.5329 13.9558 21.7939 13.8854 21.8969 13.7508C22 13.6163 22 13.3998 22 12.9669V11.0332C22 10.6003 22 10.3838 21.8969 10.2493C21.7938 10.1147 21.5329 10.0443 21.011 9.90358C19.0606 9.37759 17.8399 7.33851 18.3433 5.40087C18.4817 4.86799 18.5509 4.60156 18.4848 4.44529C18.4187 4.28902 18.2291 4.18134 17.8497 3.96596L16.125 2.98673C15.7528 2.77539 15.5667 2.66972 15.3997 2.69222C15.2326 2.71472 15.0442 2.90273 14.6672 3.27873C13.208 4.73448 10.7936 4.73442 9.33434 3.27864C8.95743 2.90263 8.76898 2.71463 8.60193 2.69212C8.43489 2.66962 8.24877 2.77529 7.87653 2.98663L6.15184 3.96587C5.77253 4.18123 5.58287 4.28891 5.51678 4.44515C5.45068 4.6014 5.51987 4.86787 5.65825 5.4008C6.16137 7.3385 4.93972 9.37763 2.98902 9.9036C2.46712 10.0443 2.20617 10.1147 2.10308 10.2492C2 10.3838 2 10.6003 2 11.0332V12.9669C2 13.3998 2 13.6163 2.10308 13.7508C2.20615 13.8854 2.46711 13.9558 2.98902 14.0965C4.9394 14.6225 6.16008 16.6616 5.65672 18.5992C5.51829 19.1321 5.44907 19.3985 5.51516 19.5548C5.58126 19.7111 5.77092 19.8188 6.15025 20.0341L7.87495 21.0134C8.24721 21.2247 8.43334 21.3304 8.6004 21.3079C8.76746 21.2854 8.95588 21.0973 9.33271 20.7213C10.7927 19.2644 13.2088 19.2643 14.6689 20.7212C15.0457 21.0973 15.2341 21.2853 15.4012 21.3078C15.5682 21.3303 15.7544 21.2246 16.1266 21.0133L17.8513 20.034C18.2307 19.8187 18.4204 19.711 18.4864 19.5547C18.5525 19.3984 18.4833 19.132 18.3448 18.5991C17.8412 16.6616 19.0609 14.6226 21.011 14.0965Z"/>', // Settings02
   backing: '<path d="M16 21C15.7668 18.0685 13.3422 15.7477 10.3085 15.5521L9.49999 15.5C9.21121 15.5076 8.94209 15.5178 8.68816 15.5298C5.68124 15.6723 3.23089 18.0974 3 21"/><path d="M12.75 9.75C12.75 11.5449 11.2949 13 9.5 13C7.70508 13 6.25 11.5449 6.25 9.75C6.25 7.95507 7.70508 6.5 9.5 6.5C11.2949 6.5 12.75 7.95507 12.75 9.75Z"/><path d="M21 17.501C20.7709 14.6314 18.4541 12.2748 15.5 11.9961"/><path d="M15.9877 9C16.8965 8.42434 17.5001 7.40788 17.5001 6.25C17.5001 4.45507 16.0496 3 14.2602 3C13.3811 3 12.5838 3.35121 12.0001 3.92139"/>', // UserMultiple
 });
@@ -1471,7 +1483,8 @@ function renderPhrases() {
 }
 function paintPhrases() {
   const n = K.phrases.length, key = `${K.ph}|${K.loop}`;
-  setText("kPh", n ? `Phrase ${K.ph == null ? "–" : K.ph + 1} / ${n}` : "No phrases");
+  const w = Math.max(2, String(n).length); // 01 / 31: zero-padded, so the strip beside it doesn't shift
+  setText("kPh", n ? `Phrase ${K.ph == null ? "–".repeat(w) : String(K.ph + 1).padStart(w, "0")} / ${n}` : "No phrases");
   $("#kPrev").disabled = !n || K.ph === 0; $("#kNext").disabled = !n || K.ph == null || K.ph === n - 1;
   $("#kLoop").disabled = !n;
   if (K.painted === key) return;
@@ -1539,11 +1552,12 @@ async function singSong(m, btn) {
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
   renderTracks(); applyGains();
   $("#kOct").value = String(K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
-  $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute));
-  $("#kClick").disabled = !(m.beats && m.beats.length);
+  $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute)); $("#kClickVol").value = P.tracks.click.vol;
+  $("#kClick").disabled = $("#kClickVol").disabled = !(m.beats && m.beats.length);
   setText("playTitle", m.title);
   go("practice");
 }
+function showMicSet(on) { $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
 function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").hidden = true; }
@@ -1558,10 +1572,13 @@ function initSing() {
   $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
   $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== guideName() && n !== "click") t.vol = K.bandVol; applyGains(); };
   resetOnDblClick($("#kGuide"), 0.5); resetOnDblClick($("#kBand"), 1);
+  $("#kClick").append(icon("click"));
   $("#kClick").onclick = () => { const c = P.tracks.click; c.mute = !c.mute; $("#kClick").setAttribute("aria-pressed", String(!c.mute)); applyGains(); };
+  $("#kClickVol").oninput = (e) => { P.tracks.click.vol = +e.target.value; applyGains(); };
+  resetOnDblClick($("#kClickVol"), 0.7);
   $("#kBack").onclick = () => seekWithin(songPos() - 5);
   $("#kFwd").onclick = () => seekWithin(songPos() + 5);
-  $("#kPrev").append(icon("prev")); $("#kNext").append(icon("next"));
+  $("#kPrev").append(icon("prev")); $("#kNext").append(icon("next")); $("#kLoop").append(icon("loop"));
   $("#kPrev").onclick = () => phraseStep(-1);
   $("#kNext").onclick = () => phraseStep(1);
   $("#kLoop").onclick = () => setLoop(!K.loop);
@@ -1572,9 +1589,12 @@ function initSing() {
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
   });
   $("#kLeave").onclick = () => { leaveSong(); go(P.song ? "stems/" + P.song.id : "stems"); };
-  // mic settings
-  $("#kSet").append(icon("settings"));
-  $("#kSet").onclick = () => { const s = $("#kSettings"); s.hidden = !s.hidden; $("#kSet").setAttribute("aria-expanded", String(!s.hidden)); };
+  // mic settings: a panel under the gear beside the mic chip; a click elsewhere or Escape closes it
+  const setBtn = $("#micSetBtn"), pop = $("#micSet");
+  setBtn.append(icon("settings"));
+  setBtn.onclick = (e) => { e.stopPropagation(); showMicSet(pop.hidden); };
+  document.addEventListener("click", (e) => { if (!pop.hidden && !pop.contains(e.target)) showMicSet(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showMicSet(false); setBtn.focus(); } });
   $("#gate").value = S.gate; $("#echo").checked = S.echo; $("#names").value = S.names;
   $("#gate").oninput = (e) => { S.gate = +e.target.value; save(); };
   resetOnDblClick($("#gate"), 0.01);
@@ -1717,7 +1737,7 @@ function loop() {
   } else level = 0;
   if (m == null) { if (++miss > 3) { med = []; cur = null; } }
   else { miss = 0; med.push(m); while (med.length > 5) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
-  $("#meter").style.width = Math.min(100, (level / 0.15) * 100) + "%";
+  if (view === "practice") drawSpectrum();
 
   if (K.on && view === "practice") {
     const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
@@ -1730,6 +1750,32 @@ function loop() {
     renderHud(sn, cur); renderCountIn(sn);
   }
   requestAnimationFrame(loop);
+}
+// The mic chip's spectrum: 7 bands from 90 Hz to 4 kHz, where a voice's energy is, spaced evenly in pitch. Each bar is
+// as tall as the loudest bin in its band (-95 dB flat … -35 dB full), rising at once and falling back gently.
+const SPEC = { lo: 90, hi: 4000, n: 7, floor: -95, span: 60 };
+let specBins = null, specData = null, specOn = false;
+const specLevel = new Float32Array(SPEC.n);
+function drawSpectrum() {
+  const bars = $("#spec").children;
+  if (!ac || !micOn) {
+    if (specOn) { for (const b of bars) b.style.transform = ""; specLevel.fill(0); specOn = false; }
+    return;
+  }
+  if (!specBins) {
+    specData = new Float32Array(analyser.frequencyBinCount);
+    const hz = ac.sampleRate / analyser.fftSize;
+    specBins = Array.from({ length: SPEC.n + 1 }, (_, k) => Math.round((SPEC.lo * Math.pow(SPEC.hi / SPEC.lo, k / SPEC.n)) / hz));
+  }
+  analyser.getFloatFrequencyData(specData);
+  for (let k = 0; k < SPEC.n; k++) {
+    let mx = -Infinity;
+    for (let i = specBins[k]; i < Math.max(specBins[k] + 1, specBins[k + 1]); i++) mx = Math.max(mx, specData[i]);
+    const v = Math.min(1, Math.max(0, (mx - SPEC.floor) / SPEC.span));
+    specLevel[k] = v > specLevel[k] ? v : specLevel[k] * 0.85 + v * 0.15;
+    bars[k].style.transform = `scaleY(${(0.15 + 0.85 * specLevel[k]).toFixed(3)})`;
+  }
+  specOn = true;
 }
 let lastTarget = null;
 function activeNote(t) { const e = songNote(t); if (e) lastTarget = e; return e; }
@@ -1808,6 +1854,7 @@ function stemsRoute(sub, extra) {
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
   if (stemsPage === "song" && (!P.song || P.song.id !== sub || P.song.stale)) openSongById(sub);
+  else if (stemsPage === "song") renderTracks(); // volumes changed in Practice show on the track sliders
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
 async function openSongById(id) {
@@ -1824,7 +1871,8 @@ function route() {
   if (v !== "stems" && !singing) { location.replace("#stems"); return; }
   view = v;
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems";
-  $("#micBtn").hidden = view !== "practice";
+  $("#micBtn").hidden = $("#micSetBtn").hidden = view !== "practice";
+  if (view !== "practice") showMicSet(false);
   if (view === "stems") stemsRoute(sub, extra);
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   if (view === "practice") {
