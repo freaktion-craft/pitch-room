@@ -1228,10 +1228,10 @@ def save_take(song_id: str, data: bytes, info: dict) -> dict:
     """Keep a take. data: a 16-bit PCM WAV of the mic. info: start (song time of its first sample, s), key (semitones
     the song played in), oct (the bars' octave, -1…1), latency (the speaker and mic delay allowed for, s), and the
     seconds behind the scores: guide (time with a note to sing), sung (of that, time you sang), voiced (of that, time
-    your pitch was read) and tuned (of that, time within 50 cents of the note). Returns the take's json: those, plus
-    id, created, end, duration, sampleRate, inTune (% of voiced that was tuned), coverage (% of guide that was sung)
-    and gain: how much to turn the take up or down to sound as loud as the song's own singer, so "Your voice" at 100%
-    sits in the band like the original vocal (the file keeps the recording as it was)."""
+    your pitch was read) and tuned (of that, time within 50 cents of the note, in any octave). Returns the take's json:
+    those, plus id, created, end, duration, sampleRate, inTune (% of voiced that was tuned), coverage (% of guide that
+    was sung) and gain: how much to turn the take up or down to sound as loud as the song's own singer, so "Your voice"
+    at 100% sits in the band like the original vocal (the file keeps the recording as it was)."""
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
     try:

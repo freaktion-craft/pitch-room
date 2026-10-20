@@ -2626,10 +2626,11 @@ function wavFile(x, sr) {
   for (let i = 0; i < x.length; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, x[i])) * 32767, true);
   return new Blob([v.buffer], { type: "audio/wav" });
 }
-// Each frame of a take, your pitch against the bars as shown (in the key the song plays in, at the octave picked).
-// guide: time with a note to sing; sung: of that, time you were singing; voiced: of that, time a pitch was read;
-// tuned: of that, time within 50 cents of the note. The pitch read now is of the sound that came in about half the
-// analyser's window ago, sung to the song as it was the latency before that.
+// Each frame of a take, your pitch against the bars (in the key the song plays in). guide: time with a note to sing;
+// sung: of that, time you were singing; voiced: of that, time a pitch was read; tuned: of that, time within 50 cents
+// of the note, in whatever octave: the right note an octave down (where many sing a song made for another voice, bars
+// moved or not) is in tune, and so is a frame the tracker read an octave off. The pitch read now is of the sound that
+// came in about half the analyser's window ago, sung to the song as it was the latency before that.
 function recScore() {
   const c = R.cap;
   if (!c || !P.playing) return;
@@ -2646,7 +2647,8 @@ function recScore() {
   c.sung += dt;
   if (cur == null) return;
   c.voiced += dt;
-  if (Math.abs(cur - e.midi) <= 0.5) c.tuned += dt;
+  const d = cur - e.midi;
+  if (Math.abs(d - 12 * Math.round(d / 12)) <= 0.5) c.tuned += dt;
 }
 function paintRec() {
   const b = $("#kRec");
