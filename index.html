@@ -317,7 +317,13 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .knote.warn { color: var(--warn-ink); }
 .knote.err { color: var(--bad); }
-@media (min-width: 900px) { .transport-row .keyctl { margin-left: 8px; } } /* apart from the time, where the row is one line */
+/* In the Studio the control sits with the song's actions, the tempo beside it, and its note at the end of the line
+   under the title (after "2:11 · 5 tracks"), on that one line */
+.row-actions .keyctl { flex: none; }
+.bpm { font-size: 13px; color: rgba(var(--fg), 0.6); white-space: nowrap; }
+.meta-line { display: flex; min-width: 0; white-space: nowrap; }
+#pKeyNote { flex: 1 1 0; width: auto; min-width: 0; height: auto; max-height: none; display: block; overflow: hidden; text-overflow: ellipsis; font-size: inherit; line-height: inherit; }
+#pKeyNote:not(:empty)::before { content: " · "; color: var(--muted); white-space: pre; }
 @media (max-width: 760px) { /* too little room beside the key: the note gets a line of its own, there even when empty */
   .keyctl { flex-wrap: wrap; row-gap: 4px; }
   .knote { flex-basis: 100%; width: auto; height: 20px; line-height: 20px; -webkit-line-clamp: 1; }
@@ -584,8 +590,8 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
 
     <section class="player" id="sPlayer" hidden>
       <div class="player-head">
-        <div class="player-title"><b id="pTitle"></b><span class="muted" id="pMeta"></span></div>
-        <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div>
+        <div class="player-title"><b id="pTitle"></b><span class="muted meta-line"><span id="pMeta"></span><span class="knote" id="pKeyNote"></span></span></div>
+        <div class="row-actions"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="bpm" id="pBpm" hidden></span><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><div id="pParts"></div><output class="ph-flag" id="pFlag" hidden></output></div>
@@ -598,7 +604,6 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
           <button class="btn sm icon" id="pEnd" type="button" aria-label="Go to end" title="Go to end (End)"></button>
         </div>
         <output id="pTime">0:00 / 0:00</output>
-        <div class="keyctl" role="group" aria-label="Key"></div>
         <div class="mix">
           <label class="mix-ico" for="pVol" title="Volume"></label>
           <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
@@ -1323,7 +1328,9 @@ async function openSong(m) {
   P.song = m; P.offset = 0; P.ph = null;
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
-  const meta = () => { $("#pMeta").textContent = [...songFacts(m), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].join(" · "); };
+  // under the title: length and tracks (the key and tempo are up with the key control)
+  const meta = () => { $("#pMeta").textContent = [fmtTime(m.duration), Object.keys(P.buffers).length ? `${trackNames(m).length} tracks` : "loading tracks…"].join(" · "); };
+  $("#pBpm").textContent = m.bpm ? `${m.bpm} BPM` : ""; $("#pBpm").hidden = !m.bpm;
   meta(); keyOf(m).then(() => { if (P.song === m) { meta(); paintKey(); } });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
@@ -1737,7 +1744,7 @@ function paintKey() {
   const m = P.song, n = P.keyWant, k = m && keyAfter(m.key, n);
   const note = P.keyNote || (Math.abs(n) >= KEY_WARN ? `${KEY_WARN} or more semitones can sound processed.` : "");
   document.querySelectorAll(".keyctl").forEach((box) => {
-    const [down, val, up] = box.querySelector(".kstep").children, name = box.querySelector(".kname"), msg = box.querySelector(".knote");
+    const [down, val, up] = box.querySelector(".kstep").children, name = box.querySelector(".kname"), msg = box.note;
     val.textContent = keySign(n); down.disabled = n <= -KEYS; up.disabled = n >= KEYS;
     name.textContent = k ? keyName(k) : ""; name.title = k && n ? `Originally ${keyName(m.key)}` : "";
     msg.textContent = msg.title = note; msg.classList.toggle("err", P.keyErr && !!P.keyNote); msg.classList.toggle("warn", !P.keyNote && !!note);
@@ -1751,7 +1758,9 @@ function paintKey() {
     down.append(icon("minus")); up.append(icon("plus")); val.title = "Semitones from the original key";
     down.onclick = () => setKey(P.keyWant - 1); up.onclick = () => setKey(P.keyWant + 1);
     step.append(down, val, up);
-    box.append(el("span", null, "Key"), step, el("span", "kname"), el("span", "knote"));
+    box.note = box.dataset.note ? $(box.dataset.note) : el("span", "knote"); // the Studio's goes under the title
+    box.append(el("span", null, "Key"), step, el("span", "kname"));
+    if (!box.dataset.note) box.append(box.note);
   }
   paintKey();
 })();
