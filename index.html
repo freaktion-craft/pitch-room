@@ -261,12 +261,12 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
    (and covers the seam where the triangle's two halves meet). */
 .pp { width: 14px; height: 16px; flex: none; fill: currentColor; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
 .tracks { display: grid; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
-.track { display: grid; grid-template-columns: 18px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 10px; padding: 6px 12px; min-height: 44px; }
+/* the icon gets room on both sides (wider first column, more left padding); the right side lines up with .mix above */
+.track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) var(--c-btn) var(--c-btn) var(--c-vol) var(--c-btn); align-items: center; gap: 10px; padding: 8px 12px 8px 18px; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
 .track .ico { width: 18px; height: 18px; }
-/* name and its note on one line, so the rows (and their icons) sit close */
-.track .name { font-size: 14px; line-height: 1.3; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.track .name small { margin-left: 8px; color: var(--faint); font-size: 12px; }
+.track .name { font-size: 14px; min-width: 0; }
+.track .name small { display: block; color: var(--faint); font-size: 12px; }
 .track.off .name, .track.off .ico { opacity: 0.35; }
 .tog { height: 28px; min-width: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fill); font: 500 12px var(--mono); color: rgba(var(--fg), 0.55); }
 .tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
@@ -331,7 +331,7 @@ input[type="range"] { accent-color: var(--ink); width: 160px; max-width: 100%; }
 #sLib .song-actions .btn.icon:hover { background: var(--fill); color: var(--ink); }
 @media (hover: none) { #sLib .song-actions .btn { opacity: 1; } }
 @media (max-width: 760px) {
-  .track { grid-template-columns: 18px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
+  .track { grid-template-columns: 24px minmax(70px, 1fr) auto auto auto; row-gap: 4px; }
   .track > :last-child { grid-row: 1; grid-column: 5; }
   .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
   .yt { flex-direction: column; }
