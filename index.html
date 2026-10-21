@@ -2356,6 +2356,8 @@ function songDur() { return P.song ? P.song.duration : 0; }
 // Playback starts a moment after Play (startAt, 60 ms ahead); until then the song is still at its offset, so a pause
 // or seek that soon never stores a position before it (below 0:00, start() throws).
 function songPos() { return P.playing ? Math.min(songDur(), P.offset + Math.max(0, ac.currentTime - P.startAt) * P.rate) : P.offset; }
+// Practice's time: as songPos, but under 0 during a lead-in, so the bars come in and the count-in counts while it's heard
+function stageTime() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt) * P.rate) : P.offset - (P.lead || 0); }
 function audible(name) {
   const t = P.tracks[name], anySolo = Object.values(P.tracks).some((x) => x.solo);
   return anySolo ? t.solo : !t.mute;
@@ -2388,7 +2390,8 @@ function playSong() {
   listenStop(); // a take that's playing gives way to the song
   if (P.offset >= songDur() - 0.05) P.offset = 0;
   P.bus = ac.createGain(); P.bus.gain.value = stemVol; P.bus.connect(master);
-  const at = ac.currentTime + 0.06;
+  const at = ac.currentTime + 0.06 + (P.lead || 0) / P.rate; // after the lead-in, if a count-in comes before the song
+  P.lead = 0;
   recEnd(at); // a key change swaps the sources without a pause: the take so far ends where the new ones start
   P.sources = [];
   for (const [name, buf] of Object.entries(P.buffers)) {
@@ -2443,9 +2446,10 @@ function pauseSong() {
   P.sources = []; Object.values(P.tracks).forEach((t) => (t.gain = null));
   paintPlay($("#pPlay"), false); renderStart();
 }
-function seekSong(t) {
+// lead: a phrase jump to a count-in that starts before the song, heard in a lead-in ahead of it (other seeks stop at 0)
+function seekSong(t, lead = false) {
   playheadJump(); // from where the line is now
-  const was = P.playing; pauseSong(); P.offset = Math.max(0, Math.min(songDur(), t)); if (was) playSong(); drawWave();
+  const was = P.playing; pauseSong(); P.offset = Math.max(0, Math.min(songDur(), t)); P.lead = lead ? Math.max(0, -t) : 0; if (was) playSong(); drawWave();
 }
 // Go to end: the playhead at the very end, stopped there as when the song runs out (Play then starts it over).
 // Go to start is seekSong(0), which keeps playing if it was.
@@ -3112,12 +3116,13 @@ function songEntries(notes, beats, bpm) {
   const beat = 60 / (bpm || 120), out = [];
   let prevEnd = 0;
   notes.forEach(([t0, t1], i) => {
-    const intro = prevEnd === 0, need = intro ? 4 * beat + 0.3 : Math.max(4, 6 * beat);
-    if (t0 - prevEnd >= need) {
+    const intro = prevEnd === 0, need = Math.max(4, 6 * beat);
+    if (intro || t0 - prevEnd >= need) { // the voice's first entry always, its count-in before the song if it comes straight in
       let sung = 0;
       for (const [a, b] of notes.slice(i)) { if (a >= t0 + 4) break; sung += Math.min(b, t0 + 4) - a; }
       if (sung < 1) return;
-      out.push({ t: t0, from: prevEnd, kind: intro ? "Intro" : "Break", counts: countsBefore(t0, beats, beat).filter((c) => c > prevEnd + 0.1) });
+      const counts = intro ? countsBefore(t0, beats, beat) : countsBefore(t0, beats, beat).filter((c) => c > prevEnd + 0.1);
+      out.push({ t: t0, from: intro ? Math.min(0, (counts[0] ?? 0) - 0.5) : prevEnd, kind: intro ? "Intro" : "Break", counts });
     }
     prevEnd = Math.max(prevEnd, t1);
   });
@@ -3125,12 +3130,16 @@ function songEntries(notes, beats, bpm) {
 }
 // The four beats before the one the voice comes in on (or just before): the 4 3 2 1.
 // The n beats before the one at t0 (or just before it), as many as the count-in asks for (S.countIn): the 4 3 2 1.
+// A voice that comes in before n beats have gone by gets the rest before the song starts (times under 0), the beat
+// carried back: they're counted in a lead-in ahead of it (P.lead).
 function countsBefore(t0, beats, beat, n = S.countIn) {
   if (!n) return [];
   if (!beats || !beats.length) return Array.from({ length: n }, (_, k) => t0 - (n - k) * beat);
   let j = beats.findIndex((b) => b >= t0 - 0.25 * beat);
   if (j < 0) j = beats.length;
-  return beats.slice(Math.max(0, j - n), j);
+  const out = beats.slice(Math.max(0, j - n), j), step = beats.length > 1 ? beats[1] - beats[0] : beat;
+  while (out.length < n) out.unshift((out.length ? out[0] : beats[0]) - step);
+  return out;
 }
 // The count-in heard: a tick on each of its beats (the first higher; a little lower than the click track's, to tell
 // them apart), unless the click track is on and plays them anyway
@@ -3199,8 +3208,8 @@ function lyricPhrases(lines, beats, bpm, dur) {
 function phraseTimes(spans, beats, bpm, dur) {
   const beat = 60 / (bpm || 120);
   return spans.map((s, i) => {
-    const next = spans[i + 1], counts = countsBefore(s.t0, beats, beat).filter((c) => c >= 0);
-    return { ...s, counts, from: Math.max(0, (counts.length ? counts[0] : s.t0) - 0.15), to: Math.min(s.t1 + Math.max(0.5, beat), next ? next.t0 : dur) };
+    const next = spans[i + 1], counts = countsBefore(s.t0, beats, beat); // the first one's maybe before the song (a lead-in)
+    return { ...s, counts, from: (counts.length ? counts[0] : s.t0) - 0.15, to: Math.min(s.t1 + Math.max(0.5, beat), next ? next.t0 : dur) };
   });
 }
 // Practice's phrases: the song's lyric lines once it has them, else the stretches between breaths.
@@ -3231,7 +3240,7 @@ function phraseGo(i, keepSpan) {
   if (!p) return;
   if (!keepSpan) K.span = null;
   K.ph = i; K.cue = i; K.hist = []; K.resume = null;
-  seekSong(p.from);
+  seekSong(p.from, true);
   countClicks(p.counts);
   paintPhrases();
 }
@@ -3363,7 +3372,7 @@ function phraseTick(sn) {
   else if (K.span) K.ph = Math.min(K.span.b, Math.max(K.span.a, phraseAt(sn) ?? K.span.a)); // the one playing, within the run
   paintPhrases();
   const head = $("#kStrip .head");
-  if (head) head.style.left = (sn / (songDur() || 1)) * 100 + "%";
+  if (head) head.style.left = (Math.max(0, sn) / (songDur() || 1)) * 100 + "%";
   return sn;
 }
 // During an intro or break: "Intro · vocals in 12 s", then the last four beats as dots, one dimming on each (screen
@@ -3464,13 +3473,17 @@ function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").h
 function songToggle() {
   if (P.playing) { pauseSong(); return; }
   if (!micOn && !testOsc) startMic();
-  // again after a pause (not at a phrase's count-in, where a jump put it): from the count-in's beats before, counted
+  // again after a pause (not at a phrase's count-in, where a jump put it): from the count-in's beats before, counted;
+  // from the start, a voice that comes straight in is counted in before the song (the intro's count-in, as a lead-in)
+  let counts = K.cue != null ? K.phrases[K.cue]?.counts : null;
   if (K.cue == null && S.countIn && P.offset > 0.5 && P.offset < songDur() - 0.5) {
-    const counts = countsBefore(P.offset, K.song.beats, 60 / (K.song.bpm || 120));
-    if (counts.length) { K.resume = { t: P.offset, counts }; P.offset = Math.max(0, counts[0] - 0.15); }
+    counts = countsBefore(P.offset, K.song.beats, 60 / (K.song.bpm || 120));
+    if (counts.length) { K.resume = { t: P.offset, counts }; P.lead = Math.max(0, 0.15 - counts[0]); P.offset = Math.max(0, counts[0] - 0.15); }
+  } else if (K.cue == null && S.countIn && P.offset <= 0.5 && K.entries[0]?.counts[0] < P.offset) {
+    counts = K.entries[0].counts; P.lead = P.offset - (counts[0] - 0.15);
   }
   playSong();
-  countClicks(K.cue != null ? K.phrases[K.cue]?.counts : K.resume?.counts);
+  countClicks(counts);
 }
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
 function initSing() {
@@ -4020,19 +4033,23 @@ function draw(now, cur, hist, evs, guide) {
   const X = (t) => hitX + (t - now) * pps;
   const top = 8, bot = H - 8, ppS = (bot - top) / (vHi - vLo), Y = (m) => bot - (m - vLo) * ppS;
 
-  // lanes
-  for (let m = Math.floor(vLo); m <= Math.ceil(vHi); m++) {
-    const y = Y(m), p = pc(m);
-    if (BLACK.has(p)) { g.globalAlpha = 0.55; g.fillStyle = C["surface-2"]; g.fillRect(GUT, y - ppS / 2, W - GUT, ppS); g.globalAlpha = 1; }
-    if (p === 0) { g.fillStyle = C.line; g.fillRect(GUT, Math.round(y + ppS / 2), W - GUT, 1); }
-    if (!BLACK.has(p) && (ppS >= 13 || p === 0)) {
-      g.fillStyle = p === 0 ? C.ink : C.muted; g.font = `${p === 0 ? 600 : 400} 11px Pretendard, system-ui, sans-serif`;
-      g.textBaseline = "middle"; g.fillText(absName(m), 16, y);
+  // lanes, and the shade over the stretch already sung; a: how much of them (drawn again over that stretch, while
+  // counting in, over the bars there), the note names only the first time
+  const lanes = (a) => {
+    for (let m = Math.floor(vLo); m <= Math.ceil(vHi); m++) {
+      const y = Y(m), p = pc(m);
+      if (BLACK.has(p)) { g.globalAlpha = 0.55 * a; g.fillStyle = C["surface-2"]; g.fillRect(GUT, y - ppS / 2, W - GUT, ppS); }
+      if (p === 0) { g.globalAlpha = a; g.fillStyle = C.line; g.fillRect(GUT, Math.round(y + ppS / 2), W - GUT, 1); }
+      if (a === 1 && !BLACK.has(p) && (ppS >= 13 || p === 0)) {
+        g.fillStyle = p === 0 ? C.ink : C.muted; g.font = `${p === 0 ? 600 : 400} 11px Pretendard, system-ui, sans-serif`;
+        g.textBaseline = "middle"; g.fillText(absName(m), 16, y);
+      }
     }
-  }
+    g.globalAlpha = 0.35 * a; g.fillStyle = C["surface-2"]; g.fillRect(GUT + 1, 0, hitX - GUT - 1, H);
+    g.globalAlpha = 1;
+  };
+  lanes(1);
   g.fillStyle = C.line; g.fillRect(GUT, 0, 1, H);
-  // past shade
-  g.globalAlpha = 0.35; g.fillStyle = C["surface-2"]; g.fillRect(GUT + 1, 0, hitX - GUT - 1, H); g.globalAlpha = 1;
 
   // bars
   g.save(); g.beginPath(); g.rect(GUT + 1, 0, W - GUT - 1, H); g.clip();
@@ -4100,6 +4117,16 @@ function draw(now, cur, hist, evs, guide) {
     g.globalAlpha = 1;
   }
   g.restore();
+  // while counting in, what's on the stretch already sung (where the count-in stands) fades back behind its lanes, so
+  // the dots read clearly over bars there (played on from the middle of a phrase): the stage under them, drawn again
+  K.veil = (K.veil || 0) + ((!$("#countIn").hidden ? 1 : 0) - (K.veil || 0)) * 0.2;
+  if (K.veil > 0.01) {
+    const a = 0.85 * K.veil;
+    g.save(); g.beginPath(); g.rect(GUT + 1, 0, hitX - GUT - 1, H); g.clip();
+    g.globalAlpha = a; g.fillStyle = C.surface; g.fillRect(GUT + 1, 0, hitX - GUT - 1, H);
+    lanes(a);
+    g.restore();
+  }
 
   // hit line
   g.fillStyle = C.ink; g.globalAlpha = 0.75; g.fillRect(hitX - 1, 0, 2, H); g.globalAlpha = 1;
@@ -4206,7 +4233,7 @@ function loop() {
 // One frame of Practice: the bars, your pitch, the readouts.
 function practiceFrame() {
   if (T.play && T.play.srcs) { takeFrame(T.play); return; }
-  const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
+  const sn = phraseTick(stageTime()), last = K.hist[K.hist.length - 1];
   if (last && sn < last.t - 0.25) K.hist = []; // jumped back
   if (P.playing) K.hist.push({ t: sn, m: cur });
   while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
