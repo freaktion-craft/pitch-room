@@ -2602,11 +2602,24 @@ function drawTrackWaves(prog, rise) {
     x.globalAlpha = 1;
     const group = name === "voices"; // the Vocals row while closed: lead and backing as one
     x.fillStyle = stemColor(group ? "lead" : name);
-    const peaks = P.trackPeaks && (group ? voicesPeaks() : P.trackPeaks[name]), on = group ? audible("lead") || audible("backing") : audible(name);
+    const peaks = P.trackPeaks && (group ? voicesPeaks() : name === "click" ? clickPeaks() : P.trackPeaks[name]), on = group ? audible("lead") || audible("backing") : audible(name);
     if (!peaks) { x.globalAlpha = 0.3; x.fillRect(0, (TWAVE_H - 1) / 2, r.width, 1); x.globalAlpha = 1; continue; }
     if (!peaks.scaled) { let top = 0; for (const v of peaks) if (v > top) top = v; peaks.scaled = Math.min(3, 1 / (top || 1)); }
     waveBars(x, c.width, Math.round(TWAVE_H * d), d, peaks, (TWAVE_H - 4) * peaks.scaled, prog, on ? 1 : 0.3, on ? 0.3 : 0.12, later);
   }
+}
+// The metronome's waveform: a tick on each beat it plays, the first of each bar (its accent) the tallest
+function clickPeaks() {
+  const t = P.tracks.click, beats = P.song.beats || [], n = 1200, dur = songDur() || 1, key = `${P.song.id}/${t.bpb}/${t.offset}/${dur}`;
+  if (P.clickPeaks && P.clickPeaks.key === key) return P.clickPeaks.v;
+  const v = new Float32Array(n);
+  beats.forEach((b, i) => {
+    const j = Math.min(n - 1, Math.floor((b / dur) * n)), accent = ((i - t.offset) % t.bpb + t.bpb) % t.bpb === 0;
+    v[j] = Math.max(v[j], accent ? 1 : 0.55);
+  });
+  v.scaled = 1;
+  P.clickPeaks = { key, v };
+  return v;
 }
 // Where the playhead is drawn, as a fraction of the song: where the song is, except just after a jump (a click on the
 // waveform, ±5 s…). Then the line travels there on a spring, the whole way, lighting up the bars it passes: quick off
@@ -2649,8 +2662,8 @@ function trackRow(name, members, sub, open) {
   const dot = sub ? el("span") : icon(group ? "vocals" : name); // lead and backing, under Vocals, go by name alone
   dot.style.color = `var(--stem-${group ? "lead" : name}, var(--muted))`;
   const bpm = P.song.bpm, isClick = name === "click";
-  const title = group ? "Vocals" : sub ? (name === "lead" ? "Lead" : "Backing") : isClick ? (bpm ? `${Math.round(bpm)} BPM` : "Click") : TRACK_TITLES[name] || name[0].toUpperCase() + name.slice(1);
-  const note = group ? "lead and backing" : isClick ? (bpm ? tr("click · {bpb}/4 · follows the song’s beat", { bpb: t.bpb }) : "click") : STEM_NOTES[name] || "";
+  const title = group ? "Vocals" : sub ? (name === "lead" ? "Lead" : "Backing") : isClick ? "Metronome" : TRACK_TITLES[name] || name[0].toUpperCase() + name.slice(1);
+  const note = group ? "lead and backing" : isClick ? (bpm ? tr("{bpm} BPM · {bpb}/4 · follows the song’s beat", { bpm: Math.round(bpm * P.rate), bpb: t.bpb }) : "no steady beat") : STEM_NOTES[name] || "";
   const nm = el("div", "name"); nm.append(document.createTextNode(tr(title)));
   if (group) { // opens and closes the lead and backing rows
     const tog = el("button", "disclose"); tog.type = "button"; tog.setAttribute("aria-expanded", String(open));
@@ -2690,10 +2703,11 @@ function trackRow(name, members, sub, open) {
   }
   const ms = el("div", "ms"); ms.append(m, s);
   row.append(dot, label, ms, v, last);
-  if (name !== "click" && !(group && open)) { // its waveform under it (drawTrackWaves), where its kept parts are picked (keepPicker)
+  if (!(group && open)) { // its waveform under it (drawTrackWaves), where its kept parts are picked (keepPicker); the metronome's, its beats
     const wrap = el("div", "twrap"), w = el("canvas", "twave"), parts = el("div", "tparts");
     w.dataset.name = parts.dataset.name = name; w.setAttribute("aria-hidden", "true");
-    wrap.append(w, parts); row.append(wrap); keepPicker(w, name);
+    wrap.append(w, parts); row.append(wrap);
+    if (name !== "click") keepPicker(w, name);
   }
   return row;
 }
@@ -2816,6 +2830,7 @@ function applyKey(n, s) {
   P.buffers = Object.fromEntries(Object.entries(P.orig).map(([k, b]) => [k, bufs[k] || b]));
   if (P.playing) swapSources(was);
   if (K.on && K.song === P.song) songEvs();
+  if (s !== was) renderTracks(); // the metronome's tempo, as played now
   paintKey();
 }
 // New buffers while playing: the new sources start where the old ones are by then, fading in as the old ones fade out.
@@ -4743,7 +4758,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Vocals": "보컬", "Lead": "리드", "Backing": "백킹", "Lead vocal": "리드 보컬", "Backing vocals": "백킹 보컬", "Drums": "드럼", "Bass": "베이스", "Guitar": "기타", "Other": "나머지", "Click": "메트로놈",
   "lead and backing": "리드와 백킹", "lead and backing voices": "리드와 백킹 보컬", "the main voice": "메인 보컬", "harmonies, doubles and chops": "화음, 더블링, 보컬 찹",
   "kit and percussion": "드럼 세트와 타악기", "bass line": "베이스 라인", "guitars": "기타 소리", "piano and keys": "피아노와 건반", "everything else": "그 밖의 모든 소리",
-  "click": "메트로놈", "follows the detected beat": "찾아낸 박자를 따라가요", "click · {bpb}/4 · follows the song’s beat": "메트로놈 · {bpb}/4 · 곡의 박자를 따라가요",
+  "click": "메트로놈", "follows the detected beat": "찾아낸 박자를 따라가요", "click · {bpb}/4 · follows the song’s beat": "메트로놈 · {bpb}/4 · 곡의 박자를 따라가요", "Metronome": "메트로놈",
+  "{bpm} BPM · {bpb}/4 · follows the song’s beat": "{bpm} BPM · {bpb}/4 · 곡의 박자를 따라가요",
   "Detected tempo {bpm} BPM": "찾아낸 템포 {bpm} BPM",
   "Show the vocals as one track": "보컬을 한 트랙으로 보기", "Show lead and backing vocals apart": "리드 보컬과 백킹 보컬 따로 보기",
   "Mute": "음소거", "Solo": "솔로", "Click on/off": "메트로놈 켜기/끄기", "{name} volume": "{name} 볼륨",
