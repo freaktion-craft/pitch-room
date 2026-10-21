@@ -545,7 +545,8 @@ input[type="range"]:disabled { opacity: 0.4; }
    stays at the right, with the search there or not. */
 #sAddBtn { margin-left: auto; }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
-.search .ico { position: absolute; left: 10px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
+/* the glyph (2 px in from its box each way) 10 px from the field's left, top and bottom, and from the text */
+.search .ico { position: absolute; left: 8px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
 .search input { width: 100%; height: 32px; padding: 0 12px 0 32px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2);
   color: inherit; font: 13px/20px var(--font); transition: border-color 0.15s, background-color 0.15s; }
 .search input::placeholder { color: rgba(var(--fg), 0.38); }
