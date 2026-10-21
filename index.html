@@ -229,15 +229,16 @@ input[type="range"]:disabled { opacity: 0.4; }
 .gauge .needle { position: absolute; top: -4px; width: 2px; height: 12px; margin-left: -1px; left: 50%; border-radius: 1px; background: var(--dim); transition: left 60ms linear; }
 .gauge-labels { display: flex; justify-content: space-between; width: 140px; font: 10px/1 var(--mono); color: var(--faint); }
 /* Practice: the count-in before the voice comes back after an intro or a break */
-/* left of the playhead line: nothing is drawn there during an intro or break, while the coming bars arrive from the right */
+/* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
+   drawn there during an intro or break, while the coming bars arrive from the right */
 /* The label over a row of dots, one per count: all bright to start, each count dims the next one, so the bright ones
    left are the counts to go. No width of its own, so the label and the dots centre on one fixed line whatever the label
-   says; fixed heights, so nothing moves between counts. */
-.countin { position: absolute; left: clamp(100px, 16%, 240px); top: 50%; width: 0; transform: translateY(-50%); display: flex; flex-direction: column;
+   says; fixed heights, so nothing moves between counts. Dots 20 px, down to 10 where the stretch is narrow. */
+.countin { --dot: 20px; position: absolute; top: 50%; width: 0; transform: translateY(-50%); display: flex; flex-direction: column;
   align-items: center; gap: 8px; pointer-events: none; text-align: center; }
 .countin span { font-size: 13px; line-height: 20px; color: var(--muted); white-space: nowrap; }
-.countin .dots { display: flex; gap: 12px; height: 20px; }
-.countin .dots i { width: 20px; height: 20px; border-radius: 50%; background: var(--ink); transition: opacity 0.15s; }
+.countin .dots { display: flex; gap: calc(var(--dot) * 0.6); height: var(--dot); }
+.countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--ink); transition: opacity 0.15s; }
 .countin .dots i.gone { opacity: 0.25; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(380px, calc(100% - 32px));
@@ -269,8 +270,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 @media (max-width: 760px) {
   header { margin-bottom: 40px; }
   .note-big { font-size: 34px; }
-  .countin .dots { gap: 8px; height: 16px; } /* clear of the note names on a narrow stage */
-  .countin .dots i { width: 16px; height: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
@@ -3321,6 +3320,11 @@ function resize() {
   // setting a canvas's size clears it, even to the same size, so only when it changed
   if (cv.width !== Math.round(W * dpr)) cv.width = Math.round(W * dpr);
   if (cv.height !== Math.round(H * dpr)) cv.height = Math.round(H * dpr);
+  // the count-in midway between the note names and the playhead, its four dots (and three gaps of 0.6 of one) inside
+  // that stretch with 8 px to spare either side (on a phone, 10 px dots and less to spare)
+  const left = (W - GUT) * HIT, ci = $("#countIn");
+  ci.style.left = Math.round(GUT + left / 2) + "px";
+  ci.style.setProperty("--dot", Math.max(10, Math.min(20, Math.floor((left - 16) / 5.8))) + "px");
 }
 new ResizeObserver(resize).observe(cv);
 readColors();
@@ -3352,12 +3356,13 @@ function rr(x, y, w, h, r) {
 }
 let vLo = 50, vHi = 64;
 const GUT = 48; // the note names' column; they start 16 px in, under the stage's head line
+const HIT = 0.24; // where the playhead line is, as a share of the width right of the note names
 // now: song time at the hit line; cur: your pitch; hist: your recent pitch; evs: the bars; guide: the original singer's
 // pitch line ({pts, shift})
 function draw(now, cur, hist, evs, guide) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = C.surface; g.fillRect(0, 0, W, H);
-  const hitX = Math.round(GUT + (W - GUT) * 0.24), pps = (W - hitX) / 4.4;
+  const hitX = Math.round(GUT + (W - GUT) * HIT), pps = (W - hitX) / 4.4;
   const X = (t) => hitX + (t - now) * pps;
   const top = 8, bot = H - 8, ppS = (bot - top) / (vHi - vLo), Y = (m) => bot - (m - vLo) * ppS;
 
