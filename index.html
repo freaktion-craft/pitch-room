@@ -558,7 +558,11 @@ input[type="range"]:disabled { opacity: 0.4; }
 .add-form > b { font-weight: 500; font-size: 15px; }
 .add-form p, #sAddSetup { margin: 0; }
 .add-form .drop { justify-content: center; } /* not the panel's label rows */
-.add-form .inline-field { justify-content: flex-start; gap: 8px; }
+/* while it's up the page behind blurs back, so the panel (and its button) have your attention; a click on it closes */
+#addVeil { position: fixed; inset: 0; z-index: 15; background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(8px);
+  opacity: 0; pointer-events: none; transition: opacity 0.22s ease; }
+#addVeil.on { opacity: 1; pointer-events: auto; }
+.add-at.open { z-index: 21; }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
 /* the glyph (2 px in from its box each way) 10 px from the field's left, top and bottom, and from the text */
 .search .ico { position: absolute; left: 8px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
@@ -605,7 +609,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sLib .first { display: flex; align-items: center; gap: 16px; width: 100%; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2);
   background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 /* an empty library: the Add song panel opens in the big button's place, in the flow */
-#sLib > .pop.inline { position: static; width: auto; margin-inline: 12px; box-shadow: 0 0 0 1px var(--line); }
+#sLib > .pop.inline { position: relative; top: 0; right: 0; width: auto; margin-inline: 12px; box-shadow: 0 0 0 1px var(--line); }
 #sLib .first:hover { border-color: rgba(var(--fg), 0.4); background: rgba(var(--fg), 0.03); }
 #sLib .first .plus { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
 #sLib .first .plus .ico { width: 20px; height: 20px; stroke-width: 1.6px; }
@@ -1016,6 +1020,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <pre class="log" id="sInstallLog" hidden></pre>
     </section>
 
+    <div id="addVeil" aria-hidden="true"></div>
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
@@ -1028,10 +1033,6 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
               <button class="btn sm dark" type="submit">Separate</button>
             </form>
             <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
-            <div class="row-actions">
-              <label class="inline-field" title="6 tracks instead of 4. The piano track often picks up other instruments."><input type="checkbox" class="switch" id="s6">Also split out guitar and piano</label>
-              <span class="muted" id="sDevice"></span>
-            </div>
             <div class="gpu-row" id="sGpu" hidden>
               <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
               <button class="btn sm dark" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
@@ -1717,11 +1718,12 @@ async function stemsRefresh() {
   $("#sAddSetup").hidden = !st || st.installed; // the Add song panel points at the setup until the tools are in
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
   if (st && st.installed) {
-    say($("#sDevice"), st.restartNeeded ? "Restart the app (close its window and open it again) to switch to the GPU."
-      : { mps: "Runs on your Apple GPU — about 30 s for a 4-minute song.", cuda: "Runs on your NVIDIA GPU{name} — usually under a minute.", cpu: "Runs on the CPU — a 4-minute song can take several minutes." }[st.device] || "",
-      { name: st.deviceName ? " (" + st.deviceName + ")" : "" });
-    $("#sGpu").hidden = !st.gpuUnused || st.restartNeeded;
-    if (st.gpuUnused && st.driverOld) {
+    // the GPU note: on the CPU with an NVIDIA card to switch to; once switched, until the app is restarted
+    $("#sGpu").hidden = !st.gpuUnused && !st.restartNeeded;
+    if (st.restartNeeded) {
+      say($("#sGpu").querySelector("span"), "Restart the app (close its window and open it again) to switch to the GPU.");
+      $("#sGpuBtn").hidden = true;
+    } else if (st.gpuUnused && st.driverOld) {
       say($("#sGpu").querySelector("span"), "This PC has an NVIDIA graphics card, but its driver is too old for GPU separation. Update the NVIDIA driver (nvidia.com/drivers), restart the app, then come back here.");
       $("#sGpuBtn").hidden = true;
     }
@@ -2456,8 +2458,8 @@ async function postJob(url, body, headers) {
   if (!r.ok) throw new Error(j.error || "That didn’t work.");
   return j.job;
 }
-// 4 stems unless the switch asks for guitar and piano too (the 6-stem model; its piano track bleeds, so it's opt-in)
-const stemModel = () => ($("#s6").checked ? "htdemucs_6s" : "htdemucs");
+// 4 stems: vocals, drums, bass and the rest (the 6-stem model's piano track bleeds, so it isn't offered)
+const stemModel = () => "htdemucs";
 // Several at once: links a line each (or spaces between), files several at a time. Each is sent in the order given;
 // the server takes them in that order, one at a time, the rest waiting with how many are ahead of them. Once one is
 // in, the library shows their progress; one that couldn't start says why here, the others going on.
@@ -2553,6 +2555,7 @@ function showAdd(on) {
   }
   const was = !pop.hidden;
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
+  $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // the page behind blurs back
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
   if (!on && pop.classList.contains("inline")) { pop.classList.remove("inline"); $("#sAddAt").append(pop); renderLibrary(); } // the big button back
 }
@@ -3418,8 +3421,6 @@ function initStems() {
   addEventListener("dragenter", (e) => {
     if (view === "stems" && stemsPage === "lib" && addPop.hidden && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) showAdd(true);
   });
-  $("#s6").checked = store.get("sixStems", false);
-  $("#s6").onchange = (e) => store.set("sixStems", e.target.checked);
   $("#pGetVideo").onclick = async () => {
     const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
     videoWait("Getting the video…");
