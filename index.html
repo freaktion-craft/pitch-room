@@ -754,13 +754,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
-    <section class="group" id="sLibPage">
-      <div class="lib-head"><div class="group-label">Library</div><a class="btn sm dark" id="sAddBtn" href="#stems/add">Add song</a></div>
-      <div id="sJobs"></div>
-      <div class="rows" id="sLib"></div>
-    </section>
-
-    <div id="sAddPage" hidden>
+    <!-- the tools to add songs, in the library and on Add song while they're missing (an update can add one) -->
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
       <p class="muted" data-html>Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Lyrics come from <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> and are lined up with the voice by <a href="https://github.com/openai/whisper" target="_blank" rel="noopener">Whisper</a>. Together they’re a 3–4 GB download, installed into this app’s own folder.</p>
@@ -768,6 +762,14 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
     </section>
+
+    <section class="group" id="sLibPage">
+      <div class="lib-head"><div class="group-label">Library</div><a class="btn sm dark" id="sAddBtn" href="#stems/add">Add song</a></div>
+      <div id="sJobs"></div>
+      <div class="rows" id="sLib"></div>
+    </section>
+
+    <div id="sAddPage" hidden>
 
     <section class="panel-card" id="sAdd" hidden>
       <b>Add a song</b>
@@ -1388,7 +1390,7 @@ async function stemsRefresh() {
   $("#sServer").hidden = !!st || !!err;
   $("#sErr").hidden = !err;
   if (err) say($("#sErr"), "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err: () => tr(err) });
-  $("#sInstall").hidden = !st || st.installed;
+  $("#sInstall").hidden = !st || st.installed || (stemsPage !== "lib" && stemsPage !== "add");
   $("#sAdd").hidden = !st || !st.installed;
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
   if (st && st.installed) {
