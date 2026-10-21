@@ -515,9 +515,16 @@ input[type="range"]:disabled { opacity: 0.4; }
 .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; } /* 16 px to the list with the group's 12 */
 #sJobs { display: grid; gap: 8px; }
 #sJobs:empty { display: none; }
-#sLib { overflow: hidden; }
-#sLib .row { padding-block: 16px; cursor: pointer; transition: background-color 0.15s; } /* the cover as far from the top and bottom as from the left */
-#sLib .row:hover { background: rgba(var(--fg), 0.03); }
+/* The list: flat, nothing behind it, a hairline between songs. It reaches 12 px past the page's edges, so a song's
+   hover fill has room round it, while the lines and what's in the rows keep to the edges; the lines either side of
+   the song pointed at give way to its fill. */
+#sLib { margin-inline: -12px; background: none; box-shadow: none; border-radius: 0; }
+#sLib .row { position: relative; padding: 16px 12px; border-radius: 8px; cursor: pointer; transition: background-color 0.15s; }
+#sLib .row + .row { border-top: 0; }
+#sLib .row + .row::before, #sLib .lib-cols::after { content: ""; position: absolute; left: 12px; right: 12px; height: 1px; background: var(--line); transition: opacity 0.15s; }
+#sLib .row + .row::before { top: 0; }
+#sLib .row:hover { background: rgba(var(--fg), 0.04); }
+#sLib .row:hover::before, #sLib .row:hover + .row::before, #sLib .lib-cols:has(+ .row:hover)::after { opacity: 0; }
 #sLib:empty { display: none; } /* until the list has loaded */
 /* an empty library: the list itself is the way to add the first song */
 #sLib .first { display: flex; align-items: center; gap: 16px; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2); }
@@ -537,7 +544,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sLib { container-type: inline-size; }
 #sLib .row, #sLib .lib-cols { display: grid; grid-template-columns: 48px minmax(0, 4fr) minmax(56px, 1fr) minmax(104px, 1.5fr) minmax(96px, 1.5fr) 56px 32px;
   column-gap: 16px; align-items: center; }
-#sLib .lib-cols { height: 40px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+#sLib .lib-cols { position: relative; height: 40px; padding: 0 12px; }
+#sLib .lib-cols::after { bottom: 0; }
 #sLib .lib-cols .sort { justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0; border: 0; background: none;
   color: var(--faint); font-size: 12px; cursor: pointer; transition: color 0.15s; }
 #sLib .lib-cols .sort[data-by="title"] { grid-column: 1 / 3; }
