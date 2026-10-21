@@ -8,11 +8,12 @@ Then open http://localhost:5178 (localhost is needed for microphone access).
 """
 import json
 import os
+import posixpath
 import re
 import sys
 import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 
 def _dll_version(path):
@@ -53,6 +54,9 @@ import stems  # noqa: E402  (after the runtime fix above)
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 MAX_SONG = 400 * 1024 * 1024
+HOSTS = ("localhost", "127.0.0.1", "[::1]")
+PAGE_FILES = {"/": "index.html", "/index.html": "index.html", "/favicon.svg": "favicon.svg", "/icons.local.js": "icons.local.js"}
+SONG_FILE = re.compile(r"/library/[0-9a-f]{12}/[^?#]*[^/]")  # a file in a song's folder, never the folder itself
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -79,6 +83,44 @@ class Handler(SimpleHTTPRequestHandler):
                 break
             self._unread -= len(chunk)
         self._unread = 0
+
+    def _ours(self) -> bool:
+        """Whether a request comes from this app's own page (or a program on this computer). Another website can
+        still make the browser send requests here: its own domain pointed at 127.0.0.1 (DNS rebinding) shows in Host,
+        and its forms and fetches show in Origin (sent with every POST) and Sec-Fetch-Site. Turned away, it can't
+        delete songs or start downloads, separations or installs, or read the library."""
+        host = (self.headers.get("Host") or "").lower()
+        name = host.rsplit(":", 1)[0] if not host.endswith("]") else host
+        if name not in HOSTS:
+            return False
+        site = self.headers.get("Sec-Fetch-Site")
+        if self.command == "POST":
+            origin = self.headers.get("Origin")
+            if origin is not None and origin.lower() != "http://" + host:
+                return False
+            return site in (None, "same-origin", "none")
+        # a link from another site may open the page; nothing else from elsewhere
+        return site in (None, "same-origin", "none") or self.headers.get("Sec-Fetch-Mode") == "navigate"
+
+    def _refuse(self):
+        self.send_response(403)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", "0")
+        self.send_header("Connection", "close")
+        self.close_connection = True
+        self.end_headers()
+
+    def _static(self, path) -> bool:
+        """Point self.path at a file the page may load: the page itself and the files in a song's folder. False for
+        anything else (the app's code, its settings, folder listings)."""
+        path = posixpath.normpath(unquote(path))  # as the file is looked up: %2e%2e/ is ../
+        if path in PAGE_FILES:
+            self.path = "/" + PAGE_FILES[path]
+            return True
+        return bool(SONG_FILE.fullmatch(path))
+
+    def list_directory(self, path):
+        self.send_error(404)
 
     def _json(self, code, payload):
         self._drain()
@@ -138,7 +180,16 @@ class Handler(SimpleHTTPRequestHandler):
                 left -= len(chunk)
         return True
 
+    def do_HEAD(self):
+        if not self._ours():
+            return self._refuse()
+        if not self._static(urlparse(self.path).path):
+            return self.send_error(404)
+        return super().do_HEAD()
+
     def do_GET(self):
+        if not self._ours():
+            return self._refuse()
         path = urlparse(self.path).path
         if path == "/icons.local.js" and not os.path.isfile(os.path.join(ROOT, "icons.local.js")):
             # optional (see index.html); answer with nothing rather than a 404 in the console
@@ -148,6 +199,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             return None
         if not path.startswith("/api/"):
+            if not self._static(path):
+                return self.send_error(404)
             return None if self._send_range() else super().do_GET()
         try:
             return self._get_api(path)
@@ -162,6 +215,8 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/stems/status":
             return self._json(200, {"installed": stems.installed(), "models": stems.MODELS, **stems.gpu_status(),
                                     "install": stems.get_job(stems._install_job["id"]) if stems._install_job else None})
+        if path == "/api/jobs":
+            return self._json(200, stems.active_jobs())
         if path.startswith("/api/jobs/"):
             job = stems.get_job(path.rsplit("/", 1)[-1])
             return self._json(200, job) if job else self._json(404, {"error": "Unknown job."})
@@ -178,7 +233,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, stems.get_melody(path.rsplit("/", 1)[-1]))
             except ValueError as e:
                 return self._json(422, {"error": str(e)})
-        return super().do_GET()
+        return self._json(404, {"error": "Not found."})
 
     def _stems_post(self, url):
         q = parse_qs(url.query)
@@ -234,6 +289,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         url = urlparse(self.path)
         self._unread = int(self.headers.get("Content-Length") or 0)
+        if not self._ours():
+            return self._refuse()
         if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")):
             try:
                 return self._stems_post(url)

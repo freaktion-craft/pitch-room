@@ -64,6 +64,13 @@ def _new_job(kind: str) -> dict:
     return job
 
 
+def active_jobs() -> list[dict]:
+    """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress."""
+    with _jobs_lock:
+        jobs = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
+        return [{k: j[k] for k in ("id", "kind", "status", "stage", "progress", "cancel")} for j in sorted(jobs, key=lambda j: j["started"])]
+
+
 def get_job(job_id: str) -> dict | None:
     with _jobs_lock:
         job = _jobs.get(job_id)
@@ -256,12 +263,44 @@ def _song_dir(song_id: str) -> str:
 _meta_lock = threading.Lock()
 
 
+def _retry(fn, *args):
+    """fn(*args), tried again for a moment while Windows says the file is busy: a file open in another thread can't be
+    replaced, and one being replaced can't be opened."""
+    for i in range(40):
+        try:
+            return fn(*args)
+        except PermissionError:
+            if i == 39:
+                raise
+            time.sleep(0.025)
+
+
+def _write_json(path: str, data, **kw):
+    """Write a json file whole or not at all: to a temporary file first, then renamed over the old one. Read at any
+    moment, or after the app stopped halfway, it's the old file or the new one, never a part of one."""
+    tmp = f"{path}.{secrets.token_hex(4)}.part"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, **kw)
+        _retry(os.replace, tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(tmp)
+        raise
+
+
+def _load_json(path: str):
+    def load():
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return _retry(load)
+
+
 def _read_meta(folder: str) -> dict:
     path = os.path.join(folder, "meta.json")
     if not os.path.isfile(path):
         raise ValueError("Unknown song.")
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    return _load_json(path)
 
 
 def _update_meta(folder: str, **kw):
@@ -269,8 +308,7 @@ def _update_meta(folder: str, **kw):
     with _meta_lock:
         meta = _read_meta(folder)
         meta.update(kw)
-        with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False)
+        _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
 
 
 _backfilled: set[str] = set()
@@ -285,7 +323,13 @@ def library() -> list[dict]:
             folder = os.path.join(LIB, d)
             if not os.path.isfile(os.path.join(folder, "meta.json")):
                 continue
-            meta = _read_meta(folder)
+            try:
+                meta = _read_meta(folder)
+                if not isinstance(meta, dict) or not isinstance(meta.get("title"), str) or not isinstance(meta.get("stems"), list):
+                    raise ValueError("fields missing")
+            except (OSError, ValueError) as e:  # one damaged song shouldn't hide the others
+                print(f"Skipped library/{d}: its meta.json can't be read ({e})", file=sys.stderr)
+                continue
             meta["split"] = _has_split(folder)
             if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
                 _backfilled.add(d)
@@ -546,8 +590,7 @@ def _pipeline(job, src: dict, model_name: str):
             _check(job)  # the last chance: once meta.json is written the song is in the library
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
                     "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
-            with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
-                json.dump(meta, f, ensure_ascii=False)
+            _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
             _set(job, songId=song_id)
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
@@ -884,8 +927,7 @@ def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | 
     import melody
     data = melody.extract(vocals_mono, drums=drums_mono)
     data["lead"] = lead  # built from the lead vocal alone
-    with open(os.path.join(folder, "melody.json"), "w", encoding="utf-8") as f:
-        json.dump(data, f, separators=(",", ":"))
+    _write_json(os.path.join(folder, "melody.json"), data, separators=(",", ":"))
     return data
 
 
@@ -917,8 +959,10 @@ def get_melody(song_id: str) -> dict:
     with _melody_lock:
         data = None
         if os.path.isfile(path):
-            with open(path, encoding="utf-8") as f:
-                data = json.load(f)
+            try:
+                data = _load_json(path)
+            except ValueError:
+                data = {}  # damaged: built again below
             if data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available()):
                 data = None
         vocals = os.path.join(folder, "vocals.mp3")
@@ -934,8 +978,7 @@ def get_melody(song_id: str) -> dict:
         if "full" not in data:
             full = melody.extract(_decode_stereo(vocals).mean(0), drums=_drums_mono(folder))
             data["full"] = {"notes": full["notes"], "contour": full["contour"]}
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, separators=(",", ":"))
+            _write_json(path, data, separators=(",", ":"))
         return _splice(data, ranges)
 
 

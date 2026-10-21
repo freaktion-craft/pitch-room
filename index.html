@@ -1280,9 +1280,17 @@ async function stemsRefresh() {
 }
 async function renderLibrary() {
   const box = $("#sLib");
-  let lib = [];
-  try { lib = await (await fetch("/api/library", { cache: "no-store" })).json(); } catch (e) { lib = []; }
+  let lib = [], jobs = [];
+  [lib, jobs] = await Promise.all(["/api/library", "/api/jobs"].map((u) => fetch(u, { cache: "no-store" }).then((r) => r.json()).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])));
   libCache = new Map(lib.map((m) => [m.id, m]));
+  // songs still being added (this page was reloaded, or opened in a second tab meanwhile) get their cards back
+  for (const j of jobs) {
+    if (pollers[j.id] || document.getElementById("job-" + j.id)) continue;
+    const card = jobCard(j.id);
+    say(card.querySelector(".top span"), j.cancel ? "Cancelling…" : j.stage);
+    card.querySelector(".bar i").style.width = Math.round(j.progress * 100) + "%";
+    watchJob(j.id, "separate");
+  }
   box.innerHTML = "";
   // nothing yet (and nothing on its way): the list becomes the one big way in, in place of the button beside its title
   const first = !lib.length && !$("#sJobs").children.length;
