@@ -111,8 +111,12 @@ header { position: relative; }
    bar reaches when a sound is just loud enough. */
 .gate-sec { display: grid; gap: 8px; }
 .gate-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.gate-head .btn { min-width: 112px; justify-content: center; } /* one width, whichever it says */
-.gate-head .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.gate-acts { display: flex; gap: 8px; }
+#hearMe { min-width: 112px; justify-content: center; } /* one width, whichever it says */
+#hearMe[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+/* the mic, on and off, as the header's chip: tinted red while it's off */
+#micBtn2:not(.on) { background: color-mix(in oklab, var(--bad) 14%, var(--surface-2)); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
+#micBtn2:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, var(--surface-2)); }
 .gate { position: relative; height: 20px; }
 .gate-meter { position: absolute; left: 0; right: 0; top: 6px; height: 8px; border-radius: 4px; background: rgba(var(--fg), 0.08); overflow: hidden; }
 .gate-meter i { display: block; height: 100%; width: 0; background: rgba(var(--fg), 0.3); }
@@ -123,7 +127,7 @@ header { position: relative; }
 #gate::-webkit-slider-thumb { width: 12px; height: 20px; margin-top: 0; border-radius: 2px; background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
 #gate::-moz-range-thumb { width: 12px; height: 20px; border-radius: 2px; background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
 #gate.hot::-webkit-slider-thumb { background: linear-gradient(90deg, transparent 4px, oklch(0.66 0 0) 4px 8px, transparent 8px); transform: none; }
-#gateHint { color: var(--faint); font-size: 12.5px; line-height: 16px; }
+#gateHint { min-height: 32px; color: var(--faint); font-size: 12.5px; line-height: 16px; } /* two lines whichever it says: the panel doesn't jump */
 /* the accent colour: a row of swatches in the settings, under a hairline, spread across the panel */
 .pop-sec { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); line-height: 20px; }
 .swatches { display: flex; justify-content: space-between; margin: 0 -4px; } /* the dots, not their rings, line up with the rows above */
@@ -711,7 +715,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <label>Input <button class="pick" id="micDev" type="button"></button></label>
       <p class="hint" id="micDevHint" hidden>Turn on the mic to see each input’s name.</p>
       <div class="gate-sec">
-        <div class="gate-head"><span>Mic sensitivity</span><button class="btn sm" id="hearMe" type="button" aria-pressed="false" title="Through headphones: through speakers it can howl">Hear yourself</button></div>
+        <div class="gate-head"><span>Mic sensitivity</span><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button><button class="btn sm" id="hearMe" type="button" aria-pressed="false" title="Through headphones: through speakers it can howl">Hear yourself</button></div></div>
         <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>
         <p class="hint" id="gateHint">Turn on the mic to see how loud it hears you.</p>
       </div>
@@ -1282,6 +1286,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
 }
 function stopMic() {
   recOff(); // no recording without the mic
+  hearMe(false); // nor hearing yourself
   if (micNode) micNode.disconnect();
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
   micNode = null; micStream = null; micOn = false; renderMic();
@@ -3109,7 +3114,7 @@ function paintGate() {
   gateShown = Math.max(db, gateShown - 0.6);
   const f = Math.max(0, Math.min(1, (gateShown - min) / (max - min)));
   const lvl = $("#gateLvl"); lvl.style.width = (f * 100).toFixed(1) + "%"; lvl.classList.toggle("on", micOn && gateShown > +s.value); // as drawn: in colour while the bar is past the line
-  const hint = micOn ? "Sounds past the line count as singing. Sing a little: the bar should go past it, and the room's quiet shouldn't." : "Turn on the mic to see how loud it hears you.";
+  const hint = micOn ? "Sound past the line counts as singing: your voice should cross it, the room's quiet shouldn't." : "Turn on the mic to see how loud it hears you.";
   if ($("#gateHint").dataset.en !== hint) { $("#gateHint").dataset.en = hint; say($("#gateHint"), hint); }
 }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
@@ -3914,11 +3919,12 @@ function renderHud(now, m) {
   $("#hudRep").classList.toggle("rec", !!R.cap);
 }
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
-function renderMic() {
-  const b = $("#micBtn");
-  if (!b.querySelector(".ico")) { const on = icon("mic"), off = icon("micOff"); on.classList.add("if-on"); off.classList.add("if-off"); $(".mic-ico").append(on, off); }
-  b.classList.toggle("on", micOn);
-  b.setAttribute("aria-pressed", String(micOn)); b.title = tr(micOn ? "Turn the mic off" : "Turn the mic on");
+function renderMic() { // the header's chip, and the one by the sensitivity in the settings
+  for (const b of [$("#micBtn"), $("#micBtn2")]) {
+    if (!b.querySelector(".ico")) { const on = icon("mic"), off = icon("micOff"); on.classList.add("if-on"); off.classList.add("if-off"); b.querySelector(".mic-ico").append(on, off); }
+    b.classList.toggle("on", micOn);
+    b.setAttribute("aria-pressed", String(micOn)); b.title = tr(micOn ? "Turn the mic off" : "Turn the mic on");
+  }
 }
 // Why the mic didn't start: over the stage in Practice, else in a panel under the mic chip, for a few seconds.
 function notice(msg) {
@@ -4014,7 +4020,7 @@ function route() {
 }
 window.addEventListener("hashchange", route);
 $("#startBtn").onclick = songToggle;
-$("#micBtn").onclick = () => (micOn ? stopMic() : startMic());
+$("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
 // Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest
 // still play, seek and step (Record clicked, then Space, plays rather than ending the take). One reached with Tab
 // keeps its own keys, so a button presses with Space and a slider goes to its ends with Home and End. Text fields and
@@ -4158,7 +4164,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Through headphones: through speakers it can howl": "헤드폰으로 들으세요. 스피커로 들으면 하울링이 날 수 있어요",
   "Mic sensitivity: how loud a sound must be to count as singing": "마이크 감도: 노래로 들을 소리의 크기",
   "Turn on the mic to see how loud it hears you.": "마이크를 켜면 들어오는 소리 크기가 보여요.",
-  "Sounds past the line count as singing. Sing a little: the bar should go past it, and the room's quiet shouldn't.": "선을 넘는 소리만 노래로 들어요. 살짝 불러 보세요. 노래는 선을 넘고, 조용할 때의 방 소리는 넘지 않으면 돼요.", "Filter out speaker sound": "스피커 소리 걸러내기", "Note names": "음 이름", "Accent colour": "강조 색",
+  "Sound past the line counts as singing: your voice should cross it, the room's quiet shouldn't.": "선을 넘는 소리만 노래로 들어요. 목소리는 선을 넘고, 조용할 때의 방 소리는 넘지 않게 맞춰 보세요.", "Filter out speaker sound": "스피커 소리 걸러내기", "Note names": "음 이름", "Accent colour": "강조 색",
   "Blue": "파랑", "Violet": "보라", "Pink": "분홍", "Coral": "코랄", "Orange": "주황", "Amber": "앰버", "Green": "초록", "Teal": "청록",
   "Double-click to reset": "더블클릭하면 처음 값으로",
   "Can’t use the microphone": "마이크를 쓸 수 없어요", "The song still plays — you just won’t see your own pitch.": "곡은 계속 재생돼요. 내 음정만 보이지 않아요.",
