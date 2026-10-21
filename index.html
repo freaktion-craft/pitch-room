@@ -514,8 +514,9 @@ input[type="range"]:disabled { opacity: 0.4; }
 #pSave:not(:disabled):hover { background: var(--ink-strong); }
 .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; } /* 16 px to the list with the group's 12 */
 /* Search, heading the list in place of a "Library" that said nothing: the songs whose title or artist has every word
-   typed, as it's typed; a field like the others, 32 px, its glass inside on the left. / goes to it; Esc empties it.
-   Add song stays at the right, with the search there or not. */
+   typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
+   to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. Add song
+   stays at the right, with the search there or not. */
 #sAddBtn { margin-left: auto; }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
 .search .ico { position: absolute; left: 10px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
@@ -525,6 +526,11 @@ input[type="range"]:disabled { opacity: 0.4; }
 .search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .search input:hover { background: var(--hover-2); }
 .search input:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+.search .keys { position: absolute; top: 6px; right: 6px; height: 20px; display: flex; gap: 4px; pointer-events: none; transition: opacity 0.15s; }
+.search kbd { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 4px; background: rgba(var(--fg), 0.06);
+  box-shadow: inset 0 0 0 1px rgba(var(--fg), 0.08); color: var(--faint); font: 500 11px/1 var(--font); }
+.search input:focus ~ .keys, .search input:not(:placeholder-shown) ~ .keys { opacity: 0; }
+@media (hover: none) { .search .keys { display: none; } }
 #sLib .lib-none { margin: 0; padding: 24px 12px; color: var(--faint); font-size: 14px; }
 /* A long list: the page's foot fades into the background while there's more below, and clears at the end */
 #listFade { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; height: 96px; pointer-events: none; opacity: 0; transition: opacity 0.2s;
@@ -1780,8 +1786,10 @@ function tiltTick() {
   CV.raf = requestAnimationFrame(tiltTick);
 }
 function initLibSearch() {
-  const f = $("#sSearch");
+  const f = $("#sSearch"), mac = /Mac|iPhone|iPad/.test(navigator.platform), keys = el("span", "keys");
   f.before(icon("search"));
+  keys.setAttribute("aria-hidden", "true"); keys.append(el("kbd", null, mac ? "⌘" : "Ctrl"), el("kbd", null, "K")); f.after(keys);
+  f.setAttribute("aria-keyshortcuts", mac ? "Meta+K /" : "Control+K /");
   f.oninput = arrangeRows;
   f.onkeydown = (e) => {
     if (e.key !== "Escape") return;
@@ -1789,8 +1797,9 @@ function initLibSearch() {
     if (f.value) { f.value = ""; arrangeRows(); } else f.blur();
   };
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || CV.tile) return;
-    if (!(view === "stems" && stemsPage === "lib") || $("#sSearchBox").hidden) return;
+    const ctrlK = e.code === "KeyK" && (mac ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey; // by the key, so a Korean layout too
+    const slash = e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target);
+    if (!(ctrlK || slash) || CV.tile || !(view === "stems" && stemsPage === "lib") || $("#sSearchBox").hidden) return;
     e.preventDefault(); f.focus(); f.select();
   });
   addEventListener("scroll", paintFade, { passive: true });
