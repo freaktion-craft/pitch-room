@@ -141,7 +141,7 @@ header { position: relative; }
 .muted { color: var(--muted); }
 
 /* Page intro: title and lede read as one block, set apart from what follows */
-.intro { display: grid; gap: 8px; margin-bottom: 32px; }
+.intro { display: grid; gap: 2px; margin-bottom: 32px; }
 .group { display: grid; gap: 12px; }
 /* Section titles: they head the content, so they read stronger than it */
 .group-label { font-size: 15px; font-weight: 500; color: var(--ink); }
@@ -514,20 +514,31 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* the album art (covers.py), as tall as the title and its details beside it: a square the row has from the start, so
    nothing moves when the picture comes in (fading); a quiet tile until then, or for good when there's none. A hairline
    inside, for a white cover on the white list. */
-/* The list is a table: the cover, the title over the artist, tempo, key, the day added, length, ⋮. Under 640 px wide
-   only the length stays beside the title. */
+/* The list is a table: the cover, the title over the artist, tempo, key, the day added, length, ⋮. The columns share
+   the width, the title half of it; the length is at the end, against the ⋮. Under 640 px wide only the length stays
+   beside the title. A header sorts by its column (lib-head .sort): its arrow shows which way, and the others' show on
+   hover, in room kept for them so no label moves. */
 #sLib { container-type: inline-size; }
-#sLib .row, #sLib .lib-head { display: grid; grid-template-columns: 48px minmax(0, 1fr) 40px 96px 88px 40px 32px; column-gap: 16px; align-items: center; }
-#sLib .lib-head { height: 40px; padding: 0 16px; border-bottom: 1px solid var(--line); color: var(--faint); font-size: 12px; }
-#sLib .lib-head span:first-child { grid-column: 1 / 3; }
-#sLib .num { text-align: right; font-variant-numeric: tabular-nums; }
+#sLib .row, #sLib .lib-head { display: grid; grid-template-columns: 48px minmax(0, 4fr) minmax(56px, 1fr) minmax(104px, 1.5fr) minmax(96px, 1.5fr) 56px 32px;
+  column-gap: 16px; align-items: center; }
+#sLib .lib-head { height: 40px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+#sLib .lib-head .sort { justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0; border: 0; background: none;
+  color: var(--faint); font-size: 12px; cursor: pointer; transition: color 0.15s; }
+#sLib .lib-head .sort[data-by="title"] { grid-column: 1 / 3; }
+#sLib .lib-head .sort.end { justify-self: end; flex-direction: row-reverse; } /* the arrow before the label, the label over the numbers */
+#sLib .lib-head .sort:hover, #sLib .lib-head .sort.on { color: var(--muted); }
+#sLib .lib-head .sort:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+#sLib .lib-head .sort .ico { width: 14px; height: 14px; opacity: 0; transition: opacity 0.15s; }
+#sLib .lib-head .sort:hover .ico, #sLib .lib-head .sort:focus-visible .ico, #sLib .lib-head .sort.on .ico { opacity: 1; }
+#sLib .num { font-variant-numeric: tabular-nums; }
+#sLib .end { text-align: right; }
 #sLib .row > .c { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #sLib .song a, #sLib .song b { display: block; min-width: 0; }
-#sLib .song b { line-height: 24px; } #sLib .song small { line-height: 20px; }
+#sLib .song { gap: 2px; } #sLib .song b { line-height: 20px; } #sLib .song small { line-height: 18px; } /* the artist right under the title */
 #sLib .song b, #sLib .song small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #sLib .song small:empty { display: none; } /* no artist known: the title alone, in the middle */
 @container (max-width: 640px) {
-  #sLib .row, #sLib .lib-head { grid-template-columns: 48px minmax(0, 1fr) 40px 32px; }
+  #sLib .row, #sLib .lib-head { grid-template-columns: 48px minmax(0, 1fr) 56px 32px; }
   #sLib .wide { display: none; }
 }
 #sLib .cover { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden; background: rgba(var(--fg), 0.06); }
@@ -1439,6 +1450,9 @@ function resetOnDblClick(input, def) {
 // replaces them by name with another style the owner of this copy holds a Hugeicons Pro license for.
 // The <svg> gets its stroke from .ico and round caps and joins from icon(), which a shape can override.
 const ICONS = {
+  sortUp: '<path d="M12 5.5V19"/><path d="M18 11C18 11 13.5811 5.00001 12 5C10.4188 4.99999 6 11 6 11"/>',
+  sortDown: '<path d="M12 18.502V5.00195"/><path d="M18 13.002C18 13.002 13.5811 19.0019 12 19.002C10.4188 19.002 6 13.002 6 13.002"/>',
+  sortBoth: '<path d="M7 4V20"/><path d="M17 19L17 4"/><path d="M10 6.99998C10 6.99998 7.79053 4.00001 6.99998 4C6.20942 3.99999 4 7 4 7"/><path d="M20 17C20 17 17.7905 20 17 20C16.2094 20 14 17 14 17"/>',
   vocals: '<path d="M19.7836 10.5355C17.831 12.4882 14.6651 12.4882 12.7125 10.5355C10.7599 8.58291 10.7599 5.41709 12.7125 3.46447C14.6651 1.51184 17.831 1.51184 19.7836 3.46447C21.7362 5.41709 21.7362 8.58291 19.7836 10.5355Z"/><path d="M11.2538 8L4.83517 15.3889C4.75179 15.4848 4.7101 15.5328 4.67652 15.5761C4.08338 16.3395 4.12122 17.4179 4.76642 18.1379C4.80295 18.1786 4.8479 18.2236 4.9378 18.3135C5.02765 18.4033 5.0726 18.4483 5.11335 18.4848C5.83313 19.1298 6.91119 19.1679 7.67463 18.5751C7.71785 18.5416 7.76584 18.4999 7.86182 18.4166L15.2538 12"/><path d="M4.80431 18.5L4.71852 18.5858C3.26547 20.0388 2.53894 20.7654 2.79464 21.3827C3.05034 22 4.07781 22 6.13274 22H13.3043"/>',
   drums: '<path d="M14 4.1239C13.3568 4.04281 12.6874 4 12 4C7.02944 4 3 6.23858 3 9C3 11.7614 7.02944 14 12 14C16.9706 14 21 11.7614 21 9C21 8.65753 20.938 8.32311 20.82 8"/><path d="M21 9V16C21 18.7614 16.9706 21 12 21C7.02944 21 3 18.7614 3 16V9"/><path d="M8 14V20"/><path d="M16 14V20"/><path d="M12 9.5L21 3"/>',
   guitar: '<path d="M18.0029 6.00049L13.6748 10.3301"/><path d="M11.5675 15.2239C10.7949 15.9962 9.54238 15.9962 8.76984 15.2239C7.99729 14.4517 7.99729 13.1996 8.76984 12.4273C9.54238 11.6551 10.7949 11.6551 11.5675 12.4273C12.34 13.1996 12.34 14.4517 11.5675 15.2239Z"/><path d="M5.98828 16.6216L7.38709 18.0199"/><path d="M9.56292 7.94818C8.84611 8.66473 8.48771 9.023 8.40162 9.08719C8.09753 9.31393 8.32517 9.19714 7.96359 9.31192C7.86123 9.34441 7.49363 9.40483 6.75844 9.52566C5.71822 9.69663 4.75154 10.161 3.98531 10.9269C1.80353 13.1079 0.685178 15.5243 4.58186 19.4195C8.47854 23.3148 10.8958 22.1968 13.0776 20.0158C13.8438 19.2499 14.3083 18.2836 14.4793 17.2437C14.6002 16.5088 14.6606 16.1413 14.6932 16.039C14.808 15.6776 14.6911 15.9051 14.918 15.6012C14.9822 15.5151 15.3406 15.1568 16.0574 14.4403C17.6928 12.8055 18.5557 11.0155 15.7723 8.23313C12.989 5.45077 11.1983 6.31341 9.56292 7.94818Z"/><path d="M21.5134 4.50448L20.5045 5.51344C20.3957 5.62225 20.3413 5.67665 20.2907 5.71771C19.8274 6.0941 19.1636 6.0941 18.7003 5.71771C18.6498 5.67665 18.5954 5.62224 18.4866 5.51344C18.3778 5.40464 18.3233 5.35024 18.2823 5.29969C17.9059 4.83636 17.9059 4.17261 18.2823 3.70927C18.3233 3.65872 18.3778 3.60432 18.4866 3.49552L19.4955 2.48656C19.6043 2.37775 19.6587 2.32335 19.7093 2.28229C20.1726 1.9059 20.8364 1.9059 21.2997 2.28229C21.3502 2.32335 21.4046 2.37775 21.5134 2.48656C21.6222 2.59535 21.6767 2.64976 21.7177 2.70031C22.0941 3.16364 22.0941 3.82739 21.7177 4.29073C21.6767 4.34128 21.6222 4.39568 21.5134 4.50448Z"/>',
@@ -1551,8 +1565,13 @@ async function renderLibrary() {
   }
   if (!lib.length) return;
   const head = el("div", "lib-head");
-  head.setAttribute("aria-hidden", "true"); // the cells say what they are to a screen reader (libLine)
-  for (const [t, c] of [["Title"], ["BPM", "num wide"], ["Key", "wide"], ["Added", "wide"], ["Length", "num"], [""]]) head.append(el("span", c || null, t && tr(t)));
+  for (const [by, c] of Object.entries(SORTS)) {
+    const b = el("button", "sort" + (c.end ? " end" : "") + (c.wide ? " wide" : ""));
+    b.type = "button"; b.dataset.by = by; b.append(el("span", null, tr(c.label)), icon("sortBoth"));
+    b.onclick = () => { libSort = libSort.by === by ? { by, desc: !libSort.desc } : { by, desc: c.desc }; store.set("libSort", libSort); sortRows(); };
+    head.append(b);
+  }
+  head.append(el("span"));
   box.append(head);
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
@@ -1560,7 +1579,7 @@ async function renderLibrary() {
     link.href = "#stems/" + m.id; link.title = m.title; link.setAttribute("aria-label", libLine(m)); link.append(el("b", null, m.title));
     info.append(link, el("small", null, m.artist || ""));
     const key = el("span", "c wide", keyName(m.key));
-    keyOf(m).then(() => { key.textContent = keyName(m.key); link.setAttribute("aria-label", libLine(m)); });
+    keyOf(m).then(() => { key.textContent = keyName(m.key); link.setAttribute("aria-label", libLine(m)); if (libSort.by === "key") sortRows(); });
     // a click that starts while the title is being renamed (in its field, or beside it to finish) doesn't open the song
     row.onpointerdown = () => { row.dataset.renaming = row.querySelector(".rename") ? "1" : ""; };
     row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
@@ -1570,10 +1589,39 @@ async function renderLibrary() {
     more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false"); more.append(icon("more"));
     acts.append(more);
     row.append(coverTile(m), info, el("span", "c num wide", m.bpm ? String(Math.round(m.bpm)) : "–"), key,
-      el("span", "c wide", dayOf(m.created)), el("span", "c num", fmtTime(m.duration)), acts);
+      el("span", "c num wide", dayOf(m.created)), el("span", "c num end", fmtTime(m.duration)), acts);
     box.append(row);
   });
+  sortRows();
   awaitCovers(lib);
+}
+// The list's order: by a column, either way, kept (store "libSort"); newest first until another is chosen. desc: the
+// way a column sorts first (the newest, otherwise A to Z and low to high). Songs a column has nothing for (no steady
+// beat, a key not read yet) go last, and ties newest first.
+const SORTS = {
+  title: { label: "Title", text: true, by: (m) => m.title },
+  bpm: { label: "BPM", wide: true, by: (m) => m.bpm || null },
+  key: { label: "Key", wide: true, by: (m) => (m.key ? m.key.pc * 2 + (m.key.mode === "minor") : null) }, // C, C minor, D♭, …
+  added: { label: "Added", wide: true, desc: true, by: (m) => m.created },
+  length: { label: "Length", end: true, by: (m) => m.duration },
+};
+let libSort = (() => { const v = store.get("libSort", null); return v && SORTS[v.by] ? { by: v.by, desc: !!v.desc } : { by: "added", desc: true }; })();
+function sortRows() {
+  const box = $("#sLib"), c = SORTS[libSort.by], way = libSort.desc ? -1 : 1;
+  const words = new Intl.Collator(locale(), { numeric: true, sensitivity: "base" });
+  const rows = [...box.querySelectorAll(".row[data-id]")].map((r) => [r, libCache.get(r.dataset.id)]).filter(([, m]) => m);
+  rows.sort(([, a], [, b]) => {
+    const x = c.by(a), y = c.by(b);
+    if (x == null || y == null) return (x == null) - (y == null) || b.created - a.created;
+    return (c.text ? words.compare(x, y) : x - y) * way || b.created - a.created;
+  });
+  for (const [r] of rows) box.append(r); // moved, not made again: covers stay loaded, a rename stays open
+  for (const b of box.querySelectorAll(".lib-head .sort")) {
+    const on = b.dataset.by === libSort.by, label = tr(SORTS[b.dataset.by].label);
+    b.classList.toggle("on", on);
+    b.querySelector(".ico").replaceWith(icon(on ? (libSort.desc ? "sortDown" : "sortUp") : "sortBoth"));
+    b.setAttribute("aria-label", on ? tr("Sorted by {col}, {way}", { col: label, way: tr(libSort.desc ? "descending" : "ascending") }) : tr("Sort by {col}", { col: label }));
+  }
 }
 // A song's album art in the list: the tile, and the picture in it once there is one.
 function coverTile(m) {
@@ -4356,7 +4404,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Split a song into tracks and practice it phrase by phrase, with your pitch on screen.": "곡을 트랙별로 나누고, 화면에서 내 음정을 보며 한 소절씩 연습하세요.",
   "Library": "라이브러리", "Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",
   "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요. 트랙별로 나뉘어 바로 연습할 수 있어요.",
-  "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
+  "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Sort by {col}": "{col} 순으로 정렬", "Sorted by {col}, {way}": "{col} 순, {way}",
+  "ascending": "오름차순", "descending": "내림차순", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
   "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
   "no steady beat": "일정한 박자 없음", "{n} tracks": "트랙 {n}개", "major": "장조", "minor": "단조",
   "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":
