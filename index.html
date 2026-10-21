@@ -122,9 +122,8 @@ header { position: relative; }
 .pop .hint { margin: 0; }
 #micNote { gap: 4px; } /* why the mic didn't start, outside Practice */
 #micNote p { margin: 0; color: var(--muted); }
-/* the input menu keeps one width whatever the inputs are called (a long name ends in …); its hint sits right under it */
+/* the input menu keeps one width whatever the inputs are called (a long name ends in …) */
 #micDev { flex: 0 1 200px; }
-#micDevHint { margin-top: -8px; }
 .iconchip .ico { width: 16px; height: 16px; }
 /* Mic sensitivity, as in Discord: what the mic hears, live, on a bar (louder to the right), and the threshold as a line
    on it to drag. Past the line the bar is in your colour: that sound counts as singing; short of it, it's grey. The bar
@@ -906,9 +905,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><b>Adding songs</b><div id="jobsList"></div></div>
     <div class="pop" id="micSet" role="dialog" aria-label="Settings" hidden>
       <label>Language <button class="pick" id="lang" type="button"></button></label>
-      <label>Input <button class="pick" id="micDev" type="button"></button></label>
-      <p class="hint" id="micDevHint" hidden>Turn on the mic to see each input’s name.</p>
-      <div class="gate-sec">
+      <label>Input <button class="pick" id="micDev" type="button"></button></label>      <div class="gate-sec">
         <div class="gate-head"><span>Mic sensitivity</span><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button><button class="btn sm" id="hearMe" type="button" aria-pressed="false" title="Through headphones: through speakers it can howl">Hear yourself</button></div></div>
         <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>      </div>
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
@@ -1391,7 +1388,6 @@ async function listMics() {
     return { v: d.deviceId, t, g, full: d.label || t };
   }).sort(by);
   micPick.set([{ v: "", t: tr("System default") }, ...items], real.some((d) => d.deviceId === S.mic) ? S.mic : "");
-  $("#micDevHint").hidden = !ins.some((d) => !d.label);
 }
 // An input's name and its device's: Windows writes "Mic | Line 1/2(Audient EVO4)", the device in the last brackets
 // (which can hold brackets of their own: "Line(Yamaha SYNCROOM Driver (WDM))").
@@ -5155,8 +5151,7 @@ const KO_SERVER = {
 const KO_TEXT = Object.assign(Object.create(null), {
   // header and settings
   "Microphone": "마이크", "Turn the mic on": "마이크 켜기", "Turn the mic off": "마이크 끄기", "Settings": "설정", "Language": "언어",
-  "Input": "입력", "System default": "시스템 기본값", "Microphone {n}": "마이크 {n}", "Turn on the mic to see each input’s name.": "마이크를 켜면 입력 장치 이름이 보여요.",
-  "Mic sensitivity": "마이크 감도", "Hear yourself": "내 목소리 듣기", "Stop hearing": "그만 듣기",
+  "Input": "입력", "System default": "시스템 기본값", "Microphone {n}": "마이크 {n}",  "Mic sensitivity": "마이크 감도", "Hear yourself": "내 목소리 듣기", "Stop hearing": "그만 듣기",
   "Through headphones: through speakers it can howl": "헤드폰으로 들으세요. 스피커로 들으면 하울링이 날 수 있어요",
   "Mic sensitivity: how loud a sound must be to count as singing": "마이크 감도: 노래로 들을 소리의 크기",
   "Filter out speaker sound": "스피커 소리 걸러내기", "Note names": "음 이름", "Accent colour": "강조 색",
