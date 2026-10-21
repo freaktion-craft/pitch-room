@@ -833,12 +833,13 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-day { display: grid; gap: 8px; }
 .tk-day h3 { margin: 0; }
 .tk-rows { overflow: hidden; } /* a take's hover fill keeps to the card's round corners */
-/* columns: play, time of day, the part sung (its times beside it), "Really delete?" while asked, compare, download, delete */
-.take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) auto 32px 32px 32px; align-items: center; gap: 12px;
+/* columns: play, time of day, the part sung (its times beside it), compare, download, delete ("Really delete?" right
+   beside it while asked) */
+.take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) 32px 32px auto; align-items: center; gap: 12px;
   min-height: 48px; padding: 8px 12px; }
 .take + .take { border-top: 1px solid var(--line); }
 .tk-play { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--ink); display: grid; place-items: center;
-  transition: background-color 0.15s; }
+  transition: background-color 0.15s, filter 0.15s, opacity 0.15s; }
 .tk-play:hover { background: var(--hover-2); }
 .tk-play:disabled { opacity: 0.4; pointer-events: none; }
 .tk-play .pp { width: 10.5px; height: 12px; }
@@ -849,8 +850,13 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-part b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 14px; }
 .tk-part small { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--faint); } /* gives way first */
 .tk-part small.err, .take.failed .tk-part b { color: var(--bad); }
-.tk-confirm { grid-column: 4; grid-row: 1; justify-self: end; font-size: 13.5px; color: var(--bad); visibility: hidden; }
-.take.armed .tk-confirm { visibility: visible; }
+/* Delete, asked: the question opens out right beside it, the play, compare and download buttons blurred back */
+.tk-end { display: flex; align-items: center; justify-self: end; }
+.tk-confirm { max-width: 0; margin-right: 0; overflow: hidden; white-space: nowrap; font-size: 13.5px; color: var(--bad); opacity: 0;
+  transition: max-width 0.2s var(--ease), margin-right 0.2s var(--ease), opacity 0.15s; }
+.take.armed .tk-confirm { max-width: 160px; margin-right: 8px; opacity: 1; }
+.tk-cmp, .tk-dl { transition: filter 0.15s, opacity 0.15s, background-color 0.15s; }
+.take.armed :is(.tk-play, .tk-cmp, .tk-dl) { filter: blur(1.5px); opacity: 0.35; pointer-events: none; }
 .tk-cmp[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); } /* comparing */
 .take.armed .tk-del { background: color-mix(in oklab, var(--bad) 18%, transparent); color: var(--bad); }
 .take.saving .tk-part b { color: var(--muted); font-weight: 400; }
@@ -865,11 +871,9 @@ input[type="range"]:disabled { opacity: 0.4; }
   .tk-mix { flex: 1 1 100%; display: grid; gap: 8px; }
   .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
   .tk-mix input[type="range"] { width: 100%; }
-  .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px 32px; gap: 8px; }
+  .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px auto; gap: 8px; }
   .tk-when { display: none; }
   .tk-part { grid-area: 1 / 2; }
-  .tk-confirm { grid-area: 1 / 2; } /* in the part's place while asked */
-  .take.armed .tk-part { visibility: hidden; }
 }
 /* beside Practice, where there's room: a column as wide as the takes' rows need, the sliders one under another, a
    take's words over its phrase and times. It opens out into the page's right margin (--out of it, set by
@@ -880,11 +884,9 @@ input[type="range"]:disabled { opacity: 0.4; }
   .pr-cols.with-takes .tk-mix { flex: 1 1 100%; display: grid; gap: 8px; }
   .pr-cols.with-takes .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
   .pr-cols.with-takes .tk-mix input[type="range"] { width: 100%; }
-  .pr-cols.with-takes .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px 32px; gap: 8px; }
+  .pr-cols.with-takes .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px auto; gap: 8px; }
   .pr-cols.with-takes .tk-when { display: none; }
   .pr-cols.with-takes .tk-part { grid-area: 1 / 2; flex-direction: column; align-items: stretch; gap: 0; }
-  .pr-cols.with-takes .tk-confirm { grid-area: 1 / 2; }
-  .pr-cols.with-takes .take.armed .tk-part { visibility: hidden; }
   .pr-cols.with-takes .tk-empty { padding: 16px; font-size: 13.5px; }
 }
 
@@ -4157,8 +4159,9 @@ function takeRow(t) {
   del.title = tr(t.failed ? "Dismiss" : "Delete this take"); del.setAttribute("aria-label", del.title);
   dl.onclick = () => takeWav(t);
   del.onclick = () => takeDelete(t);
-  row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what,
-    el("span", "tk-confirm", tr("Really delete?")), cmp, dl, del);
+  dl.classList.add("tk-dl");
+  const end = el("span", "tk-end"); end.append(el("span", "tk-confirm", tr("Really delete?")), del); // the question right beside Delete
+  row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what, cmp, dl, end);
   if (!t.saving && !t.failed) row.append(takeWaveEl(t));
   return row;
 }
@@ -4199,7 +4202,7 @@ async function takeDelete(t) {
   renderTakes();
 }
 async function takeWav(t) {
-  const btn = takeRowOf(t.id).querySelector(".dl");
+  const btn = takeRowOf(t.id).querySelector(".tk-dl");
   btn.disabled = true; takeNote(t.id, "Mixing the WAV…");
   try {
     const r = await fetch(`/api/library/${T.song}/takes/${t.id}/wav`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(T.mix) });
