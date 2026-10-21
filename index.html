@@ -198,15 +198,19 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* Sing view */
 .play-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .play-bar .title { margin-right: auto; }
-.stage { position: relative; background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); overflow: hidden;
-  height: clamp(320px, 62vh, 640px); }
-.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.hud-l, .hud-r { position: absolute; top: 16px; pointer-events: none; }
-.hud-l { left: 56px; display: grid; gap: 4px; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--surface) 85%, transparent); backdrop-filter: blur(8px); }
-.hud-l .rep { font-size: 13px; color: var(--muted); }
-.hud-l .how { font-size: 13.5px; font-weight: 500; max-width: 46ch; }
-.hud-l .how:empty { display: none; }
-.hud-r { right: 16px; text-align: right; display: grid; justify-items: end; gap: 8px; }
+/* The stage: a line on top (what Practice is doing, and whose line is whose) over the bars, so no bar is ever under a
+   box; on the bars only your note, at the top right */
+.stage { position: relative; display: flex; flex-direction: column; background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line);
+  overflow: hidden; height: clamp(320px, 62vh, 640px); }
+.stage-head { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; padding: 10px 16px;
+  box-shadow: inset 0 -1px 0 var(--line); font-size: 13px; line-height: 20px; color: var(--muted); }
+.stage-head .legend { display: flex; gap: 16px; }
+.stage-head .legend span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.stage-head .legend i { width: 16px; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--muted) 45%, var(--surface)); } /* as drawn */
+.stage-head .legend i.you { height: 3px; border-radius: 2px; background: var(--voice); }
+.plot { position: relative; flex: 1; min-height: 0; }
+.plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hud-r { position: absolute; top: 16px; right: 16px; pointer-events: none; text-align: right; display: grid; justify-items: end; gap: 8px; }
 .note-big { font: 600 48px/1 var(--font); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .note-sub { font: 12.5px/1.2 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gauge { position: relative; width: 140px; height: 4px; border-radius: 2px; background: rgba(var(--fg), 0.08); }
@@ -254,7 +258,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 @media (max-width: 760px) {
   header { margin-bottom: 40px; }
   .note-big { font-size: 34px; }
-  .hud-l { top: auto; bottom: 12px; }
   .countin .dots { gap: 8px; height: 16px; } /* clear of the note names on a narrow stage */
   .countin .dots i { width: 16px; height: 16px; }
 }
@@ -546,8 +549,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .btn.rec[aria-pressed="true"] .ico circle { fill: currentColor; }
 .btn.rec.on .ico { animation: rec-pulse 1.2s ease-in-out infinite; }
 @keyframes rec-pulse { 50% { opacity: 0.3; } }
-.hud-l .rep.rec { color: var(--ink); }
-.hud-l .rep.rec::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--bad); vertical-align: 1px; }
+.stage-head .rep.rec { color: var(--ink); }
+.stage-head .rep.rec::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--bad); vertical-align: 1px; }
 @media (prefers-reduced-motion: reduce) { .btn.rec.on .ico { animation: none; } }
 
 /* Takes: what you recorded in Practice, by day, newest first, like notes to self. The sliders in the head set how a
@@ -649,19 +652,21 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     </div>
 
     <section class="stage" id="stage" aria-label="Pitch display">
-      <canvas id="cv"></canvas>
-      <div class="hud-l">
+      <div class="stage-head">
         <div class="rep" id="hudRep"></div>
-        <div class="how" id="hudHow"></div>
+        <div class="legend"><span><i aria-hidden="true"></i>Original singer</span><span><i class="you" aria-hidden="true"></i>You</span></div>
       </div>
-      <div class="hud-r" aria-live="off">
-        <div class="note-big" id="noteBig">–</div>
-        <div class="note-sub" id="noteSub">Waiting for sound</div>
-        <div class="gauge" aria-hidden="true"><div class="zone"></div><div class="needle" id="needle"></div></div>
-        <div class="gauge-labels" aria-hidden="true"><span>flat</span><span>centre</span><span>sharp</span></div>
+      <div class="plot">
+        <canvas id="cv"></canvas>
+        <div class="hud-r" aria-live="off">
+          <div class="note-big" id="noteBig">–</div>
+          <div class="note-sub" id="noteSub">Waiting for sound</div>
+          <div class="gauge" aria-hidden="true"><div class="zone"></div><div class="needle" id="needle"></div></div>
+          <div class="gauge-labels" aria-hidden="true"><span>flat</span><span>centre</span><span>sharp</span></div>
+        </div>
+        <div class="countin" id="countIn" hidden><span id="countLbl"></span><div class="dots" id="countDots" aria-hidden="true"></div><span class="sr" id="countNum" aria-live="assertive"></span></div>
+        <div class="overlay" id="overlay" hidden></div>
       </div>
-      <div class="countin" id="countIn" hidden><span id="countLbl"></span><div class="dots" id="countDots" aria-hidden="true"></div><span class="sr" id="countNum" aria-live="assertive"></span></div>
-      <div class="overlay" id="overlay" hidden></div>
     </section>
     <div class="keys-wrap" id="keysWrap"><div class="keys" id="keys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
     <p class="credit">Piano samples: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> · Alexander Holm, CC-BY 3.0</p>
@@ -3121,7 +3126,7 @@ function rr(x, y, w, h, r) {
   g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
 let vLo = 50, vHi = 64;
-const GUT = 44;
+const GUT = 48; // the note names' column; they start 16 px in, under the stage's head line
 // now: song time at the hit line; cur: your pitch; hist: your recent pitch; evs: the bars; guide: the original singer's
 // pitch line ({pts, shift})
 function draw(now, cur, hist, evs, guide) {
@@ -3138,7 +3143,7 @@ function draw(now, cur, hist, evs, guide) {
     if (p === 0) { g.fillStyle = C.line; g.fillRect(GUT, Math.round(y + ppS / 2), W - GUT, 1); }
     if (!BLACK.has(p) && (ppS >= 13 || p === 0)) {
       g.fillStyle = p === 0 ? C.ink : C.muted; g.font = `${p === 0 ? 600 : 400} 11px Pretendard, system-ui, sans-serif`;
-      g.textBaseline = "middle"; g.fillText(absName(m), 8, y);
+      g.textBaseline = "middle"; g.fillText(absName(m), 16, y);
     }
   }
   g.fillStyle = C.line; g.fillRect(GUT, 0, 1, H);
@@ -3283,7 +3288,6 @@ function renderHud(now, m) {
   const rec = R.cap ? tr("Recording {t}", { t: fmtTime(Math.max(0, songPos() - R.cap.start)) }) : tr("Practice");
   setText("hudRep", `${rec} · ${tr(K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung")}`);
   $("#hudRep").classList.toggle("rec", !!R.cap);
-  setText("hudHow", tr("Grey line: the original singer. {colour}: you.", { colour: tr(ACCENTS[accent]) }));
 }
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
 function renderMic() {
@@ -3603,7 +3607,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Pitch display": "음정 화면", "Waiting for sound": "소리를 기다리는 중", "Mic is off": "마이크 꺼짐", "flat": "낮음", "centre": "정확", "sharp": "높음",
   "target {note} · sing now": "목표 {note} · 지금 부르세요", "target {note} · {off}": "목표 {note} · {off}", "{n} st sharp": "{n}반음 높음", "{n} st flat": "{n}반음 낮음",
   "Recording {t}": "녹음 중 {t}", "bars as sung": "음정 바: 부른 그대로", "bars an octave up": "음정 바: 한 옥타브 위", "bars an octave down": "음정 바: 한 옥타브 아래",
-  "Grey line: the original singer. {colour}: you.": "회색 선: 원곡 가수. {colour}: 내 목소리.",
+  "Original singer": "원곡 가수", "You": "나",
   "Piano keyboard (tap to hear a note)": "피아노 건반 (누르면 소리가 나요)", "Piano samples:": "피아노 샘플:",
   "Reading the melody… (up to a minute the first time)": "멜로디 읽는 중… (처음엔 1분쯤 걸려요)", "Couldn’t read the melody.": "멜로디를 읽지 못했어요.",
   // takes
