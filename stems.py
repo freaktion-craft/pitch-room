@@ -318,6 +318,39 @@ def _update_meta(folder: str, **kw):
         _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
 
 
+# ---------- settings ----------
+# The page's settings (language, colour, mic, each song's key and tempo…), kept beside the app in settings.json so
+# they're the same in every tab and browser, at whatever port the app runs. A change is sent as the keys it touches,
+# merged here, so two tabs changing different settings don't undo each other.
+SETTINGS = os.path.join(ROOT, "settings.json")
+_settings_lock = threading.Lock()
+
+
+def get_settings() -> dict:
+    try:
+        data = _load_json(SETTINGS) if os.path.isfile(SETTINGS) else {}
+    except ValueError:
+        data = {}  # damaged: start again
+    return data if isinstance(data, dict) else {}
+
+
+def set_settings(changes) -> dict:
+    """Merge {key: value} into the settings (a value of None drops the key); returns them all."""
+    if not isinstance(changes, dict) or not all(isinstance(k, str) and re.fullmatch(r"\w{1,64}", k) for k in changes):
+        raise ValueError("Send the settings as {name: value}.")
+    with _settings_lock:
+        data = get_settings()
+        for k, v in changes.items():
+            if v is None:
+                data.pop(k, None)
+            else:
+                data[k] = v
+        if len(json.dumps(data)) > 500_000:
+            raise ValueError("That's more settings than there's room for.")
+        _write_json(SETTINGS, data, ensure_ascii=False)
+        return data
+
+
 _backfilled: set[str] = set()
 
 

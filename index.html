@@ -669,8 +669,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 }
 
 </style>
-<script>/* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
-try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}</script>
+<script>/* the settings, put in by the server as it sends the page (server.py); null when the page is opened some other way */
+const SAVED = /*SETTINGS*/null;
+/* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
+try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}</script>
 </head>
 <body>
 <canvas id="aurora" width="64" height="40" aria-hidden="true"></canvas>
@@ -855,10 +857,40 @@ const KO = ["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La�
 const BLACK = new Set([1,3,6,8,10]);
 
 // ---------- settings ----------
-const store = { // falls back to what the app saved under its old name, Pitch Room
-  get(k, d) { try { const v = localStorage.getItem("stem:" + k) ?? localStorage.getItem("pitchroom:" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem("stem:" + k, JSON.stringify(v)); } catch (e) {} },
-};
+// Kept on the server (settings.json), which puts them into the page as it sends it (SAVED), so they're the same in
+// every tab and at any port. Each change goes back as that key alone, a moment later (several at once together), so
+// two tabs changing different settings don't undo each other. This browser keeps a copy too (localStorage): what the
+// page starts from when it's opened without the server, and, the first time the server keeps them, what it's given.
+const store = (() => {
+  const local = (k) => { try { const v = localStorage.getItem("stem:" + k) ?? localStorage.getItem("pitchroom:" + k); return v == null ? undefined : JSON.parse(v); } catch (e) { return undefined; } };
+  const all = SAVED && typeof SAVED === "object" ? SAVED : null, pending = {};
+  let timer = 0;
+  const flush = () => {
+    clearTimeout(timer);
+    if (!Object.keys(pending).length) return;
+    const body = JSON.stringify(pending);
+    for (const k in pending) delete pending[k];
+    fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+  };
+  addEventListener("pagehide", flush);
+  if (all && !Object.keys(all).length) { // the server's first time: this browser's settings go over (Pitch Room's under their new name)
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const name = localStorage.key(i), k = name.replace(/^(stem|pitchroom):/, "");
+        if (k !== name && !(k in pending) && local(k) != null) pending[k] = all[k] = local(k);
+      }
+    } catch (e) {}
+    flush();
+  }
+  return {
+    get(k, d) { const v = all && k in all ? all[k] : local(k); return v == null ? d : v; },
+    set(k, v) {
+      if (all) all[k] = v;
+      try { localStorage.setItem("stem:" + k, JSON.stringify(v)); } catch (e) {}
+      pending[k] = v; clearTimeout(timer); timer = setTimeout(flush, 300);
+    },
+  };
+})();
 // names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
 // treated as silent; vol: the keyboard's piano; mic: the input's deviceId ("" = the system default)
 const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "" };

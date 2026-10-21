@@ -7,3 +7,4 @@ library/
 models/
 .ffmpeg/
 icons.local.js
+settings.json

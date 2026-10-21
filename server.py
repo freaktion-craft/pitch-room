@@ -191,6 +191,8 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._ours():
             return self._refuse()
         path = urlparse(self.path).path
+        if path in ("/", "/index.html"):
+            return self._page()
         if path == "/icons.local.js" and not os.path.isfile(os.path.join(ROOT, "icons.local.js")):
             # optional (see index.html); answer with nothing rather than a 404 in the console
             self.send_response(200)
@@ -209,6 +211,19 @@ class Handler(SimpleHTTPRequestHandler):
             traceback.print_exc()
             return self._json(500, {"error": f"{e.__class__.__name__}: {e}"})
 
+    def _page(self):
+        """index.html with the settings in it, so the page starts as it was left, at any port and before first paint."""
+        with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
+            html = f.read()
+        data = json.dumps(stems.get_settings(), ensure_ascii=False).replace("</", "<\\/")
+        body = html.replace("/*SETTINGS*/null", data, 1).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")  # the settings in it change
+        self.end_headers()
+        self.wfile.write(body)
+
     def _get_api(self, path):
         if path == "/api/health":
             return self._json(200, {"ok": True, "app": "stem"})
@@ -222,6 +237,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, job) if job else self._json(404, {"error": "Unknown job."})
         if path == "/api/library":
             return self._json(200, stems.library())
+        if path == "/api/settings":
+            return self._json(200, stems.get_settings())
         if path.startswith("/api/library/") and path.endswith(("/info", "/takes", "/lyrics")):
             try:
                 song = path.split("/")[3]
@@ -239,6 +256,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _stems_post(self, url):
         q = parse_qs(url.query)
         model = (q.get("model") or ["htdemucs"])[0]
+        if url.path == "/api/settings":
+            return self._json(200, stems.set_settings(json.loads(self._body(600_000) or b"{}")))
         if url.path == "/api/stems/install":
             return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1")})
         if url.path == "/api/stems/upload":
@@ -303,7 +322,7 @@ class Handler(SimpleHTTPRequestHandler):
         self._unread = int(self.headers.get("Content-Length") or 0)
         if not self._ours():
             return self._refuse()
-        if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")):
+        if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")) or url.path == "/api/settings":
             try:
                 return self._stems_post(url)
             except ValueError as e:
