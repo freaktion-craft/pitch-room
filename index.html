@@ -107,10 +107,11 @@ header { display: flex; align-items: center; gap: 8px; margin-bottom: 72px; } /*
 .mic.on .mic-ico { color: var(--ink); }
 .mic.on .if-off { visibility: hidden; }
 /* turned off: a beat after the chip starts to close, the slash draws across the whole mic, top left to bottom right;
-   then the mic takes its cut where the slash crosses it (the off icon's body). Turned on, it's back at once. */
-.mic:not(.on) .if-on { visibility: hidden; transition: visibility 0s 0.34s; }
+   as it finishes the mic melts into its cut one (the off icon's body, cut where the slash crosses). Turned on, it's
+   back at once. */
+.mic:not(.on) .if-on { opacity: 0; transition: opacity 0.18s ease 0.28s; }
 .mic.on .if-off path:not(.slash) { opacity: 0; }
-.mic:not(.on) .if-off path:not(.slash) { transition: opacity 0s 0.34s; }
+.mic:not(.on) .if-off path:not(.slash) { transition: opacity 0.18s ease 0.28s; }
 .mic-ico .slash { stroke-dasharray: 1 2; stroke-dashoffset: 0; }
 .mic.on .mic-ico .slash { stroke-dashoffset: 1.1; } /* drawn back past its start, so its round cap doesn't show */
 .mic:not(.on) .mic-ico .slash { transition: stroke-dashoffset 0.22s cubic-bezier(0.4, 0, 0.2, 1) 0.12s; }
@@ -4997,6 +4998,7 @@ function renderHud(now, m) {
   $("#hudRep").classList.toggle("rec", !!R.cap);
 }
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
+const MIC_SHAKE = { deg: 12, period: 150, decay: 170, ms: 760, n: 40 }; // swing (°), one swing (ms), fading (ms), length, frames
 function renderMic() { // the header's chip, and the one by the sensitivity in the settings
   for (const b of [$("#micBtn"), $("#micBtn2")]) {
     if (!b.querySelector(".ico")) {
@@ -5008,10 +5010,16 @@ function renderMic() { // the header's chip, and the one by the sensitivity in t
     const was = b.classList.contains("on");
     b.classList.toggle("on", micOn);
     b.setAttribute("aria-pressed", String(micOn)); b.title = tr(micOn ? "Turn the mic off" : "Turn the mic on");
-    // turned off: the mic shakes as the slash strikes it, settling as it's done
+    // turned off: the mic shakes as the slash strikes it, like a struck thing, ringing down: a damped swing (about 7 a
+    // second) that fades away smoothly rather than stopping
     if (was && !micOn && !stillMotion()) {
-      b.querySelector(".mic-ico").animate([{ transform: "none" }, { transform: "rotate(-12deg)", offset: 0.14 }, { transform: "rotate(9deg)", offset: 0.34 },
-        { transform: "rotate(-5deg)", offset: 0.54 }, { transform: "rotate(2deg)", offset: 0.74 }, { transform: "none" }], { duration: 440, delay: 110, easing: "ease-out" });
+      const frames = [];
+      for (let k = 0; k <= MIC_SHAKE.n; k++) {
+        const t = (k / MIC_SHAKE.n) * MIC_SHAKE.ms, env = Math.exp(-t / MIC_SHAKE.decay) * Math.min(1, t / 40);
+        frames.push({ transform: `rotate(${(-MIC_SHAKE.deg * env * Math.sin((2 * Math.PI * t) / MIC_SHAKE.period)).toFixed(2)}deg)` });
+      }
+      frames[frames.length - 1].transform = "none";
+      b.querySelector(".mic-ico").animate(frames, { duration: MIC_SHAKE.ms, delay: 110, easing: "linear" });
     }
   }
 }
