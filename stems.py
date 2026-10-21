@@ -137,10 +137,25 @@ def _turn(job):
             _check(job)
             yield
         finally:
+            _free_gpu()
             _work_lock.release()
     finally:
         with _jobs_lock:
             _line.remove(job["id"])
+
+
+def _free_gpu():
+    """Give the GPU back the memory a model is done with. PyTorch keeps what it frees for its own next use, and Windows
+    lets a program go past the card's memory into the computer's (many times slower) rather than fail: with Whisper's
+    and the separation's leftovers held, the lead-vocal step took over ten minutes instead of one."""
+    if "torch" not in sys.modules:
+        return
+    import gc
+
+    import torch
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _run(job, fn, *args):
@@ -625,6 +640,7 @@ def _pipeline(job, src: dict, model_name: str):
             _get_model(model_name)
             _stage(job, f"Separating on {device().upper()}", 0.25)
             names, stems = _separate(job, wav, model_name)
+            _free_gpu()  # room for the lead-vocal model
             _stage(job, "Finding the beat", 0.71)
             drum_stem = stems[names.index("drums")].mean(0) if "drums" in names else None
             bpm, beats = _beats(wav.mean(0) if drum_stem is None else drum_stem, wav.mean(0), dur)
@@ -701,7 +717,6 @@ def _fetch_whisper(job, share: tuple[float, float]):
 def _whisper(job, share: tuple[float, float]):
     """Whisper, loaded for a step (on the GPU if there's an NVIDIA one) and let go after: it holds ≈2 GB of memory."""
     import stable_whisper
-    import torch
 
     import lyrics
     _fetch_whisper(job, share)
@@ -710,9 +725,9 @@ def _whisper(job, share: tuple[float, float]):
     try:
         yield model
     finally:
+        model.cpu()  # its weights leave the GPU even while the caller still holds the model
         del model
-        if dev == "cuda":
-            torch.cuda.empty_cache()
+        _free_gpu()
 
 
 def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, float]) -> tuple[list, float]:
@@ -989,11 +1004,9 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
             del sep
     finally:
         _in_thread.job = None
+        _free_gpu()
     if sr != SR:
         raise RuntimeError(f"The lead-vocal model returned {sr} Hz audio.")
-    if device() == "cuda":
-        import torch
-        torch.cuda.empty_cache()
     return y.T.copy()
 
 
