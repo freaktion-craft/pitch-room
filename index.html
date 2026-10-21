@@ -458,6 +458,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* back to the library, and in the Studio the song's Save at the other end of the line */
 .backbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
 .backbar .back { margin-bottom: 0; }
+.bb-acts { display: flex; align-items: center; gap: 8px; } /* the song's own: Save, then Practice */
 #pSave:disabled { opacity: 0.4; }
 #pSave:not(:disabled) { background: var(--ink); color: var(--on-ink); }
 #pSave:not(:disabled):hover { background: var(--ink-strong); }
@@ -726,7 +727,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <h1 class="title">Practice any song</h1>
       <p class="lede">Split a song into tracks and practice it phrase by phrase, with your pitch on screen.</p>
     </div>
-    <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)" hidden>Save</button></div>
+    <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)">Save</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
@@ -786,7 +787,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
           <button class="dl" id="pExport" type="button" aria-label="Export what you hear (MP3)" title="Export what you hear (MP3)"></button>
         </div></div>
         <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span id="pMeta"></span><span class="knote" id="pKeyNote"></span></span>
-          <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
+          <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button></div></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
@@ -3566,7 +3567,7 @@ function go(v) { if (location.hash !== "#" + v) location.hash = v; else route();
 // Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
 function stemsRoute(sub, extra) {
   stemsPage = !sub ? "lib" : sub === "add" ? "add" : extra === "info" ? "info" : "song";
-  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib"; $("#pSave").hidden = stemsPage !== "song";
+  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib"; $("#sSongActs").hidden = stemsPage !== "song";
   $("#sLibPage").hidden = stemsPage !== "lib"; $("#sAddPage").hidden = stemsPage !== "add"; $("#sPlayer").hidden = stemsPage !== "song";
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
