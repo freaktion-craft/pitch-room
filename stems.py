@@ -6,8 +6,10 @@ Songs live in ./library/<id>/ :
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
-    melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
+    melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model), backing.mp3
+                    checked for leakage, cut where the lyrics' syllables start once there are lyrics (melody.py)
     lyrics.json     the lyrics, each line timed to the voice (Practice's phrases), or none found; once asked for (lyrics.py)
+    syllables.json  the onset of every sung syllable of lyrics.json on lead.mp3, for the bars (syllables.py)
     cover.jpg       the album art, as the library shows it (covers.py)
     meta.json       title, duration, bpm, beat times, key, stems, model, keep (parts of tracks that play while muted)
     keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
@@ -294,6 +296,11 @@ def _install(job, gpu_only: bool = False):
         except Exception as e:  # noqa: BLE001
             with _jobs_lock:
                 job["log"].append(f"The lyrics model will be downloaded with the first song ({e}).")
+        try:  # and the melody's pitch tracker (≈180 MB)
+            _fetch_rmvpe(job, (0.99, 1.0))
+        except Exception as e:  # noqa: BLE001
+            with _jobs_lock:
+                job["log"].append(f"The melody model will be downloaded with the first song ({e}).")
     if torch_was_loaded:  # the old PyTorch is already in memory; a fresh start picks up the new one
         _restart_needed = True
 
@@ -786,8 +793,14 @@ def _pipeline(job, src: dict, model_name: str):
                 if lead is not None:
                     _check(job)
                     _write_split(folder, vox, lead)
+                try:
+                    _fetch_rmvpe(job, (0.86, 0.87))
+                except Exception:  # noqa: BLE001  (offline: read with pYIN now, again once the model is there)
+                    pass
                 _stage(job, "Reading the vocal melody", 0.87)
-                _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None)
+                n = vox.shape[1] if lead is None else min(vox.shape[1], lead.shape[1])
+                _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None,
+                             None if lead is None else (vox[:, :n] - lead[:, :n]).mean(0))  # = backing.mp3
             _stage(job, "Saving tracks", 0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):
@@ -845,6 +858,66 @@ def _fetch_whisper(job, share: tuple[float, float]):
     whisper.tqdm = _whisper_bar(job, share)
     os.makedirs(MODEL_DIR, exist_ok=True)
     whisper._download(whisper._MODELS[lyrics.WHISPER_MODEL], MODEL_DIR, False)  # checks the file's SHA-256
+
+
+def _fetch_file(url: str, path: str, size: int, sha256: str, job=None, share: tuple[float, float] = (0.0, 1.0)):
+    """A model file into models/, downloaded once: written under a temporary name and kept only when its size and
+    SHA-256 are the expected ones."""
+    import hashlib
+    import urllib.request
+    if os.path.isfile(path) and os.path.getsize(path) == size:
+        return
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp, h, done = path + ".part", hashlib.sha256(), 0
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r, open(tmp, "wb") as f:
+            while chunk := r.read(1 << 20):
+                f.write(chunk)
+                h.update(chunk)
+                done += len(chunk)
+                if job:
+                    _check(job)
+                    _set(job, progress=share[0] + (share[1] - share[0]) * min(1.0, done / size))
+        if done != size or h.hexdigest() != sha256:
+            raise RuntimeError(f"{os.path.basename(path)} didn't come whole (or isn't the expected file).")
+        os.replace(tmp, path)
+    finally:
+        if os.path.isfile(tmp):
+            os.remove(tmp)
+
+
+def _fetch_rmvpe(job=None, share: tuple[float, float] = (0.0, 1.0)):
+    """The melody's pitch tracker, models/rmvpe.pt (≈180 MB, MIT). Without it the melody is read with pYIN."""
+    import melody
+    path = os.path.join(MODEL_DIR, "rmvpe.pt")
+    if os.path.isfile(path) and os.path.getsize(path) == melody.RMVPE_BYTES:
+        return
+    if job:
+        _stage(job, "Downloading the melody model (first time only, ≈180 MB)", share[0])
+    _fetch_file(melody.RMVPE_URL, path, melody.RMVPE_BYTES, melody.RMVPE_SHA256, job, share)
+
+
+def _fetch_syllable_models(langs: list[str], job=None, share: tuple[float, float] = (0.0, 1.0)):
+    """The speech models that time the lyrics' syllables, models/w2v_ko (Korean, ≈1.3 GB) and models/w2v_en
+    (English, ≈380 MB), both Apache-2.0: those the lyrics need that aren't there yet."""
+    import syllables
+    todo = []
+    for lang in langs:
+        folder, repo, rev, files = syllables.MODEL_FILES[lang]
+        for name, (size, sha) in files.items():
+            p = os.path.join(MODEL_DIR, folder, name)
+            if not (os.path.isfile(p) and os.path.getsize(p) == size):
+                todo.append((f"https://huggingface.co/{repo}/resolve/{rev}/{name}", p, size, sha))
+    total = sum(t[2] for t in todo)
+    if not todo:
+        return
+    if job:
+        _stage(job, f"Downloading the syllable model (first time only, ≈{max(0.1, total / 1e9):.1f} GB)", share[0])
+    done = 0
+    for url, p, size, sha in todo:
+        span = share[1] - share[0]
+        _fetch_file(url, p, size, sha, job, (share[0] + span * done / total, share[0] + span * (done + size) / total))
+        done += size
 
 
 @contextlib.contextmanager
@@ -958,12 +1031,20 @@ def start_lyrics(song_id: str, how) -> str:
         import covers
         _set(job, status="running", stage="Finding the lyrics", progress=0.02)
         voice = _voice16k(folder)
+        mel = None
         with _turn(job):  # one model on the GPU at a time
             # whose song it was found to be (not a cover's: that's named for whoever sings it)
             named = f"{meta['artist']} {meta['title']}" if meta.get("artist") and not covers.is_cover(meta["title"]) else ""
-            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.98), how, named)
+            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.9), how, named)
+            if data.get("lines") and _has_split(folder):  # the bars, cut where the new lyrics' syllables start
+                syl = _syllables(folder, data, job, (0.9, 0.96))
+                _stage(job, "Fitting the bars to the lyrics", 0.96)
+                mel = _melody_of(folder, True, syl)
         if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
             _write_json(os.path.join(folder, "lyrics.json"), data, ensure_ascii=False)
+            if mel is not None:
+                with _melody_lock:
+                    _write_json(os.path.join(folder, "melody.json"), mel, separators=(",", ":"))
 
     job = _new_job("lyrics")
     job["songId"] = song_id
@@ -1310,12 +1391,90 @@ def _tracks(folder: str, meta: dict) -> list[str]:
 _melody_lock = threading.Lock()  # one rebuild at a time, so two pages asking at once don't both build it
 
 
-def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | None = None, lead: bool = False) -> dict:
-    import melody
-    data = melody.extract(vocals_mono, drums=drums_mono)
-    data["lead"] = lead  # built from the lead vocal alone
+def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | None = None, lead: bool = False,
+                 backing_mono: np.ndarray | None = None, syl: dict | None = None, device: str | None = None) -> dict:
+    """melody.json: the bars of the lead vocal (or of the whole vocal stem without the lead model), with the backing
+    stem checked for leakage and, once the song has lyrics, cuts where their syllables start (syl: _syllables())."""
+    data = _melody_data(vocals_mono, drums_mono, lead, backing_mono, syl, device)
     _write_json(os.path.join(folder, "melody.json"), data, separators=(",", ":"))
     return data
+
+
+def _melody_data(vocals_mono, drums_mono=None, lead=False, backing_mono=None, syl=None, device=None) -> dict:
+    import melody
+    try:
+        _fetch_rmvpe()
+    except Exception as e:  # noqa: BLE001  (offline: read with pYIN now, and again once the model is there)
+        print(f"Couldn't get the melody model: {e}", file=sys.stderr)
+    data = melody.extract(vocals_mono, drums=drums_mono, backing=backing_mono,
+                          syllables=syl["onsets"] if syl else None, device=device)
+    data["lead"] = lead  # built from the lead vocal alone
+    data["lyricsAt"] = syl["at"] if syl else None  # the lyrics.json whose syllables cut the bars
+    data["sylFailed"] = bool(syl and syl.get("failed"))  # its syllables couldn't be had (a model missing, offline)
+    return data
+
+
+def _melody_of(folder: str, split: bool, syl: dict | None = None, device: str | None = None) -> dict:
+    """_melody_data from the song's files: lead.mp3 and backing.mp3 once split, else vocals.mp3."""
+    if split:
+        lead = _decode_stereo(os.path.join(folder, "lead.mp3")).mean(0)
+        back = _decode_stereo(os.path.join(folder, "backing.mp3")).mean(0)
+    else:
+        lead, back = _decode_stereo(os.path.join(folder, "vocals.mp3")).mean(0), None
+    return _melody_data(lead, _drums_mono(folder), split, back, syl, device)
+
+
+def _lyrics_data(folder: str) -> dict | None:
+    """lyrics.json when it has lines (the bars then follow their syllables), else None."""
+    path = os.path.join(folder, "lyrics.json")
+    try:
+        data = _load_json(path) if os.path.isfile(path) else None
+    except ValueError:
+        return None
+    return data if data and data.get("lines") else None
+
+
+def _syllables(folder: str, lyr: dict | None, job=None, share: tuple[float, float] = (0.0, 1.0),
+               device: str | None = None, fetch: bool = True) -> dict | None:
+    """{at, onsets}: the onset of every sung syllable of lyrics.json (lyr) on lead.mp3, kept in syllables.json for the
+    lyrics.json it came from (its "at"). None without lyrics or a lead vocal; {at, onsets: [], failed} when the
+    syllable models can't be had (the bars are then cut by the sound alone, and again once they're there). fetch:
+    download the models if they're missing (a lyrics job does; Practice opening a song doesn't wait for a GB)."""
+    if not lyr or not os.path.isfile(os.path.join(folder, "lead.mp3")):
+        return None
+    path = os.path.join(folder, "syllables.json")
+    try:
+        old = _load_json(path) if os.path.isfile(path) else None
+    except ValueError:
+        old = None
+    if old and old.get("at") == lyr.get("at"):
+        return old
+    import syllables
+    try:
+        if fetch:
+            _fetch_syllable_models(syllables.languages(lyr["lines"]), job, share)
+        if job:
+            _stage(job, "Timing the lyrics' syllables", share[0] + 0.8 * (share[1] - share[0]))
+        al = syllables.align_lyrics(_decode_stereo(os.path.join(folder, "lead.mp3")).mean(0), lyr["lines"], dev=device)
+    except Exception as e:  # noqa: BLE001
+        print(f"No syllables for library/{os.path.basename(folder)}: {e}", file=sys.stderr)
+        return {"at": lyr.get("at"), "onsets": [], "failed": str(e)[:200]}
+    data = {"at": lyr.get("at"), "onsets": [[round(t, 3), s] for t, s in al["onsets"]], "skipped": al.get("skipped")}
+    _write_json(path, data)
+    return data
+
+
+def _stale(data: dict, lyr: dict | None) -> bool:
+    """melody.json was read with less than the app has now: pYIN for want of rmvpe.pt, or without the syllables of its
+    lyrics for want of their models, and those are there now."""
+    import melody
+    if data.get("tracker") == "pyin" and importlib.util.find_spec("torch") and any(os.path.isfile(p) for p in melody.RMVPE_PATHS):
+        return True
+    if data.get("sylFailed") and lyr:
+        import syllables
+        return all(os.path.isfile(os.path.join(MODEL_DIR, syllables.MODEL_FILES[g][0], "model.safetensors"))
+                   for g in syllables.languages(lyr["lines"]))
+    return False
 
 
 def _drums_mono(folder: str) -> np.ndarray | None:
@@ -1337,8 +1496,10 @@ def _splice(data: dict, ranges: list) -> dict:
 
 
 def get_melody(song_id: str) -> dict:
-    """Cached melody.json. Rebuilt when the extraction changed, or when it came from the whole vocal stem and the
-    lead model is installed now; then the lead vocal is separated first (about a minute, once per song). With unsplit
+    """Cached melody.json. Rebuilt when the extraction changed, when it came from the whole vocal stem and the lead
+    model is installed now (the lead vocal is separated first: about a minute, once per song), when the lyrics changed
+    (their syllables cut the bars: the first time they're timed on the lead vocal, ≈5 s on a GPU), or when it was read
+    without a model that's there now. On the GPU unless a separation has it (then on the CPU, ≈15-30 s). With unsplit
     parts, those take the notes of all the vocals, read once (a few seconds) and kept in melody.json as "full"."""
     import melody
     folder = _song_dir(song_id)
@@ -1350,15 +1511,24 @@ def get_melody(song_id: str) -> dict:
                 data = _load_json(path)
             except ValueError:
                 data = {}  # damaged: built again below
-            if data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available()):
+            lyr = _lyrics_data(folder) if data.get("lead") else None
+            if (data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available())
+                    or data.get("lyricsAt") != (lyr or {}).get("at") or _stale(data, lyr)):
                 data = None
         vocals = os.path.join(folder, "vocals.mp3")
         if data is None:
             if not os.path.isfile(vocals):
                 raise ValueError("This song has no vocal track to practice with.")
             split = _ensure_split(folder)
-            src = _decode_stereo(os.path.join(folder, "lead.mp3") if split else vocals)
-            data = _save_melody(folder, src.mean(0), _drums_mono(folder), split)
+            gpu = _work_lock.acquire(blocking=False)  # the GPU, unless a separation or a lyrics job has it
+            try:
+                dev = None if gpu else "cpu"
+                syl = _syllables(folder, _lyrics_data(folder), device=dev, fetch=False) if split else None
+                data = _melody_of(folder, split, syl, dev)
+            finally:
+                if gpu:
+                    _work_lock.release()
+            _write_json(path, data, separators=(",", ":"))
         ranges = _read_meta(folder).get("unsplit") or []
         if not ranges or not data.get("lead"):
             return {k: v for k, v in data.items() if k != "full"}
@@ -1822,8 +1992,8 @@ def list_takes(song_id: str) -> list[dict]:
 
 def take_pitch(song_id: str, tid: str) -> list:
     """A take's pitch as Practice draws your line: [[t, midi or None], …] every 20 ms, t in seconds into the take as
-    recorded (the page lays it onto the song at the take's tempo), read the way the song's melody is (pYIN, the quiet
-    frames dropped, slips smoothed) and kept beside the take (<take>.pitch.json) after the first time (a second or two)."""
+    recorded (the page lays it onto the song at the take's tempo), read the way the song's melody is (RMVPE, the quiet
+    frames dropped, slips smoothed; midi from A440: the page moves it onto the song's a4) and kept beside the take (<take>.pitch.json) after the first time (a second or two)."""
     import melody
     t = _take(song_id, tid)
     d = _take_dir(song_id)

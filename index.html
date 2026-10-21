@@ -1188,7 +1188,7 @@ S.ears = Object.fromEntries(Object.entries(EAR_DEFAULT).map(([k, d]) => {
   return [k, ok.includes(v) ? v : d];
 }));
 const save = () => store.set("settings", S);
-const A4 = 440;
+let A4 = 440; // the reference the song's bars are numbered against (melody.json's a4): the mic, the guide tones, takes
 
 const mf = (m) => A4 * Math.pow(2, (m - 69) / 12);
 const pc = (m) => ((Math.round(m) % 12) + 12) % 12;
@@ -1322,7 +1322,7 @@ function samplePiano(m, at, dur, dest, vel) {
   let best = null;
   for (const k of samples.keys()) if (best == null || Math.abs(k - m) < Math.abs(best - m)) best = k;
   const src = ac.createBufferSource(); src.buffer = samples.get(best);
-  src.playbackRate.value = Math.pow(2, (m - best) / 12);
+  src.playbackRate.value = Math.pow(2, (m - best) / 12) * (A4 / 440); // the samples are tuned to A440
   const g = ac.createGain();
   g.gain.setValueAtTime(vel * 1.5, at);
   g.gain.setTargetAtTime(0, at + dur, 0.12);
@@ -3721,8 +3721,18 @@ function lyricNote(id, msg) {
   if (K.on && K.song && K.song.id === id && !K.lyrics && msg.err) K.lyricMsg = msg;
   if (infoShown && infoShown.id === id) paintInfoLyrics();
 }
+// New lyrics also move the bars (they're cut where the syllables start): Practice takes the song's melody again.
+async function melodyAgain(id) {
+  let mel;
+  try { const r = await fetch("/api/melody/" + id); mel = await r.json(); if (!r.ok) return; } catch (e) { return; }
+  if (!K.song || K.song.id !== id) return;
+  K.notes = mel.notes; K.contour = mel.contour; A4 = mel.a4 || 440;
+  K.entries = songEntries(K.notes, K.song.beats, K.song.bpm);
+  setPhrases();
+}
 async function lyricsDone(id, ok) {
   let lyr = null;
+  if (ok && K.song && K.song.id === id) melodyAgain(id);
   try { lyr = await (await fetch(`/api/library/${id}/lyrics`, { cache: "no-store" })).json(); } catch (e) { lyr = null; }
   if (ok || !lyricJobs.get(id)?.err) lyricJobs.delete(id);
   if (lyr && K.song && K.song.id === id) {
@@ -3828,7 +3838,7 @@ async function singSong(m, btn) {
     return;
   } finally { clearTimeout(slow); if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
   show(was);
-  K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.on = true;
+  K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.on = true; A4 = mel.a4 || 440;
   K.entries = songEntries(K.notes, m.beats, m.bpm);
   K.song = m; lyricsFor(m, lyr); setPhrases();
   songEvs(); songView(true);
@@ -3934,7 +3944,7 @@ function paintGate() {
 }
 // The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
 const guideName = () => (P.tracks.lead ? "lead" : "vocals");
-function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").hidden = true; }
+function leaveSong() { if (P.playing) pauseSong(); K.on = false; A4 = 440; $("#countIn").hidden = true; }
 function songToggle() {
   if (P.playing) { pauseSong(); return; }
   if (!micOn && !testOsc) startMic();
@@ -5039,7 +5049,8 @@ function takeFrame(tp) {
   const now = tk.start + gone * sp, sh = (tk.oct || 0) * 12 + (tk.key || 0);
   if (!tp.evs) tp.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const hist = [];
-  if (tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + t * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m }); }
+  const a4sh = 12 * Math.log2(A4 / 440); // a take's line is read against A440, the bars against the song's a4
+  if (tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + t * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m: m == null ? m : m - a4sh }); }
   const last = hist[hist.length - 1], cur = last && now - last.t < 0.1 ? last.m : null;
   songView();
   draw(now, cur, hist, tp.evs, { pts: K.contour, shift: sh });

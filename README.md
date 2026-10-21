@@ -34,7 +34,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 - **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.
 - **Rename** (⋮ in the library) edits a song’s title right in the list.
 
-**Practice** — the melody is read from the lead vocal (pYIN pitch tracking, cut into notes), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
+**Practice** — the melody is read from the lead vocal (RMVPE pitch tracking, cut into notes, and once the song has lyrics also where their syllables start; the backing vocals' leftovers in the lead stem are left out), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
 
 - **Find lyrics** (beside Record) looks the song up on [LRCLIB](https://lrclib.net) and lines the lyrics up with the lead vocal word by word with [Whisper](https://github.com/openai/whisper); each word then sits under the bars where it’s sung. If LRCLIB has the wrong song or none, the song’s **Info** page searches it by hand or takes lyrics pasted in.
 - The song is cut into **phrases**: a line of the lyrics each, or without lyrics, where the singer breathes. Jump to one and it counts you in (4 3 2 1); **Loop** repeats it. ← / → move between phrases, Home / End go to the start / the end, L turns the loop on and off.
@@ -44,7 +44,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 - **Headphones** (beside Find lyrics) sends each part to the ear you want: the band, the guide vocal and the metronome (its count-in too) each to the left, the right or both, live as the song plays.
 - **Takes Studio** (beside Takes) lays your takes out on the song's timeline, each where you sang it: switch any of them on and play them with the band, in time.
 
-Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp, audio-separator, Whisper — about 3–4 GB, into `.venv` and `models/`). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.
+Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp, audio-separator, Whisper, the melody's pitch tracker — about 3–4 GB, into `.venv` and `models/`). The first song with Korean or English lyrics adds a model that times their syllables (1.3 GB for Korean, 0.4 GB for English). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.
 
 **GPU:** on Windows and Linux the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
 
@@ -58,6 +58,7 @@ Only use audio you have the right to use; downloading from YouTube may go agains
 | `server.py` | Serves the page and the library API |
 | `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export, takes (jobs run in the background) |
 | `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |
+| `syllables.py` | The lyrics' syllables timed on the lead vocal, where the melody's notes may start |
 | `launch.py` | Installs packages, finds a free port, starts the server, opens Chrome |
 | `start-*` | One-click launchers per OS |
 
