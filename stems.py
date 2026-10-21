@@ -59,9 +59,11 @@ _model_cache: dict = {}
 
 
 # ---------- jobs ----------
-def _new_job(kind: str) -> dict:
+def _new_job(kind: str, name: str = "") -> dict:
+    """name: what a song being added is called, as far as it's known (a file's name; a link's video's title, once
+    it's been got, the link until then)."""
     job = {"id": secrets.token_hex(6), "kind": kind, "status": "queued", "stage": "Waiting", "progress": 0.0,
-           "error": None, "songId": None, "log": [], "started": time.time(), "cancel": False}
+           "error": None, "songId": None, "log": [], "started": time.time(), "cancel": False, "name": name}
     with _jobs_lock:
         _jobs[job["id"]] = job
     return job
@@ -71,7 +73,7 @@ def active_jobs() -> list[dict]:
     """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress."""
     with _jobs_lock:
         jobs = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
-        return [{k: j[k] for k in ("id", "kind", "status", "stage", "progress", "cancel")} for j in sorted(jobs, key=lambda j: j["started"])]
+        return [{k: j[k] for k in ("id", "kind", "status", "stage", "progress", "cancel", "name")} for j in sorted(jobs, key=lambda j: j["started"])]
 
 
 def get_job(job_id: str) -> dict | None:
@@ -563,14 +565,14 @@ def rename_song(song_id: str, title) -> str:
 
 # ---------- separation pipeline ----------
 def start_upload(data: bytes, filename: str, model: str) -> str:
-    job = _new_job("separate")
+    job = _new_job("separate", os.path.splitext(os.path.basename(filename or ""))[0])
     return _run(job, _pipeline, {"kind": "upload", "data": data, "filename": filename}, model)
 
 
 def start_youtube(url: str, model: str) -> str:
     if not re.match(r"^https?://", url or ""):
         raise ValueError("Paste a full link that starts with https://")
-    job = _new_job("separate")
+    job = _new_job("separate", url)
     return _run(job, _pipeline, {"kind": "url", "url": url}, model)
 
 
@@ -744,6 +746,7 @@ def _pipeline(job, src: dict, model_name: str):
             video, channel = None, ""
             if src["kind"] == "url":
                 path, title, channel = _download(job, src["url"], folder)
+                _set(job, name=title)
                 source = src["url"]
                 _stage(job, "Getting the video", 0.12)
                 try:
