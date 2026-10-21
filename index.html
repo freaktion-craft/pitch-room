@@ -583,17 +583,31 @@ input[type="range"]:disabled { opacity: 0.4; }
    what's under it is hidden more and blurred more: six blurs (0.5 px doubling to 16 px), each in its own band of the
    fade, overlapping the next, under the background coming in on an eased curve. Each layer fades itself in and out
    (an opacity on the box would cut the blurs off from what's behind it). */
-#listFade { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; height: 192px; pointer-events: none; }
-#listFade > * { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s; }
-#listFade.on > * { opacity: 1; }
-#listFade.now > * { transition: none; }
-#listFade > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
-#listFade > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }
-#listFade > i:nth-child(3) { backdrop-filter: blur(2px); mask: linear-gradient(transparent 33.3%, #000 50%, #000 66.7%, transparent 83.3%); }
-#listFade > i:nth-child(4) { backdrop-filter: blur(4px); mask: linear-gradient(transparent 50%, #000 66.7%, #000 83.3%, transparent 100%); }
-#listFade > i:nth-child(5) { backdrop-filter: blur(8px); mask: linear-gradient(transparent 66.7%, #000 83.3%); }
-#listFade > i:nth-child(6) { backdrop-filter: blur(16px); mask: linear-gradient(transparent 83.3%, #000 100%); }
-#listFade > b { background: linear-gradient(color-mix(in oklab, var(--bg) 0%, transparent) 0%, color-mix(in oklab, var(--bg) 3%, transparent) 14%,
+#listFade, #listFadeTop { position: fixed; left: 0; right: 0; z-index: 5; height: 192px; pointer-events: none; --dir: to bottom; }
+#listFade { bottom: 0; }
+/* and the same under the library's pinned top, the other way up, while rows have gone under it */
+#listFadeTop { top: var(--mast, 0px); z-index: 3; --dir: to top; }
+:is(#listFade, #listFadeTop) > * { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s; }
+:is(#listFade, #listFadeTop).on > * { opacity: 1; }
+:is(#listFade, #listFadeTop).now > * { transition: none; }
+/* The library's top (the app's bar, the intro, search and Add song, the column heads) stays put while the list scrolls
+   under it: each part sticks right where it stands (--top-*, measured by pinLibTop) over a band of the page's colour as
+   tall as all of it (#libMast), so the rows pass under the gaps between them too. The bar's panels stay over the rest. */
+#libMast { display: none; position: fixed; left: 0; right: 0; top: 0; height: var(--mast, 0px); z-index: 3; background: var(--bg); pointer-events: none; }
+html.lib-top #libMast { display: block; }
+html.lib-top { scroll-padding-top: var(--mast); } /* a row reached with Tab isn't left under it */
+html.lib-top #app > header { position: sticky; top: var(--top-header); z-index: 6; }
+html.lib-top #sIntro { position: sticky; top: var(--top-intro); z-index: 4; }
+html.lib-top #sLibPage .lib-head { position: sticky; top: var(--top-head); z-index: 4; transition: z-index 0s linear 0.22s; }
+html.lib-top #sLibPage .lib-head:has(.add-at.open) { z-index: 22; transition: none; } /* the Add song panel over its blur */
+html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 4; }
+:is(#listFade, #listFadeTop) > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(var(--dir), transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
+:is(#listFade, #listFadeTop) > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(var(--dir), transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }
+:is(#listFade, #listFadeTop) > i:nth-child(3) { backdrop-filter: blur(2px); mask: linear-gradient(var(--dir), transparent 33.3%, #000 50%, #000 66.7%, transparent 83.3%); }
+:is(#listFade, #listFadeTop) > i:nth-child(4) { backdrop-filter: blur(4px); mask: linear-gradient(var(--dir), transparent 50%, #000 66.7%, #000 83.3%, transparent 100%); }
+:is(#listFade, #listFadeTop) > i:nth-child(5) { backdrop-filter: blur(8px); mask: linear-gradient(var(--dir), transparent 66.7%, #000 83.3%); }
+:is(#listFade, #listFadeTop) > i:nth-child(6) { backdrop-filter: blur(16px); mask: linear-gradient(var(--dir), transparent 83.3%, #000 100%); }
+:is(#listFade, #listFadeTop) > b { background: linear-gradient(var(--dir), color-mix(in oklab, var(--bg) 0%, transparent) 0%, color-mix(in oklab, var(--bg) 3%, transparent) 14%,
   color-mix(in oklab, var(--bg) 10%, transparent) 27%, color-mix(in oklab, var(--bg) 22%, transparent) 40%, color-mix(in oklab, var(--bg) 38%, transparent) 52%,
   color-mix(in oklab, var(--bg) 56%, transparent) 64%, color-mix(in oklab, var(--bg) 74%, transparent) 76%, color-mix(in oklab, var(--bg) 89%, transparent) 88%, var(--bg) 100%); }
 /* The list: flat, nothing behind it, a hairline between songs. It reaches 12 px past the page's edges, so a song's
@@ -1022,6 +1036,8 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <pre class="log" id="sInstallLog" hidden></pre>
     </section>
 
+    <div id="libMast" aria-hidden="true"></div>
+    <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
     <div id="addVeil" aria-hidden="true"></div>
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
@@ -1730,6 +1746,7 @@ async function stemsRefresh() {
       $("#sGpuBtn").hidden = true;
     }
   }
+  pinLibTop(); // a notice or the setup above the list moves it down
 }
 // The library's first drawing, which the opening waits for.
 let libDrawnNow;
@@ -1804,6 +1821,7 @@ async function drawLibrary() {
     box.append(row);
   });
   arrangeRows();
+  pinLibTop(); paintFade(); // the column heads are new: pinned where they stand
   awaitCovers(lib);
 }
 // The list's order: by a column, either way, kept (store "libSort"); newest first until another is chosen. desc: the
@@ -1951,12 +1969,34 @@ function initLibSearch() {
   addEventListener("scroll", paintFade, { passive: true });
   addEventListener("resize", paintFade);
 }
-// The fade at the page's foot: on the library while the page runs on below the window. now: a change of page, where
-// it's there (or gone) at once with the page, not fading in after it.
+// The library's top held where it stands (the CSS by #libMast): unpinned for a moment to measure where each part sits
+// in the page, then pinned there. Again when the page changes, the list is drawn or the window resized.
+function pinLibTop() {
+  const root = document.documentElement;
+  root.classList.remove("lib-top");
+  if (!(view === "stems" && stemsPage === "lib")) return;
+  // where each part sits in the page, by layout alone (offsets, not boxes: an opening animation's lift isn't counted)
+  const at = (n) => {
+    if (!n || n.hidden || !n.getClientRects().length) return null;
+    let top = 0;
+    for (let e = n; e; e = e.offsetParent) top += e.offsetTop;
+    return { top, bottom: top + n.offsetHeight };
+  };
+  const parts = { header: at($("#app > header")), intro: at($("#sIntro")), head: at($("#sLibPage .lib-head")), cols: at($("#sLib .lib-cols")) };
+  let bottom = 0;
+  for (const [k, r] of Object.entries(parts)) if (r) { root.style.setProperty(`--top-${k}`, r.top + "px"); bottom = Math.max(bottom, r.bottom); }
+  root.style.setProperty("--mast", bottom + "px");
+  root.classList.add("lib-top");
+}
+addEventListener("resize", pinLibTop);
+// The fades: at the page's foot on the library while the page runs on below the window, and under its pinned top once
+// rows have gone under it. now: a change of page, where they're there (or gone) at once with the page, not fading in.
 function paintFade(now) {
-  const more = document.documentElement.scrollHeight - (scrollY + innerHeight) > 4, f = $("#listFade");
-  if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
-  f.classList.toggle("on", view === "stems" && stemsPage === "lib" && more);
+  const lib = view === "stems" && stemsPage === "lib", more = document.documentElement.scrollHeight - (scrollY + innerHeight) > 4;
+  for (const [f, on] of [[$("#listFade"), lib && more], [$("#listFadeTop"), lib && scrollY > 4]]) {
+    if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
+    f.classList.toggle("on", on);
+  }
 }
 function initCoverView() {
   const view = $("#coverView"), card = view.querySelector(".cv-card");
@@ -5161,7 +5201,7 @@ function route() {
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } // takes are recorded and played in Practice only
   if (view === "stems") stemsRoute(sub, extra);
-  paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
+  pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   // back in the library: the song (still loaded) starts from the top when it's opened again, in the Studio or Practice
   if (view === "stems" && stemsPage === "lib" && P.song) { P.offset = 0; P.lead = 0; K.cue = null; K.resume = null; }
@@ -5204,6 +5244,8 @@ async function boot() {
   }
   rise($("#sLib"), t);
   [...$("#sLib").querySelectorAll(".row")].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6));
+  const rising = document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity);
+  Promise.all(rising.map((a) => a.finished)).then(pinLibTop, pinLibTop); // measured where it rose to
 }
 $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
