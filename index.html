@@ -400,6 +400,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   background: var(--ink); color: var(--on-ink); font-size: 12px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
 .transport-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.transport-row .ptracks { font-size: 13px; color: var(--muted); } /* how many tracks, after the time */
 /* Key change, in the Studio's header and in Practice's bar: a dropdown of the keys, then a note in whatever room is
    left on the line (that big shifts can sound processed, or why a change failed). The dropdown has a fixed width and
    the note takes no room of its own, so nothing moves as they change. */
@@ -963,7 +964,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
           <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
           <button class="dl" id="pExport" type="button" aria-label="Export what you hear (MP3)" title="Export what you hear (MP3)"></button>
         </div></div>
-        <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span id="pMeta"></span><span class="knote" id="pKeyNote"></span></span>
+        <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span class="knote" id="pKeyNote"></span></span>
           <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button></div></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
@@ -977,6 +978,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
           <button class="btn sm icon" id="pEnd" type="button" aria-label="Go to end" title="Go to end (End)"></button>
         </div>
         <output id="pTime">0:00 / 0:00</output>
+        <span class="ptracks" id="pMeta"></span>
       </div>
       <div class="tracks" id="pTracks"></div>
       <p class="muted export-state" id="pExportState"></p>
@@ -2300,10 +2302,10 @@ async function openSong(m) {
   paintMeta();
   drawWave();
 }
-// under the Studio's title, after the key and tempo: length and tracks
+// after the Studio's time: how many tracks (the length is in the time)
 function paintMeta() {
   const m = P.song;
-  if (m) $("#pMeta").textContent = [fmtTime(m.duration), Object.keys(P.buffers).length ? tr("{n} tracks", { n: trackNames(m).length }) : tr("loading tracks…")].filter(Boolean).join(" · ");
+  if (m) $("#pMeta").textContent = Object.keys(P.buffers).length ? tr("{n} tracks", { n: trackNames(m).length }) : tr("loading tracks…");
 }
 function closeSong() {
   pauseSong();
