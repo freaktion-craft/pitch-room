@@ -105,7 +105,15 @@ header { display: flex; align-items: center; gap: 8px; margin-bottom: 72px; } /*
 .mic-ico { display: inline-grid; }
 .mic-ico > .ico { grid-area: 1 / 1; width: 16px; height: 16px; }
 .mic.on .mic-ico { color: var(--ink); }
-.mic.on .if-off, .mic:not(.on) .if-on { visibility: hidden; }
+.mic.on .if-off { visibility: hidden; }
+/* turned off: a beat after the chip starts to close, the slash draws across the whole mic, top left to bottom right;
+   then the mic takes its cut where the slash crosses it (the off icon's body). Turned on, it's back at once. */
+.mic:not(.on) .if-on { visibility: hidden; transition: visibility 0s 0.34s; }
+.mic.on .if-off path:not(.slash) { opacity: 0; }
+.mic:not(.on) .if-off path:not(.slash) { transition: opacity 0s 0.34s; }
+.mic-ico .slash { stroke-dasharray: 1 2; stroke-dashoffset: 0; }
+.mic.on .mic-ico .slash { stroke-dashoffset: 1.1; } /* drawn back past its start, so its round cap doesn't show */
+.mic:not(.on) .mic-ico .slash { transition: stroke-dashoffset 0.22s cubic-bezier(0.4, 0, 0.2, 1) 0.12s; }
 /* the mic's spectrum: one bar per band of the voice range, as tall as that band is loud */
 .spec { display: inline-flex; align-items: center; gap: 2px; height: 16px; overflow: hidden; width: 0; margin-left: -8px; opacity: 0;
   transition: width 0.3s var(--ease), margin-left 0.3s var(--ease), opacity 0.2s; }
@@ -4991,7 +4999,12 @@ function renderHud(now, m) {
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
 function renderMic() { // the header's chip, and the one by the sensitivity in the settings
   for (const b of [$("#micBtn"), $("#micBtn2")]) {
-    if (!b.querySelector(".ico")) { const on = icon("mic"), off = icon("micOff"); on.classList.add("if-on"); off.classList.add("if-off"); b.querySelector(".mic-ico").append(on, off); }
+    if (!b.querySelector(".ico")) {
+      const on = icon("mic"), off = icon("micOff"), slash = off.lastElementChild; // the off icon's last stroke is its slash
+      on.classList.add("if-on"); off.classList.add("if-off");
+      slash.classList.add("slash"); slash.setAttribute("pathLength", "1"); // drawn in by its dash
+      b.querySelector(".mic-ico").append(on, off);
+    }
     b.classList.toggle("on", micOn);
     b.setAttribute("aria-pressed", String(micOn)); b.title = tr(micOn ? "Turn the mic off" : "Turn the mic on");
   }
