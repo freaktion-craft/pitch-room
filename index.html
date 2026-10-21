@@ -734,6 +734,20 @@ input[type="range"]:disabled { opacity: 0.4; }
    right, as Save and Practice are on the Studio's. */
 .sb-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; }
 .sb-vol { display: flex; align-items: center; gap: 8px 16px; margin-left: auto; }
+/* Headphones: a panel under its button, a row for each part with the ears it can play in */
+.ears-at { position: relative; display: inline-flex; }
+.ears-at .pop { width: min(360px, calc(100vw - 32px)); }
+.ears-at .pop > b { font-weight: 500; }
+#earRows { display: grid; gap: 8px; }
+.ear-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 32px; }
+.ear-row > span { color: var(--muted); }
+.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill); }
+.seg button { min-width: 48px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-checked="true"] { background: var(--surface-2); color: var(--ink); }
+/* set to anything but both ears for all (and your voice off): a dot on the button, so a quiet ear isn't a mystery */
+#kEars { position: relative; }
+#kEars.set::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--voice); }
 .sb-vol .kfield { height: 32px; }
 #songBar .keyctl { flex: 1 1 100%; } /* the key, tempo and click on a line of their own, however wide */
 /* Find lyrics: pressed, it opens out (paintLyrBtn) with a spinner at its left while they're found */
@@ -906,7 +920,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 
   <main id="vPractice" aria-label="Practice" hidden>
     <div class="backbar"><button class="btn sm back" id="kLeave" type="button">Studio</button>
-      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
+      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b>Headphones</b><div id="earRows"></div><p class="hint" id="earHint"></p></div></span><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
     <div class="pr-cols" id="prCols">
     <div class="pr-main">
     <div class="songbar" id="songBar">
@@ -1127,8 +1141,14 @@ const store = (() => {
 // names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
 // treated as silent; vol: the keyboard's piano; mic: the input's deviceId ("" = the system default); countIn: the beats
 // Practice counts in before a phrase, a loop or a play after a pause (0: none)
-const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4 };
+const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4, ears: null };
 for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
+// ears: which ear each part plays in, in Practice (EARS)
+const EAR_DEFAULT = { band: "both", guide: "both", click: "both", me: "off" };
+S.ears = Object.fromEntries(Object.entries(EAR_DEFAULT).map(([k, d]) => {
+  const v = S.ears && S.ears[k];
+  return [k, ["l", "both", "r"].includes(v) || (k === "me" && v === "off") ? v : d];
+}));
 const save = () => store.set("settings", S);
 const A4 = 440;
 
@@ -1325,7 +1345,7 @@ async function startMic() {
   }
   stopTest();
   micNode = ac.createMediaStreamSource(micStream); micNode.connect(micBus); onMicEnd(micStream);
-  micOn = true; renderMic(); listMics(); return true;
+  micOn = true; renderMic(); listMics(); applyEars(); return true; // heard back in Practice, if so set
 }
 // The chosen input if it's still there, else the system default: an unplugged mic is no error.
 async function openMic() {
@@ -1626,6 +1646,7 @@ Object.assign(ICONS, {
   micOff: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C14.0193 18 15.443 17.4658 16.5665 16.5665M12 22H15M12 22H9M19 12C18.93 12.8406 18.7031 13.6331 18.3497 14.3497"/><path d="M8.3535 4.3535C8.98114 2.96566 10.3778 2 12 2C14.2091 2 16 3.79086 16 6V11C16 11.309 15.965 11.6098 15.8987 11.8987M8 8V11C8 13.2091 9.79086 15 12 15C12.8492 15 13.6365 14.7354 14.2841 14.2841"/><path d="M2 2L22 22"/>', // MicOff02
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
   goTo: '<path d="M9 6.65032C9 6.65032 15.9383 6.10759 16.9154 7.08463C17.8924 8.06167 17.3496 15 17.3496 15M16.5 7.5L6.5 17.5"/>', // ArrowUpRight01
+  headphones: '<path d="M20.0849 17C20.5849 15.5 21 13.4368 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 13.4368 3.41512 15.5 3.91512 17"/><path d="M8.97651 19.6043L7.23857 14.6127C7.05341 14.1466 6.4617 13.9131 5.97493 14.0297C4.46441 14.5333 3.6462 16.1718 4.14742 17.6895L4.58543 19.0158C5.08664 20.5334 6.71747 21.3555 8.22799 20.8519C8.68896 20.6556 9.10449 20.0897 8.97651 19.6043Z"/><path d="M15.0235 19.6043L16.7614 14.6127C16.9466 14.1466 17.5383 13.9131 18.0251 14.0297C19.5356 14.5333 20.3538 16.1718 19.8526 17.6895L19.4146 19.0158C18.9134 20.5334 17.2825 21.3555 15.772 20.8519C15.311 20.6556 14.8955 20.0897 15.0235 19.6043Z"/>', // Headphones
   practice: '<path d="M7 6.5C7 4.01472 9.01472 2 11.5 2C13.9853 2 16 4.01472 16 6.5V11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5V6.5Z"/><path d="M11.5 19H11.0828C7.57267 19 4.57706 16.4623 4 13M11.5 19H11.9172C15.4273 19 18.4229 16.4623 19 13M11.5 19V22"/>', // Mic01
   video: '<path d="M2 11C2 7.70017 2 6.05025 3.02513 5.02513C4.05025 4 5.70017 4 9 4H10C13.2998 4 14.9497 4 15.9749 5.02513C17 6.05025 17 7.70017 17 11V13C17 16.2998 17 17.9497 15.9749 18.9749C14.9497 20 13.2998 20 10 20H9C5.70017 20 4.05025 20 3.02513 18.9749C2 17.9497 2 16.2998 2 13V11Z"/><path d="M17 8.90585L17.1259 8.80196C19.2417 7.05623 20.2996 6.18336 21.1498 6.60482C22 7.02628 22 8.42355 22 11.2181V12.7819C22 15.5765 22 16.9737 21.1498 17.3952C20.2996 17.8166 19.2417 16.9438 17.1259 15.198L17 15.0941"/><circle cx="11.5" cy="9.5" r="1.5"/>', // Video01
   videoOff: '<path d="M2.00189 1.99988L21.9772 21.9999"/><path d="M16.8516 16.8677C16.7224 17.8061 16.4665 18.4668 15.9595 18.9744C14.9356 19.9996 13.2877 19.9996 9.992 19.9996H8.99323C5.69749 19.9996 4.04961 19.9996 3.02575 18.9744C2.00189 17.9493 2.00189 16.2994 2.00189 12.9996V10.9996C2.00189 7.69971 2.00189 6.04979 3.02575 5.02466C3.36827 4.68172 3.78062 4.45351 4.30114 4.30164"/><path d="M8.23627 4.0004C8.47815 3.99988 8.72995 3.99988 8.99217 3.99988H9.99093C13.2867 3.99988 14.9346 3.99988 15.9584 5.02501C16.9822 6.05013 16.9822 7.70005 16.9822 10.9999V12.7573M16.9822 9.2313L19.3018 7.52901C20.7729 6.54061 21.4489 7.17184 21.6674 7.64835C22.1191 8.92801 21.9768 11.3935 21.9768 14.5416C21.8703 16.5549 21.5952 16.7718 21.3137 16.9938L21.3107 16.9961"/>', // VideoOff
@@ -2633,13 +2654,14 @@ function playSong() {
   P.lead = 0;
   recEnd(at); // a key change swaps the sources without a pause: the take so far ends where the new ones start
   P.sources = [];
+  P.ears = { band: earNode("band", P.bus), guide: earNode("guide", P.bus), click: earNode("click", P.bus) }; // which ear each plays in
   for (const [name, buf] of Object.entries(P.buffers)) {
-    const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.bus);
+    const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.ears[name === guideName() ? "guide" : "band"].in);
     if (name !== guideName()) g.connect(bandTap);
     const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(at, P.offset / P.rate); // song time → its time in this version
     P.tracks[name].gain = g; P.sources.push(s);
   }
-  const cg = ac.createGain(); cg.gain.value = audible("click") ? P.tracks.click.vol : 0; cg.connect(P.bus); P.tracks.click.gain = cg;
+  const cg = ac.createGain(); cg.gain.value = audible("click") ? P.tracks.click.vol : 0; cg.connect(P.ears.click.in); P.tracks.click.gain = cg;
   P.startAt = at; P.playing = true; renderStart();
   applyGains(); // muted tracks' kept parts, from here
   recBegin(at);
@@ -2682,7 +2704,7 @@ function pauseSong() {
   P.offset = songPos(); P.playing = false;
   P.sources.forEach((s) => { try { s.stop(); } catch (e) {} });
   const bus = P.bus; if (bus) { bus.gain.setTargetAtTime(0, ac.currentTime, 0.01); setTimeout(() => bus.disconnect(), 200); }
-  P.sources = []; Object.values(P.tracks).forEach((t) => (t.gain = null));
+  P.sources = []; P.ears = null; Object.values(P.tracks).forEach((t) => (t.gain = null));
   paintPlay($("#pPlay"), false); renderStart();
 }
 // lead: a phrase jump to a count-in that starts before the song, heard in a lead-in ahead of it (other seeks stop at 0)
@@ -3408,7 +3430,7 @@ function countClicks(counts) {
     const o = ac.createOscillator(), g = ac.createGain();
     o.frequency.value = i === 0 ? 1568 : 1047;
     g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.55, at + 0.001); g.gain.setTargetAtTime(0, at + 0.002, 0.012);
-    o.connect(g); g.connect(P.bus); o.start(at); o.stop(at + 0.08); // silenced with the song's bus if it stops first
+    o.connect(g); g.connect(P.ears ? P.ears.click.in : P.bus); o.start(at); o.stop(at + 0.08); // silenced with the song's bus if it stops first
   });
 }
 const countItems = () => [{ v: 0, t: tr("Off") }, { v: 1, t: tr("1 beat") }, ...[2, 4, 8].map((n) => ({ v: n, t: tr("{n} beats", { n }) }))];
@@ -3714,6 +3736,75 @@ async function hearMe(on) {
   const b = $("#hearMe");
   b.setAttribute("aria-pressed", String(on)); say(b, on ? "Stop hearing" : "Hear yourself");
 }
+// Headphones, in Practice (S.ears): which ear the band, the guide vocal, the metronome (its count-in too) and your own
+// voice play in: "l", "r" or "both", and your voice "off" too (on, the mic is heard back as you sing). A part in one
+// ear is both its channels there, at 0.7 each, about as loud as it was in both (the limiter keeps the peaks). The
+// Studio plays everything in both ears, and your voice not at all.
+const EARS = { band: "Band", guide: "Guide vocal", click: "Metronome", me: "Your voice" };
+const EAR_SIDES = [["off", "Mute"], ["l", "Left"], ["both", "Both"], ["r", "Right"]];
+const earOf = (part) => (view === "practice" ? S.ears[part] : part === "me" ? "off" : "both");
+let meEar = null; // your voice's way to the headphones, made the first time it's wanted
+function earNode(part, dest) {
+  const pan = ac.createStereoPanner(), g = ac.createGain();
+  pan.connect(g); g.connect(dest);
+  const n = { in: pan, pan, g, part };
+  setEar(n, true);
+  return n;
+}
+function setEar(n, now) {
+  const e = earOf(n.part), pan = e === "l" ? -1 : e === "r" ? 1 : 0, gain = e === "off" ? 0 : e === "both" ? 1 : 0.7;
+  if (now) { n.pan.pan.value = pan; n.g.gain.value = gain; return; }
+  n.pan.pan.setTargetAtTime(pan, ac.currentTime, 0.01); n.g.gain.setTargetAtTime(gain, ac.currentTime, 0.01);
+}
+// After a change, or a change of page: the song's parts as they play, and your voice, straight to the output (not
+// through the limiter, whose look-ahead would make it later still).
+function applyEars() {
+  paintEarsBtn();
+  if (!ac) return;
+  if (P.ears) for (const n of Object.values(P.ears)) setEar(n);
+  if (!meEar && micBus && earOf("me") !== "off") { meEar = earNode("me", ac.destination); micBus.connect(meEar.in); }
+  if (meEar) setEar(meEar);
+}
+function paintEarsBtn() { $("#kEars").classList.toggle("set", Object.entries(EAR_DEFAULT).some(([k, d]) => S.ears[k] !== d)); }
+function renderEars() {
+  const rows = $("#earRows");
+  rows.replaceChildren(...Object.entries(EARS).map(([part, name]) => {
+    const row = el("div", "ear-row"), seg = el("div", "seg");
+    seg.setAttribute("role", "radiogroup"); seg.setAttribute("aria-label", tr(name));
+    for (const [v, t] of EAR_SIDES) {
+      if (v === "off" && part !== "me") continue;
+      const b = el("button", null, tr(t));
+      b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(S.ears[part] === v));
+      b.onclick = () => {
+        S.ears[part] = v; save(); applyEars();
+        for (const x of seg.children) x.setAttribute("aria-checked", String(x === b));
+        paintEarHint();
+      };
+      seg.append(b);
+    }
+    row.append(el("span", null, tr(name)), seg);
+    return row;
+  }));
+  paintEarHint();
+}
+function paintEarHint() {
+  say($("#earHint"), S.ears.me === "off" ? "Your voice: hear the mic back as you sing, with headphones on."
+    : "Your voice comes back a little late (the browser's delay), and only while the mic is on.");
+}
+function showEars(on) {
+  $("#earsPop").hidden = !on; $("#kEars").setAttribute("aria-expanded", String(on));
+  if (on) { showMicSet(false); showJobs(false); renderEars(); }
+}
+function initEars() {
+  const btn = $("#kEars"), pop = $("#earsPop");
+  btn.append(icon("headphones"));
+  btn.onclick = (e) => { e.stopPropagation(); showEars(pop.hidden); };
+  pop.onclick = (e) => e.stopPropagation(); // a choice made in it (its row redrawn) doesn't count as a click outside
+  document.addEventListener("click", () => { if (!pop.hidden) showEars(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showEars(false); btn.focus(); } });
+  pop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!pop.hidden && to && !pop.contains(to) && to !== btn) showEars(false); });
+  paintEarsBtn();
+}
 // The sensitivity bar, while the settings are open: how loud the mic hears you (falling back gently), in your colour
 // once it's past the line.
 let gateShown = -Infinity;
@@ -3787,7 +3878,7 @@ function initSing() {
   });
   $("#kLeave").prepend(icon("back"));
   $("#kLeave").onclick = () => { leaveSong(); go(P.song ? "stems/" + P.song.id : "stems"); };
-  initTakes();
+  initTakes(); initEars();
   // settings: a panel under the gear beside the mic chip; a click elsewhere or Escape closes it
   const setBtn = $("#micSetBtn"), pop = $("#micSet");
   setBtn.append(icon("settings"));
@@ -4883,7 +4974,8 @@ function route() {
     K.studio = null;
   }
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems";
-  showMicSet(false);
+  showMicSet(false); showEars(false);
+  applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } // takes are recorded and played in Practice only
   if (view === "stems") stemsRoute(sub, extra);
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
@@ -5003,6 +5095,7 @@ function setLang(v) {
   renderMic(); paintRec(); paintPlay($("#pPlay"), P.playing); renderStart();
   if (P.song) { paintMeta(); renderTracks(); paintVideoBtn(); }
   if (K.song) { renderPhrases(); renderTakes(); }
+  if (!$("#earsPop").hidden) renderEars();
   if ($("#sLib").children.length) renderLibrary();
   if (infoShown) drawInfo();
 }
@@ -5185,6 +5278,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Click a phrase to go to it · Shift+click another to loop the run between them": "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요",
   "Compare: the original singer's part, then yours": "비교: 원곡 가수가 부른 부분, 그다음 내 테이크", "Playing a take": "테이크 듣는 중",
   "Comparing · the original singer": "비교 중 · 원곡 가수", "Comparing · yours": "비교 중 · 내 테이크",
+  "Headphones": "헤드폰", "Headphones: which ear each part plays in": "헤드폰: 소리마다 어느 쪽 귀로 들을지", "Mute": "끔", "Left": "왼쪽", "Both": "양쪽", "Right": "오른쪽",
+  "Your voice: hear the mic back as you sing, with headphones on.": "내 목소리: 부르는 동안 마이크 소리를 다시 들려줘요. 헤드폰을 끼고 쓰세요.",
+  "Your voice comes back a little late (the browser's delay), and only while the mic is on.": "내 목소리는 브라우저 지연 때문에 살짝 늦게 들리고, 마이크가 켜져 있을 때만 들려요.",
   "Count-in": "카운트인", "Off": "없음", "1 beat": "1박", "{n} beats": "{n}박", "From {t}": "{t}부터", "Phrases": "소절", "Phrase –": "소절 –",
   "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
   "Intro": "전주", "Break": "간주", "{kind} · vocals in {s} s": "{kind} · {s}초 뒤 보컬",
