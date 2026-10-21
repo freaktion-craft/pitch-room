@@ -222,10 +222,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, job) if job else self._json(404, {"error": "Unknown job."})
         if path == "/api/library":
             return self._json(200, stems.library())
-        if path.startswith("/api/library/") and path.endswith(("/info", "/takes")):
+        if path.startswith("/api/library/") and path.endswith(("/info", "/takes", "/lyrics")):
             try:
                 song = path.split("/")[3]
-                return self._json(200, stems.song_info(song) if path.endswith("/info") else stems.list_takes(song))
+                read = stems.song_info if path.endswith("/info") else stems.list_takes if path.endswith("/takes") else stems.get_lyrics
+                return self._json(200, read(song))
             except ValueError as e:
                 return self._json(422, {"error": str(e)})
         if path.startswith("/api/melody/"):
@@ -273,9 +274,20 @@ class Handler(SimpleHTTPRequestHandler):
                 body = json.loads(self._body(100_000) or b"{}")
                 data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"), body.get("key") or 0)
                 return self._attachment(data, "audio/mpeg", filename, "export.mp3")
+            if parts[3] == "lyrics":  # find them: {} on LRCLIB by the title, {"id": n} that entry, {"text": …} pasted
+                body = json.loads(self._body(60_000) or b"{}")
+                how = body if isinstance(body, dict) and body else None
+                return self._json(200, {"job": stems.start_lyrics(parts[2], how)})
             if parts[3] == "takes":  # a take recorded in Practice: the WAV as the body, the rest in the query
                 info = {k: v[0] for k, v in q.items()}
                 return self._json(200, stems.save_take(parts[2], self._body(MAX_SONG), info))
+        if len(parts) == 5 and parts[1] == "library" and parts[3] == "lyrics":  # api/library/<id>/lyrics/<action>
+            if parts[4] == "search":
+                body = json.loads(self._body(10_000) or b"{}")
+                return self._json(200, stems.search_lyrics(body.get("q") if isinstance(body, dict) else None))
+            if parts[4] == "delete":
+                stems.drop_lyrics(parts[2])
+                return self._json(200, {"ok": True})
         if len(parts) == 6 and parts[1] == "library" and parts[3] == "takes":  # api/library/<id>/takes/<take>/<action>
             if parts[5] == "delete":
                 stems.delete_take(parts[2], parts[4])

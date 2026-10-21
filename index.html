@@ -210,6 +210,15 @@ input[type="range"]:disabled { opacity: 0.4; }
 .stage-head .legend span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .stage-head .legend i { width: 16px; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--muted) 45%, var(--surface)); } /* as drawn */
 .stage-head .legend i.you { height: 3px; border-radius: 2px; background: var(--voice); }
+/* the lyrics' line being sung (a number, the line; the next one quieter), or where finding them has got */
+.stage-lyric { flex: none; display: flex; align-items: baseline; gap: 12px; min-width: 0; padding: 12px 16px; box-shadow: inset 0 -1px 0 var(--line); }
+.stage-lyric .num { flex: none; width: 20px; font-size: 13px; line-height: 24px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.stage-lyric .num:empty { display: none; }
+.stage-lyric .cur { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 16px; line-height: 24px; font-weight: 600; }
+.stage-lyric.coming .cur, .stage-lyric.note .cur { color: var(--muted); }
+.stage-lyric.note .cur { font-weight: 400; font-size: 13px; }
+.stage-lyric .next { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; line-height: 24px; color: var(--faint); }
+.stage-lyric .next a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .plot { position: relative; flex: 1; min-height: 0; }
 .plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .hud-r { position: absolute; top: 16px; right: 16px; pointer-events: none; text-align: right; display: grid; justify-items: end; gap: 8px; }
@@ -496,6 +505,25 @@ input[type="range"]:disabled { opacity: 0.4; }
 .facts dt { font-size: 12.5px; color: var(--muted); }
 .facts dd { margin: 0; font-size: 18px; font-weight: 500; }
 .facts dd small { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 400; color: var(--faint); }
+/* Info: the lyrics, where they're from, what to do about them, and each line where it's sung (a click plays it) */
+.info-lyrics { display: grid; gap: 12px; }
+.info-lyrics .ly-state { margin: 0; font-size: 13.5px; color: var(--muted); }
+.info-lyrics .ly-state.warn { color: var(--warn-ink); }
+.ly-acts, .ly-find { display: flex; flex-wrap: wrap; gap: 8px; }
+.ly-find input { flex: 1 1 240px; min-width: 0; height: 32px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2); padding: 0 12px; font-size: 14px; }
+.ly-find input:focus, .ly-paste textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+.ly-found { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.ly-found li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background: var(--bg); font-size: 13.5px; }
+.ly-found li span { flex: 1; min-width: 0; }
+.ly-found li small { display: block; color: var(--faint); font-size: 12.5px; }
+.ly-paste { display: grid; gap: 8px; justify-items: start; }
+.ly-paste textarea { width: 100%; min-height: 160px; resize: vertical; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2); padding: 8px 12px;
+  font: 14px/20px var(--font); color: inherit; }
+.ly-lines { margin: 0; padding: 4px; list-style: none; display: grid; gap: 2px; max-height: 320px; overflow-y: auto; border-radius: 10px; background: var(--bg); }
+.ly-lines button { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; width: 100%; padding: 4px 8px; border: 0; border-radius: 6px; background: none;
+  text-align: left; font-size: 13.5px; line-height: 20px; }
+.ly-lines button:hover { background: var(--fill); }
+.ly-lines button span { color: var(--faint); font-variant-numeric: tabular-nums; }
 .info-range { display: grid; gap: 12px; }
 .info-range:empty { display: none; }
 .rbars { display: grid; gap: 12px; }
@@ -584,8 +612,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .take.playing .tk-play { background: var(--ink); color: var(--on-ink); }
 .tk-when { font: 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .tk-part { display: flex; align-items: baseline; gap: 8px; min-width: 0; line-height: 20px; }
-.tk-part b { flex: none; font-weight: 500; font-size: 14px; }
-.tk-part small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--faint); }
+.tk-part b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 14px; }
+.tk-part small { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--faint); } /* gives way first */
 .tk-part small.err, .take.failed .tk-part b { color: var(--bad); }
 .tk-confirm { grid-column: 4; grid-row: 1; justify-self: end; font-size: 13.5px; color: var(--bad); visibility: hidden; }
 .take.armed .tk-confirm { visibility: visible; }
@@ -665,6 +693,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
         <div class="rep" id="hudRep"></div>
         <div class="legend"><span><i aria-hidden="true"></i>Original singer</span><span><i class="you" aria-hidden="true"></i>You</span></div>
       </div>
+      <div class="stage-lyric" id="kLyric" hidden><span class="num" id="kLyNum"></span><span class="cur" id="kLyCur"></span><span class="next" id="kLyNext"></span></div>
       <div class="plot">
         <canvas id="cv"></canvas>
         <div class="hud-r" aria-live="off">
@@ -710,7 +739,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <div id="sAddPage" hidden>
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
-      <p class="muted" data-html>Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.</p>
+      <p class="muted" data-html>Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Lyrics come from <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> and are lined up with the voice by <a href="https://github.com/openai/whisper" target="_blank" rel="noopener">Whisper</a>. Together they’re a 3–4 GB download, installed into this app’s own folder.</p>
       <div class="row-actions"><button class="btn dark" id="sInstallBtn" type="button">Install stem tools</button><span class="muted" id="sInstallState"></span></div>
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
@@ -746,6 +775,7 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <p class="muted" id="iWait">Reading the song…</p>
       <dl class="facts" id="iFacts"></dl>
       <div class="info-range" id="iRange"></div>
+      <div class="info-lyrics" id="iLyrics"></div>
     </section>
 
     <section class="player" id="sPlayer" hidden>
@@ -1488,7 +1518,7 @@ let infoShown = null; // {id, s, m, n}: the song the Info page shows (n: in its 
 async function renderInfo(id) {
   const wait = $("#iWait");
   infoShown = null;
-  $("#iTitle").textContent = ""; $("#iSub").replaceChildren(); $("#iFacts").replaceChildren(); $("#iRange").replaceChildren();
+  $("#iTitle").textContent = ""; $("#iSub").replaceChildren(); $("#iFacts").replaceChildren(); $("#iRange").replaceChildren(); $("#iLyrics").replaceChildren();
   $("#iActs").hidden = true; wait.hidden = false; say(wait, "Reading the song…");
   let s, lib;
   try {
@@ -1527,10 +1557,85 @@ function drawInfo() {
   if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, tr("{n} semitones", { n: v.hi - v.lo }) + (v.mostly ? tr(" · mostly {lo}–{hi}", { lo: absName(v.mostly[0]), hi: absName(v.mostly[1]) }) : ""));
   fact("Tracks", String(trackNames(s).length), trackNames(s).map((k) => tr(k)).join(", "));
   if (v) renderInfoRange(s);
+  renderInfoLyrics(id);
   $("#iOpen").href = `#stems/${id}`;
   $("#iSing").hidden = !s.stems.includes("vocals");
   $("#iSing").onclick = () => singSong(m, $("#iSing"));
   $("#iActs").hidden = false;
+}
+// The song's lyrics: where they came from, each line where it's sung (a click plays it in the vocal track), and ways to
+// get others: look again, search LRCLIB, paste them in, or do without (phrases then fall between breaths).
+let infoLyrics = null; // {id, data: lyrics.json or null}
+async function renderInfoLyrics(id) {
+  let lyr = null;
+  try { lyr = await (await fetch(`/api/library/${id}/lyrics`, { cache: "no-store" })).json(); } catch (e) { lyr = null; }
+  if (!infoShown || infoShown.id !== id) return;
+  infoLyrics = { id, data: lyr && lyr.lyrics };
+  if (lyr && lyr.job) { if (!lyricJobs.has(id)) lyricJobs.set(id, { t: "Looking for the lyrics…" }); watchJob(lyr.job, "lyrics", id); }
+  const box = $("#iLyrics"), d = infoLyrics.data;
+  box.replaceChildren(el("div", "group-label minor", tr("Lyrics")), el("p", "ly-state"));
+  const acts = el("div", "ly-acts");
+  const find = el("div", "ly-find"), q = el("input"), go = mkBtn(tr("Search"), null), found = el("ol", "ly-found");
+  const paste = el("div", "ly-paste"), text = el("textarea"), line = mkBtn(tr("Line them up with the voice"), null, true);
+  find.hidden = found.hidden = paste.hidden = true;
+  q.type = "search"; q.value = infoShown.s.title.replace(/\[[^\]]*\]|\([^)]*\)/g, " ").replace(/\s+/g, " ").trim(); q.setAttribute("aria-label", tr("Search LRCLIB"));
+  text.placeholder = tr("Paste the lyrics here, a line of the song to each line."); text.setAttribute("aria-label", tr("Lyrics"));
+  const start = async (how) => { if (await startLyrics(id, how)) { find.hidden = found.hidden = paste.hidden = true; } paintInfoLyrics(); };
+  const search = async () => {
+    found.hidden = false; found.replaceChildren(el("li", null, tr("Searching…")));
+    let rows;
+    try {
+      const r = await fetch(`/api/library/${id}/lyrics/search`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: q.value }) });
+      rows = await r.json(); if (!r.ok) throw new Error(rows.error || "Couldn’t search.");
+    } catch (e) { found.replaceChildren(el("li", null, tr(e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message))); return; }
+    found.replaceChildren(...(rows.length ? rows.slice(0, 8).map((x) => {
+      const li = el("li"), what = el("span", null, `${x.artist} – ${x.track}`);
+      what.append(el("small", null, [x.album, x.duration ? fmtTime(x.duration) : "", tr(x.synced ? "timed" : "words only")].filter(Boolean).join(" · ")));
+      li.append(what, mkBtn(tr("Use these"), () => start({ id: x.id }))); return li;
+    }) : [el("li", null, tr("Nothing found. Try fewer words, or the title as it’s written in its own language."))]));
+  };
+  go.onclick = search; q.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); search(); } };
+  line.onclick = () => start({ text: text.value });
+  find.append(q, go); paste.append(text, line);
+  const again = mkBtn(tr("Look again"), () => start({})), look = mkBtn(tr("Search LRCLIB"), () => { find.hidden = !find.hidden; found.hidden = true; paste.hidden = true; if (!find.hidden) q.focus(); });
+  const put = mkBtn(tr("Paste lyrics"), () => { paste.hidden = !paste.hidden; find.hidden = found.hidden = true; if (!paste.hidden) text.focus(); });
+  const drop = mkBtn(tr("Practise without lyrics"), async () => {
+    try { await fetch(`/api/library/${id}/lyrics/delete`, { method: "POST" }); } catch (e) { return; }
+    lyricsDone(id, true);
+  });
+  drop.hidden = !(d && d.lines); again.hidden = !drop.hidden; // with lyrics, others come by search or paste
+  acts.append(again, look, put, drop);
+  box.append(acts, find, found, paste);
+  if (d && d.lines) {
+    const ol = el("ol", "ly-lines");
+    for (const l of d.lines) {
+      if (!(l.t1 > l.t0)) continue;
+      const b = el("button"); b.type = "button"; b.title = tr("Play this line of the vocal track");
+      b.append(el("span", null, fmtTime(l.t0)), el("div", null, l.text));
+      b.onclick = () => hearAt(infoShown.s, l.t0, l.t1, b);
+      const li = el("li"); li.append(b); ol.append(li);
+    }
+    box.append(ol);
+  }
+  paintInfoLyrics();
+}
+// The Info page's line about the lyrics, and its buttons off while they're being found
+function paintInfoLyrics() {
+  if (!infoLyrics || !infoShown || infoLyrics.id !== infoShown.id) return;
+  const id = infoLyrics.id, d = infoLyrics.data, job = lyricJobs.get(id), st = $("#iLyrics .ly-state");
+  if (!st) return;
+  let t, warn = false;
+  if (job) { t = tr(job.t, job.v); warn = !!job.err; }
+  else if (d && d.lines) {
+    const n = d.lines.length;
+    t = d.source && d.source.site === "lrclib" ? tr("From LRCLIB · {artist} – {track} · {n} lines", { artist: d.source.artist, track: d.source.track, n }) : tr("Pasted in · {n} lines", { n });
+    if (d.match != null && d.match < 0.3) { t += " · " + tr("they hardly match what’s sung: maybe another song’s"); warn = true; }
+  } else if (d && d.dropped) t = tr("No lyrics: Practice splits the song into phrases where the singer breathes.");
+  else if (d) t = tr("None found on LRCLIB. Search for them, or paste them in.");
+  else t = tr("Not looked for yet. Practice looks when it opens.");
+  st.textContent = t; st.classList.toggle("warn", warn);
+  const busy = !!job && !job.err;
+  $("#iLyrics").querySelectorAll(".ly-acts button, .ly-find *, .ly-found button, .ly-paste *").forEach((b) => { b.disabled = busy; });
 }
 // A moment of the vocal track (decoded on first use), with a little room either side and short fades.
 // A moment of the vocal the melody was read from: the lead vocal once split (the backing vocals could bury the note),
@@ -1635,6 +1740,9 @@ function watchJob(id, kind, forSong) {
         if (j.status === "error") videoWait(j.error, true);
         else videoWait("{stage}… {pct}%", false, { stage: () => tr(j.stage), pct: Math.round(j.progress * 100) });
       }
+    } else if (kind === "lyrics") {
+      if (j.status === "queued" || j.status === "running") lyricNote(forSong, { t: "{stage}… {pct}%", v: { stage: tr(j.stage), pct: Math.round(j.progress * 100) } });
+      else if (j.status === "error") lyricNote(forSong, { t: "Couldn’t get the lyrics: {why}", v: { why: tr(j.error) }, err: true });
     } else if (kind === "split") {
       splitting[forSong] = j.status === "queued" ? ["waiting to split into lead and backing…"] : ["splitting into lead and backing… {pct}%", { pct: Math.round(j.progress * 100) }];
       const note = $('#pTracks .track[data-name="vocals"] .name small');
@@ -1652,6 +1760,7 @@ function watchJob(id, kind, forSong) {
       if (j.status === "cancelled") return dropJob(id);
       if ((kind === "install" || kind === "gpu") && j.status === "done") stemsRefresh();
       if (kind === "video") videoFetched(forSong, j.status === "done");
+      if (kind === "lyrics") lyricsDone(forSong, j.status === "done");
       if (kind === "split") {
         delete splitting[forSong];
         if (P.song && P.song.id === forSong) {
@@ -2468,7 +2577,8 @@ function initStems() {
 // ---------- practice (singing a song from the library) ----------
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
-const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1, studio: null };
+const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1, studio: null,
+  lyrics: null, lyricMsg: null, lyricKey: null }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place
 function songEvs() {
   const sh = K.oct * 12 + P.key; // the bars move with the octave picked and the key the song plays in
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
@@ -2534,11 +2644,34 @@ function songPhrases(notes, beats, bpm, dur) {
     i = a;
   }
   const kept = out.filter((s) => s.reduce((n, [t0, t1]) => n + t1 - t0, 0) >= 0.5);
-  return kept.map((s, i) => {
-    const t0 = s[0][0], t1 = s[s.length - 1][1], next = kept[i + 1];
-    const counts = countsBefore(t0, beats, beat).filter((c) => c >= 0);
-    return { t0, t1, counts, from: Math.max(0, (counts.length ? counts[0] : t0) - 0.15), to: Math.min(t1 + Math.max(0.5, beat), next ? next[0][0] : dur) };
+  return phraseTimes(kept.map((s) => ({ t0: s[0][0], t1: s[s.length - 1][1] })), beats, bpm, dur);
+}
+// With lyrics, a phrase is a line of them, from its first word to its last as they're sung (Whisper's times, lyrics.py);
+// a line under LYRIC_MIN s joins the next. A line Whisper started before the one before it ended starts where that ends.
+const LYRIC_MIN = 1.5;
+function lyricPhrases(lines, beats, bpm, dur) {
+  const spans = [];
+  for (const l of lines) {
+    const last = spans[spans.length - 1], t0 = last ? Math.max(l.t0, last.t1) : l.t0;
+    if (!l.text || !(l.t1 > t0)) continue; // a line Whisper couldn't place
+    if (last && last.t1 - last.t0 < LYRIC_MIN) { last.t1 = l.t1; last.text += " / " + l.text; }
+    else spans.push({ t0, t1: l.t1, text: l.text });
+  }
+  return phraseTimes(spans, beats, bpm, dur);
+}
+// Each phrase's count-in (the four beats before it), and where it plays from (the count-in) and to (just before the next).
+function phraseTimes(spans, beats, bpm, dur) {
+  const beat = 60 / (bpm || 120);
+  return spans.map((s, i) => {
+    const next = spans[i + 1], counts = countsBefore(s.t0, beats, beat).filter((c) => c >= 0);
+    return { ...s, counts, from: Math.max(0, (counts.length ? counts[0] : s.t0) - 0.15), to: Math.min(s.t1 + Math.max(0.5, beat), next ? next.t0 : dur) };
   });
+}
+// Practice's phrases: the song's lyric lines once it has them, else the stretches between breaths.
+function setPhrases() {
+  const m = K.song;
+  K.phrases = K.lyrics ? lyricPhrases(K.lyrics, m.beats, m.bpm, songDur()) : songPhrases(K.notes, m.beats, m.bpm, songDur());
+  K.cue = null; K.lyricKey = null; setLoop(false); renderPhrases();
 }
 // The phrase you're on: the one playing, or the next one during a rest; during the count-in after a jump, the one you
 // jumped to. null after the last.
@@ -2579,7 +2712,7 @@ function renderPhrases() {
   K.phrases.forEach((p, i) => {
     const b = el("button"); b.type = "button"; b.tabIndex = -1;
     b.style.left = (p.t0 / dur) * 100 + "%"; b.style.width = ((p.t1 - p.t0) / dur) * 100 + "%";
-    b.title = tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) }); b.setAttribute("aria-label", b.title);
+    b.title = tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) }) + (p.text ? "\n" + p.text : ""); b.setAttribute("aria-label", b.title);
     b.dataset.i = i; strip.append(b);
   });
   strip.append(el("i", "head"));
@@ -2596,6 +2729,68 @@ function paintPhrases() {
   const strip = $("#kStrip");
   strip.classList.toggle("looping", K.loop);
   strip.querySelectorAll("button").forEach((b) => b.setAttribute("aria-current", String(+b.dataset.i === K.ph)));
+}
+// Lyrics. The song's lines (lyrics.json) come with the melody; if they were never looked for, Practice looks now (and
+// the first time downloads Whisper's model), saying how far it's got in the lyrics' line on the stage; phrases follow
+// the lines once they're in. lyricJobs: what each song's lyrics job last said, for Practice and the Info page.
+const lyricJobs = new Map();
+function lyricsFor(m, lyr, look = true) {
+  const data = lyr && lyr.lyrics;
+  K.lyrics = (data && data.lines) || null;
+  K.lyricMsg = K.lyrics || (data && data.dropped) ? null : data ? { t: "No lyrics found for this song.", find: true } : { t: "Looking for the lyrics…" };
+  if (!lyr) { K.lyricMsg = null; return; } // the server didn't answer: no line at all
+  if (lyr.job) watchJob(lyr.job, "lyrics", m.id);
+  else if (!data && look) startLyrics(m.id, {});
+}
+async function startLyrics(id, how) {
+  let j;
+  try {
+    const r = await fetch(`/api/library/${id}/lyrics`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(how) });
+    j = await r.json().catch(() => ({ error: "The server didn’t answer properly." }));
+    if (!r.ok) throw new Error(j.error || "Couldn’t get the lyrics.");
+  } catch (e) { lyricNote(id, { t: "Couldn’t get the lyrics: {why}", v: { why: e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message }, err: true }); return false; }
+  lyricJobs.set(id, { t: "Looking for the lyrics…" });
+  watchJob(j.job, "lyrics", id);
+  return true;
+}
+// What finding a song's lyrics has got to (msg: {t, v} to say through tr), in Practice's line and on its Info page
+function lyricNote(id, msg) {
+  lyricJobs.set(id, msg);
+  if (K.on && K.song && K.song.id === id && !K.lyrics) K.lyricMsg = msg;
+  if (infoShown && infoShown.id === id) paintInfoLyrics();
+}
+async function lyricsDone(id, ok) {
+  let lyr = null;
+  try { lyr = await (await fetch(`/api/library/${id}/lyrics`, { cache: "no-store" })).json(); } catch (e) { lyr = null; }
+  if (ok || !lyricJobs.get(id)?.err) lyricJobs.delete(id);
+  if (lyr && K.song && K.song.id === id) {
+    const had = JSON.stringify(K.lyrics);
+    lyricsFor(K.song, { ...lyr, job: null }, false); // not looked for again here: it would go round if LRCLIB is out of reach
+    if (!ok && lyricJobs.get(id)) K.lyricMsg = lyricJobs.get(id); // why it failed, in its place
+    if (JSON.stringify(K.lyrics) !== had) setPhrases();
+  }
+  if (infoShown && infoShown.id === id) renderInfoLyrics(id);
+}
+// Above the bars: the phrase being sung (or about to be, quieter) and the one after; else what finding them says.
+function renderLyric(sn) {
+  const bar = $("#kLyric"), i = K.lyrics ? phraseAt(sn) : null, p = i == null ? null : K.phrases[i], on = !!p && sn >= p.t0 - 0.25;
+  const key = K.lyrics ? `${i}|${on}` : JSON.stringify(K.lyricMsg) + lang;
+  if (key === K.lyricKey) return;
+  K.lyricKey = key;
+  bar.hidden = !K.lyrics && !K.lyricMsg;
+  const num = $("#kLyNum"), cur = $("#kLyCur"), next = $("#kLyNext");
+  next.replaceChildren();
+  if (K.lyrics) {
+    const q = i == null ? null : K.phrases[i + 1];
+    bar.className = "stage-lyric" + (on ? "" : " coming");
+    num.textContent = p ? String(i + 1).padStart(2, "0") : ""; cur.textContent = p ? p.text : "";
+    if (q) next.textContent = q.text;
+    return;
+  }
+  if (!K.lyricMsg) return;
+  bar.className = "stage-lyric note"; num.textContent = "";
+  cur.textContent = tr(K.lyricMsg.t, K.lyricMsg.v);
+  if (K.lyricMsg.find) { const a = el("a", null, tr("Find them on the song’s Info page")); a.href = `#stems/${K.song.id}/info`; next.append(a); }
 }
 // Every frame: keep the loop going, follow the playhead, move the strip's marker.
 function phraseTick(sn) {
@@ -2643,10 +2838,11 @@ async function singSong(m, btn) {
   const show = (text) => { if (lbl) say(lbl, text); };
   if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
   const slow = setTimeout(() => show("Reading the melody… (up to a minute the first time)"), 500);
-  let mel;
+  let mel, lyr;
   try {
     if (!P.song || P.song.id !== m.id) await openSong(m);
-    const r = await fetch("/api/melody/" + m.id);
+    let r;
+    [r, lyr] = await Promise.all([fetch("/api/melody/" + m.id), fetch(`/api/library/${m.id}/lyrics`, { cache: "no-store" }).then((x) => (x.ok ? x.json() : null)).catch(() => null)]);
     mel = await r.json();
     if (!r.ok) throw new Error(mel.error || "Couldn’t read the melody.");
   } catch (e) {
@@ -2657,7 +2853,7 @@ async function singSong(m, btn) {
   show(was);
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = 0; K.on = true; // bars as sung; "Bars" moves them an octave
   K.entries = songEntries(K.notes, m.beats, m.bpm);
-  K.phrases = songPhrases(K.notes, m.beats, m.bpm, songDur()); K.cue = null; setLoop(false); renderPhrases();
+  K.song = m; lyricsFor(m, lyr); setPhrases();
   songEvs(); songView(true);
   // Practice sets the tracks its own way (Guide vocal, Band); the Studio's mix is put back on the way out (route)
   K.studio = mixNow();
@@ -2894,7 +3090,9 @@ function takePart(t) {
   K.phrases.forEach((p, i) => { const mid = (p.t0 + p.t1) / 2; if (mid >= t.start && mid <= end) ps.push(i + 1); });
   const range = `${fmtTime(t.start)}–${fmtTime(end)}`, len = fmtLen(t.duration);
   if (!ps.length) return { what: range, more: len };
-  return { what: ps.length === 1 ? tr("Phrase {n}", { n: ps[0] }) : tr("Phrases {a}–{b}", { a: ps[0], b: ps[ps.length - 1] }), more: `${range} · ${len}` };
+  const which = ps.length === 1 ? tr("Phrase {n}", { n: ps[0] }) : tr("Phrases {a}–{b}", { a: ps[0], b: ps[ps.length - 1] }), words = K.phrases[ps[0] - 1].text;
+  if (words) return { what: words + (ps.length > 1 ? " …" : ""), more: `${which} · ${range} · ${len}` }; // by its words, with lyrics
+  return { what: which, more: `${range} · ${len}` };
 }
 // Takes by day, newest first.
 function renderTakes() {
@@ -3260,7 +3458,7 @@ function practiceFrame() {
   songView();
   draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 + P.key });
   setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
-  renderHud(sn, cur); renderCountIn(sn);
+  renderHud(sn, cur); renderCountIn(sn); renderLyric(sn);
 }
 // The mic chip's spectrum: 7 bands from 90 Hz to 4 kHz, where a voice's energy is, spaced evenly in pitch. Each bar is
 // as tall as the loudest bin in its band (-95 dB flat … -35 dB full), rising at once and falling back gently.
@@ -3505,9 +3703,17 @@ const KO_SERVER = {
   "Something went wrong. Check the terminal window for details.": "문제가 생겼어요. 자세한 내용은 터미널 창을 확인하세요.",
   "Please send a file under {n} MB.": "{n} MB보다 작은 파일을 보내 주세요.",
   "Installing PyTorch for your NVIDIA GPU ({idx}, ≈2–3 GB)…": "NVIDIA GPU용 PyTorch 설치하는 중 ({idx}, ≈2–3 GB)…",
-  "Downloading and installing (≈1–2 GB, a few minutes)…": "내려받아 설치하는 중 (≈1–2 GB, 몇 분 걸려요)…",
+  "Downloading and installing (≈3–4 GB, a few minutes)…": "내려받아 설치하는 중 (≈3–4 GB, 몇 분 걸려요)…",
   "No CUDA build of PyTorch matched this system. Separation will keep using the CPU.": "이 시스템에 맞는 CUDA용 PyTorch가 없어요. 분리는 계속 CPU로 해요.",
-  "Installing Demucs, librosa and yt-dlp…": "Demucs, librosa, yt-dlp 설치하는 중…",
+  "Installing Demucs, librosa, yt-dlp and Whisper…": "Demucs, librosa, yt-dlp, Whisper 설치하는 중…",
+  "Finding the lyrics": "가사 찾는 중", "Lining the lyrics up with the voice": "가사를 목소리에 맞추는 중",
+  "Downloading the lyrics model (first time only, ≈1.5 GB)": "가사 모델 내려받는 중 (처음 한 번만, ≈1.5 GB)",
+  "Couldn’t reach LRCLIB. Is this computer online?": "LRCLIB에 연결하지 못했어요. 인터넷에 연결돼 있나요?", "LRCLIB answered {code}.": "LRCLIB이 {code} 오류로 답했어요.",
+  "Paste the lyrics, a line of the song to each line.": "가사를 붙여넣어 주세요. 한 줄에 노래 한 줄씩이요.", "That LRCLIB entry has no lyrics.": "그 LRCLIB 항목에는 가사가 없어요.",
+  "Send an LRCLIB entry's id or the lyrics' text.": "LRCLIB 항목 번호나 가사를 보내 주세요.", "That's longer than a song's lyrics.": "노래 가사로 보기엔 너무 길어요.",
+  "This song's lyrics are being lined up already. Try again in a moment.": "이 곡의 가사를 맞추는 중이에요. 잠시 뒤에 다시 해 주세요.",
+  "Type a title or an artist to look for.": "찾을 곡명이나 가수를 입력해 주세요.",
+  "Lyrics need Whisper: install the stem tools on the Library page first.": "가사에는 Whisper가 필요해요. 먼저 라이브러리 페이지에서 스템 도구를 설치해 주세요.", "This song has no vocal track.": "이 곡에는 보컬 트랙이 없어요.",
   "Installing failed. The last lines of the log above say why.": "설치하지 못했어요. 위 로그의 마지막 줄에 이유가 있어요.",
   "Send the new title as text.": "새 제목을 텍스트로 보내 주세요.", "A song needs a title.": "곡 제목을 입력하세요.",
   "Paste a full link that starts with https://": "https://로 시작하는 전체 링크를 붙여넣으세요.",
@@ -3565,8 +3771,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
     "Python 서버가 필요해요. OS에 맞는 <code>start-…</code> 파일로 앱을 시작한 뒤 <b>http://localhost:5178</b>에서 다시 여세요.",
   "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
   "One-time setup": "처음 한 번 설치",
-  "Stem separation uses Demucs (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Together they’re a 1–2 GB download, installed into this app’s own folder.":
-    "스템 분리에는 <a href=\"https://github.com/facebookresearch/demucs\" target=\"_blank\" rel=\"noopener\">Demucs</a>(PyTorch), 박자 분석에는 librosa, YouTube 링크에는 yt-dlp를 써요. 연습 화면의 음정 바는 리드 보컬만으로 만드는데, 이 리드 보컬은 카라오케 모델(audio-separator)이 백킹 보컬과 보컬 찹에서 떼어 내요. 모두 합쳐 1–2 GB를 내려받아 이 앱의 폴더에 설치해요.",
+  "Stem separation uses Demucs (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Lyrics come from LRCLIB and are lined up with the voice by Whisper. Together they’re a 3–4 GB download, installed into this app’s own folder.":
+    "스템 분리에는 <a href=\"https://github.com/facebookresearch/demucs\" target=\"_blank\" rel=\"noopener\">Demucs</a>(PyTorch), 박자 분석에는 librosa, YouTube 링크에는 yt-dlp를 써요. 연습 화면의 음정 바는 리드 보컬만으로 만드는데, 이 리드 보컬은 카라오케 모델(audio-separator)이 백킹 보컬과 보컬 찹에서 떼어 내요. 가사는 <a href=\"https://lrclib.net\" target=\"_blank\" rel=\"noopener\">LRCLIB</a>에서 받아 <a href=\"https://github.com/openai/whisper\" target=\"_blank\" rel=\"noopener\">Whisper</a>로 목소리에 맞춰요. 모두 합쳐 3–4 GB를 내려받아 이 앱의 폴더에 설치해요.",
   "Install stem tools": "스템 도구 설치", "Add a song": "새 곡 추가", "Paste a YouTube link": "YouTube 링크 붙여넣기", "YouTube link": "YouTube 링크", "Separate": "분리",
   "or choose an audio file · drop it here": "또는 오디오 파일 선택 · 여기로 끌어다 놓기",
   "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
@@ -3594,7 +3800,19 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "no pitched tracks": "음정 있는 트랙 없음", "not read yet": "아직 읽지 않음", "no steady beat found": "일정한 박자를 찾지 못했어요",
   "{n} semitones": "{n}반음", " · mostly {lo}–{hi}": " · 주로 {lo}–{hi}",
   "lead": "리드 보컬", "backing": "백킹 보컬", "vocals": "보컬", "drums": "드럼", "bass": "베이스", "guitar": "기타", "piano": "피아노", "other": "나머지",
-  "Where the melody sits": "멜로디 음역", "Song": "곡", "Lowest": "최저음", "Highest": "최고음",
+  "Where the melody sits": "멜로디 음역",
+  "Lyrics": "가사", "Search": "찾기", "Search LRCLIB": "LRCLIB에서 찾기", "Look again": "다시 찾기", "Paste lyrics": "가사 붙여넣기",
+  "Practise without lyrics": "가사 없이 연습", "Line them up with the voice": "목소리에 맞추기", "Use these": "이 가사 쓰기", "Searching…": "찾는 중…",
+  "timed": "줄별 시간 있음", "words only": "가사만", "Play this line of the vocal track": "보컬 트랙에서 이 줄 듣기",
+  "Paste the lyrics here, a line of the song to each line.": "가사를 여기에 붙여넣어 주세요. 한 줄에 노래 한 줄씩이요.",
+  "Nothing found. Try fewer words, or the title as it’s written in its own language.": "찾지 못했어요. 단어를 줄이거나 원래 언어로 쓴 제목으로 찾아보세요.",
+  "Couldn’t search.": "찾지 못했어요.", "Couldn’t get the lyrics.": "가사를 가져오지 못했어요.", "Couldn’t get the lyrics: {why}": "가사를 가져오지 못했어요: {why}",
+  "Looking for the lyrics…": "가사 찾는 중…", "No lyrics found for this song.": "이 곡의 가사를 찾지 못했어요.", "Find them on the song’s Info page": "곡 정보에서 직접 찾기",
+  "From LRCLIB · {artist} – {track} · {n} lines": "LRCLIB · {artist} – {track} · {n}줄", "Pasted in · {n} lines": "붙여넣은 가사 · {n}줄",
+  "they hardly match what’s sung: maybe another song’s": "부르는 내용과 거의 안 맞아요. 다른 곡 가사일 수 있어요",
+  "No lyrics: Practice splits the song into phrases where the singer breathes.": "가사 없이 연습해요. 소절은 가수가 숨 쉬는 곳에서 나눠요.",
+  "None found on LRCLIB. Search for them, or paste them in.": "LRCLIB에서 찾지 못했어요. 직접 찾거나 붙여넣어 보세요.",
+  "Not looked for yet. Practice looks when it opens.": "아직 찾지 않았어요. 연습을 열면 찾아요.", "Song": "곡", "Lowest": "최저음", "Highest": "최고음",
   "Play that moment of the vocal track": "보컬 트랙에서 그 순간 듣기", "In the song · {t}": "곡에서 · {t}", "Piano": "피아노",
   // Studio
   "Save": "저장", "Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)": "이 곡의 믹스 저장: 볼륨, 음소거, 솔로, 메트로놈 (Ctrl+S)",

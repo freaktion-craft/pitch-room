@@ -7,6 +7,7 @@ Songs live in ./library/<id>/ :
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
+    lyrics.json     the lyrics, each line timed to the voice (Practice's phrases), or none found (see lyrics.py)
     meta.json       title, duration, bpm, beat times, key, stems, model, keep (parts of tracks that play while muted)
     keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
     takes/          you, singing along in Practice: <take>.flac and <take>.json (when, which part, key, scores)
@@ -41,7 +42,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(ROOT, "library")
 SR = 44100
 MODELS = {"htdemucs": "4 stems", "htdemucs_6s": "6 stems (+ guitar, piano)"}
-HEAVY = ["torch", "demucs", "librosa", "yt_dlp"]
+HEAVY = ["torch", "demucs", "librosa", "yt_dlp", "whisper", "stable_whisper"]
 # Lead-vocal separation (audio-separator) is optional: without it the bars come from the whole vocal stem.
 # BS-Roformer karaoke by frazer & becruily (195 MB, ~60 s for a 4-minute song on an RTX 4070 Ti). On a song with
 # vocal chops, the bars it took out were the stretches a search for exact bar-to-bar loops had flagged. Two other
@@ -235,7 +236,7 @@ def _install_cuda_torch(job, replace: bool) -> bool:
 
 def _install(job, gpu_only: bool = False):
     global _restart_needed
-    _set(job, status="running", stage="Downloading and installing (≈1–2 GB, a few minutes)…")
+    _set(job, status="running", stage="Downloading and installing (≈3–4 GB, a few minutes)…")
     torch_was_loaded = "torch" in sys.modules
     if has_nvidia():
         ok = _install_cuda_torch(job, replace=gpu_only)
@@ -245,10 +246,16 @@ def _install(job, gpu_only: bool = False):
             if gpu_only:
                 raise RuntimeError("No CUDA build of PyTorch matched this system. Separation will keep using the CPU.")
     if not gpu_only:
-        _set(job, stage="Installing Demucs, librosa and yt-dlp…")
-        if _pip(job, ["install", "-r", os.path.join(ROOT, "requirements-stems.txt")], (0.6, 0.98)) != 0:
+        _set(job, stage="Installing Demucs, librosa, yt-dlp and Whisper…")
+        if _pip(job, ["install", "-r", os.path.join(ROOT, "requirements-stems.txt")], (0.6, 0.9)) != 0:
             raise RuntimeError("Installing failed. The last lines of the log above say why.")
     importlib.invalidate_caches()
+    if not gpu_only:
+        try:  # the lyrics model now rather than at the first song (it's fetched then if this fails)
+            _fetch_whisper(job, (0.9, 0.99))
+        except Exception as e:  # noqa: BLE001
+            with _jobs_lock:
+                job["log"].append(f"The lyrics model will be downloaded with the first song ({e}).")
     if torch_was_loaded:  # the old PyTorch is already in memory; a fresh start picks up the new one
         _restart_needed = True
 
@@ -581,6 +588,12 @@ def _pipeline(job, src: dict, model_name: str):
                     _write_split(folder, vox, lead)
                 _stage(job, "Reading the vocal melody", 0.87)
                 _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None)
+                try:  # the song works without them; one that can't look now (offline) looks when Practice opens
+                    from scipy.signal import resample_poly
+                    voice = resample_poly((vox if lead is None else lead).mean(0), 160, 441).astype(np.float32)  # 44.1 → 16 kHz
+                    _write_json(os.path.join(folder, "lyrics.json"), _song_lyrics(job, title, dur, voice, (0.875, 0.9)), ensure_ascii=False)
+                except Exception:  # noqa: BLE001
+                    pass
             _stage(job, "Saving tracks", 0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):
@@ -595,6 +608,183 @@ def _pipeline(job, src: dict, model_name: str):
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
+
+
+# ---------- lyrics ----------
+# lyrics.json: {"lines": [{t0, t1, text, words}], "match", "source": {site: "lrclib", id, artist, track} or {site:
+# "pasted"}, "at"}, or {"lines": null} when none were found (so Practice doesn't look each time it opens). match: the
+# share of the words Whisper is fairly sure it hears where they've been put (probability over 0.5). The song's own
+# lyrics score about 0.75 and another song's 0 to 0.05, so an entry under MATCH_MIN is taken for another song.
+MATCH_MIN = 0.3
+
+
+def _whisper_bar(job, share: tuple[float, float]):
+    """Stands in for tqdm in Whisper's model download: the job's progress, and a stop once it's cancelled."""
+    class Bar:
+        def __init__(self, total=None, **_kw):
+            self.total, self.n = total or 1, 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def update(self, k):
+            self.n += k
+            _check(job)
+            _set(job, progress=share[0] + (share[1] - share[0]) * min(1.0, self.n / self.total))
+    return Bar
+
+
+def _fetch_whisper(job, share: tuple[float, float]):
+    """Whisper's model file in models/, downloaded if it isn't there (≈1.5 GB)."""
+    import whisper
+
+    import lyrics
+    if os.path.isfile(os.path.join(MODEL_DIR, lyrics.WHISPER_FILE)):
+        return
+    _stage(job, "Downloading the lyrics model (first time only, ≈1.5 GB)", share[0])
+    whisper.tqdm = _whisper_bar(job, share)
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    whisper._download(whisper._MODELS[lyrics.WHISPER_MODEL], MODEL_DIR, False)  # checks the file's SHA-256
+
+
+@contextlib.contextmanager
+def _whisper(job, share: tuple[float, float]):
+    """Whisper, loaded for a step (on the GPU if there's an NVIDIA one) and let go after: it holds ≈2 GB of memory."""
+    import stable_whisper
+    import torch
+
+    import lyrics
+    _fetch_whisper(job, share)
+    dev = "cuda" if device() == "cuda" else "cpu"
+    model = stable_whisper.load_model(lyrics.WHISPER_MODEL, device=dev, download_root=MODEL_DIR)
+    try:
+        yield model
+    finally:
+        del model
+        if dev == "cuda":
+            torch.cuda.empty_cache()
+
+
+def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, float]) -> tuple[list, float]:
+    """Lines of lyrics put where they're sung in voice (mono, 16 kHz): lyrics.json's lines, and how well they match."""
+    import lyrics
+    _check(job)
+    with _creep(job, share, len(voice) / 16000 * (0.05 if device() == "cuda" else 0.5)):
+        r = model.align(voice, "\n".join(lines), language=lyrics.language(lines), original_split=True, verbose=None)
+    probs = [w.probability for s in r.segments for w in s.words]
+    return lyrics.aligned(r), round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
+
+
+def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tuple[float, float], how: dict | None = None) -> dict:
+    """lyrics.json for a song: found on LRCLIB by its title (the first of three likely entries that turns out to be
+    sung in it), or how={"id": n}, that LRCLIB entry, or how={"text": …}, lyrics pasted in; those two are kept however
+    well they match. voice: the lead vocal, mono at 16 kHz. Uses the GPU: the caller holds _work_lock."""
+    import lyrics
+    lo, hi = share
+    mid = lo + 0.5 * (hi - lo)  # the first half for finding them (and the model's download, the first time)
+    if how and how.get("text") is not None:
+        found = [{"site": "pasted", "lines": lyrics.lines_of(how["text"])}]
+        if not found[0]["lines"]:
+            raise ValueError("Paste the lyrics, a line of the song to each line.")
+    elif how:
+        entry = lyrics.get(how["id"])
+        if not entry or not entry["lines"]:
+            raise ValueError("That LRCLIB entry has no lyrics.")
+        found = [entry | {"site": "lrclib"}]
+    else:
+        _stage(job, "Finding the lyrics", lo)
+        found = [e | {"site": "lrclib"} for e in lyrics.candidates(title, duration)]
+        if not found:
+            return {"lines": None, "at": time.time()}
+    with _whisper(job, (lo, mid)) as model:
+        step = (hi - mid) / len(found)
+        for i, entry in enumerate(found):
+            _stage(job, "Lining the lyrics up with the voice", mid + i * step)
+            lines, match = _align(model, voice, entry["lines"], job, (mid + i * step, mid + (i + 1) * step))
+            if how or match >= MATCH_MIN:
+                source = {"site": "pasted"} if entry["site"] == "pasted" else {k: entry[k] for k in ("site", "id", "artist", "track")}
+                return {"lines": lines, "match": match, "source": source, "at": time.time()}
+    return {"lines": None, "at": time.time()}
+
+
+def _voice16k(folder: str) -> np.ndarray:
+    """The lead vocal (or the whole vocal stem before it's split), mono at 16 kHz, as Whisper hears it."""
+    path = os.path.join(folder, "lead.mp3" if os.path.isfile(os.path.join(folder, "lead.mp3")) else "vocals.mp3")
+    if not os.path.isfile(path):
+        raise ValueError("This song has no vocal track.")
+    raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", path, "-ac", "1", "-ar", "16000", "-f", "f32le", "pipe:1"],
+                         capture_output=True, check=True).stdout
+    return np.frombuffer(raw, dtype=np.float32).copy()
+
+
+_lyrics_jobs: dict[str, str] = {}  # song id -> its lyrics job, so Practice opened twice doesn't start two
+
+
+def get_lyrics(song_id: str) -> dict:
+    """{lyrics: lyrics.json or None (never looked for), job: the id of the job finding them, if one is running}."""
+    folder = _song_dir(song_id)
+    _read_meta(folder)
+    path = os.path.join(folder, "lyrics.json")
+    try:
+        data = _load_json(path) if os.path.isfile(path) else None
+    except ValueError:
+        data = None  # damaged: as if never looked for
+    running = get_job(_lyrics_jobs.get(song_id, ""))
+    return {"lyrics": data, "job": running["id"] if running and running["status"] in ("queued", "running") else None}
+
+
+def start_lyrics(song_id: str, how) -> str:
+    """Find a song's lyrics and line them up with its voice, in the background (half a minute at most on a GPU; the
+    first time, Whisper's model is downloaded too). how: None to look on LRCLIB by the title, {"id": n} for an entry
+    picked from search_lyrics, {"text": …} for lyrics pasted in. Returns the job's id; one already running for the song
+    is returned rather than a second started, unless this one asks for something in particular."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not installed():
+        raise ValueError("Lyrics need Whisper: install the stem tools on the Library page first.")
+    if how is not None:
+        if not isinstance(how, dict) or not (isinstance(how.get("text"), str) or isinstance(how.get("id"), int)):
+            raise ValueError("Send an LRCLIB entry's id or the lyrics' text.")
+        if len(how.get("text") or "") > 50_000:
+            raise ValueError("That's longer than a song's lyrics.")
+        if isinstance(how.get("text"), str) and not how["text"].strip():
+            raise ValueError("Paste the lyrics, a line of the song to each line.")
+    running = get_job(_lyrics_jobs.get(song_id, ""))
+    if running and running["status"] in ("queued", "running"):
+        if how is None:
+            return running["id"]
+        raise ValueError("This song's lyrics are being lined up already. Try again in a moment.")
+
+    def work(job):
+        _set(job, status="running", stage="Finding the lyrics", progress=0.02)
+        voice = _voice16k(folder)
+        with _turn(job):  # one model on the GPU at a time
+            data = _song_lyrics(job, meta["title"], float(meta["duration"]), voice, (0.05, 0.98), how)
+        if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
+            _write_json(os.path.join(folder, "lyrics.json"), data, ensure_ascii=False)
+
+    job = _new_job("lyrics")
+    job["songId"] = song_id
+    _lyrics_jobs[song_id] = _run(job, work)
+    return _lyrics_jobs[song_id]
+
+
+def search_lyrics(q) -> list[dict]:
+    """LRCLIB's entries for words typed in (a title, an artist, a line of the lyrics)."""
+    import lyrics
+    if not isinstance(q, str) or not q.strip():
+        raise ValueError("Type a title or an artist to look for.")
+    return lyrics.search(q.strip()[:200])
+
+
+def drop_lyrics(song_id: str):
+    """No lyrics for a song: Practice goes back to phrases between breaths, and doesn't look for lyrics again."""
+    folder = _song_dir(song_id)
+    _read_meta(folder)
+    _write_json(os.path.join(folder, "lyrics.json"), {"lines": None, "dropped": True, "at": time.time()})
 
 
 # ---------- key ----------
