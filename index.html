@@ -2368,8 +2368,16 @@ function songDur() { return P.song ? P.song.duration : 0; }
 // Playback starts a moment after Play (startAt, 60 ms ahead); until then the song is still at its offset, so a pause
 // or seek that soon never stores a position before it (below 0:00, start() throws).
 function songPos() { return P.playing ? Math.min(songDur(), P.offset + Math.max(0, ac.currentTime - P.startAt) * P.rate) : P.offset; }
-// Practice's time: as songPos, but under 0 during a lead-in, so the bars come in and the count-in counts while it's heard
-function stageTime() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt) * P.rate) : P.offset - (P.lead || 0); }
+// Practice's time: as songPos, but under 0 during a lead-in, so the bars come in and the count-in counts while it's heard;
+// paused, where Play will start from (its lead-in's start), so the count-in stands as it will begin, all its beats to go
+function stageTime() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt) * P.rate) : P.offset - leadAhead(); }
+// The lead-in Play will start with, paused here: one a phrase jump set, or from the start, the first entry's count-in
+// where it begins before the song (a voice that comes straight in)
+function leadAhead() {
+  if (P.playing || P.lead || K.cue != null || !S.countIn || P.offset > 0.5) return P.lead || 0;
+  const c = K.entries[0]?.counts[0];
+  return c != null && c - 0.15 < P.offset ? P.offset - (c - 0.15) : 0;
+}
 function audible(name) {
   const t = P.tracks[name], anySolo = Object.values(P.tracks).some((x) => x.solo);
   return anySolo ? t.solo : !t.mute;
@@ -3136,7 +3144,7 @@ function songEntries(notes, beats, bpm) {
       for (const [a, b] of notes.slice(i)) { if (a >= t0 + 4) break; sung += Math.min(b, t0 + 4) - a; }
       if (sung < 1) return;
       const counts = intro ? countsBefore(t0, beats, beat) : countsBefore(t0, beats, beat).filter((c) => c > prevEnd + 0.1);
-      out.push({ t: t0, from: intro ? Math.min(0, (counts[0] ?? 0) - 0.5) : prevEnd, kind: intro ? "Intro" : "Break", counts });
+      out.push({ t: t0, from: intro ? Math.min(0, (counts[0] ?? 0) - 0.65) : prevEnd, kind: intro ? "Intro" : "Break", counts }); // shown from its lead-in's start
     }
     prevEnd = Math.max(prevEnd, t1);
   });
@@ -3495,8 +3503,8 @@ function songToggle() {
   if (K.cue == null && S.countIn && P.offset > 0.5 && P.offset < songDur() - 0.5) {
     counts = countsBefore(P.offset, K.song.beats, 60 / (K.song.bpm || 120));
     if (counts.length) { K.resume = { t: P.offset, counts }; P.lead = Math.max(0, 0.15 - counts[0]); P.offset = Math.max(0, counts[0] - 0.15); }
-  } else if (K.cue == null && S.countIn && P.offset <= 0.5 && K.entries[0]?.counts[0] < P.offset) {
-    counts = K.entries[0].counts; P.lead = P.offset - (counts[0] - 0.15);
+  } else if (K.cue == null && leadAhead()) {
+    counts = K.entries[0].counts; P.lead = leadAhead();
   }
   playSong();
   countClicks(counts);
