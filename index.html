@@ -562,7 +562,9 @@ input[type="range"]:disabled { opacity: 0.4; }
 #addVeil { position: fixed; inset: 0; z-index: 15; background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(8px);
   opacity: 0; pointer-events: none; transition: opacity 0.22s ease; }
 #addVeil.on { opacity: 1; pointer-events: auto; }
-.add-at.open { z-index: 21; }
+/* above it at once when it opens; and still above it while it fades away, so the button never blurs in passing */
+.add-at { z-index: 0; transition: z-index 0s linear 0.22s; }
+.add-at.open { z-index: 21; transition: none; }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
 /* the glyph (2 px in from its box each way) 10 px from the field's left, top and bottom, and from the text */
 .search .ico { position: absolute; left: 8px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
