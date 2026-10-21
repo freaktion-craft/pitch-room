@@ -12,7 +12,9 @@
   --fg: 255, 255, 255; /* rgb of every translucent ink tint below */
   --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.275 0 0); --hover-2: oklch(0.315 0 0); /* buttons and fields stand clear of the card */
   --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0); --knob: oklch(0.87 0 0);
-  --muted: rgba(var(--fg), 0.45); --faint: rgba(var(--fg), 0.3); --fill: rgba(var(--fg), 0.05); --line: rgba(var(--fg), 0.06); --ring: rgba(var(--fg), 0.12);
+  /* text: muted for what's beside the main text, faint for what's quieter still; both at least 4.5:1 on the page and
+     the card (6.1 and 4.7), so they're read without effort. dim is for marks that aren't text (meters, a pressed M). */
+  --muted: rgba(var(--fg), 0.55); --faint: rgba(var(--fg), 0.46); --dim: rgba(var(--fg), 0.3); --fill: rgba(var(--fg), 0.05); --line: rgba(var(--fg), 0.06); --ring: rgba(var(--fg), 0.12);
   --accent: oklch(0.94 0 0);
   /* --voice, your colour (your pitch, the playhead, focus rings): one of these, picked in the header and set on <html>
      before first paint. Matched for the dark surface: L 0.68–0.77 (blue and violet lowest, as they look brighter),
@@ -82,7 +84,7 @@ header { display: flex; align-items: center; gap: 12px; margin-bottom: 72px; }
   transition: width 0.3s var(--ease), margin-left 0.3s var(--ease), opacity 0.2s; }
 .mic.on .spec { width: 33px; margin-left: 0; opacity: 1; } /* 7 bars of 3 px, 2 px apart */
 .spec i { flex: none; }
-.spec i { width: 3px; height: 16px; border-radius: 1.5px; background: var(--faint); transform: scaleY(0.15); }
+.spec i { width: 3px; height: 16px; border-radius: 1.5px; background: var(--dim); transform: scaleY(0.15); }
 .mic.on .spec i { background: var(--ink); }
 /* settings (the mic's, note names, colour), under the gear */
 header { position: relative; }
@@ -215,7 +217,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .note-sub { font: 12.5px/1.2 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gauge { position: relative; width: 140px; height: 4px; border-radius: 2px; background: rgba(var(--fg), 0.08); }
 .gauge .zone { position: absolute; top: 0; bottom: 0; left: 50%; width: 16%; transform: translateX(-50%); border-radius: 2px; background: rgba(var(--fg), 0.12); }
-.gauge .needle { position: absolute; top: -4px; width: 2px; height: 12px; margin-left: -1px; left: 50%; border-radius: 1px; background: var(--faint); transition: left 60ms linear; }
+.gauge .needle { position: absolute; top: -4px; width: 2px; height: 12px; margin-left: -1px; left: 50%; border-radius: 1px; background: var(--dim); transition: left 60ms linear; }
 .gauge-labels { display: flex; justify-content: space-between; width: 140px; font: 10px/1 var(--mono); color: var(--faint); }
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* left of the playhead line: nothing is drawn there during an intro or break, while the coming bars arrive from the right */
@@ -241,7 +243,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .key { border: 0; padding: 0; }
 /* Keys have a light face on the dark app, so their edges and labels use fixed dark tints */
 .key.w { width: 26px; height: 84px; background: var(--key-w); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); border-radius: 0 0 5px 5px; margin-right: -1px;
-  display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.35); padding-bottom: 4px; }
+  display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.62); padding-bottom: 4px; }
 .key.b { position: absolute; top: 0; width: 16px; height: 52px; background: var(--key-b); border-radius: 0 0 4px 4px; z-index: 1; }
 .key.guide.w { background: var(--key-w-on); }
 .key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }
@@ -412,7 +414,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .track .ico { width: 18px; height: 18px; }
 .track .name { font-size: 14px; min-width: 0; }
 .track .name small { display: block; color: var(--faint); font-size: 12px; }
-.track.off .name, .track.off .ico { opacity: 0.35; }
+.track.off .ico { opacity: 0.35; }
+.track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
 .tog { height: 28px; min-width: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fill); font: 500 12px var(--mono); color: rgba(var(--fg), 0.55); }
 .tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
 .tog[aria-pressed="true"].s { background: oklch(0.84 0.14 85); color: oklch(0.3 0.06 85); }
@@ -426,7 +429,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .ms .tog:last-child { border-radius: 0 6px 6px 0; box-shadow: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35), inset 1px 0 0 rgba(0, 0, 0, 0.45); }
 .ms .tog:hover { background: linear-gradient(oklch(0.34 0 0), oklch(0.3 0 0)); color: rgba(var(--fg), 0.8); }
 .ms .tog[aria-pressed="true"] { background: oklch(0.2 0 0); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6); }
-.ms .tog.m[aria-pressed="true"] { color: var(--faint); }
+.ms .tog.m[aria-pressed="true"] { color: var(--dim); }
 .ms .tog.s[aria-pressed="true"] { color: oklch(0.86 0.14 85); text-shadow: 0 0 6px oklch(0.86 0.14 85 / 0.6); }
 .track input[type="range"] { width: 100%; }
 /* downloads, the song's (what you hear) and each track's: one size, one look; the song's in full ink */
