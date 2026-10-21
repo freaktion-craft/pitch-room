@@ -2645,6 +2645,12 @@ function applyGains() {
   }
   paintSave(); // a change to the mix makes Save live
 }
+// The song's tracks come in over FADE when they start, and go out over it when they stop: no click where a wave is cut
+// off mid-swing, and too short to hear as a fade, so the first beat after a seek or a loop is as crisp as ever. The
+// metronome and the count-in come in at once.
+const FADE = 0.05;
+const fadeIn = (g, at, to = 1) => { g.setValueAtTime(0, at); g.linearRampToValueAtTime(to, at + FADE); };
+const fadeOut = (g, now) => { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + FADE); };
 function playSong() {
   if (!P.song || !Object.keys(P.buffers).length) return;
   ensureCtx();
@@ -2655,7 +2661,8 @@ function playSong() {
   P.lead = 0;
   recEnd(at); // a key change swaps the sources without a pause: the take so far ends where the new ones start
   P.sources = [];
-  P.ears = { band: earNode("band", P.bus), guide: earNode("guide", P.bus), click: earNode("click", P.bus) }; // which ear each plays in
+  const tracks = ac.createGain(); tracks.gain.value = 0; fadeIn(tracks.gain, at); tracks.connect(P.bus);
+  P.ears = { band: earNode("band", tracks), guide: earNode("guide", tracks), click: earNode("click", P.bus) }; // which ear each plays in
   for (const [name, buf] of Object.entries(P.buffers)) {
     const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.ears[name === guideName() ? "guide" : "band"].in);
     if (name !== guideName()) g.connect(bandTap);
@@ -2703,8 +2710,9 @@ function pauseSong() {
   if (!P.playing) return;
   recEnd(ac.currentTime);
   P.offset = songPos(); P.playing = false;
-  P.sources.forEach((s) => { try { s.stop(); } catch (e) {} });
-  const bus = P.bus; if (bus) { bus.gain.setTargetAtTime(0, ac.currentTime, 0.01); setTimeout(() => bus.disconnect(), 200); }
+  const now = ac.currentTime, bus = P.bus;
+  P.sources.forEach((s) => { try { s.stop(now + FADE); } catch (e) {} }); // out over FADE, then stopped
+  if (bus) { fadeOut(bus.gain, now); setTimeout(() => bus.disconnect(), 200); }
   P.sources = []; P.ears = null; Object.values(P.tracks).forEach((t) => (t.gain = null));
   paintPlay($("#pPlay"), false); renderStart();
 }
@@ -4366,7 +4374,7 @@ async function tsPlay() {
   catch (e) { return; }
   if (TS.ver !== want || stemsPage !== "takes" || TS.playing) return;
   const at = ac.currentTime + 0.06, V = TS.pos / sp, guide = guideName();
-  TS.bus = ac.createGain(); TS.bus.gain.value = stemVol; TS.bus.connect(master);
+  TS.bus = ac.createGain(); TS.bus.gain.value = 0; fadeIn(TS.bus.gain, at, stemVol); TS.bus.connect(master); // in over FADE, as the song
   TS.gains = { band: ac.createGain(), guide: ac.createGain() };
   TS.gains.band.gain.value = T.mix.band; TS.gains.guide.gain.value = T.mix.guide;
   TS.gains.band.connect(TS.bus); TS.gains.guide.connect(TS.bus);
@@ -4385,8 +4393,9 @@ async function tsVoiceOn(t, at = ac.currentTime + 0.03) {
   if (!TS.playing || !TS.on.has(t.id) || TS.voice.has(t.id)) return;
   const V = (TS.pos + Math.max(0, at - TS.at) * sp) / sp, vs = t.start / sp;
   if (V >= vs + t.duration) return;
-  const from = Math.max(0, V - vs), g = ac.createGain(), src = ac.createBufferSource();
-  g.gain.value = T.mix.voice * (t.gain || 1); g.connect(TS.bus); src.buffer = buf; src.connect(g);
+  const from = Math.max(0, V - vs), g = ac.createGain(), src = ac.createBufferSource(), vol = T.mix.voice * (t.gain || 1);
+  g.gain.value = vol; g.connect(TS.bus); src.buffer = buf; src.connect(g);
+  if (from > 0) { g.gain.value = 0; fadeIn(g.gain, at, vol); } // switched on partway through: in over FADE
   src.start(at + Math.max(0, vs - V), from, t.duration - from);
   TS.voice.set(t.id, { src, g });
 }
@@ -4394,7 +4403,7 @@ function tsVoiceOff(id) {
   const v = TS.voice.get(id);
   if (!v) return;
   TS.voice.delete(id);
-  v.g.gain.setTargetAtTime(0, ac.currentTime, 0.01); try { v.src.stop(ac.currentTime + 0.05); } catch (e) {}
+  fadeOut(v.g.gain, ac.currentTime); try { v.src.stop(ac.currentTime + FADE); } catch (e) {}
 }
 // keep: a pause, so Play carries on from here
 function tsStop(keep) {
@@ -4402,8 +4411,8 @@ function tsStop(keep) {
   const pos = tsPos();
   TS.playing = false; TS.pos = keep ? pos : TS.pos;
   for (const id of [...TS.voice.keys()]) tsVoiceOff(id);
-  const bus = TS.bus; if (bus) { bus.gain.setTargetAtTime(0, ac.currentTime, 0.01); setTimeout(() => bus.disconnect(), 200); }
-  TS.srcs.forEach((x) => { try { x.stop(ac.currentTime + 0.05); } catch (e) {} });
+  const bus = TS.bus; if (bus) { fadeOut(bus.gain, ac.currentTime); setTimeout(() => bus.disconnect(), 200); }
+  TS.srcs.forEach((x) => { try { x.stop(ac.currentTime + FADE); } catch (e) {} });
   TS.srcs = []; TS.bus = null;
   paintPlay($("#tsPlay"), false); tsWave();
 }
