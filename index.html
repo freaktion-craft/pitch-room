@@ -60,9 +60,9 @@ a { color: inherit; text-decoration: none; }
 
 /* Practice's aurora (drawAurora): behind the page along the bottom of the window, the cards in front of it. Drawn
    tiny and stretched, then blurred, so it's all glow; it spills past the window's edges so the blur doesn't fade them. */
-#aurora { position: fixed; left: -48px; right: -48px; bottom: -48px; width: calc(100% + 96px); height: calc(52vh + 48px); z-index: 0;
+#aurora { position: fixed; left: -48px; right: -48px; bottom: -48px; width: calc(100% + 96px); height: calc(40vh + 48px); z-index: 0;
   pointer-events: none; opacity: 0; filter: blur(28px); transition: opacity 0.8s; }
-#aurora.on { opacity: 0.75; }
+#aurora.on { opacity: 0.4; } /* there, not looked at */
 #app { position: relative; z-index: 1; }
 /* One width for every page, so the header and column edges don't jump when switching views */
 .app { max-width: 1440px; margin: 0 auto; padding-block: 24px 64px;
@@ -964,7 +964,7 @@ function ensureCtx() {
     micBus = ac.createGain(); micBus.connect(analyser);
     const sink = ac.createGain(); sink.gain.value = 0; analyser.connect(sink); sink.connect(ac.destination);
     // the band as it plays (every track but the guide vocal, at their volumes), for Practice's aurora
-    bandTap = ac.createAnalyser(); bandTap.fftSize = 2048; bandTap.smoothingTimeConstant = 0.5; bandTap.connect(sink);
+    bandTap = ac.createAnalyser(); bandTap.fftSize = 2048; bandTap.smoothingTimeConstant = 0.85; bandTap.connect(sink);
     tbuf = new Float32Array(analyser.fftSize);
     noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.04), ac.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
@@ -3597,7 +3597,7 @@ function draw(now, cur, hist, evs, guide) {
 
 // Practice's aurora: the band's spectrum as a glow rising from the bottom of the window while the song plays, behind
 // the page, mostly in your colour with a neighbouring hue or two in it. AUR.n bands from 60 Hz to 8 kHz, low on the
-// left; each rises at once and sinks back slowly, its curtain swaying a little. Drawn into a 64 × 40 canvas that CSS
+// left; each swells and sinks back slowly, its curtain swaying a little, faint enough to stay out of the way. Drawn into a 64 × 40 canvas that CSS
 // stretches across the window and blurs, so it costs next to nothing; off with reduced motion, and outside Practice.
 const AUR = { n: 28, lv: new Float32Array(28), cv: $("#aurora"), fft: null, voice: "", hues: [] };
 function drawAurora() {
@@ -3612,7 +3612,7 @@ function drawAurora() {
     let sum = 0;
     for (let k = k0; k < k1; k++) sum += fft[k];
     const v = Math.min(1, (sum / (k1 - k0) / 255) * (0.75 + (0.55 * i) / a.n)); // highs carry less energy: lifted a little
-    a.lv[i] = v > a.lv[i] ? a.lv[i] + (v - a.lv[i]) * 0.45 : a.lv[i] * 0.95;
+    a.lv[i] = v > a.lv[i] ? a.lv[i] + (v - a.lv[i]) * 0.1 : a.lv[i] * 0.985; // slow both ways: a swell, not a flicker
     if (a.lv[i] > 0.01) any = true;
   }
   if (!any) { a.cv.getContext("2d").clearRect(0, 0, a.cv.width, a.cv.height); return; }
@@ -3627,7 +3627,7 @@ function drawAurora() {
     const v = a.lv[i] ** 1.4, hgt = v * ch;
     if (hgt < 0.5) continue;
     const [L, C2, Hh] = a.hues[i % 7 === 3 ? 1 : i % 5 === 1 ? 2 : 0]; // mostly your colour
-    const cx = ((i + 0.5) / a.n) * cw + Math.sin(t * 0.7 + i * 1.9) * 0.8, half = (cw / a.n) * 1.8;
+    const cx = ((i + 0.5) / a.n) * cw + Math.sin(t * 0.35 + i * 1.9) * 0.4, half = (cw / a.n) * 1.8;
     const grad = c.createLinearGradient(0, ch, 0, ch - hgt);
     grad.addColorStop(0, `oklch(${L} ${C2} ${Hh} / ${0.5 * v + 0.1})`); grad.addColorStop(1, `oklch(${L} ${C2} ${Hh} / 0)`);
     c.fillStyle = grad; c.fillRect(cx - half, ch - hgt, half * 2, hgt);
