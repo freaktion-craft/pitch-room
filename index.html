@@ -5068,6 +5068,8 @@ function route() {
   if (view !== "practice") { recOff(); listenStop(); } // takes are recorded and played in Practice only
   if (view === "stems") stemsRoute(sub, extra);
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
+  // back in the library: the song (still loaded) starts from the top when it's opened again, in the Studio or Practice
+  if (view === "stems" && stemsPage === "lib" && P.song) { P.offset = 0; P.lead = 0; K.cue = null; K.resume = null; }
   if (view === "practice") {
     $("#overlay").hidden = true;
     if (!K.studio) practiceMix(); // back from the Takes Studio
