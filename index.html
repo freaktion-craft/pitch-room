@@ -589,6 +589,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .strip button:hover { background: rgba(var(--fg), 0.26); }
 .strip button[aria-current="true"] { background: rgba(var(--fg), 0.42); }
 .strip.looping button[aria-current="true"] { background: var(--ink); }
+.strip button.inspan { background: rgba(var(--fg), 0.3); } /* a run of phrases looped together */
+.strip.looping button.inspan:not([aria-current="true"]) { background: rgba(var(--fg), 0.6); }
 .strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
 /* Record, beside Play: a dot in the red. Armed, the button takes a tint of the red and the dot fills in; while a take
    is being recorded the dot pulses, and the stage says "Recording" with the take's length. */
@@ -723,8 +725,9 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
-        <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L)"></button>
-        <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
+        <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them"></button>
+        <label class="kfield">Count-in <button class="pick" id="kCount" type="button"></button></label>
+        <div class="strip" id="kStrip" role="group" aria-label="Phrases" title="Click a phrase to go to it · Shift+click another to loop the run between them"></div>
       </div>
     </div>
 
@@ -894,8 +897,9 @@ const store = (() => {
   };
 })();
 // names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
-// treated as silent; vol: the keyboard's piano; mic: the input's deviceId ("" = the system default)
-const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "" };
+// treated as silent; vol: the keyboard's piano; mic: the input's deviceId ("" = the system default); countIn: the beats
+// Practice counts in before a phrase, a loop or a play after a pause (0: none)
+const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4 };
 for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
 const save = () => store.set("settings", S);
 const A4 = 440;
@@ -1118,7 +1122,7 @@ async function restartMic() {
 }
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
-let micPick = null, namesPick = null, octPick = null, langPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
+let micPick = null, namesPick = null, octPick = null, langPick = null, countPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
 const octItems = () => [{ v: -1, t: tr("octave down") }, { v: 0, t: tr("as sung") }, { v: 1, t: tr("octave up") }];
 // The click's beats per bar, in the Studio's click row. One dropdown, made once and moved into each new row (every
 // makePick adds its own list and listeners for good).
@@ -2721,7 +2725,7 @@ function initStems() {
 // ---------- practice (singing a song from the library) ----------
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
-const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1, studio: null,
+const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1, studio: null, span: null, resume: null,
   lyrics: null, lyricMsg: null, lyricKey: null, lyricRows: [] }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place
 function songEvs() {
   const sh = K.oct * 12 + P.key; // the bars move with the octave picked and the key the song plays in
@@ -2748,12 +2752,28 @@ function songEntries(notes, beats, bpm) {
   return out;
 }
 // The four beats before the one the voice comes in on (or just before): the 4 3 2 1.
-function countsBefore(t0, beats, beat) {
-  if (!beats || !beats.length) return [4, 3, 2, 1].map((k) => t0 - k * beat);
+// The n beats before the one at t0 (or just before it), as many as the count-in asks for (S.countIn): the 4 3 2 1.
+function countsBefore(t0, beats, beat, n = S.countIn) {
+  if (!n) return [];
+  if (!beats || !beats.length) return Array.from({ length: n }, (_, k) => t0 - (n - k) * beat);
   let j = beats.findIndex((b) => b >= t0 - 0.25 * beat);
   if (j < 0) j = beats.length;
-  return beats.slice(Math.max(0, j - 4), j);
+  return beats.slice(Math.max(0, j - n), j);
 }
+// The count-in heard: a tick on each of its beats (the first higher; a little lower than the click track's, to tell
+// them apart), unless the click track is on and plays them anyway
+function countClicks(counts) {
+  if (!P.playing || !counts || !counts.length || audible("click")) return;
+  counts.forEach((c, i) => {
+    const at = P.startAt + (c - P.offset) / P.rate;
+    if (at < ac.currentTime - 0.01) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.value = i === 0 ? 1568 : 1047;
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.55, at + 0.001); g.gain.setTargetAtTime(0, at + 0.002, 0.012);
+    o.connect(g); g.connect(P.bus); o.start(at); o.stop(at + 0.08); // silenced with the song's bus if it stops first
+  });
+}
+const countItems = () => [{ v: 0, t: tr("Off") }, { v: 1, t: tr("1 beat") }, ...[2, 4, 8].map((n) => ({ v: n, t: tr("{n} beats", { n }) }))];
 // The song's lines, to practise one at a time. A rest of a beat or more (0.45 s at least) is a breath and ends a
 // phrase. A phrase over about two bars is split again at its longest rest; one under a bar joins the neighbour it's
 // closer to, if that's within 2 s and the two stay within three bars. A blip of singing on its own isn't a phrase.
@@ -2833,11 +2853,14 @@ function phraseAt(t) {
   const i = K.phrases.findIndex((p) => t < p.to);
   return i < 0 ? null : i;
 }
-function phraseGo(i) {
+// To phrase i, from its count-in (heard). A run being looped stays when the loop comes round to its start (keepSpan).
+function phraseGo(i, keepSpan) {
   const p = K.phrases[i];
   if (!p) return;
-  K.ph = i; K.cue = i; K.hist = [];
+  if (!keepSpan) K.span = null;
+  K.ph = i; K.cue = i; K.hist = []; K.resume = null;
   seekSong(p.from);
+  countClicks(p.counts);
   paintPhrases();
 }
 function phraseStep(d) {
@@ -2847,12 +2870,13 @@ function phraseStep(d) {
 function setLoop(on) {
   K.loop = on;
   if (on) K.ph = phraseAt(songPos()) ?? K.phrases.length - 1;
+  else K.span = null;
   $("#kLoop").setAttribute("aria-pressed", String(on));
   paintPhrases();
 }
 // After a seek that isn't a phrase jump (±5 s, the strip's gaps, start and end): loop whatever phrase you landed in.
 function seekWithin(t) {
-  K.hist = []; K.cue = null;
+  K.hist = []; K.cue = null; K.resume = null;
   seekSong(t);
   if (K.loop) K.ph = phraseAt(songPos()) ?? K.phrases.length - 1;
   paintPhrases();
@@ -2872,16 +2896,20 @@ function renderPhrases() {
   K.painted = null; paintPhrases();
 }
 function paintPhrases() {
-  const n = K.phrases.length, key = `${K.ph}|${K.loop}`;
-  const w = Math.max(2, String(n).length); // 01 / 31: zero-padded, so the strip beside it doesn't shift
-  setText("kPh", n ? tr("Phrase {n} / {total}", { n: K.ph == null ? "–".repeat(w) : String(K.ph + 1).padStart(w, "0"), total: n }) : tr("No phrases"));
+  const n = K.phrases.length, sp = K.span, key = `${K.ph}|${K.loop}|${sp ? sp.a + "-" + sp.b : ""}`;
+  const w = Math.max(2, String(n).length), pad = (i) => String(i + 1).padStart(w, "0"); // 01 / 31: zero-padded, so the strip beside it doesn't shift
+  setText("kPh", !n ? tr("No phrases") : sp ? tr("Phrases {a}–{b}", { a: pad(sp.a), b: pad(sp.b) }) // about as wide as "Phrase 03 / 31"
+    : tr("Phrase {n} / {total}", { n: K.ph == null ? "–".repeat(w) : pad(K.ph), total: n }));
   $("#kPrev").disabled = !n || K.ph === 0; $("#kNext").disabled = !n || K.ph == null || K.ph === n - 1;
   $("#kLoop").disabled = !n;
   if (K.painted === key) return;
   K.painted = key;
   const strip = $("#kStrip");
   strip.classList.toggle("looping", K.loop);
-  strip.querySelectorAll("button").forEach((b) => b.setAttribute("aria-current", String(+b.dataset.i === K.ph)));
+  strip.querySelectorAll("button").forEach((b) => {
+    b.setAttribute("aria-current", String(+b.dataset.i === K.ph));
+    b.classList.toggle("inspan", !!sp && +b.dataset.i >= sp.a && +b.dataset.i <= sp.b);
+  });
 }
 // Lyrics. The song's lines (lyrics.json) come with the melody, once they've been looked for: Find lyrics, left of
 // Record, looks for them (the Info page can search and paste too); phrases follow the lines once they're in.
@@ -2955,8 +2983,12 @@ function renderLyric() {
 }
 // Every frame: keep the loop going, follow the playhead, move the strip's marker.
 function phraseTick(sn) {
-  if (K.loop && P.playing && K.ph != null && sn >= K.phrases[K.ph].to) { phraseGo(K.ph); return songPos(); }
+  if (K.loop && P.playing && K.ph != null) { // round again: the phrase, or the run of them
+    const [a, b] = K.span ? [K.span.a, K.span.b] : [K.ph, K.ph];
+    if (sn >= K.phrases[b].to) { phraseGo(a, true); return songPos(); }
+  }
   if (!K.loop) K.ph = phraseAt(sn);
+  else if (K.span) K.ph = Math.min(K.span.b, Math.max(K.span.a, phraseAt(sn) ?? K.span.a)); // the one playing, within the run
   paintPhrases();
   const head = $("#kStrip .head");
   if (head) head.style.left = (sn / (songDur() || 1)) * 100 + "%";
@@ -2970,6 +3002,9 @@ function renderCountIn(sn) {
   if (K.on && K.cue != null) {
     const p = K.phrases[K.cue];
     if (p && sn < p.t0) e = { kind: tr("Phrase {n}", { n: K.cue + 1 }), t: p.t0, counts: p.counts, cue: true }; else K.cue = null;
+  }
+  if (!e && K.on && K.resume) { // played again after a pause: counted in to where it stopped
+    if (sn < K.resume.t) e = { kind: tr("From {t}", { t: fmtTime(K.resume.t) }), t: K.resume.t, counts: K.resume.counts, cue: true }; else K.resume = null;
   }
   if (!e && K.on) e = K.entries.find((x) => sn >= x.from + 0.5 && sn < x.t);
   if (!e) { box.hidden = true; return; }
@@ -3034,11 +3069,22 @@ function leaveSong() { if (P.playing) pauseSong(); K.on = false; $("#countIn").h
 function songToggle() {
   if (P.playing) { pauseSong(); return; }
   if (!micOn && !testOsc) startMic();
+  // again after a pause (not at a phrase's count-in, where a jump put it): from the count-in's beats before, counted
+  if (K.cue == null && S.countIn && P.offset > 0.5 && P.offset < songDur() - 0.5) {
+    const counts = countsBefore(P.offset, K.song.beats, 60 / (K.song.bpm || 120));
+    if (counts.length) { K.resume = { t: P.offset, counts }; P.offset = Math.max(0, counts[0] - 0.15); }
+  }
   playSong();
+  countClicks(K.cue != null ? K.phrases[K.cue]?.counts : K.resume?.counts);
 }
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
 function initSing() {
   octPick = makePick($("#kOct"), "Octave of the note bars", (v) => { K.oct = v; songEvs(); });
+  countPick = makePick($("#kCount"), "Count-in", (v) => {
+    S.countIn = v; save();
+    if (K.song) { K.entries = songEntries(K.notes, K.song.beats, K.song.bpm); setPhrases(); } // the phrases start from their count-ins
+  });
+  countPick.set(countItems(), S.countIn);
   octPick.set(octItems(), K.oct);
   $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
   $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== guideName() && n !== "click") t.vol = K.bandVol; applyGains(); };
@@ -3058,6 +3104,12 @@ function initSing() {
   $("#kLoop").onclick = () => setLoop(!K.loop);
   $("#kStrip").addEventListener("click", (e) => {
     const b = e.target.closest("button");
+    if (b && e.shiftKey) { // a run to loop: from the phrase you're on (or the run's start) to this one
+      const i = +b.dataset.i, from = K.span ? K.span.a : K.ph ?? i;
+      K.span = from === i ? null : { a: Math.min(from, i), b: Math.max(from, i) };
+      K.loop = true; $("#kLoop").setAttribute("aria-pressed", "true");
+      phraseGo(K.span ? K.span.a : i, true); return;
+    }
     if (b) { phraseGo(+b.dataset.i); return; }
     const r = e.currentTarget.getBoundingClientRect();
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
@@ -3937,7 +3989,7 @@ function setLang(v) {
   langPick.set(LANGS, lang);
   resay(); closeMenu();
   for (const p of picks) p.relabel();
-  octPick.set(octItems(), K.oct); paintKey(); listMics();
+  octPick.set(octItems(), K.oct); countPick.set(countItems(), S.countIn); paintKey(); listMics();
   document.querySelectorAll('input[type="range"]').forEach((s) => { if (s.ondblclick) s.title = tr("Double-click to reset"); });
   renderMic(); paintRec(); paintPlay($("#pPlay"), P.playing); renderStart();
   if (P.song) { paintMeta(); renderTracks(); paintVideoBtn(); }
@@ -4106,7 +4158,10 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Band": "반주", "Band volume": "반주 볼륨", "Click on/off (follows the beat)": "메트로놈 켜기/끄기 (박자를 따라가요)", "Click volume": "메트로놈 볼륨",
   "Bars": "음정 바", "Octave of the note bars": "음정 바의 옥타브", "octave down": "한 옥타브 아래", "as sung": "부른 그대로", "octave up": "한 옥타브 위",
   "Previous phrase": "이전 소절", "Previous phrase (←)": "이전 소절 (←)", "Next phrase": "다음 소절", "Next phrase (→)": "다음 소절 (→)",
-  "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)", "Phrases": "소절", "Phrase –": "소절 –",
+  "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)",
+  "Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them": "이 소절 반복 (L) · 소절 막대에서 Shift+클릭하면 여러 소절을 묶어 반복해요",
+  "Click a phrase to go to it · Shift+click another to loop the run between them": "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요",
+  "Count-in": "카운트인", "Off": "없음", "1 beat": "1박", "{n} beats": "{n}박", "From {t}": "{t}부터", "Phrases": "소절", "Phrase –": "소절 –",
   "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
   "Intro": "전주", "Break": "간주", "{kind} · vocals in {s} s": "{kind} · {s}초 뒤 보컬",
   "Pitch display": "음정 화면",
