@@ -128,9 +128,10 @@ header { position: relative; }
 .gate-meter { position: absolute; left: 0; right: 0; top: 6px; height: 8px; border-radius: 4px; background: rgba(var(--fg), 0.08); overflow: hidden; }
 .gate-meter i { display: block; height: 100%; width: 0; background: rgba(var(--fg), 0.3); }
 .gate-meter i.on { background: var(--voice); }
-.pop .gate input[type="range"] { position: absolute; top: 0; left: -6px; width: calc(100% + 12px); }
-#gate::-webkit-slider-runnable-track { background: transparent; }
-#gate::-moz-range-track, #gate::-moz-range-progress { background: transparent; }
+.pop .gate input[type="range"] { position: absolute; top: 0; left: -6px; width: calc(100% + 12px); height: 20px; margin: 0; }
+/* the track as tall as the handle, so the handle's line stands over the bar, its middle on the bar's */
+#gate::-webkit-slider-runnable-track { height: 20px; background: transparent; }
+#gate::-moz-range-track, #gate::-moz-range-progress { height: 20px; background: transparent; }
 #gate::-webkit-slider-thumb { width: 12px; height: 20px; margin-top: 0; border-radius: 2px; background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
 #gate::-moz-range-thumb { width: 12px; height: 20px; border-radius: 2px; background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
 #gate.hot::-webkit-slider-thumb { background: linear-gradient(90deg, transparent 4px, oklch(0.66 0 0) 4px 8px, transparent 8px); transform: none; }
