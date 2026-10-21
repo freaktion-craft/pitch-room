@@ -4286,9 +4286,9 @@ function route() {
 window.addEventListener("hashchange", route);
 // ---------- opening ----------
 // The page waits behind the bar until the library is in and the font has loaded (BOOT_MIN at least, so the bar makes
-// a sweep rather than a flicker; 5 s at most), then comes in: the bar fades, the header with it; the intro's heading
-// and its line rise in turn, then the Library heading, the songs being added, and the list, its songs one by one.
-// Another page (a song, opened by a link) just fades in.
+// a sweep rather than a flicker; 5 s at most), then comes in: the bar blurs away, the header comes into focus; the
+// intro's heading and its line rise out of a blur in turn, then the Library heading, the songs being added, and the
+// list, its songs one by one. Another page (a song, opened by a link) just comes into focus.
 const BOOT_MIN = 800;
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 async function boot() {
@@ -4296,20 +4296,20 @@ async function boot() {
   if (!root.classList.contains("booting")) return;
   await Promise.race([Promise.all([libDrawn, document.fonts.ready]), sleep(5000)]);
   await sleep(BOOT_MIN - performance.now());
-  await $("#boot").animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-out", fill: "forwards" }).finished;
+  await $("#boot").animate([{ opacity: 1, filter: "blur(0)" }, { opacity: 0, filter: "blur(4px)" }], { duration: 240, easing: "ease-out", fill: "forwards" }).finished;
   root.classList.remove("booting");
   $("#boot").getAnimations().forEach((a) => a.cancel());
   const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
-  const rise = (node, delay, dy = 8) => node && node.animate([{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: "none" }],
-    { duration: 520, delay, easing: ease, fill: "backwards" });
-  $("#app > header").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: "ease-out", fill: "backwards" });
-  if (!(view === "stems" && stemsPage === "lib")) { rise($("#app main:not([hidden])"), 60, 4); return; }
+  const rise = (node, delay, dy = 8, blur = 8) => node && node.animate([{ opacity: 0, transform: `translateY(${dy}px)`, filter: `blur(${blur}px)` },
+    { opacity: 1, transform: "none", filter: "blur(0)" }], { duration: 640, delay, easing: ease, fill: "backwards" });
+  rise($("#app > header"), 0, 0, 6);
+  if (!(view === "stems" && stemsPage === "lib")) { rise($("#app main:not([hidden])"), 60, 4, 6); return; }
   let t = 80;
   for (const node of [...$("#sIntro").children, $("#sLibPage .lib-head"), $("#sJobs").children.length && $("#sJobs")]) {
     if (node) { rise(node, t); t += 90; }
   }
   rise($("#sLib"), t);
-  [...$("#sLib").querySelectorAll(".row")].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6));
+  [...$("#sLib").querySelectorAll(".row")].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6));
 }
 $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
