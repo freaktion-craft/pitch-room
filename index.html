@@ -2814,24 +2814,26 @@ function paintRec() {
 
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
 // (play) or paused (at: {id, pos}). mix: how takes sound, played here and downloaded; Your voice works on top of the
-// take's own gain, which brings it to about the loudness of the song's singer.
-const T = { song: null, list: [], loaded: false, voice: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 } };
+// take's own gain, which brings it to about the loudness of the song's singer. unsaved: takes of any song being saved,
+// or that couldn't be, kept until saved or dismissed (so practicing another song meanwhile doesn't lose them).
+const T = { song: null, list: [], loaded: false, voice: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 }, unsaved: [] };
 for (const [k, v] of Object.entries(store.get("takeMix", {}) || {})) if (k in T.mix && Number.isFinite(v)) T.mix[k] = Math.max(0, Math.min(2, v));
 async function loadTakes(m) {
   if (T.song !== m.id) {
     listenStop();
-    Object.assign(T, { song: m.id, list: [], loaded: false, band: null, at: null }); T.voice.clear();
+    Object.assign(T, { song: m.id, list: T.unsaved.filter((t) => t.song === m.id), loaded: false, band: null, at: null }); T.voice.clear();
     renderTakes();
   }
   let list = null;
   try { const r = await fetch(`/api/library/${m.id}/takes`, { cache: "no-store" }); if (r.ok) list = await r.json(); } catch (e) { list = null; }
   if (T.song !== m.id || !list) return;
-  T.list = [...T.list.filter((t) => t.saving || t.failed), ...list]; T.loaded = true;
+  T.list = [...T.unsaved.filter((t) => t.song === m.id), ...list]; T.loaded = true;
   renderTakes();
 }
 async function takeSave(c, wav) {
-  const t = c.entry || { id: "new" + Math.random().toString(16).slice(2), created: Date.now() / 1000, start: c.start, duration: c.n / ac.sampleRate, key: c.key };
+  const t = c.entry || { id: "new" + Math.random().toString(16).slice(2), song: c.song, created: Date.now() / 1000, start: c.start, duration: c.n / ac.sampleRate, key: c.key };
   c.entry = t; t.saving = true; t.failed = null;
+  if (!T.unsaved.includes(t)) T.unsaved.push(t);
   if (T.song === c.song) { if (!T.list.includes(t)) T.list.unshift(t); renderTakes(); }
   const q = new URLSearchParams({ start: c.start.toFixed(4), key: c.key, oct: c.oct, latency: c.lat.toFixed(4) });
   let saved = null;
@@ -2844,6 +2846,7 @@ async function takeSave(c, wav) {
     t.saving = false; t.failed = e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message; // English: takeRow translates
     t.retry = () => takeSave(c, wav); // the recording stays here until it's saved or dismissed
   }
+  if (saved) T.unsaved = T.unsaved.filter((x) => x !== t);
   if (T.song !== c.song) return;
   if (saved) T.list = T.list.map((x) => (x === t ? saved : x));
   renderTakes();
@@ -2928,7 +2931,7 @@ function disarmTakes() {
 }
 async function takeDelete(t) {
   const row = takeRowOf(t.id), del = row.querySelector(".tk-del");
-  if (t.failed) { T.list = T.list.filter((x) => x !== t); renderTakes(); return; }
+  if (t.failed) { T.list = T.list.filter((x) => x !== t); T.unsaved = T.unsaved.filter((x) => x !== t); renderTakes(); return; }
   if (!row.classList.contains("armed")) {
     disarmTakes(); row.classList.add("armed");
     del.title = tr("Click again to delete"); del.setAttribute("aria-label", tr("Really delete this take?"));
@@ -3069,7 +3072,7 @@ function initTakes() {
   document.addEventListener("click", (e) => { if (!e.target.closest(".take.armed .tk-del")) disarmTakes(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") disarmTakes(); });
   // a take still being recorded or saved lives only in this page: closing or reloading it asks first
-  addEventListener("beforeunload", (e) => { if (R.cap || R.closing.length || T.list.some((t) => t.saving || t.failed)) e.preventDefault(); });
+  addEventListener("beforeunload", (e) => { if (R.cap || R.closing.length || T.unsaved.length) e.preventDefault(); });
 }
 
 // ---------- canvas ----------
