@@ -831,7 +831,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-days { display: grid; gap: 20px; }
 .tk-day { display: grid; gap: 8px; }
 .tk-day h3 { margin: 0; }
-.tk-rows { overflow: hidden; } /* a playing take's progress line keeps to the card's round corners */
+.tk-rows { overflow: hidden; } /* a take's hover fill keeps to the card's round corners */
 /* columns: play, time of day, the part sung (its times beside it), "Really delete?" while asked, compare, download, delete */
 .take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) auto 32px 32px 32px; align-items: center; gap: 12px;
   min-height: 48px; padding: 8px 12px; }
@@ -853,9 +853,11 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-cmp[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); } /* comparing */
 .take.armed .tk-del { background: color-mix(in oklab, var(--bad) 18%, transparent); color: var(--bad); }
 .take.saving .tk-part b { color: var(--muted); font-weight: 400; }
-.tk-prog { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--voice); transform-origin: left; transform: scaleX(0); pointer-events: none; }
-.take:not(.playing):not(.paused) .tk-prog { visibility: hidden; }
-.take.paused .tk-prog { opacity: 0.45; }
+/* its waveform (drawTakeWave), under the rest, the card's width: press or drag on it to play from there */
+.take { row-gap: 4px; }
+.tk-wave { grid-column: 1 / -1; height: 28px; border-radius: 4px; cursor: pointer; touch-action: none; }
+.tk-wave canvas { display: block; width: 100%; height: 100%; }
+.tk-wave:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .tk-empty { display: flex; align-items: center; gap: 12px; margin: 0; padding: 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.18); color: var(--muted); font-size: 14px; }
 .tk-empty .ico { width: 18px; height: 18px; color: var(--bad); }
 @media (max-width: 760px) {
@@ -4038,12 +4040,12 @@ function recTick(sn) {
 // (play) or paused (at: {id, pos}). mix: how takes sound, played here and downloaded; Your voice works on top of the
 // take's own gain, which brings it to about the loudness of the song's singer. unsaved: takes of any song being saved,
 // or that couldn't be, kept until saved or dismissed (so practicing another song meanwhile doesn't lose them).
-const T = { song: null, list: [], loaded: false, voice: new Map(), pitch: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 }, unsaved: [] };
+const T = { song: null, list: [], loaded: false, voice: new Map(), pitch: new Map(), peaks: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 }, unsaved: [] };
 for (const [k, v] of Object.entries(store.get("takeMix", {}) || {})) if (k in T.mix && Number.isFinite(v)) T.mix[k] = Math.max(0, Math.min(2, v));
 async function loadTakes(m) {
   if (T.song !== m.id) {
     listenStop();
-    Object.assign(T, { song: m.id, list: T.unsaved.filter((t) => t.song === m.id), loaded: false, band: null, at: null }); T.voice.clear(); T.pitch.clear();
+    Object.assign(T, { song: m.id, list: T.unsaved.filter((t) => t.song === m.id), loaded: false, band: null, at: null }); T.voice.clear(); T.pitch.clear(); T.peaks.clear();
     renderTakes();
   }
   let list = null;
@@ -4147,7 +4149,8 @@ function takeRow(t) {
   dl.onclick = () => takeWav(t);
   del.onclick = () => takeDelete(t);
   row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what,
-    el("span", "tk-confirm", tr("Really delete?")), cmp, dl, del, el("i", "tk-prog"));
+    el("span", "tk-confirm", tr("Really delete?")), cmp, dl, del);
+  if (!t.saving && !t.failed) row.append(takeWaveEl(t));
   return row;
 }
 const takeRowOf = (id) => document.querySelector(`#tkList .take[data-id="${id}"]`);
@@ -4182,7 +4185,7 @@ async function takeDelete(t) {
   let r = null;
   try { r = await fetch(`/api/library/${T.song}/takes/${t.id}/delete`, { method: "POST" }); } catch (e) { r = null; }
   if (!r || (!r.ok && r.status !== 422)) { del.disabled = false; takeNote(t.id, "Couldn’t delete the take. Is the app still running?", true); return; } // 422: gone already
-  T.list = T.list.filter((x) => x !== t); T.voice.delete(t.id);
+  T.list = T.list.filter((x) => x !== t); T.voice.delete(t.id); T.peaks.delete(t.id);
   if (T.at && T.at.id === t.id) T.at = null;
   renderTakes();
 }
@@ -4478,8 +4481,7 @@ function listenTick() {
   if (!p.srcs) return;
   const pos = p.pos + Math.max(0, ac.currentTime - p.at);
   if (pos >= p.total) { listenStop(); return; }
-  const bar = takeRowOf(p.id)?.querySelector(".tk-prog");
-  if (bar) bar.style.transform = `scaleX(${(pos / p.total).toFixed(4)})`;
+  drawTakeWave(p.take);
 }
 function paintListen() {
   for (const row of document.querySelectorAll("#tkList .take:not(.saving):not(.failed)")) {
@@ -4488,10 +4490,91 @@ function paintListen() {
     row.classList.toggle("playing", playing); row.classList.toggle("paused", paused);
     ppTo(b.querySelector(".pp"), on ? 1 : 0);
     b.title = tr(on ? "Pause" : paused ? "Play on" : "Play this take with the band"); b.setAttribute("aria-label", b.title);
-    const t = T.list.find((x) => x.id === id), bar = row.querySelector(".tk-prog");
-    if (paused) bar.style.transform = `scaleX(${(T.at.pos / t.duration).toFixed(4)})`;
-    else if (!playing) bar.style.transform = "scaleX(0)";
+    const t = T.list.find((x) => x.id === id);
+    if (t) drawTakeWave(t);
   }
+}
+// A take's waveform, under its row: your voice, lit in your colour as far as it has played (or is paused at); in a
+// comparison the original singer's pass lights it in the ink first, then yours in your colour. A press on it (or a drag,
+// let go where you want) plays the take from there; ← and → move 5 s. Its peaks are worked out from the recording the
+// first time its row is in view, and kept while the song is open (T.peaks: id → {v, job}).
+const TK_WAVE_H = 28;
+const takeWaveIO = new IntersectionObserver((es) => {
+  for (const e of es) {
+    if (!e.isIntersecting) continue;
+    e.target._seen = true;
+    const t = T.list.find((x) => x.id === e.target.closest(".take")?.dataset.id);
+    if (t) drawTakeWave(t);
+  }
+});
+function takeWaveEl(t) {
+  const w = el("div", "tk-wave"), at = (e) => { const r = w.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
+  w.append(el("canvas")); w.tabIndex = 0;
+  w.setAttribute("role", "slider"); w.setAttribute("aria-label", tr("Where in the take"));
+  w.setAttribute("aria-valuemin", "0"); w.setAttribute("aria-valuemax", String(Math.round(t.duration)));
+  w.onpointermove = (e) => { w._hover = at(e); if (w._scrub != null) w._scrub = w._hover; drawTakeWave(t); };
+  w.onpointerleave = () => { w._hover = null; drawTakeWave(t); };
+  w.onpointerdown = (e) => { if (e.button) return; w.setPointerCapture(e.pointerId); w._scrub = at(e); drawTakeWave(t); };
+  w.onpointerup = () => { if (w._scrub == null) return; const f = w._scrub; w._scrub = null; takeSeek(t, f * t.duration); };
+  w.onpointercancel = () => { w._scrub = null; drawTakeWave(t); };
+  w.onkeydown = (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    takeSeek(t, (takeWaveAt(t)?.f || 0) * t.duration + (e.key === "ArrowRight" ? 5 : -5));
+  };
+  takeWaveIO.observe(w);
+  return w;
+}
+// Where a take's waveform is lit to (f, of the take) and how, or null when it isn't playing or paused
+function takeWaveAt(t) {
+  const p = T.play;
+  if (p && p.id === t.id) {
+    if (!p.srcs) return { f: p.pos / t.duration }; // still loading
+    const pos = p.pos + Math.max(0, ac.currentTime - p.at);
+    if (pos < p.yours) return { f: Math.min(1, pos / t.duration), orig: true }; // comparing: the original singer's pass
+    return { f: Math.min(1, (pos - p.yours) / t.duration) };
+  }
+  return T.at && T.at.id === t.id ? { f: T.at.pos / t.duration, paused: true } : null;
+}
+function takePeaks(t) {
+  let e = T.peaks.get(t.id);
+  if (!e) {
+    ensureCtx();
+    e = { v: null };
+    e.job = takeVoice(t).then((buf) => {
+      const data = buf.getChannelData(0), n = 600, step = Math.max(1, Math.floor(data.length / n)), v = new Float32Array(n);
+      let top = 0;
+      for (let i = 0; i < n; i++) { let m = 0; for (let j = i * step, end = Math.min(data.length, j + step); j < end; j += 4) m = Math.max(m, Math.abs(data[j])); v[i] = m; top = Math.max(top, m); }
+      for (let i = 0; i < n; i++) v[i] /= top || 1;
+      e.v = v; drawTakeWave(t);
+    }, () => {}); // couldn't be had: stays flat (tried again with the song)
+    T.peaks.set(t.id, e);
+  }
+  return e.v;
+}
+function drawTakeWave(t) {
+  const w = takeRowOf(t.id)?.querySelector(".tk-wave"), cv = w && w.firstChild;
+  if (!cv) return;
+  const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+  if (!r.width) return;
+  if (cv.width !== Math.round(r.width * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(TK_WAVE_H * d); }
+  const x = cv.getContext("2d"), pk = w._seen ? takePeaks(t) : null, now = takeWaveAt(t), scrub = w._scrub != null;
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
+  if (!pk) { x.fillStyle = C.ink; x.globalAlpha = 0.18; x.fillRect(0, Math.round((cv.height - d) / 2), cv.width, d); x.globalAlpha = 1; return; }
+  const f = scrub ? w._scrub : now ? now.f : 0, maxH = TK_WAVE_H - 4;
+  x.fillStyle = C.ink; waveBars(x, cv.width, cv.height, d, pk, maxH, 0, 0, 0.22, Infinity);
+  if (f > 0) { x.fillStyle = now && now.orig && !scrub ? C.ink : C.voice; waveBars(x, cv.width, cv.height, d, pk, maxH, f, now && now.paused && !scrub ? 0.6 : 1, 0, Infinity); }
+  x.setTransform(1, 0, 0, 1, 0, 0);
+  if (now || scrub) { x.fillStyle = C.voice; x.fillRect(Math.round(f * cv.width - d), 0, 2 * d, cv.height); } // where it is
+  if (w._hover != null && !scrub) { x.fillStyle = C.ink; x.globalAlpha = 0.4; x.fillRect(Math.round(w._hover * cv.width), 0, d, cv.height); x.globalAlpha = 1; }
+  const s = String(Math.round(f * t.duration));
+  if (w.getAttribute("aria-valuenow") !== s) w.setAttribute("aria-valuenow", s);
+}
+// A press on a take's waveform: the take plays from there (whatever else was playing gives way)
+function takeSeek(t, pos) {
+  listenStop();
+  T.at = { id: t.id, pos: Math.max(0, Math.min(t.duration - 0.1, pos)) };
+  listenTake(t);
 }
 // The take as recorded, decoded once (the last few kept).
 function takeVoice(t) {
@@ -4542,6 +4625,8 @@ function initTakes() {
   }
   document.addEventListener("click", (e) => { if (!e.target.closest(".take.armed .tk-del")) disarmTakes(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") disarmTakes(); });
+  let w = 0; // the takes' waveforms drawn again at another width
+  new ResizeObserver(([e]) => { const now = Math.round(e.contentRect.width); if (now !== w) { w = now; paintListen(); } }).observe($("#tkList"));
   // a take still being recorded or saved lives only in this page: closing or reloading it asks first
   addEventListener("beforeunload", (e) => { if (R.cap || R.closing.length || T.unsaved.length) e.preventDefault(); });
 }
@@ -5287,7 +5372,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Download as WAV, mixed as set above": "위 설정대로 믹스해서 WAV로 내려받기", "Download this take as WAV": "이 테이크를 WAV로 내려받기",
   "Mixing the WAV…": "WAV 믹스하는 중…", "Couldn’t make the WAV.": "WAV를 만들지 못했어요.",
   "Loading…": "불러오는 중…", "Getting the band in key {n}…": "{n} 키 반주 준비하는 중…", "The song changed.": "곡이 바뀌었어요.",
-  "Play on": "이어서 재생", "Play this take with the band": "반주와 함께 이 테이크 듣기",
+  "Play on": "이어서 재생", "Play this take with the band": "반주와 함께 이 테이크 듣기", "Where in the take": "테이크 안의 위치",
 }, KO_SERVER);
 
 renderMic(); initStems(); initSing(); initLang(); route(); boot();
