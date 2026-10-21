@@ -528,8 +528,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sLib .lib-head .sort.end { justify-self: end; flex-direction: row-reverse; } /* the arrow before the label, the label over the numbers */
 #sLib .lib-head .sort:hover, #sLib .lib-head .sort.on { color: var(--muted); }
 #sLib .lib-head .sort:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
-#sLib .lib-head .sort .ico { width: 14px; height: 14px; opacity: 0; transition: opacity 0.15s; }
-#sLib .lib-head .sort:hover .ico, #sLib .lib-head .sort:focus-visible .ico, #sLib .lib-head .sort.on .ico { opacity: 1; }
+#sLib .lib-head .sort .lab { display: inline-flex; align-items: center; gap: 4px; } /* the length's: a clock, then the word */
+#sLib .lib-head .sort .ico { width: 14px; height: 14px; }
+#sLib .lib-head .sort .arrow { opacity: 0; transition: opacity 0.15s; }
+#sLib .lib-head .sort:hover .arrow, #sLib .lib-head .sort:focus-visible .arrow, #sLib .lib-head .sort.on .arrow { opacity: 1; }
 #sLib .num { font-variant-numeric: tabular-nums; }
 #sLib .end { text-align: right; }
 #sLib .row > .c { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1450,6 +1452,7 @@ function resetOnDblClick(input, def) {
 // replaces them by name with another style the owner of this copy holds a Hugeicons Pro license for.
 // The <svg> gets its stroke from .ico and round caps and joins from icon(), which a shape can override.
 const ICONS = {
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 8V12L14 14"/>',
   sortUp: '<path d="M12 5.5V19"/><path d="M18 11C18 11 13.5811 5.00001 12 5C10.4188 4.99999 6 11 6 11"/>',
   sortDown: '<path d="M12 18.502V5.00195"/><path d="M18 13.002C18 13.002 13.5811 19.0019 12 19.002C10.4188 19.002 6 13.002 6 13.002"/>',
   sortBoth: '<path d="M7 4V20"/><path d="M17 19L17 4"/><path d="M10 6.99998C10 6.99998 7.79053 4.00001 6.99998 4C6.20942 3.99999 4 7 4 7"/><path d="M20 17C20 17 17.7905 20 17 20C16.2094 20 14 17 14 17"/>',
@@ -1567,7 +1570,10 @@ async function renderLibrary() {
   const head = el("div", "lib-head");
   for (const [by, c] of Object.entries(SORTS)) {
     const b = el("button", "sort" + (c.end ? " end" : "") + (c.wide ? " wide" : ""));
-    b.type = "button"; b.dataset.by = by; b.append(el("span", null, tr(c.label)), icon("sortBoth"));
+    const lab = el("span", "lab");
+    if (c.icon) lab.append(icon(c.icon));
+    lab.append(tr(c.label));
+    b.type = "button"; b.dataset.by = by; b.append(lab, sortArrow("sortBoth"));
     b.onclick = () => { libSort = libSort.by === by ? { by, desc: !libSort.desc } : { by, desc: c.desc }; store.set("libSort", libSort); sortRows(); };
     head.append(b);
   }
@@ -1603,9 +1609,10 @@ const SORTS = {
   bpm: { label: "BPM", wide: true, by: (m) => m.bpm || null },
   key: { label: "Key", wide: true, by: (m) => (m.key ? m.key.pc * 2 + (m.key.mode === "minor") : null) }, // C, C minor, D♭, …
   added: { label: "Added", wide: true, desc: true, by: (m) => m.created },
-  length: { label: "Length", end: true, by: (m) => m.duration },
+  length: { label: "Length", icon: "clock", end: true, by: (m) => m.duration },
 };
 let libSort = (() => { const v = store.get("libSort", null); return v && SORTS[v.by] ? { by: v.by, desc: !!v.desc } : { by: "added", desc: true }; })();
+function sortArrow(name) { const a = icon(name); a.classList.add("arrow"); return a; }
 function sortRows() {
   const box = $("#sLib"), c = SORTS[libSort.by], way = libSort.desc ? -1 : 1;
   const words = new Intl.Collator(locale(), { numeric: true, sensitivity: "base" });
@@ -1619,7 +1626,7 @@ function sortRows() {
   for (const b of box.querySelectorAll(".lib-head .sort")) {
     const on = b.dataset.by === libSort.by, label = tr(SORTS[b.dataset.by].label);
     b.classList.toggle("on", on);
-    b.querySelector(".ico").replaceWith(icon(on ? (libSort.desc ? "sortDown" : "sortUp") : "sortBoth"));
+    b.querySelector(".arrow").replaceWith(sortArrow(on ? (libSort.desc ? "sortDown" : "sortUp") : "sortBoth"));
     b.setAttribute("aria-label", on ? tr("Sorted by {col}, {way}", { col: label, way: tr(libSort.desc ? "descending" : "ascending") }) : tr("Sort by {col}", { col: label }));
   }
 }
