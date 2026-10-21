@@ -246,6 +246,13 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, read(song))
             except ValueError as e:
                 return self._json(422, {"error": str(e)})
+        if path.startswith("/api/library/") and path.endswith("/pitch"):  # api/library/<id>/takes/<take>/pitch
+            parts = path.strip("/").split("/")
+            if len(parts) == 6 and parts[3] == "takes":
+                try:
+                    return self._json(200, stems.take_pitch(parts[2], parts[4]))
+                except ValueError as e:
+                    return self._json(422, {"error": str(e)})
         if path.startswith("/api/melody/"):
             try:
                 return self._json(200, stems.get_melody(path.rsplit("/", 1)[-1]))

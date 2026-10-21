@@ -620,8 +620,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-day { display: grid; gap: 8px; }
 .tk-day h3 { margin: 0; }
 .tk-rows { overflow: hidden; } /* a playing take's progress line keeps to the card's round corners */
-/* columns: play, time of day, the part sung (its times beside it), "Really delete?" while asked, download, delete */
-.take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) auto 32px 32px; align-items: center; gap: 12px;
+/* columns: play, time of day, the part sung (its times beside it), "Really delete?" while asked, compare, download, delete */
+.take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) auto 32px 32px 32px; align-items: center; gap: 12px;
   min-height: 48px; padding: 8px 12px; }
 .take + .take { border-top: 1px solid var(--line); }
 .tk-play { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--ink); display: grid; place-items: center;
@@ -638,6 +638,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tk-part small.err, .take.failed .tk-part b { color: var(--bad); }
 .tk-confirm { grid-column: 4; grid-row: 1; justify-self: end; font-size: 13.5px; color: var(--bad); visibility: hidden; }
 .take.armed .tk-confirm { visibility: visible; }
+.tk-cmp[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); } /* comparing */
 .take.armed .tk-del { background: color-mix(in oklab, var(--bad) 18%, transparent); color: var(--bad); }
 .take.saving .tk-part b { color: var(--muted); font-weight: 400; }
 .tk-prog { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; background: var(--voice); transform-origin: left; transform: scaleX(0); pointer-events: none; }
@@ -649,7 +650,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   .tk-mix { flex: 1 1 100%; display: grid; gap: 8px; }
   .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
   .tk-mix input[type="range"] { width: 100%; }
-  .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px; gap: 8px; }
+  .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px 32px; gap: 8px; }
   .tk-when { display: none; }
   .tk-part { grid-area: 1 / 2; }
   .tk-confirm { grid-area: 1 / 2; } /* in the part's place while asked */
@@ -664,7 +665,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   .pr-cols.with-takes .tk-mix { flex: 1 1 100%; display: grid; gap: 8px; }
   .pr-cols.with-takes .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
   .pr-cols.with-takes .tk-mix input[type="range"] { width: 100%; }
-  .pr-cols.with-takes .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px; gap: 8px; }
+  .pr-cols.with-takes .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px 32px; gap: 8px; }
   .pr-cols.with-takes .tk-when { display: none; }
   .pr-cols.with-takes .tk-part { grid-area: 1 / 2; flex-direction: column; align-items: stretch; gap: 0; }
   .pr-cols.with-takes .tk-confirm { grid-area: 1 / 2; }
@@ -1401,6 +1402,7 @@ Object.assign(ICONS, {
   loop: '<path d="M16.3884 3L17.3913 3.97574C17.8393 4.41165 18.0633 4.62961 17.9844 4.81481C17.9056 5 17.5888 5 16.9552 5H9.19422C5.22096 5 2 8.13401 2 12C2 13.4872 2.47668 14.8662 3.2895 16"/><path d="M7.61156 21L6.60875 20.0243C6.16074 19.5883 5.93673 19.3704 6.01557 19.1852C6.09441 19 6.4112 19 7.04478 19H14.8058C18.779 19 22 15.866 22 12C22 10.5128 21.5233 9.13383 20.7105 8"/>', // Repeat
   settings: '<path d="M15.5 12C15.5 13.933 13.933 15.5 12 15.5C10.067 15.5 8.5 13.933 8.5 12C8.5 10.067 10.067 8.5 12 8.5C13.933 8.5 15.5 10.067 15.5 12Z"/><path d="M21.011 14.0965C21.5329 13.9558 21.7939 13.8854 21.8969 13.7508C22 13.6163 22 13.3998 22 12.9669V11.0332C22 10.6003 22 10.3838 21.8969 10.2493C21.7938 10.1147 21.5329 10.0443 21.011 9.90358C19.0606 9.37759 17.8399 7.33851 18.3433 5.40087C18.4817 4.86799 18.5509 4.60156 18.4848 4.44529C18.4187 4.28902 18.2291 4.18134 17.8497 3.96596L16.125 2.98673C15.7528 2.77539 15.5667 2.66972 15.3997 2.69222C15.2326 2.71472 15.0442 2.90273 14.6672 3.27873C13.208 4.73448 10.7936 4.73442 9.33434 3.27864C8.95743 2.90263 8.76898 2.71463 8.60193 2.69212C8.43489 2.66962 8.24877 2.77529 7.87653 2.98663L6.15184 3.96587C5.77253 4.18123 5.58287 4.28891 5.51678 4.44515C5.45068 4.6014 5.51987 4.86787 5.65825 5.4008C6.16137 7.3385 4.93972 9.37763 2.98902 9.9036C2.46712 10.0443 2.20617 10.1147 2.10308 10.2492C2 10.3838 2 10.6003 2 11.0332V12.9669C2 13.3998 2 13.6163 2.10308 13.7508C2.20615 13.8854 2.46711 13.9558 2.98902 14.0965C4.9394 14.6225 6.16008 16.6616 5.65672 18.5992C5.51829 19.1321 5.44907 19.3985 5.51516 19.5548C5.58126 19.7111 5.77092 19.8188 6.15025 20.0341L7.87495 21.0134C8.24721 21.2247 8.43334 21.3304 8.6004 21.3079C8.76746 21.2854 8.95588 21.0973 9.33271 20.7213C10.7927 19.2644 13.2088 19.2643 14.6689 20.7212C15.0457 21.0973 15.2341 21.2853 15.4012 21.3078C15.5682 21.3303 15.7544 21.2246 16.1266 21.0133L17.8513 20.034C18.2307 19.8187 18.4204 19.711 18.4864 19.5547C18.5525 19.3984 18.4833 19.132 18.3448 18.5991C17.8412 16.6616 19.0609 14.6226 21.011 14.0965Z"/>', // Settings02
   record: '<circle cx="12" cy="12" r="8"/>', // Record
+  compare: '<path d="M19 9H6.65856C5.65277 9 5.14987 9 5.02472 8.69134C4.89957 8.38268 5.25517 8.01942 5.96637 7.29289L8.21091 5"/><path d="M5 15H17.3414C18.3472 15 18.8501 15 18.9753 15.3087C19.1004 15.6173 18.7448 15.9806 18.0336 16.7071L15.7891 19"/>', // Arrow Data Transfer Horizontal
   retry: '<path d="M20.0092 2V5.13219C20.0092 5.42605 19.6418 5.55908 19.4537 5.33333C17.6226 3.2875 14.9617 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12"/>', // Refresh
   backing: '<path d="M16 21C15.7668 18.0685 13.3422 15.7477 10.3085 15.5521L9.49999 15.5C9.21121 15.5076 8.94209 15.5178 8.68816 15.5298C5.68124 15.6723 3.23089 18.0974 3 21"/><path d="M12.75 9.75C12.75 11.5449 11.2949 13 9.5 13C7.70508 13 6.25 11.5449 6.25 9.75C6.25 7.95507 7.70508 6.5 9.5 6.5C11.2949 6.5 12.75 7.95507 12.75 9.75Z"/><path d="M21 17.501C20.7709 14.6314 18.4541 12.2748 15.5 11.9961"/><path d="M15.9877 9C16.8965 8.42434 17.5001 7.40788 17.5001 6.25C17.5001 4.45507 16.0496 3 14.2602 3C13.3811 3 12.5838 3.35121 12.0001 3.92139"/>', // UserMultiple
 });
@@ -3257,12 +3259,12 @@ function paintRec() {
 // (play) or paused (at: {id, pos}). mix: how takes sound, played here and downloaded; Your voice works on top of the
 // take's own gain, which brings it to about the loudness of the song's singer. unsaved: takes of any song being saved,
 // or that couldn't be, kept until saved or dismissed (so practicing another song meanwhile doesn't lose them).
-const T = { song: null, list: [], loaded: false, voice: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 }, unsaved: [] };
+const T = { song: null, list: [], loaded: false, voice: new Map(), pitch: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 }, unsaved: [] };
 for (const [k, v] of Object.entries(store.get("takeMix", {}) || {})) if (k in T.mix && Number.isFinite(v)) T.mix[k] = Math.max(0, Math.min(2, v));
 async function loadTakes(m) {
   if (T.song !== m.id) {
     listenStop();
-    Object.assign(T, { song: m.id, list: T.unsaved.filter((t) => t.song === m.id), loaded: false, band: null, at: null }); T.voice.clear();
+    Object.assign(T, { song: m.id, list: T.unsaved.filter((t) => t.song === m.id), loaded: false, band: null, at: null }); T.voice.clear(); T.pitch.clear();
     renderTakes();
   }
   let list = null;
@@ -3354,15 +3356,17 @@ function takeRow(t) {
   else { play.append(ppIcon()); play.disabled = !!t.saving; play.onclick = () => listenTake(t); }
   const what = el("span", "tk-part");
   what.append(el("b", null, t.saving ? tr("Saving take…") : t.failed ? tr("Couldn’t save this take") : part.what), el("small", null, t.failed ? tr(t.failed) : part.more));
-  const dl = el("button", "dl"), del = el("button", "dl tk-del");
-  dl.type = del.type = "button"; dl.append(icon("download")); del.append(icon("trash"));
-  dl.disabled = !!(t.saving || t.failed); del.disabled = !!t.saving;
+  const cmp = el("button", "dl tk-cmp"), dl = el("button", "dl"), del = el("button", "dl tk-del");
+  cmp.type = dl.type = del.type = "button"; cmp.append(icon("compare")); dl.append(icon("download")); del.append(icon("trash"));
+  cmp.disabled = dl.disabled = !!(t.saving || t.failed); del.disabled = !!t.saving;
+  cmp.title = tr("Compare: the original singer's part, then yours"); cmp.setAttribute("aria-label", cmp.title); cmp.setAttribute("aria-pressed", "false");
+  cmp.onclick = () => listenTake(t, "compare");
   dl.title = tr("Download as WAV, mixed as set above"); dl.setAttribute("aria-label", tr("Download this take as WAV"));
   del.title = tr(t.failed ? "Dismiss" : "Delete this take"); del.setAttribute("aria-label", del.title);
   dl.onclick = () => takeWav(t);
   del.onclick = () => takeDelete(t);
   row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what,
-    el("span", "tk-confirm", tr("Really delete?")), dl, del, el("i", "tk-prog"));
+    el("span", "tk-confirm", tr("Really delete?")), cmp, dl, del, el("i", "tk-prog"));
   return row;
 }
 const takeRowOf = (id) => document.querySelector(`#tkList .take[data-id="${id}"]`);
@@ -3415,15 +3419,20 @@ async function takeWav(t) {
 
 // Listening: your voice with the band (every track but the guide vocal) and the guide at its own volume, in the key the
 // take was sung in, from the take's start (or where it was paused). Playing a take stops the song, and the song stops it.
-async function listenTake(t) {
-  if (T.play && T.play.id === t.id) { listenStop(true); return; } // pause; Play goes on from here
+// mode: "take", the take over the band as set above; "compare", the original singer's part first (the band with the
+// guide vocal at full), then, a breath later (COMPARE_GAP), yours as set above. Pressing the same again pauses a take
+// (Play goes on from there) and stops a comparison.
+const COMPARE_GAP = 0.8;
+async function listenTake(t, mode = "take") {
+  if (T.play && T.play.id === t.id && T.play.mode === mode) { listenStop(mode === "take"); return; }
   listenStop(); pauseSong(); ensureCtx();
-  const pos = T.at && T.at.id === t.id ? T.at.pos : 0, p = { id: t.id, take: t };
+  const pos = mode === "take" && T.at && T.at.id === t.id ? T.at.pos : 0, p = { id: t.id, take: t, mode };
   T.play = p; paintListen();
   // usually a moment; a take in a key not played yet waits for its tracks to be made (about 10 s)
   const sp = t.speed || 1;
   const slow = setTimeout(() => takeNote(t.id, t.key === P.key && sp === P.rate ? "Loading…" : sp !== 1 ? "Getting the band at that tempo…" : "Getting the band in key {n}…", false, { n: keySign(t.key) }), 400);
   let voice, bufs;
+  takePitch(t).then((x) => { p.pitch = x; }, () => {}); // the line you sang, for the stage, when it comes
   try { [voice, bufs] = await Promise.all([takeVoice(t), takeBand(t.key, sp)]); }
   catch (e) {
     clearTimeout(slow);
@@ -3434,15 +3443,33 @@ async function listenTake(t) {
   if (T.play !== p) return; // stopped, or another take started, meanwhile
   const at = ac.currentTime + 0.06, left = t.duration - pos, guide = guideName();
   p.bus = ac.createGain(); p.bus.gain.value = stemVol; p.bus.connect(master); // the Studio's volume, as for the song
-  p.gains = { voice: ac.createGain(), band: ac.createGain(), guide: ac.createGain() };
-  for (const g of Object.values(p.gains)) g.connect(p.bus);
-  p.gains.voice.gain.value = T.mix.voice * (t.gain || 1); p.gains.band.gain.value = T.mix.band; p.gains.guide.gain.value = T.mix.guide;
   p.srcs = [];
-  for (const [name, buf] of Object.entries(bufs)) {
-    const s = ac.createBufferSource(); s.buffer = buf; s.connect(name === guide ? p.gains.guide : p.gains.band); s.start(at, t.start / sp + pos, left); p.srcs.push(s);
+  // the band from the take's place in the song (at its tempo), and your voice, from `from` s into the take, at `when`
+  const pass = (when, from, gains, withVoice) => {
+    for (const g of Object.values(gains)) g.connect(p.bus);
+    for (const [name, buf] of Object.entries(bufs)) {
+      const s = ac.createBufferSource(); s.buffer = buf; s.connect(name === guide ? gains.guide : gains.band); s.start(when, t.start / sp + from, t.duration - from); p.srcs.push(s);
+    }
+    if (withVoice) { const v = ac.createBufferSource(); v.buffer = voice; v.connect(gains.voice); v.start(when, from, t.duration - from); p.srcs.push(v); }
+  };
+  const mix = (v, b, gd) => { const g = { voice: ac.createGain(), band: ac.createGain(), guide: ac.createGain() }; g.voice.gain.value = v; g.band.gain.value = b; g.guide.gain.value = gd; return g; };
+  p.gains = mix(T.mix.voice * (t.gain || 1), T.mix.band, T.mix.guide); // yours, as set above (listenGains follows the sliders)
+  if (mode === "compare") {
+    pass(at, 0, mix(0, T.mix.band, 1), false); // the original singer
+    p.yours = t.duration + COMPARE_GAP; // s after `at` that yours starts
+    pass(at + p.yours, 0, p.gains, true);
+  } else { p.yours = 0; pass(at, pos, p.gains, true); }
+  p.at = at; p.pos = pos; p.total = p.yours + t.duration; // s of it, from its start
+  paintListen();
+}
+// A take's pitch (stems.take_pitch), fetched once: [[s into the take, midi or null], …]
+function takePitch(t) {
+  if (!T.pitch.has(t.id)) {
+    const job = fetch(`/api/library/${T.song}/takes/${t.id}/pitch`).then((r) => (r.ok ? r.json() : []));
+    job.catch(() => T.pitch.delete(t.id));
+    T.pitch.set(t.id, job);
   }
-  const v = ac.createBufferSource(); v.buffer = voice; v.connect(p.gains.voice); v.start(at, pos, left); p.srcs.push(v);
-  p.at = at; p.pos = pos;
+  return T.pitch.get(t.id);
 }
 function listenGains() {
   const p = T.play;
@@ -3459,7 +3486,7 @@ function listenStop(keep) {
   T.play = null; T.at = null;
   if (p.srcs) {
     const pos = p.pos + Math.max(0, ac.currentTime - p.at);
-    if (keep && pos < p.take.duration - 0.1) T.at = { id: p.id, pos };
+    if (keep && p.mode === "take" && pos < p.take.duration - 0.1) T.at = { id: p.id, pos };
     p.bus.gain.setTargetAtTime(0, ac.currentTime, 0.01);
     p.srcs.forEach((s) => { try { s.stop(ac.currentTime + 0.05); } catch (e) {} });
     setTimeout(() => p.bus.disconnect(), 200);
@@ -3470,19 +3497,20 @@ function listenTick() {
   const p = T.play;
   if (!p.srcs) return;
   const pos = p.pos + Math.max(0, ac.currentTime - p.at);
-  if (pos >= p.take.duration) { listenStop(); return; }
+  if (pos >= p.total) { listenStop(); return; }
   const bar = takeRowOf(p.id)?.querySelector(".tk-prog");
-  if (bar) bar.style.transform = `scaleX(${(pos / p.take.duration).toFixed(4)})`;
+  if (bar) bar.style.transform = `scaleX(${(pos / p.total).toFixed(4)})`;
 }
 function paintListen() {
   for (const row of document.querySelectorAll("#tkList .take:not(.saving):not(.failed)")) {
-    const id = row.dataset.id, on = !!T.play && T.play.id === id, paused = !on && !!T.at && T.at.id === id, b = row.querySelector(".tk-play");
-    row.classList.toggle("playing", on); row.classList.toggle("paused", paused);
+    const id = row.dataset.id, playing = !!T.play && T.play.id === id, on = playing && T.play.mode === "take", paused = !playing && !!T.at && T.at.id === id, b = row.querySelector(".tk-play");
+    row.querySelector(".tk-cmp")?.setAttribute("aria-pressed", String(playing && T.play.mode === "compare"));
+    row.classList.toggle("playing", playing); row.classList.toggle("paused", paused);
     ppTo(b.querySelector(".pp"), on ? 1 : 0);
     b.title = tr(on ? "Pause" : paused ? "Play on" : "Play this take with the band"); b.setAttribute("aria-label", b.title);
     const t = T.list.find((x) => x.id === id), bar = row.querySelector(".tk-prog");
     if (paused) bar.style.transform = `scaleX(${(T.at.pos / t.duration).toFixed(4)})`;
-    else if (!on) bar.style.transform = "scaleX(0)";
+    else if (!playing) bar.style.transform = "scaleX(0)";
   }
 }
 // The take as recorded, decoded once (the last few kept).
@@ -3769,6 +3797,7 @@ function loop() {
 }
 // One frame of Practice: the bars, your pitch, the readouts.
 function practiceFrame() {
+  if (T.play && T.play.srcs) { takeFrame(T.play); return; }
   const sn = phraseTick(songPos()), last = K.hist[K.hist.length - 1];
   if (last && sn < last.t - 0.25) K.hist = []; // jumped back
   if (P.playing) K.hist.push({ t: sn, m: cur });
@@ -3777,6 +3806,22 @@ function practiceFrame() {
   draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 + P.key });
   setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
   renderHud(sn, cur); renderCountIn(sn); renderLyric();
+}
+// While a take plays, the stage follows it: the bars in the key and octave it was sung in, where it is in the song, and
+// the line you sang, drawn as it goes, the dot where it is now (in a comparison, only once it's your turn).
+function takeFrame(tp) {
+  const tk = tp.take, sp = tk.speed || 1, gone = tp.pos + Math.max(0, ac.currentTime - tp.at), yours = gone >= tp.yours;
+  const now = tk.start + Math.max(0, yours ? gone - tp.yours : gone) * sp, sh = (tk.oct || 0) * 12 + (tk.key || 0);
+  if (!tp.evs) tp.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
+  const hist = [];
+  if (yours && tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + t * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m }); }
+  const last = hist[hist.length - 1], cur = last && now - last.t < 0.1 ? last.m : null;
+  songView();
+  draw(now, cur, hist, tp.evs, { pts: K.contour, shift: sh });
+  setText("kTime", `${fmtTime(now)} / ${fmtTime(songDur())}`);
+  renderHud(now, cur); renderLyric();
+  setText("hudRep", tr(tp.mode !== "compare" ? "Playing a take" : yours ? "Comparing · yours" : "Comparing · the original singer"));
+  $("#countIn").hidden = true;
 }
 // The mic chip's spectrum: 7 bands from 90 Hz to 4 kHz, where a voice's energy is, spaced evenly in pitch. Each bar is
 // as tall as the loudest bin in its band (-95 dB flat … -35 dB full), rising at once and falling back gently.
@@ -4161,6 +4206,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)",
   "Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them": "이 소절 반복 (L) · 소절 막대에서 Shift+클릭하면 여러 소절을 묶어 반복해요",
   "Click a phrase to go to it · Shift+click another to loop the run between them": "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요",
+  "Compare: the original singer's part, then yours": "비교: 원곡 가수가 부른 부분, 그다음 내 테이크", "Playing a take": "테이크 듣는 중",
+  "Comparing · the original singer": "비교 중 · 원곡 가수", "Comparing · yours": "비교 중 · 내 테이크",
   "Count-in": "카운트인", "Off": "없음", "1 beat": "1박", "{n} beats": "{n}박", "From {t}": "{t}부터", "Phrases": "소절", "Phrase –": "소절 –",
   "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
   "Intro": "전주", "Break": "간주", "{kind} · vocals in {s} s": "{kind} · {s}초 뒤 보컬",

@@ -1648,6 +1648,10 @@ def save_take(song_id: str, data: bytes, info: dict) -> dict:
     with open(js + ".part", "w", encoding="utf-8") as f:  # the json last: a take is listed once both are complete
         json.dump(take, f)
     os.replace(js + ".part", js)
+    def pitch():  # read now, in the background, so the line's there by the time the take is played
+        with contextlib.suppress(Exception):
+            take_pitch(song_id, take["id"])
+    threading.Thread(target=pitch, daemon=True).start()
     return take
 
 
@@ -1666,10 +1670,41 @@ def list_takes(song_id: str) -> list[dict]:
     return sorted(out, key=lambda t: t.get("created", 0), reverse=True)
 
 
+def take_pitch(song_id: str, tid: str) -> list:
+    """A take's pitch as Practice draws your line: [[t, midi or None], …] every 20 ms, t in seconds into the take as
+    recorded (the page lays it onto the song at the take's tempo), read the way the song's melody is (pYIN, the quiet
+    frames dropped, slips smoothed) and kept beside the take (<take>.pitch.json) after the first time (a second or two)."""
+    import melody
+    t = _take(song_id, tid)
+    d = _take_dir(song_id)
+    path = os.path.join(d, tid + ".pitch.json")
+    if os.path.isfile(path):
+        try:
+            return _load_json(path)
+        except ValueError:
+            pass  # damaged: read again
+    raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", os.path.join(d, tid + ".flac"), "-ac", "1", "-ar", str(melody.SR),
+                          "-f", "f32le", "pipe:1"], capture_output=True, check=True).stdout
+    x = np.frombuffer(raw, dtype=np.float32).copy()
+    if len(x) < melody.SR * 0.2:
+        return []
+    tt, f0 = melody._track(x)
+    db, loud = melody._levels(x, tt, f0)
+    voiced = (f0 > 0) & (db > loud - melody.GATE_DB)
+    midi = np.full(len(f0), np.nan)
+    midi[voiced] = 69 + 12 * np.log2(f0[voiced] / 440.0)
+    sm = melody._smooth(midi)
+    out = [[round(float(tt[k]), 2), None if np.isnan(sm[k]) else round(float(sm[k]), 2)] for k in range(0, len(sm), 2)]
+    out = [c for j, c in enumerate(out) if c[1] is not None or j == 0 or out[j - 1][1] is not None]  # one None per silence
+    if os.path.isfile(os.path.join(d, tid + ".json")):  # not deleted meanwhile
+        _write_json(path, out)
+    return out
+
+
 def delete_take(song_id: str, tid: str):
     _take(song_id, tid)
     d = _take_dir(song_id)
-    for ext in (".json", ".flac"):  # the json first, so a take half deleted isn't listed
+    for ext in (".json", ".flac", ".pitch.json"):  # the json first, so a take half deleted isn't listed
         with contextlib.suppress(FileNotFoundError):
             os.remove(os.path.join(d, tid + ext))
 
