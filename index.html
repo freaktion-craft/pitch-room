@@ -57,6 +57,14 @@
 html, body { margin: 0; }
 /* Always reserve the scrollbar's space, so short pages (Stems) don't shift sideways when switching tabs */
 html { scrollbar-gutter: stable; }
+/* Scrollbars: a thin pill of the ink on nothing (the page's own background shows round it), brighter under the
+   pointer and while held; no arrows. Where the standard properties are set (a dropdown's list), those win. */
+::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+::-webkit-scrollbar-thumb { min-height: 40px; border: 3px solid transparent; border-radius: 6px; background: rgba(var(--fg), 0.14) padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(var(--fg), 0.26); }
+::-webkit-scrollbar-thumb:active { background-color: rgba(var(--fg), 0.34); }
+::-webkit-scrollbar-corner, ::-webkit-scrollbar-track { background: transparent; }
+@supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: rgba(var(--fg), 0.18) transparent; } }
 body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font); -webkit-font-smoothing: antialiased; }
 [hidden] { display: none !important; }
 /* Interface text can't be selected (a stray drag highlights nothing); what someone might copy can: song titles and
@@ -545,10 +553,22 @@ input[type="range"]:disabled { opacity: 0.4; }
 .search input:focus ~ .keys, .search input:not(:placeholder-shown) ~ .keys { opacity: 0; }
 @media (hover: none) { .search .keys { display: none; } }
 #sLib .lib-none { margin: 0; padding: 24px 12px; color: var(--faint); font-size: 14px; }
-/* A long list: the page's foot fades into the background while there's more below, and clears at the end */
-#listFade { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; height: 96px; pointer-events: none; opacity: 0; transition: opacity 0.2s;
-  background: linear-gradient(to bottom, transparent, var(--bg)); }
-#listFade.on { opacity: 1; }
+/* A long list: the page's foot fades into the background while there's more below, and clears at the end. Lower down,
+   what's under it is hidden more and blurred more: six blurs (0.5 px doubling to 16 px), each in its own band of the
+   fade, overlapping the next, under the background coming in on an eased curve. Each layer fades itself in and out
+   (an opacity on the box would cut the blurs off from what's behind it). */
+#listFade { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; height: 192px; pointer-events: none; }
+#listFade > * { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s; }
+#listFade.on > * { opacity: 1; }
+#listFade > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
+#listFade > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }
+#listFade > i:nth-child(3) { backdrop-filter: blur(2px); mask: linear-gradient(transparent 33.3%, #000 50%, #000 66.7%, transparent 83.3%); }
+#listFade > i:nth-child(4) { backdrop-filter: blur(4px); mask: linear-gradient(transparent 50%, #000 66.7%, #000 83.3%, transparent 100%); }
+#listFade > i:nth-child(5) { backdrop-filter: blur(8px); mask: linear-gradient(transparent 66.7%, #000 83.3%); }
+#listFade > i:nth-child(6) { backdrop-filter: blur(16px); mask: linear-gradient(transparent 83.3%, #000 100%); }
+#listFade > b { background: linear-gradient(color-mix(in oklab, var(--bg) 0%, transparent) 0%, color-mix(in oklab, var(--bg) 3%, transparent) 14%,
+  color-mix(in oklab, var(--bg) 10%, transparent) 27%, color-mix(in oklab, var(--bg) 22%, transparent) 40%, color-mix(in oklab, var(--bg) 38%, transparent) 52%,
+  color-mix(in oklab, var(--bg) 56%, transparent) 64%, color-mix(in oklab, var(--bg) 74%, transparent) 76%, color-mix(in oklab, var(--bg) 89%, transparent) 88%, var(--bg) 100%); }
 /* The list: flat, nothing behind it, a hairline between songs. It reaches 12 px past the page's edges, so a song's
    hover fill has room round it, while the lines and what's in the rows keep to the edges; the lines either side of
    the song pointed at give way to its fill. */
@@ -1054,7 +1074,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
   <div class="cv-fly"><div class="cv-card"><img alt=""><i class="cv-light"></i><i class="cv-sheen"></i></div></div>
 </div>
 
-<div id="listFade" aria-hidden="true"></div>
+<div id="listFade" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
 <div id="boot" aria-hidden="true"><div class="bar"><i></i></div></div>
 
 <script src="icons.local.js"></script>
