@@ -58,6 +58,12 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 :focus-visible { outline: 2px solid var(--voice); outline-offset: 2px; border-radius: 6px; }
 
+/* Practice's aurora (drawAurora): behind the page along the bottom of the window, the cards in front of it. Drawn
+   tiny and stretched, then blurred, so it's all glow; it spills past the window's edges so the blur doesn't fade them. */
+#aurora { position: fixed; left: -48px; right: -48px; bottom: -48px; width: calc(100% + 96px); height: calc(52vh + 48px); z-index: 0;
+  pointer-events: none; opacity: 0; filter: blur(28px); transition: opacity 0.8s; }
+#aurora.on { opacity: 0.75; }
+#app { position: relative; z-index: 1; }
 /* One width for every page, so the header and column edges don't jump when switching views */
 .app { max-width: 1440px; margin: 0 auto; padding-block: 24px 64px;
   padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
@@ -667,6 +673,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}</script>
 </head>
 <body>
+<canvas id="aurora" width="64" height="40" aria-hidden="true"></canvas>
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Stem</a>
@@ -902,7 +909,7 @@ function say(node, en, vars, attr) {
 }
 
 // ---------- audio ----------
-let ac = null, analyser = null, tbuf = null, master = null, noiseBuf = null;
+let ac = null, analyser = null, tbuf = null, master = null, noiseBuf = null, bandTap = null;
 let micStream = null, micNode = null, micBus = null, micOn = false, testOsc = null, testOffset = 0;
 // Everything the page plays meets in master, then goes through a limiter on its way out: tracks summed loud (or turned
 // up past 100, or moved to another key) peak over full scale, which the sound system would clip. The limiter turns
@@ -956,6 +963,8 @@ function ensureCtx() {
     // the mic goes in here, so the pitch tracker and the take recorder hear the same input, whichever one is plugged in
     micBus = ac.createGain(); micBus.connect(analyser);
     const sink = ac.createGain(); sink.gain.value = 0; analyser.connect(sink); sink.connect(ac.destination);
+    // the band as it plays (every track but the guide vocal, at their volumes), for Practice's aurora
+    bandTap = ac.createAnalyser(); bandTap.fftSize = 2048; bandTap.smoothingTimeConstant = 0.5; bandTap.connect(sink);
     tbuf = new Float32Array(analyser.fftSize);
     noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.04), ac.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
@@ -1963,6 +1972,7 @@ function playSong() {
   P.sources = [];
   for (const [name, buf] of Object.entries(P.buffers)) {
     const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.bus);
+    if (name !== guideName()) g.connect(bandTap);
     const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(at, P.offset / P.rate); // song time → its time in this version
     P.tracks[name].gain = g; P.sources.push(s);
   }
@@ -3581,6 +3591,46 @@ function draw(now, cur, hist, evs, guide) {
   }
 }
 
+// Practice's aurora: the band's spectrum as a glow rising from the bottom of the window while the song plays, behind
+// the page, mostly in your colour with a neighbouring hue or two in it. AUR.n bands from 60 Hz to 8 kHz, low on the
+// left; each rises at once and sinks back slowly, its curtain swaying a little. Drawn into a 64 × 40 canvas that CSS
+// stretches across the window and blurs, so it costs next to nothing; off with reduced motion, and outside Practice.
+const AUR = { n: 28, lv: new Float32Array(28), cv: $("#aurora"), fft: null, voice: "", hues: [] };
+function drawAurora() {
+  const on = K.on && view === "practice" && !!bandTap && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  AUR.cv.classList.toggle("on", on);
+  if (!on) return;
+  const a = AUR, fft = a.fft || (a.fft = new Uint8Array(bandTap.frequencyBinCount)), hz = ac.sampleRate / bandTap.fftSize;
+  bandTap.getByteFrequencyData(fft); // 0…255 over −100…−30 dB
+  let any = false;
+  for (let i = 0; i < a.n; i++) {
+    const k0 = Math.floor((60 * (8000 / 60) ** (i / a.n)) / hz), k1 = Math.max(k0 + 1, Math.ceil((60 * (8000 / 60) ** ((i + 1) / a.n)) / hz));
+    let sum = 0;
+    for (let k = k0; k < k1; k++) sum += fft[k];
+    const v = Math.min(1, (sum / (k1 - k0) / 255) * (0.75 + (0.55 * i) / a.n)); // highs carry less energy: lifted a little
+    a.lv[i] = v > a.lv[i] ? a.lv[i] + (v - a.lv[i]) * 0.45 : a.lv[i] * 0.95;
+    if (a.lv[i] > 0.01) any = true;
+  }
+  if (!any) { a.cv.getContext("2d").clearRect(0, 0, a.cv.width, a.cv.height); return; }
+  if (a.voice !== C.voice) { // your colour, and two hues either side of it
+    a.voice = C.voice;
+    const m = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(C.voice) || [0, 0.68, 0.17, 262];
+    a.hues = [[+m[1], +m[2], +m[3]], [+m[1] + 0.04, +m[2] * 0.9, +m[3] - 45], [+m[1] - 0.02, +m[2], +m[3] + 40]];
+  }
+  const c = a.cv.getContext("2d"), cw = a.cv.width, ch = a.cv.height, t = performance.now() / 1000;
+  c.clearRect(0, 0, cw, ch); c.globalCompositeOperation = "lighter"; c.filter = "blur(1.5px)"; // curtains run into each other
+  for (let i = 0; i < a.n; i++) {
+    const v = a.lv[i] ** 1.4, hgt = v * ch;
+    if (hgt < 0.5) continue;
+    const [L, C2, Hh] = a.hues[i % 7 === 3 ? 1 : i % 5 === 1 ? 2 : 0]; // mostly your colour
+    const cx = ((i + 0.5) / a.n) * cw + Math.sin(t * 0.7 + i * 1.9) * 0.8, half = (cw / a.n) * 1.8;
+    const grad = c.createLinearGradient(0, ch, 0, ch - hgt);
+    grad.addColorStop(0, `oklch(${L} ${C2} ${Hh} / ${0.5 * v + 0.1})`); grad.addColorStop(1, `oklch(${L} ${C2} ${Hh} / 0)`);
+    c.fillStyle = grad; c.fillRect(cx - half, ch - hgt, half * 2, hgt);
+  }
+  c.filter = "none";
+}
+
 // ---------- main loop ----------
 let med = [], cur = null, miss = 0, level = 0;
 function loop() {
@@ -3599,6 +3649,7 @@ function loop() {
   else { miss = 0; med.push(m); while (med.length > 5) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
   drawSpectrum(); // the mic chip is in the header on every page
   if (K.on && view === "practice") practiceFrame();
+  drawAurora();
   if (T.play) listenTick();
   requestAnimationFrame(loop);
 }
