@@ -64,7 +64,7 @@ body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font); -we
 body { -webkit-user-select: none; user-select: none; }
 /* Korean lines break between words, as they're read, not inside them (a word too long for its line still breaks) */
 html:lang(ko) body { word-break: keep-all; overflow-wrap: break-word; }
-input, textarea, .song b, #pTitle, #iTitle, #playTitle, #pMeta, #iSub, .facts dd, .server-off, .log, .job .top,
+input, textarea, .song b, #pTitle, #iTitle, #pMeta, #iSub, .facts dd, .server-off, .log, .job .top,
 #sAddMsg, #sInstallState, #sGpuState, #pExportState { -webkit-user-select: text; user-select: text; }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -249,8 +249,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 .btn.dark:hover { background: var(--ink-strong); }
 
 /* Sing view */
-.play-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-.play-bar .title { margin-right: auto; }
 /* The stage: a line on top (what Practice is doing, and whose line is whose) over the bars, so no bar is ever under a
    box; on the bars only your note, at the top right */
 .stage { position: relative; display: flex; flex-direction: column; background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line);
@@ -838,9 +836,6 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 
   <main id="vPractice" aria-label="Practice" hidden>
     <button class="btn sm back" id="kLeave" type="button">Studio</button>
-    <div class="play-bar">
-      <h1 class="title" id="playTitle"></h1>
-    </div>
     <div class="pr-cols" id="prCols">
     <div class="pr-main">
     <div class="songbar" id="songBar">
@@ -1959,7 +1954,6 @@ function renameSong(row, m) {
 function songRenamed(id, title) {
   for (const s of [libCache.get(id), P.song, K.song]) if (s && s.id === id) s.title = title;
   if (P.song && P.song.id === id) $("#pTitle").textContent = title;
-  if (K.song && K.song.id === id) setText("playTitle", title);
 }
 
 // Info page (#stems/<id>/info): key, tempo, length, the vocal range and how it sits against yours.
@@ -3436,7 +3430,6 @@ async function singSong(m, btn) {
   octPick.set(octItems(), K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute)); $("#kClickVol").value = P.tracks.click.vol;
   $("#kClick").disabled = $("#kClickVol").disabled = !(m.beats && m.beats.length);
-  setText("playTitle", m.title);
   await loadTakes(m); // in first, so Practice opens with its takes beside it, rather than them pushing in after
   go("practice");
 }
