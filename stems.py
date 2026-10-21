@@ -7,7 +7,7 @@ Songs live in ./library/<id>/ :
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
-    lyrics.json     the lyrics, each line timed to the voice (Practice's phrases), or none found (see lyrics.py)
+    lyrics.json     the lyrics, each line timed to the voice (Practice's phrases), or none found; once asked for (lyrics.py)
     meta.json       title, duration, bpm, beat times, key, stems, model, keep (parts of tracks that play while muted)
     keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
     takes/          you, singing along in Practice: <take>.flac and <take>.json (when, which part, key, scores)
@@ -588,12 +588,6 @@ def _pipeline(job, src: dict, model_name: str):
                     _write_split(folder, vox, lead)
                 _stage(job, "Reading the vocal melody", 0.87)
                 _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None)
-                try:  # the song works without them; one that can't look now (offline) looks when Practice opens
-                    from scipy.signal import resample_poly
-                    voice = resample_poly((vox if lead is None else lead).mean(0), 160, 441).astype(np.float32)  # 44.1 → 16 kHz
-                    _write_json(os.path.join(folder, "lyrics.json"), _song_lyrics(job, title, dur, voice, (0.875, 0.9)), ensure_ascii=False)
-                except Exception:  # noqa: BLE001
-                    pass
             _stage(job, "Saving tracks", 0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):

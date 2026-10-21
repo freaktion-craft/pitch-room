@@ -36,7 +36,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 
 **Practice** — the melody is read from the lead vocal (pYIN pitch tracking, cut into notes), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
 
-- **Lyrics** come from [LRCLIB](https://lrclib.net) by the song’s title and are lined up with the lead vocal word by word by [Whisper](https://github.com/openai/whisper); the line being sung shows above the bars. If LRCLIB has the wrong song or none, the song’s **Info** page searches it by hand or takes lyrics pasted in.
+- **Find lyrics** (beside Record) looks the song up on [LRCLIB](https://lrclib.net) and lines the lyrics up with the lead vocal word by word with [Whisper](https://github.com/openai/whisper); each word then sits under the bars where it’s sung. If LRCLIB has the wrong song or none, the song’s **Info** page searches it by hand or takes lyrics pasted in.
 - The song is cut into **phrases**: a line of the lyrics each, or without lyrics, where the singer breathes. Jump to one and it counts you in (4 3 2 1); **Loop** repeats it. ← / → move between phrases, Home / End go to the start / the end, L turns the loop on and off.
 - After an intro or a break, a count-in shows when the voice comes back.
 - The bars can move an octave up or down if the song sits outside your range.
