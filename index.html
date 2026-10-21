@@ -2605,7 +2605,7 @@ const paintVideoBtn = () => $("#pVideoBtn").replaceChildren(icon(showVideo ? "vi
 function syncVideo() {
   const v = $("#pVideo");
   if ($("#pVideoBox").hidden || !v.getAttribute("src") || v.readyState < 1 || v.seeking) return;
-  const pos = songPos(), past = pos >= v.duration - 0.05;
+  const pos = heardPos(), past = pos >= v.duration - 0.05; // the picture with the sound as heard
   if (v.playbackRate !== P.rate) v.playbackRate = P.rate; // the picture's own clock is song time
   if (P.playing && !past) {
     if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); }
@@ -2623,6 +2623,21 @@ function songPos() { return P.playing ? Math.min(songDur(), P.offset + Math.max(
 // Practice's time: as songPos, but under 0 during a lead-in, so the bars come in and the count-in counts while it's heard;
 // paused, where Play will start from (its lead-in's start), so the count-in stands as it will begin, all its beats to go
 function stageTime() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt) * P.rate) : P.offset - leadAhead(); }
+// What's heard lags the audio clock: ac.currentTime is where the audio is being rendered, and the sound reaches the ears
+// later by the page's buffering (baseLatency), the sound system's (outputLatency: about 40-50 ms wired on Windows, more
+// over Bluetooth) and the limiter's look-ahead. Everything drawn (the bars, the playheads, the count-in, the times, the
+// video) follows what's heard; what's played and recorded keeps the audio clock. A start doesn't step the drawing back
+// first: it holds where it was shown (P.shownFrom, set by playSong) until what's heard gets there.
+function heardLag() { return ac ? Math.max(0, (ac.baseLatency || 0) + (ac.outputLatency || 0) + limitDelay) : 0; }
+function heardPos() { return P.playing ? Math.max(P.shownFrom ?? 0, songPos() - heardLag() * P.rate) : songPos(); }
+function heardStage() { return P.playing ? Math.max(P.shownFrom ?? -Infinity, stageTime() - heardLag() * P.rate) : stageTime(); }
+// Your voice is read later than it's sung: the mic's own latency, the pitch tracker's window (it hears the middle of its
+// last fftSize samples) and the median over the last few readings (about two frames). A reading stands for this long ago.
+let frameDt = 1 / 60; // s between frames, measured (loop)
+function micLag() {
+  const tk = micStream && micStream.getAudioTracks()[0], s = (tk && tk.getSettings && tk.getSettings()) || {};
+  return (+s.latency || 0.01) + (analyser ? (0.5 * analyser.fftSize) / ac.sampleRate : 0) + 2 * frameDt;
+}
 // The lead-in Play will start with, paused here: one a phrase jump set, or from the start, the first entry's count-in
 // where it begins before the song (a voice that comes straight in)
 function leadAhead() {
@@ -2669,6 +2684,7 @@ function playSong() {
   if (P.offset >= songDur() - 0.05) P.offset = 0;
   P.bus = ac.createGain(); P.bus.gain.value = stemVol; P.bus.connect(master);
   const at = ac.currentTime + 0.06 + (P.lead || 0) / P.rate; // after the lead-in, if a count-in comes before the song
+  P.shownFrom = P.offset - (P.lead || 0); // where the stage stands paused, held there until it's heard (heardStage)
   P.lead = 0; P.counted = null; // a count-in, if one comes with this start, says so after (countClicks)
   recEnd(at); // a key change swaps the sources without a pause: the take so far ends where the new ones start
   P.sources = [];
@@ -2720,7 +2736,7 @@ document.querySelectorAll(".pp").forEach((svg) => ppTo(svg, 0));
 function pauseSong() {
   if (!P.playing) return;
   recEnd(ac.currentTime);
-  P.offset = songPos(); P.playing = false;
+  P.offset = Math.max(0, heardPos()); P.playing = false; // where it was heard to: Play goes on from there, nothing skipped
   const now = ac.currentTime, bus = P.bus;
   P.sources.forEach((s) => { try { s.stop(now + FADE); } catch (e) {} }); // out over FADE, then stopped
   if (bus) { fadeOut(bus.gain, now); setTimeout(() => bus.disconnect(), 200); }
@@ -2813,7 +2829,7 @@ function drawWave() {
     const half = flag.offsetWidth / 2;
     flag.style.left = Math.max(half, Math.min(W - half, prog * W)) + "px"; // kept over the waveform
   }
-  $("#pTime").textContent = `${fmtTime(songPos())} / ${fmtTime(songDur())}`;
+  $("#pTime").textContent = `${fmtTime(heardPos())} / ${fmtTime(songDur())}`;
 }
 // A waveform's bars into canvas context x (cw × Hd device pixels, d of them per CSS px), each up to maxH CSS px: on whole
 // device pixels, 2 px wide and 1 px apart (at 1×), each the loudest of the peaks it covers, the ones before prog (0…1)
@@ -2891,10 +2907,10 @@ function clickPeaks() {
 const PH_W = 24, PH_CATCH = 10, PH_SNAP = 70; // the spring's natural frequency (rad/s); the catch's reach (px), longest time (ms)
 function playheadJump() {
   if (P.scrub || matchMedia("(prefers-reduced-motion: reduce)").matches) { P.ph = null; return; }
-  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: P.ph ? P.ph.v : 0, t: performance.now(), from: null, cap: null };
+  P.ph = { x: P.ph ? P.ph.x : songDur() ? heardPos() / songDur() : 0, v: P.ph ? P.ph.v : 0, t: performance.now(), from: null, cap: null };
 }
 function playheadShown(W) {
-  const to = songDur() ? songPos() / songDur() : 0, s = P.ph;
+  const to = songDur() ? heardPos() / songDur() : 0, s = P.ph;
   if (!s || P.scrub) { P.ph = null; return to; }
   const now = performance.now();
   if (now - s.t > 250) { P.ph = null; return to; } // a jump made where the waveform wasn't drawn (Practice): nothing to show
@@ -4383,16 +4399,18 @@ function tsWave() {
   if (cv.width !== Math.round(r.width * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); }
   const x = cv.getContext("2d"); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
   if (!P.peaks) { x.fillStyle = C.muted; x.globalAlpha = 0.3; x.fillRect(0, cv.height / 2, cv.width, d); x.globalAlpha = 1; return; }
-  const prog = (songDur() ? tsPos() / songDur() : 0);
+  const prog = (songDur() ? tsHeard() / songDur() : 0);
   x.fillStyle = C.ink; waveBars(x, cv.width, cv.height, d, P.peaks, r.height - 8, prog, 0.75, 0.3, 1e9); // risen already
 }
 function tsPos() { return TS.playing ? Math.min(songDur(), TS.pos + Math.max(0, ac.currentTime - TS.at) * tsSpeed()) : TS.pos; }
+// …as heard (heardLag): where the playhead and the lit waveform are drawn
+function tsHeard() { return TS.playing ? Math.min(songDur(), TS.pos + Math.max(0, ac.currentTime - heardLag() - TS.at) * tsSpeed()) : TS.pos; }
 // Each frame on the page: the playhead, the time, the band's waveform lit to there; the song's end stops it.
 function tsPaint() {
-  const pos = tsPos(), dur = songDur() || 1, tl = $("#tsTl"), w = tl.clientWidth - 24;
+  const pos = tsHeard(), dur = songDur() || 1, tl = $("#tsTl"), w = tl.clientWidth - 24;
   $("#tsLine").style.left = 12 + (pos / dur) * w + "px";
   $("#tsTime").textContent = `${fmtTime(pos)} / ${fmtTime(songDur())}`;
-  if (TS.playing && pos >= songDur() - 0.02) { tsStop(); TS.pos = 0; }
+  if (TS.playing && tsPos() >= songDur() - 0.02) { tsStop(); TS.pos = 0; }
   if (TS.playing) tsWave();
 }
 requestAnimationFrame(function tsLoop() { if (view === "stems" && stemsPage === "takes") tsPaint(); requestAnimationFrame(tsLoop); });
@@ -4568,7 +4586,7 @@ function takeWaveAt(t) {
   const p = T.play;
   if (p && p.id === t.id) {
     if (!p.srcs) return { f: p.pos / t.duration }; // still loading
-    return { f: Math.min(1, (p.pos + Math.max(0, ac.currentTime - p.at)) / t.duration) };
+    return { f: Math.min(1, (p.pos + Math.max(0, ac.currentTime - heardLag() - p.at)) / t.duration) }; // as heard
   }
   return T.at && T.at.id === t.id ? { f: T.at.pos / t.duration, paused: true } : null;
 }
@@ -4907,7 +4925,11 @@ function reading(m) {
   leap.ms.push(m); while (leap.ms.length > 5) leap.ms.shift();
   if (now - leap.at >= HOLD && leap.ms.length >= 3) { med = leap.ms; cur = middle(med); leap = null; }
 }
+let lastFrame = 0;
 function loop() {
+  const now = performance.now();
+  if (lastFrame && now - lastFrame < 100) frameDt += ((now - lastFrame) / 1000 - frameDt) * 0.1; // the screen's own pace
+  lastFrame = now;
   let m = null;
   if (ac && (micOn || testOsc)) {
     if (testOsc) {
@@ -4931,19 +4953,20 @@ function loop() {
 function practiceFrame() {
   if (T.play && T.play.srcs) { takeFrame(T.play); return; }
   const sn = phraseTick(stageTime()), last = K.hist[K.hist.length - 1];
-  recTick(sn);
-  if (last && sn < last.t - 0.25) K.hist = []; // jumped back
-  if (P.playing) K.hist.push({ t: sn, m: cur });
-  while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
+  recTick(sn); // the audio's own clock: loops and a take's end are scheduled on it
+  const heard = heardStage(); // what's being heard: the bars, the count-in and the readouts follow it
+  if (last && heard < last.t - 0.25) K.hist = []; // jumped back
+  if (P.playing) K.hist.push({ t: heard - micLag() * P.rate, m: cur }); // where in the song you sang what's read now
+  while (K.hist.length && K.hist[0].t < heard - 6) K.hist.shift();
   songView();
-  draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: P.key });
-  setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
-  renderHud(sn, cur); renderCountIn(sn); renderLyric();
+  draw(heard, cur, K.hist, K.evs, { pts: K.contour, shift: P.key });
+  setText("kTime", `${fmtTime(Math.max(0, heard))} / ${fmtTime(songDur())}`);
+  renderHud(heard, cur); renderCountIn(heard); renderLyric();
 }
 // While a take plays, the stage follows it: the bars in the key and octave it was sung in, where it is in the song, and
 // the line you sang, drawn as it goes, the dot where it is now (compared too: the original is in the other ear).
 function takeFrame(tp) {
-  const tk = tp.take, sp = tk.speed || 1, gone = tp.pos + Math.max(0, ac.currentTime - tp.at);
+  const tk = tp.take, sp = tk.speed || 1, gone = tp.pos + Math.max(0, ac.currentTime - heardLag() - tp.at); // as heard
   const now = tk.start + gone * sp, sh = (tk.oct || 0) * 12 + (tk.key || 0);
   if (!tp.evs) tp.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const hist = [];
