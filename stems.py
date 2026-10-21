@@ -497,8 +497,12 @@ def _look_up(song_id: str):
         with contextlib.suppress(OSError, ValueError, TypeError, KeyError):
             s = _load_json(os.path.join(folder, "lyrics.json")).get("source") or {}
             hint = f"{s['artist']} {s['track']}" if s.get("artist") else ""
+    # a title that's the song's name alone: whose channel it's on may say whose song it is
+    channel = meta.get("channel") or ""
+    if from_link and not cover and not hint and not lyrics.split_title(own)[0] and not channel:
+        channel = _channel(meta["source"])
     try:
-        record = covers.online(own, dur, hint, cover=cover)
+        record = covers.online(own, dur, hint, cover=cover, channel="" if cover else channel)
     except RuntimeError as e:
         failed = e
     if record and not name:
@@ -509,7 +513,7 @@ def _look_up(song_id: str):
         before = lyrics.split_title(own)[0]
         singer = covers.cover_by(own) or (before if before and not lyrics._words(before) & lyrics._words(record["artist"] if record else "") else "")
         if not singer and from_link:
-            singer = meta.get("channel") or _channel(meta["source"])
+            singer = channel or _channel(meta["source"])
         name = (f"{song} (Cover)", singer)
     if not art and record and not (cover and from_link):
         with contextlib.suppress(RuntimeError):
@@ -530,6 +534,8 @@ def _look_up(song_id: str):
             return  # deleted meanwhile
         meta = _load_json(path)
         meta.update(sourceTitle=own, artist=name[1][:TITLE_MAX], cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
+        if channel and not meta.get("channel"):
+            meta["channel"] = channel
         if not meta.get("named"):
             meta["title"] = name[0][:TITLE_MAX]
         _write_json(path, meta, ensure_ascii=False)
@@ -865,7 +871,7 @@ def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, 
     return lyrics.aligned(r), round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
 
 
-def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tuple[float, float], how: dict | None = None) -> dict:
+def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tuple[float, float], how: dict | None = None, hint: str = "") -> dict:
     """lyrics.json for a song: found on LRCLIB by its title (the first of three likely entries that turns out to be
     sung in it), or how={"id": n}, that LRCLIB entry, or how={"text": …}, lyrics pasted in; those two are kept however
     well they match. voice: the lead vocal, mono at 16 kHz. Uses the GPU: the caller holds _work_lock."""
@@ -883,7 +889,7 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
         found = [entry | {"site": "lrclib"}]
     else:
         _stage(job, "Finding the lyrics", lo)
-        found = [e | {"site": "lrclib"} for e in lyrics.candidates(title, duration)]
+        found = [e | {"site": "lrclib"} for e in lyrics.candidates(title, duration, hint=hint)]
         if not found:
             return {"lines": None, "at": time.time()}
     with _whisper(job, (lo, mid)) as model:
@@ -946,10 +952,13 @@ def start_lyrics(song_id: str, how) -> str:
         raise ValueError("This song's lyrics are being lined up already. Try again in a moment.")
 
     def work(job):
+        import covers
         _set(job, status="running", stage="Finding the lyrics", progress=0.02)
         voice = _voice16k(folder)
         with _turn(job):  # one model on the GPU at a time
-            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.98), how)
+            # whose song it was found to be (not a cover's: that's named for whoever sings it)
+            named = f"{meta['artist']} {meta['title']}" if meta.get("artist") and not covers.is_cover(meta["title"]) else ""
+            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.98), how, named)
         if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
             _write_json(os.path.join(folder, "lyrics.json"), data, ensure_ascii=False)
 

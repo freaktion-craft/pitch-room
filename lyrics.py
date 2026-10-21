@@ -86,12 +86,13 @@ def _words(s: str) -> set[str]:
     return set(re.findall(r"\w+", unicodedata.normalize("NFKC", s).casefold()))
 
 
-def candidates(title: str, duration: float, most: int = 3) -> list[dict]:
+def candidates(title: str, duration: float, most: int = 3, hint: str = "") -> list[dict]:
     """LRCLIB entries that could be the song, at most `most`, likeliest first: about as long as it (within 10 s or 8 %,
     since a video can run longer than the record), sharing the most words with its title, synced ones first, then the
-    closest in length. A length can match by chance, so which one it is gets settled by hearing it (stems.py)."""
-    seen, found, tw, failed = set(), [], _words(title), None
-    for q in queries(title):
+    closest in length. A length can match by chance, so which one it is gets settled by hearing it (stems.py). hint:
+    "artist track" when the song's record is known (searched first: a title can be the song's name alone)."""
+    seen, found, tw, failed = set(), [], _words(f"{title} {hint}"), None
+    for q in dict.fromkeys(([hint] if hint else []) + queries(title)):
         try:
             results = search(q)
         except RuntimeError as e:  # LRCLIB busy or out of reach: the other searches may still get through
