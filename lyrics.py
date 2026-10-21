@@ -46,6 +46,19 @@ FEAT = re.compile(r"(?i)\b(feat|ft)\b\.?.*?(?=\s-\s|$)")
 CUT = re.compile(r"[|ㅣᅵ]|\s/\s")  # where a channel's own tags start: a bar (or the Korean ㅣ used as one), " / "
 
 
+def _clean(s: str) -> str:
+    return " ".join(NOISE.sub(" ", FEAT.sub(" ", re.sub(r"[\"“”‘’'`]", "", s))).split())
+
+
+def split_title(title: str) -> tuple[str, str]:
+    """A video's title as (artist, song), for a song found nowhere: "Giwon (기원) - 신호는 잘 지켜 (signs) [가사]" gives
+    ("Giwon", "신호는 잘 지켜"). Without " - " it's all song."""
+    t = CUT.split(unicodedata.normalize("NFKC", title))[0]
+    t = re.sub(r"\[[^\]]*\]|【[^】]*】|\([^)]*\)", " ", t)
+    artist, _, song = t.partition(" - ") if " - " in t else ("", "", t)
+    return _clean(artist), _clean(song)
+
+
 def queries(title: str) -> list[str]:
     """Searches to try for a video's title, most specific first: "Giwon (기원) - 신호는 잘 지켜 (signs) [가사]" gives
     "Giwon 신호는 잘 지켜", "신호는 잘 지켜", then the other names in brackets ("Giwon signs", "signs", …). What's after
@@ -53,7 +66,7 @@ def queries(title: str) -> list[str]:
     t = CUT.split(unicodedata.normalize("NFKC", title))[0]
     alts = [a.strip() for a in re.findall(r"\(([^)]*)\)|\[([^\]]*)\]|【([^】]*)】", t) for a in a if a.strip() and not TAG.search(a)]
     t = re.sub(r"\[[^\]]*\]|【[^】]*】|\([^)]*\)", " ", t)
-    clean = lambda s: " ".join(NOISE.sub(" ", FEAT.sub(" ", re.sub(r"[\"“”‘’'`]", "", s))).split())  # noqa: E731
+    clean = _clean
     artist, _, song = t.partition(" - ") if " - " in t else ("", "", t)
     artist, song = clean(artist), clean(song)
     alts = [a for a in map(clean, alts) if a and not FEAT.match(a)]

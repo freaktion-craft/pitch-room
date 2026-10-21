@@ -410,85 +410,129 @@ def library() -> list[dict]:
             if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
                 _backfilled.add(d)
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
-            if _cover_wanted(meta):
-                _want_cover(d)
+            if _lookup_wanted(meta):
+                _want_lookup(d)
             out.append(meta)
     return sorted(out, key=lambda m: m.get("created", 0), reverse=True)
 
 
-# meta.json's "cover": {"from": "file", "itunes", "deezer" or "youtube", "at", "px"} once cover.jpg is saved (covers.py),
-# None when there's none to be had, absent until it's been looked for. Looked for one song at a time, in the background:
-# as a song is added, and for the songs added before covers were (or while offline, or saved smaller than covers.SIZE)
-# as the library is listed.
-_cover_line: list[str] = []
-_cover_asked: set[str] = set()
-_cover_lock = threading.Lock()
+# What a song is (covers.py), looked up one song at a time in the background: as it's added, and for the songs added
+# before (or while offline, or with a cover saved smaller than covers.SIZE) as the library is listed. In meta.json:
+#   title        the record's title (or "… (Cover)"), once found; unless the song was renamed ("named")
+#   artist       the record's artist, or a cover's singer; "" when not known; absent until looked up
+#   sourceTitle  the video's or file's own title, which lyrics and covers are looked for by
+#   cover        {"from": "file", "itunes", "deezer" or "youtube", "at", "px"} once cover.jpg is saved, None when
+#                there's none to be had
+_lookup_line: list[str] = []
+_lookup_asked: set[str] = set()
+_lookup_lock = threading.Lock()
 
 
-def _cover_wanted(meta: dict) -> bool:
+def _lookup_wanted(meta: dict) -> bool:
     import covers
     c = meta.get("cover", False)
-    return c is not None and (not c or c.get("px", 0) < covers.SIZE)
+    return "artist" not in meta or (c is not None and (not c or c.get("px", 0) < covers.SIZE))
 
 
-def _want_cover(song_id: str):
-    with _cover_lock:
-        if song_id in _cover_asked:
+def _want_lookup(song_id: str):
+    with _lookup_lock:
+        if song_id in _lookup_asked:
             return
-        _cover_asked.add(song_id)
-        _cover_line.append(song_id)
-        if len(_cover_line) == 1:
-            threading.Thread(target=_cover_worker, daemon=True).start()
+        _lookup_asked.add(song_id)
+        _lookup_line.append(song_id)
+        if len(_lookup_line) == 1:
+            threading.Thread(target=_lookup_worker, daemon=True).start()
 
 
-def _cover_worker():
+def _lookup_worker():
     while True:
-        with _cover_lock:
-            if not _cover_line:
+        with _lookup_lock:
+            if not _lookup_line:
                 return
-            song_id = _cover_line[0]
+            song_id = _lookup_line[0]
         try:
-            _find_cover(song_id)
-        except Exception as e:  # noqa: BLE001  (the song works without one; it's looked for again next time)
-            print(f"No cover for library/{song_id}: {e}", file=sys.stderr)
-        with _cover_lock:
-            _cover_line.pop(0)
-            if not _cover_line:
+            _look_up(song_id)
+        except Exception as e:  # noqa: BLE001  (the song works without; it's looked up again next time)
+            print(f"Couldn't look up library/{song_id}: {e}", file=sys.stderr)
+        with _lookup_lock:
+            _lookup_line.pop(0)
+            if not _lookup_line:
                 return
         time.sleep(1)  # the sites ask for a few searches a second at most
 
 
-def _find_cover(song_id: str):
+def _channel(url: str) -> str:
+    """Who put a video up (its channel), asked of YouTube; "" if it can't be had."""
+    import yt_dlp
+    os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}) as ydl:
+            info = ydl.extract_info(url, download=False, process=False)
+    except Exception:  # noqa: BLE001
+        return ""
+    return info.get("channel") or info.get("uploader") or ""
+
+
+def _look_up(song_id: str):
     import covers
+    import lyrics
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
-    if not _cover_wanted(meta):
+    if not _lookup_wanted(meta):
         return
-    out, got = os.path.join(folder, "cover.jpg"), None
+    own, dur = meta.get("sourceTitle") or meta["title"], float(meta["duration"])
+    out, art, name, record, failed = os.path.join(folder, "cover.jpg"), None, None, None, None
     src = _saved(folder, "source")
-    from_link = re.match(r"^https?://", meta.get("source") or "")
-    if src and not from_link and (i := covers.attached(ffmpeg_exe(), os.path.join(folder, src))) is not None:
-        got = "file" if covers.save(ffmpeg_exe(), os.path.join(folder, src), out, stream=i) else None
-    failed = None
-    if not got:
-        hint = ""
-        with contextlib.suppress(OSError, ValueError, TypeError):
+    from_link = bool(re.match(r"^https?://", meta.get("source") or ""))
+    cover = covers.is_cover(own)
+    if src and not from_link:  # an uploaded file: its own name and picture, if it has them
+        path = os.path.join(folder, src)
+        if (t := covers.tags(ffmpeg_exe(), path)).get("title"):
+            name = (t["title"], t.get("artist", ""))
+        if (i := covers.attached(ffmpeg_exe(), path)) is not None and covers.save(ffmpeg_exe(), path, out, stream=i):
+            art = "file"
+    tagged = bool(name)  # a file's own tags name it as it is, a cover or not
+    hint = f"{name[1]} {name[0]}" if name else ""
+    if not hint:
+        with contextlib.suppress(OSError, ValueError, TypeError, KeyError):
             s = _load_json(os.path.join(folder, "lyrics.json")).get("source") or {}
             hint = f"{s['artist']} {s['track']}" if s.get("artist") else ""
-        try:
-            found = covers.online(meta["title"], float(meta["duration"]), hint)
-            if found and (data := covers.fetch(found[0])) and covers.save(ffmpeg_exe(), data, out):
-                got = found[1]
-        except RuntimeError as e:
-            failed = e
-    if not got and from_link and (url := covers.youtube(meta["source"])):
+    try:
+        record = covers.online(own, dur, hint, cover=cover)
+    except RuntimeError as e:
+        failed = e
+    if record and not name:
+        name = (record["track"], record["artist"])
+    if cover and not tagged:  # the song it covers, sung by: whoever the title says, or the artist before " - " if
+        # that isn't the record's, or the channel
+        song = name[0] if name else lyrics.split_title(covers.COVER.sub(" ", covers.COVER_BY.sub(" ", own)))[1] or own
+        before = lyrics.split_title(own)[0]
+        singer = covers.cover_by(own) or (before if before and not lyrics._words(before) & lyrics._words(record["artist"] if record else "") else "")
+        if not singer and from_link:
+            singer = meta.get("channel") or _channel(meta["source"])
+        name = (f"{song} (Cover)", singer)
+    if not art and record and not (cover and from_link):
+        with contextlib.suppress(RuntimeError):
+            if (data := covers.fetch(record["art"])) and covers.save(ffmpeg_exe(), data, out):
+                art = record["site"]
+    if not art and from_link and (url := covers.youtube(meta["source"])):
         with contextlib.suppress(RuntimeError):
             if (data := covers.fetch(url)) and covers.save(ffmpeg_exe(), data, out, letterboxed=True):
-                got = "youtube"
-    if not got and failed:
-        raise failed  # couldn't ask: left to look for again
-    if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
-        _update_meta(folder, cover={"from": got, "at": round(time.time()), "px": covers.SIZE} if got else None)
+                art = "youtube"
+    if failed and not record:
+        raise failed  # couldn't ask: left to look up again
+    if not name:
+        artist, song = lyrics.split_title(own)
+        name = (song or own, artist)
+    with _meta_lock:  # read again: renamed meanwhile, the new name stays
+        path = os.path.join(folder, "meta.json")
+        if not os.path.isfile(path):
+            return  # deleted meanwhile
+        meta = _load_json(path)
+        meta.update(sourceTitle=own, artist=name[1][:TITLE_MAX], cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
+        if not meta.get("named"):
+            meta["title"] = name[0][:TITLE_MAX]
+        _write_json(path, meta, ensure_ascii=False)
 
 
 def delete_song(song_id: str):
@@ -507,7 +551,7 @@ def rename_song(song_id: str, title) -> str:
     title = " ".join(title.split())[:TITLE_MAX].rstrip()
     if not title:
         raise ValueError("A song needs a title.")
-    _update_meta(folder, title=title)
+    _update_meta(folder, title=title, named=True)  # not named again by what it's found to be
     return title
 
 
@@ -572,7 +616,7 @@ def _saved(folder: str, name: str) -> str | None:
     return next((f for f in os.listdir(folder) if f.startswith(name + ".") and not f.endswith((".part", ".ytdl"))), None)
 
 
-def _download(job, url: str, folder: str) -> tuple[str, str]:
+def _download(job, url: str, folder: str) -> tuple[str, str, str]:
     try:
         with _ytdl(job, folder, "source", "bestaudio/best", 0.02, 0.12) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -582,7 +626,7 @@ def _download(job, url: str, folder: str) -> tuple[str, str]:
     name = _saved(folder, "source")
     if not name:
         raise ValueError("The download finished but no audio file was saved.")
-    return os.path.join(folder, name), info.get("title") or "YouTube audio"
+    return os.path.join(folder, name), info.get("title") or "YouTube audio", info.get("channel") or info.get("uploader") or ""
 
 
 # The picture only, to follow lyrics while singing: the stems play the sound. Up to 720p, H.264 MP4 when there is one
@@ -691,9 +735,9 @@ def _pipeline(job, src: dict, model_name: str):
         _set(job, status="queued", stage="Waiting for the previous song to finish")
         with _turn(job):
             _set(job, status="running", stage="Getting the audio", progress=0.02)
-            video = None
+            video, channel = None, ""
             if src["kind"] == "url":
-                path, title = _download(job, src["url"], folder)
+                path, title, channel = _download(job, src["url"], folder)
                 source = src["url"]
                 _stage(job, "Getting the video", 0.12)
                 try:
@@ -744,12 +788,14 @@ def _pipeline(job, src: dict, model_name: str):
             _check(job)  # the last chance: once meta.json is written the song is in the library
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
                     "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
+            if channel:
+                meta["channel"] = channel  # who put the video up: a cover's singer, often
             _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
             _set(job, songId=song_id)
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
-    _want_cover(song_id)
+    _want_lookup(song_id)
 
 
 # ---------- lyrics ----------
@@ -903,7 +949,7 @@ def start_lyrics(song_id: str, how) -> str:
         _set(job, status="running", stage="Finding the lyrics", progress=0.02)
         voice = _voice16k(folder)
         with _turn(job):  # one model on the GPU at a time
-            data = _song_lyrics(job, meta["title"], float(meta["duration"]), voice, (0.05, 0.98), how)
+            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.98), how)
         if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
             _write_json(os.path.join(folder, "lyrics.json"), data, ensure_ascii=False)
 

@@ -514,15 +514,32 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* the album art (covers.py), as tall as the title and its details beside it: a square the row has from the start, so
    nothing moves when the picture comes in (fading); a quiet tile until then, or for good when there's none. A hairline
    inside, for a white cover on the white list. */
-#sLib .cover { position: relative; flex: none; align-self: flex-start; width: 48px; height: 48px; margin-right: -4px; border-radius: 6px; overflow: hidden; background: rgba(var(--fg), 0.06); }
+/* The list is a table: the cover, the title over the artist, tempo, key, the day added, length, ⋮. Under 640 px wide
+   only the length stays beside the title. */
+#sLib { container-type: inline-size; }
+#sLib .row, #sLib .lib-head { display: grid; grid-template-columns: 48px minmax(0, 1fr) 40px 96px 88px 40px 32px; column-gap: 16px; align-items: center; }
+#sLib .lib-head { height: 40px; padding: 0 16px; border-bottom: 1px solid var(--line); color: var(--faint); font-size: 12px; }
+#sLib .lib-head span:first-child { grid-column: 1 / 3; }
+#sLib .num { text-align: right; font-variant-numeric: tabular-nums; }
+#sLib .row > .c { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sLib .song a, #sLib .song b { display: block; min-width: 0; }
+#sLib .song b { line-height: 24px; } #sLib .song small { line-height: 20px; }
+#sLib .song b, #sLib .song small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sLib .song small:empty { display: none; } /* no artist known: the title alone, in the middle */
+@container (max-width: 640px) {
+  #sLib .row, #sLib .lib-head { grid-template-columns: 48px minmax(0, 1fr) 40px 32px; }
+  #sLib .wide { display: none; }
+}
+#sLib .cover { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden; background: rgba(var(--fg), 0.06); }
 #sLib .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(var(--fg), 0.08); }
 #sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
 #sLib .cover img.in { opacity: 1; }
 #sLib .cover[role="button"] { cursor: zoom-in; }
 #sLib .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-/* A cover, pressed: it flies up from the list to the middle of the page (.cv-fly), where it tilts toward the pointer
-   like a card held in the hand (.cv-card), a light gleaming off it where the pointer is and a sheen sliding across as
-   it turns. A click, a tap or Esc puts it back. */
+/* A cover, pressed: it flies up from the list to the middle of the page (.cv-fly) and faces you there. As the pointer
+   comes near it leans a little (.cv-card), pressed where the pointer is, like a card held in the hand; a light from
+   the upper left gleams off it where the tilt puts the light's reflection, and a sheen slides across as it turns. A
+   click, a tap or Esc puts it back. */
 #coverView { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; perspective: 1200px; cursor: zoom-out;
   background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); outline: none; }
 #coverView[hidden] { display: none; }
@@ -530,11 +547,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 .cv-card { position: relative; width: 100%; height: 100%; border-radius: 12px; overflow: hidden; touch-action: none;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06); will-change: transform; }
 .cv-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.cv-card i { position: absolute; inset: 0; pointer-events: none; opacity: var(--glow, 0); }
-.cv-card .cv-light { background: radial-gradient(circle at var(--lx, 50%) var(--ly, 50%), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.15) 30%, rgba(255, 255, 255, 0) 60%); mix-blend-mode: overlay; }
+.cv-card i { position: absolute; inset: 0; pointer-events: none; opacity: var(--glow, 0.5); }
+.cv-card .cv-light { background: radial-gradient(circle at var(--lx, 38%) var(--ly, 30%), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.15) 30%, rgba(255, 255, 255, 0) 60%); mix-blend-mode: overlay; }
 .cv-card .cv-sheen { background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.3) 48%, rgba(255, 255, 255, 0.08) 54%, transparent 65%) var(--sx, 50%) 0 / 300% 100% no-repeat;
   mix-blend-mode: overlay; }
-#sLib .song { flex: 1 1 0; }
 .song { display: grid; gap: 4px; min-width: 0; }
 .song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .song small { color: var(--faint); font-size: 12.5px; }
@@ -1534,12 +1550,17 @@ async function renderLibrary() {
     a.append(plus, text); box.append(a);
   }
   if (!lib.length) return;
+  const head = el("div", "lib-head");
+  head.setAttribute("aria-hidden", "true"); // the cells say what they are to a screen reader (libLine)
+  for (const [t, c] of [["Title"], ["BPM", "num wide"], ["Key", "wide"], ["Added", "wide"], ["Length", "num"], [""]]) head.append(el("span", c || null, t && tr(t)));
+  box.append(head);
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     row.dataset.id = m.id;
-    link.href = "#stems/" + m.id; link.append(el("b", null, m.title));
-    info.append(link, el("small", null, libLine(m)));
-    keyOf(m).then(() => { info.querySelector("small").textContent = libLine(m); });
+    link.href = "#stems/" + m.id; link.title = m.title; link.setAttribute("aria-label", libLine(m)); link.append(el("b", null, m.title));
+    info.append(link, el("small", null, m.artist || ""));
+    const key = el("span", "c wide", keyName(m.key));
+    keyOf(m).then(() => { key.textContent = keyName(m.key); link.setAttribute("aria-label", libLine(m)); });
     // a click that starts while the title is being renamed (in its field, or beside it to finish) doesn't open the song
     row.onpointerdown = () => { row.dataset.renaming = row.querySelector(".rename") ? "1" : ""; };
     row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
@@ -1547,7 +1568,10 @@ async function renderLibrary() {
     const more = mkBtn("", () => songMenu(more, m));
     more.classList.add("icon"); more.title = tr("More"); more.setAttribute("aria-label", tr("More for {title}", { title: m.title }));
     more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false"); more.append(icon("more"));
-    acts.append(more); row.append(coverTile(m), info, acts); box.append(row);
+    acts.append(more);
+    row.append(coverTile(m), info, el("span", "c num wide", m.bpm ? String(Math.round(m.bpm)) : "–"), key,
+      el("span", "c wide", dayOf(m.created)), el("span", "c num", fmtTime(m.duration)), acts);
+    box.append(row);
   });
   awaitCovers(lib);
 }
@@ -1570,10 +1594,12 @@ function paintCover(tile, m) {
   tile.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); showCover(tile); } };
 }
 // ---------- a cover, up close ----------
-// It flies from its tile to the middle (the tile's picture stays put, hidden, the big one standing in for it), then
-// leans toward the pointer: up to TILT degrees at the card's edges, easing there, with the light where the pointer is.
-const TILT = 14;
-const CV = { tile: null, x: 0, y: 0, tx: 0, ty: 0, glow: 0, tglow: 0, lx: 50, ly: 50, raf: 0, closing: false };
+// It flies from its tile to the middle (the tile's picture stays put, hidden, the big one standing in for it), facing
+// you. With the pointer over it, it leans up to TILT degrees, pressed where the pointer is; coming near, a little,
+// nothing from further than NEAR (a share of its half-width) beyond its edge. The light: one from the upper left, its
+// reflection where the card's tilt sends it (opposite to the way it turns, as in a mirror), brighter the more it leans.
+const TILT = 8, NEAR = 0.5;
+const CV = { tile: null, x: 0, y: 0, tx: 0, ty: 0, raf: 0, closing: false };
 const stillMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 // the transform that puts the big cover over the tile: the step between them, as a FLIP animation's first frame
 function overTile(tile, fly) {
@@ -1584,8 +1610,8 @@ function showCover(tile) {
   if (CV.tile) return;
   const view = $("#coverView"), fly = view.querySelector(".cv-fly"), card = view.querySelector(".cv-card");
   card.querySelector("img").src = tile.querySelector("img").src;
-  CV.tile = tile; CV.closing = false; CV.x = CV.y = CV.tx = CV.ty = CV.glow = CV.tglow = 0;
-  card.style.transform = ""; card.style.setProperty("--glow", "0");
+  CV.tile = tile; CV.closing = false; CV.x = CV.y = CV.tx = CV.ty = 0;
+  card.style.transform = ""; ["--glow", "--lx", "--ly", "--sx"].forEach((v) => card.style.removeProperty(v));
   view.hidden = false; view.focus({ preventScroll: true });
   tile.style.visibility = "hidden";
   const from = overTile(tile, fly), ms = stillMotion() ? 0 : 420, ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -1597,7 +1623,7 @@ function showCover(tile) {
 async function hideCover() {
   const tile = CV.tile;
   if (!tile || CV.closing) return;
-  CV.closing = true; CV.tx = CV.ty = CV.tglow = 0;
+  CV.closing = true; CV.tx = CV.ty = 0;
   const view = $("#coverView"), fly = view.querySelector(".cv-fly"), card = view.querySelector(".cv-card");
   const to = overTile(tile, fly), ms = stillMotion() ? 0 : 340, ease = "cubic-bezier(0.4, 0, 0.2, 1)";
   card.animate([{ transform: card.style.transform || "none" }, { transform: "none" }], { duration: ms * 0.6, easing: ease, fill: "forwards" });
@@ -1612,12 +1638,13 @@ async function hideCover() {
   if (document.activeElement === view || document.activeElement === document.body) tile.focus({ preventScroll: true });
 }
 function tiltTick() {
-  const card = $("#coverView .cv-card"), k = 0.12;
-  CV.x += (CV.tx - CV.x) * k; CV.y += (CV.ty - CV.y) * k; CV.glow += (CV.tglow - CV.glow) * 0.1;
+  const card = $("#coverView .cv-card"), k = 0.1;
+  CV.x += (CV.tx - CV.x) * k; CV.y += (CV.ty - CV.y) * k;
+  // x: how far it's turned to face right (its right edge going back), y: to face down (its bottom going back)
   if (!CV.closing) card.style.transform = `rotateX(${(-CV.y * TILT).toFixed(2)}deg) rotateY(${(CV.x * TILT).toFixed(2)}deg)`;
-  card.style.setProperty("--glow", CV.glow.toFixed(3));
-  card.style.setProperty("--lx", CV.lx.toFixed(1) + "%"); card.style.setProperty("--ly", CV.ly.toFixed(1) + "%");
+  card.style.setProperty("--lx", (38 - CV.x * 40).toFixed(1) + "%"); card.style.setProperty("--ly", (30 - CV.y * 40).toFixed(1) + "%");
   card.style.setProperty("--sx", (50 - CV.x * 40).toFixed(1) + "%");
+  card.style.setProperty("--glow", (0.5 + 0.5 * Math.min(1, Math.hypot(CV.x, CV.y))).toFixed(3));
   CV.raf = requestAnimationFrame(tiltTick);
 }
 function initCoverView() {
@@ -1625,13 +1652,11 @@ function initCoverView() {
   view.addEventListener("pointermove", (e) => {
     if (!CV.tile || CV.closing) return;
     const r = card.getBoundingClientRect(), clamp = (v) => Math.max(-1, Math.min(1, v));
-    CV.tx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2));
-    CV.ty = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2));
-    CV.lx = (CV.tx + 1) * 50; CV.ly = (CV.ty + 1) * 50;
-    const over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-    CV.tglow = over ? 1 : 0.35;
+    const u = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), v = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    const near = Math.max(0, Math.min(1, 1 - (Math.max(Math.abs(u), Math.abs(v)) - 1) / NEAR)); // 1 over it, 0 from NEAR out
+    CV.tx = clamp(u) * near; CV.ty = clamp(v) * near;
   });
-  view.addEventListener("pointerleave", () => { CV.tx = CV.ty = 0; CV.tglow = 0; });
+  view.addEventListener("pointerleave", () => { CV.tx = CV.ty = 0; });
   view.addEventListener("click", hideCover);
   view.addEventListener("wheel", (e) => e.preventDefault(), { passive: false }); // the list stays where it was under it
   document.addEventListener("keydown", (e) => {
@@ -1664,7 +1689,9 @@ const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A",
 const KEY_MINOR = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"];
 const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${tr(k.mode)}` : ""); // G♯ minor, G♯ 단조
 const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : tr("no steady beat"), keyName(m.key)].filter(Boolean);
-const libLine = (m) => songFacts(m).join(" · "); // how long, how fast, what key: what picking a song to sing goes by
+const libLine = (m) => [m.title, m.artist, ...songFacts(m)].filter(Boolean).join(" · "); // read out for a row
+// the day a song was added, as 2026-10-20 (the computer's own day)
+const dayOf = (t) => { const d = new Date(t * 1000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 // Songs added before keys were read get theirs from /info, which works it out once (about a second) and saves it.
 const keyJobs = new Map();
 function keyOf(m) {
@@ -1737,7 +1764,7 @@ function renameSong(row, m) {
     title.textContent = old;
     const small = row.querySelector(".song small"); // the error, for a moment, where the song's details are
     small.textContent = tr(j.error || "Couldn’t rename the song. Is the app still running?"); small.style.color = "var(--bad)";
-    setTimeout(() => { small.textContent = libLine(m); small.style.color = ""; }, 4000);
+    setTimeout(() => { small.textContent = m.artist || ""; small.style.color = ""; }, 4000);
   };
   f.oninput = () => { if (/[\r\n]/.test(f.value)) f.value = f.value.replace(/[\r\n]+/g, " "); mirror(); }; // a pasted line break
   f.onkeydown = (e) => {
@@ -4329,7 +4356,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Split a song into tracks and practice it phrase by phrase, with your pitch on screen.": "곡을 트랙별로 나누고, 화면에서 내 음정을 보며 한 소절씩 연습하세요.",
   "Library": "라이브러리", "Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",
   "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요. 트랙별로 나뉘어 바로 연습할 수 있어요.",
-  "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
+  "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
   "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
   "no steady beat": "일정한 박자 없음", "{n} tracks": "트랙 {n}개", "major": "장조", "minor": "단조",
   "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":
