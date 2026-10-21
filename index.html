@@ -725,6 +725,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* Record, beside Play: a dot in the red. Armed, the button takes a tint of the red and the dot fills in; while a take
    is being recorded the dot pulses, and the stage says "Recording" with the take's length. */
 .btn.rec { color: var(--bad); }
+/* Record, split: the icon records, the label beside it (with its chevron) picks how; one control, a hairline apart */
+.rec-split { display: inline-flex; gap: 1px; }
+.rec-split .btn.rec { border-radius: 8px 0 0 8px; }
+.rec-split .rec-mode { border-radius: 0 8px 8px 0; font-size: 13px; }
 .btn.rec .ico { width: 16px; height: 16px; }
 .btn.rec[aria-pressed="true"] { background: color-mix(in oklab, var(--bad) 22%, var(--surface-2)); }
 .btn.rec[aria-pressed="true"]:hover { background: color-mix(in oklab, var(--bad) 30%, var(--surface-2)); }
@@ -850,11 +854,9 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <output id="kTime">0:00 / 0:00</output>
         <label class="kfield">Guide vocal <input type="range" id="kGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume"></label>
         <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
-        <span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span>
-        <label class="kfield">Bars <button class="pick" id="kOct" type="button"></button></label>
-        <div class="keyctl" role="group" aria-label="Key"></div>
+        <div class="keyctl" role="group" aria-label="Key"><span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span></div>
       </div>
-      <div class="sb-end"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button></div>
+      <div class="sb-end"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div>
       <div class="phrase-row">
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
@@ -1266,8 +1268,7 @@ async function restartMic() {
 }
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
-let micPick = null, namesPick = null, octPick = null, langPick = null, countPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
-const octItems = () => [{ v: -1, t: tr("octave down") }, { v: 0, t: tr("as sung") }, { v: 1, t: tr("octave up") }];
+let micPick = null, namesPick = null, langPick = null, countPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
 // The click's beats per bar, in the Studio's click row. One dropdown, made once and moved into each new row (every
 // makePick adds its own list and listeners for good).
 let bpbPick = null;
@@ -2879,6 +2880,8 @@ function initTempo(box, after) {
     box.note = box.dataset.note ? $(box.dataset.note) : el("span", "knote"); // the Studio's goes under the title
     box.append(btn);
     initTempo(box, btn);
+    const clk = box.querySelector(":scope > .kfield"); // Practice's click, right after the tempo it follows
+    if (clk) box.append(clk);
     if (!box.dataset.note) box.append(box.note);
     box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n, P.rateWant), minWidth: 240, foot: keyFoot });
   }
@@ -3101,10 +3104,10 @@ function initStems() {
 // ---------- practice (singing a song from the library) ----------
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
-const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1, studio: null, span: null, resume: null,
+const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, hist: [], guideVol: 0.5, bandVol: 1, studio: null, span: null, resume: null,
   lyrics: null, lyricMsg: null, lyricKey: null, lyricRows: [] }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place
 function songEvs() {
-  const sh = K.oct * 12 + P.key; // the bars move with the octave picked and the key the song plays in
+  const sh = P.key; // the bars move with the key the song plays in
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const ms = K.notes.map((n) => n[2] + sh);
   K.lo = ms.length ? Math.min(...ms) : 57; K.hi = ms.length ? Math.max(...ms) : 69;
@@ -3428,7 +3431,7 @@ async function singSong(m, btn) {
     return;
   } finally { clearTimeout(slow); if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
   show(was);
-  K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.oct = 0; K.on = true; // bars as sung; "Bars" moves them an octave
+  K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.on = true;
   K.entries = songEntries(K.notes, m.beats, m.bpm);
   K.song = m; lyricsFor(m, lyr); setPhrases();
   songEvs(); songView(true);
@@ -3436,7 +3439,9 @@ async function singSong(m, btn) {
   K.studio = mixNow();
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
   renderTracks(); applyGains();
-  octPick.set(octItems(), K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
+  $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
+  if (recMode === "v2" && verses().length < 2) recMode = "phrase"; // this song has no second verse
+  recPick.set(recItems(), recMode);
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute)); $("#kClickVol").value = P.tracks.click.vol;
   $("#kClick").disabled = $("#kClickVol").disabled = !(m.beats && m.beats.length);
   await loadTakes(m); // in first, so Practice opens with its takes beside it, rather than them pushing in after
@@ -3487,13 +3492,11 @@ function songToggle() {
 }
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
 function initSing() {
-  octPick = makePick($("#kOct"), "Octave of the note bars", (v) => { K.oct = v; songEvs(); });
   countPick = makePick($("#kCount"), "Count-in", (v) => {
     S.countIn = v; save();
     if (K.song) { K.entries = songEntries(K.notes, K.song.beats, K.song.bpm); setPhrases(); } // the phrases start from their count-ins
   });
   countPick.set(countItems(), S.countIn);
-  octPick.set(octItems(), K.oct);
   $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
   $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== guideName() && n !== "click") t.vol = K.bandVol; applyGains(); };
   resetOnDblClick($("#kGuide"), 0.5); resetOnDblClick($("#kBand"), 1);
@@ -3571,7 +3574,7 @@ const REC_WORKLET = `registerProcessor("stem-rec", class extends AudioWorkletPro
 });`;
 // armed: Record is on; node: the recorder, once its worklet has loaded; cap: the take being recorded; closing: takes the
 // song has stopped for, whose last samples are still on their way (they come in the latency later)
-const R = { armed: false, node: null, ready: null, cap: null, closing: [] };
+const R = { armed: false, node: null, ready: null, cap: null, closing: [], sec: null }; // sec: a verse's or the song's take, {end}
 const TAKE_MIN = 2; // s: shorter takes aren't kept (a Play pressed by mistake), as on the server
 function recInit() {
   ensureCtx();
@@ -3609,7 +3612,7 @@ function recLatency() {
 function recBegin(at) {
   if (!R.armed || !R.node || !micOn || !K.on || view !== "practice" || !K.song || !P.song || K.song.id !== P.song.id) return;
   const lat = recLatency();
-  R.cap = { song: P.song.id, start: P.offset + (at - P.startAt) * P.rate, key: P.key, rate: P.rate, oct: K.oct, lat, from: Math.round((at + lat) * ac.sampleRate), to: null,
+  R.cap = { song: P.song.id, start: P.offset + (at - P.startAt) * P.rate, key: P.key, rate: P.rate, oct: 0, lat, from: Math.round((at + lat) * ac.sampleRate), to: null,
     parts: [], n: 0 };
   R.node.port.postMessage(true);
   paintRec();
@@ -3660,6 +3663,72 @@ function paintRec() {
   b.setAttribute("aria-pressed", String(R.armed)); b.classList.toggle("on", !!R.cap);
   b.title = tr(R.armed ? "Stop recording (R)" : "Record yourself as you sing (R)");
   paintTakesShown();
+}
+// How Record records (its label picks it, kept as "recMode"): phrase, a take for each phrase as the song plays (as it
+// always did, cut where one phrase gives way to the next); v1, v2, the first or second verse, from its count-in to its
+// end, as one take; all, the whole song from the start. A verse is the voice from one entry (the song's first, or one
+// after a break of 4 s or more) to the last note before the next. With lyrics, by its chorus instead (most songs sing
+// on through, with no such break): the longest run of two to eight lines that comes round again; a verse runs to the end
+// of a chorus, one that opens the song being the first verse's.
+const REC_MODES = { phrase: "Per phrase", v1: "Verse 1", v2: "Verse 2", all: "Whole song" };
+let recMode = REC_MODES[store.get("recMode", "phrase")] ? store.get("recMode", "phrase") : "phrase", recPick = null;
+function lyricVerses() {
+  const ls = K.lyrics;
+  if (!ls || ls.length < 6) return null;
+  const tx = ls.map((l) => folded(l.text).replace(/[^\p{L}\p{N}]/gu, "")), at = (i, L) => tx.slice(i, i + L).join("|");
+  let blk = null;
+  for (let L = Math.min(8, ls.length >> 1); L >= 2 && !blk; L--) {
+    for (let i = 0; i + L <= ls.length && !blk; i++) {
+      if (tx.slice(i, i + L).some((t) => !t)) continue;
+      for (let j = i + L; j + L <= ls.length; j++) if (at(j, L) === at(i, L)) { blk = { i, L }; break; }
+    }
+  }
+  if (!blk) return null;
+  const head = at(blk.i, 2), ends = [];
+  for (let j = 0; j + 1 < ls.length;) {
+    if (at(j, 2) !== head) { j++; continue; }
+    const e = Math.min(ls.length - 1, j + blk.L - 1);
+    if (j > 0) ends.push(e);
+    j = e + 1;
+  }
+  if (!ends.length) return null;
+  return [[0, ends[0]], ends[1] != null && [ends[0] + 1, ends[1]]].filter(Boolean).map(([a, b]) => ({ t0: ls[a].t0, t1: ls[b].t1 }));
+}
+function verses() {
+  const lv = lyricVerses();
+  if (lv) return lv.map((v) => ({ a: K.phrases.findIndex((p) => p.t1 > v.t0 + 0.05), b: K.phrases.findLastIndex((p) => p.t0 < v.t1 - 0.05) })).filter((v) => v.a >= 0 && v.b >= v.a);
+  return K.entries.map((e, i) => {
+    const next = K.entries[i + 1], end = next ? next.from : K.notes.length ? K.notes[K.notes.length - 1][1] : songDur();
+    const a = K.phrases.findIndex((p) => p.t1 > e.t), b = K.phrases.findLastIndex((p) => p.t0 < end);
+    return a < 0 || b < a ? null : { a, b };
+  }).filter(Boolean);
+}
+function recItems() {
+  const n = verses().length;
+  return Object.entries(REC_MODES).filter(([v]) => v !== "v2" || n > 1).map(([v, t]) => ({ v, t: tr(t) }));
+}
+// The icon (and R): per phrase, Record on and off as before; otherwise a take of the verse or the song, played from its
+// count-in and stopped at its end (rec.sec), or stopped early by pressing again.
+function recPress() {
+  if (recMode === "phrase" || R.armed) { if (R.armed) { if (R.sec) { R.sec = null; pauseSong(); } recOff(); } else setRec(true); return; }
+  const v = verses(), sec = recMode === "all" ? { a: 0, b: K.phrases.length - 1, all: true } : v[recMode === "v1" ? 0 : 1];
+  if (!sec) return;
+  setRec(true).then(() => {
+    if (!R.armed) return;
+    R.sec = { end: sec.all ? songDur() : K.phrases[sec.b].to };
+    if (P.playing) pauseSong();
+    if (sec.all) { K.cue = null; K.resume = null; seekWithin(0); } else phraseGo(sec.a);
+    songToggle();
+  });
+}
+// Each frame while recording: per phrase, a new take where the phrase changes; a verse's take ends with the verse.
+function recTick(sn) {
+  if (!R.cap || !P.playing) return;
+  if (R.sec) { if (sn >= R.sec.end - 0.02) { R.sec = null; pauseSong(); recOff(); } return; }
+  if (recMode !== "phrase") return;
+  const ph = phraseAt(sn);
+  if (R.cap.ph === undefined) R.cap.ph = ph;
+  else if (ph !== R.cap.ph && ph != null) { const at = ac.currentTime; recEnd(at); recBegin(at); if (R.cap) R.cap.ph = ph; }
 }
 
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
@@ -3951,7 +4020,9 @@ async function takeBand(n, s) {
 
 function initTakes() {
   $("#kRec").append(icon("record"));
-  $("#kRec").onclick = () => setRec(!R.armed);
+  $("#kRec").onclick = recPress;
+  recPick = makePick($("#kRecMode"), "How to record", (v) => { recMode = v; store.set("recMode", v); });
+  recPick.set(recItems(), recMode);
   $("#kLyr").onclick = () => { // again after a failure; not while a search runs
     const id = K.song && K.song.id, j = id && lyricJobs.get(id);
     if (!id || (j && !j.err)) return;
@@ -4098,7 +4169,7 @@ function draw(now, cur, hist, evs, guide) {
   // where there's no room below), on two lines if it runs into the next phrase's; how it's sung is yours to phrase.
   // Outlined in the stage's colour so the lines behind don't cut it; phrases sung already fade back.
   if (K.lyricRows.length) {
-    const sh = K.oct * 12 + P.key, LH = 20;
+    const sh = P.key, LH = 20;
     g.font = "500 14px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "top";
     g.lineJoin = "round"; g.lineWidth = 4; g.strokeStyle = C.surface; g.fillStyle = C.ink;
     let lo = null;
@@ -4234,11 +4305,12 @@ function loop() {
 function practiceFrame() {
   if (T.play && T.play.srcs) { takeFrame(T.play); return; }
   const sn = phraseTick(stageTime()), last = K.hist[K.hist.length - 1];
+  recTick(sn);
   if (last && sn < last.t - 0.25) K.hist = []; // jumped back
   if (P.playing) K.hist.push({ t: sn, m: cur });
   while (K.hist.length && K.hist[0].t < sn - 6) K.hist.shift();
   songView();
-  draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: K.oct * 12 + P.key });
+  draw(sn, cur, K.hist, K.evs, { pts: K.contour, shift: P.key });
   setText("kTime", `${fmtTime(sn)} / ${fmtTime(songDur())}`);
   renderHud(sn, cur); renderCountIn(sn); renderLyric();
 }
@@ -4296,7 +4368,7 @@ function renderHud(now, m) {
   const tgt = activeNote(now), tm = tgt ? Math.round(tgt.midi) : null;
   renderKeys(tm, m);
   const rec = R.cap ? tr("Recording {t}", { t: fmtTime(Math.max(0, songPos() - R.cap.start)) }) : tr("Practice");
-  setText("hudRep", `${rec} · ${tr(K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung")}`);
+  setText("hudRep", rec);
   $("#hudRep").classList.toggle("rec", !!R.cap);
 }
 function renderStart() { paintPlay($("#startBtn"), P.playing); }
@@ -4449,7 +4521,7 @@ document.addEventListener("keydown", (e) => {
   }
   if (view === "practice" && K.on) {
     if (e.repeat && e.code === "Space") { e.preventDefault(); return; }
-    const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: () => setRec(!R.armed),
+    const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
       Home: songStart, End: songEnd }[e.code];
     if (act) { e.preventDefault(); act(); }
   }
@@ -4498,7 +4570,8 @@ function setLang(v) {
   langPick.set(LANGS, lang);
   resay(); closeMenu();
   for (const p of picks) p.relabel();
-  octPick.set(octItems(), K.oct); countPick.set(countItems(), S.countIn); paintKey(); listMics();
+  countPick.set(countItems(), S.countIn); paintKey(); listMics();
+  if (K.song) recPick.set(recItems(), recMode);
   document.querySelectorAll('input[type="range"]').forEach((s) => { if (s.ondblclick) s.title = tr("Double-click to reset"); });
   renderMic(); paintRec(); paintPlay($("#pPlay"), P.playing); renderStart();
   if (P.song) { paintMeta(); renderTracks(); paintVideoBtn(); }
@@ -4668,7 +4741,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Original key": "원래 키", "original": "원래", "Higher": "높은 키", "Lower": "낮은 키", "Changing key… {pct}": "키 바꾸는 중… {pct}", "Originally {key}": "원래 {key}",
   "{n} or more semitones can sound processed.": "{n}반음 이상은 소리가 어색할 수 있어요.", "Couldn’t change the key.": "키를 바꾸지 못했어요.",
   // Practice
-  "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "Guide vocal": "가이드 보컬", "Guide vocal volume": "가이드 보컬 볼륨",
+  "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "How to record": "녹음 방식", "Per phrase": "소절마다", "Verse 1": "1절", "Verse 2": "2절", "Whole song": "전체", "Guide vocal": "가이드 보컬", "Guide vocal volume": "가이드 보컬 볼륨",
   "Band": "반주", "Band volume": "반주 볼륨", "Click on/off (follows the beat)": "메트로놈 켜기/끄기 (박자를 따라가요)", "Click volume": "메트로놈 볼륨",
   "Bars": "음정 바", "Octave of the note bars": "음정 바의 옥타브", "octave down": "한 옥타브 아래", "as sung": "부른 그대로", "octave up": "한 옥타브 위",
   "Previous phrase": "이전 소절", "Previous phrase (←)": "이전 소절 (←)", "Next phrase": "다음 소절", "Next phrase (→)": "다음 소절 (→)",
