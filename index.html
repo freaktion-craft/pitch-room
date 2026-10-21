@@ -2874,13 +2874,15 @@ function clickPeaks() {
   return v;
 }
 // Where the playhead is drawn, as a fraction of the song: where the song is, except just after a jump (a click on the
-// waveform, ±5 s…). Then the line travels there on a spring, the whole way, lighting up the bars it passes: quick off
-// the mark, easing in with a small overshoot, settled in about a quarter second. drawWave blurs its last frame of
-// travel into a streak, so a fast line reads as one moving line, not a row of copies. The sound jumps at once.
-const PH_W = 22, PH_Z = 0.75; // the spring's natural frequency (rad/s) and damping ratio
+// waveform, ±5 s…). Then the line glides there, the whole way, lighting up the bars it passes: on a critically damped
+// spring (quick off the mark, slowing in, never past the mark), until it's within PH_CATCH px, where it's caught like
+// by a magnet: pulled in from the speed it came at, faster and faster (in a few frames, PH_SNAP ms at most), and it
+// sticks. drawWave blurs its last frame of travel into a streak, so a fast line reads as one moving line, not a row of
+// copies. The sound jumps at once.
+const PH_W = 24, PH_CATCH = 10, PH_SNAP = 70; // the spring's natural frequency (rad/s); the catch's reach (px), longest time (ms)
 function playheadJump() {
   if (P.scrub || matchMedia("(prefers-reduced-motion: reduce)").matches) { P.ph = null; return; }
-  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: P.ph ? P.ph.v : 0, t: performance.now(), from: null };
+  P.ph = { x: P.ph ? P.ph.x : songDur() ? songPos() / songDur() : 0, v: P.ph ? P.ph.v : 0, t: performance.now(), from: null, cap: null };
 }
 function playheadShown(W) {
   const to = songDur() ? songPos() / songDur() : 0, s = P.ph;
@@ -2888,9 +2890,21 @@ function playheadShown(W) {
   const now = performance.now();
   if (now - s.t > 250) { P.ph = null; return to; } // a jump made where the waveform wasn't drawn (Practice): nothing to show
   s.from = s.x; // where it was a frame ago: the motion blur runs from there
-  const dt = Math.min(0.05, (now - s.t) / 1000) / 4; s.t = now;
-  for (let i = 0; i < 4; i++) { s.v += (-PH_W * PH_W * (s.x - to) - 2 * PH_Z * PH_W * s.v) * dt; s.x += s.v * dt; } // semi-implicit Euler
-  if (Math.abs(s.x - to) * W < 0.5 && Math.abs(s.v) * W < 30) { P.ph = null; return to; }
+  if (!s.cap) {
+    const dt = Math.min(0.05, (now - s.t) / 1000) / 4;
+    for (let i = 0; i < 4; i++) { s.v += (-PH_W * PH_W * (s.x - to) - 2 * PH_W * s.v) * dt; s.x += s.v * dt; } // semi-implicit Euler
+    if (Math.abs(s.x - to) * W < PH_CATCH) { // in the magnet's reach: on from the speed it came in at, twice that at the end
+      const d = s.x - to, u = d ? (-s.v * Math.sign(d)) / Math.abs(d) : 0; // its speed, in reaches per second
+      const T = u > 0 ? Math.max(16, Math.min(PH_SNAP, 500 / u)) : PH_SNAP; // ms: half the reach at that speed
+      s.cap = { d, at: now, T, a: Math.max(0, Math.min(1, (u * T) / 1000)) };
+    }
+  }
+  s.t = now;
+  if (s.cap) { // what's left closes faster and faster (its start speed a, then accelerating), and sticks
+    const k = Math.min(1, (now - s.cap.at) / s.cap.T), a = s.cap.a;
+    if (k >= 1) { P.ph = null; return to; }
+    s.x = to + s.cap.d * (1 - (a * k + (1 - a) * k * k));
+  }
   return s.x;
 }
 requestAnimationFrame(function waveLoop() { if (view === "stems" && stemsPage === "song" && P.song) drawWave(); requestAnimationFrame(waveLoop); });
