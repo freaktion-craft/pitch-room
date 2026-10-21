@@ -754,6 +754,33 @@ input[type="range"]:disabled { opacity: 0.4; }
 .takes { display: grid; gap: 16px; margin-top: 40px; }
 .tk-head { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; min-height: 32px; }
 .tk-head h2 { margin: 0; }
+.tk-title { display: flex; align-items: center; gap: 12px; }
+/* Takes Studio (#stems/<song>/takes): the song's takes laid out on its timeline, each where it was sung, to hear any of
+   them with the band, in time. The band's waveform on top; under it the takes, a lane each where they overlap; a take
+   pressed is on (in your colour) and plays where it falls; a click anywhere else on the timeline goes there; the
+   playhead runs across it all. Takes sung in another key or tempo play with the band in theirs: one version at a time. */
+.ts { display: grid; gap: 16px; }
+.ts-top { display: flex; align-items: center; gap: 16px; }
+.ts-top .back { margin-bottom: 0; }
+#tsTitle { font-weight: 500; font-size: 15px; }
+.ts-bar { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; padding: 12px; border-radius: 12px; background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line); font-size: 13px; }
+.ts-bar output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-right: auto; }
+.ts-vers { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.ts-vers .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.ts-tl { position: relative; padding: 12px; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+#tsWave { display: block; width: 100%; height: 64px; }
+.ts-lanes { display: grid; gap: 4px; margin-top: 8px; }
+.ts-lane { position: relative; height: 48px; border-radius: 6px; background: rgba(var(--fg), 0.02); }
+.ts-clip { position: absolute; top: 0; bottom: 0; min-width: 4px; padding: 0; border: 0; border-radius: 6px; overflow: hidden; cursor: pointer; text-align: left;
+  background: rgba(var(--fg), 0.06); box-shadow: inset 0 0 0 1px rgba(var(--fg), 0.12); color: var(--muted); transition: background-color 0.15s, box-shadow 0.15s; }
+.ts-clip:hover { background: rgba(var(--fg), 0.1); }
+.ts-clip[aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 20%, transparent); box-shadow: inset 0 0 0 1px var(--voice); color: var(--ink); }
+.ts-clip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ts-clip canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ts-clip span { position: relative; display: block; padding: 4px 6px; font-size: 11px; line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-line { position: absolute; top: 8px; bottom: 8px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); pointer-events: none; }
+.ts-empty { margin: 0; color: var(--muted); font-size: 14px; }
 .tk-mix { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; font-size: 13px; }
 .tk-mix input[type="range"] { width: 112px; }
 .tk-days { display: grid; gap: 20px; }
@@ -893,7 +920,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     </div>
     <section class="takes" id="takes" aria-labelledby="tkTitle" hidden>
       <div class="tk-head">
-        <h2 class="group-label" id="tkTitle">Takes</h2>
+        <div class="tk-title"><h2 class="group-label" id="tkTitle">Takes</h2><a class="btn sm" id="tkStudio" hidden>Takes Studio</a></div>
         <div class="tk-mix" id="tkMix" role="group" aria-label="How takes sound, played and downloaded" hidden>
           <label class="kfield">Your voice <input type="range" id="tkVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
           <label class="kfield">Band <input type="range" id="tkBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
@@ -954,6 +981,20 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
     </section>
     </div>
+
+    <section class="ts" id="sTakesStudio" aria-label="Takes Studio" hidden>
+      <div class="ts-top"><a class="btn sm back" id="tsBack" href="#stems">Practice</a><b id="tsTitle"></b></div>
+      <div class="ts-bar">
+        <button class="btn dark round" id="tsPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
+        <output id="tsTime">0:00 / 0:00</output>
+        <label class="kfield">Your voice <input type="range" id="tsVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
+        <label class="kfield">Band <input type="range" id="tsBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
+        <label class="kfield">Guide vocal <input type="range" id="tsGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
+      </div>
+      <div class="ts-vers" id="tsVers" hidden></div>
+      <div class="ts-tl" id="tsTl"><canvas id="tsWave" aria-label="The song: click to go there"></canvas><div class="ts-lanes" id="tsLanes"></div><i class="ts-line" id="tsLine"></i></div>
+      <p class="ts-empty" id="tsEmpty" hidden>No takes yet. Record in Practice and they're laid out here, each where you sang it.</p>
+    </section>
 
     <section class="panel-card info" id="sInfo" hidden>
       <div class="player-head">
@@ -3109,6 +3150,7 @@ function initStems() {
   });
   initSongMenu();
   initCoverView();
+  initTakesStudio();
   initLibSearch();
   $("#pVol").value = stemVol;
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
@@ -3470,11 +3512,8 @@ async function singSong(m, btn) {
   K.song = m; lyricsFor(m, lyr); setPhrases();
   songEvs(); songView(true);
   // Practice sets the tracks its own way (Guide vocal, Band); the Studio's mix is put back on the way out (route)
-  K.studio = mixNow();
-  for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
-  renderTracks(); applyGains();
+  practiceMix();
   $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
-  if (recMode === "v2" && verses().length < 2) recMode = "phrase"; // this song has no second verse
   recPick.set(recItems(), recMode);
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute)); $("#kClickVol").value = P.tracks.click.vol;
   $("#kClick").disabled = $("#kClickVol").disabled = !(m.beats && m.beats.length);
@@ -3523,6 +3562,12 @@ function songToggle() {
   }
   playSong();
   countClicks(counts);
+}
+// Practice sets the tracks its own way (Guide vocal, Band); the Studio's mix is kept to put back on the way out (route)
+function practiceMix() {
+  K.studio = mixNow();
+  for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
+  renderTracks(); applyGains();
 }
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
 function initSing() {
@@ -3698,71 +3743,28 @@ function paintRec() {
   b.title = tr(R.armed ? "Stop recording (R)" : "Record yourself as you sing (R)");
   paintTakesShown();
 }
-// How Record records (its label picks it, kept as "recMode"): phrase, a take for each phrase as the song plays (as it
-// always did, cut where one phrase gives way to the next); v1, v2, the first or second verse, from its count-in to its
-// end, as one take; all, the whole song from the start. A verse is the voice from one entry (the song's first, or one
-// after a break of 4 s or more) to the last note before the next. With lyrics, by its chorus instead (most songs sing
-// on through, with no such break): the longest run of two to eight lines that comes round again; a verse runs to the end
-// of a chorus, one that opens the song being the first verse's.
-const REC_MODES = { phrase: "Per phrase", v1: "Verse 1", v2: "Verse 2", all: "Whole song" };
-let recMode = REC_MODES[store.get("recMode", "phrase")] ? store.get("recMode", "phrase") : "phrase", recPick = null;
-function lyricVerses() {
-  const ls = K.lyrics;
-  if (!ls || ls.length < 6) return null;
-  const tx = ls.map((l) => folded(l.text).replace(/[^\p{L}\p{N}]/gu, "")), at = (i, L) => tx.slice(i, i + L).join("|");
-  let blk = null;
-  for (let L = Math.min(8, ls.length >> 1); L >= 2 && !blk; L--) {
-    for (let i = 0; i + L <= ls.length && !blk; i++) {
-      if (tx.slice(i, i + L).some((t) => !t)) continue;
-      for (let j = i + L; j + L <= ls.length; j++) if (at(j, L) === at(i, L)) { blk = { i, L }; break; }
-    }
-  }
-  if (!blk) return null;
-  const head = at(blk.i, 2), ends = [];
-  for (let j = 0; j + 1 < ls.length;) {
-    if (at(j, 2) !== head) { j++; continue; }
-    const e = Math.min(ls.length - 1, j + blk.L - 1);
-    if (j > 0) ends.push(e);
-    j = e + 1;
-  }
-  if (!ends.length) return null;
-  return [[0, ends[0]], ends[1] != null && [ends[0] + 1, ends[1]]].filter(Boolean).map(([a, b]) => ({ t0: ls[a].t0, t1: ls[b].t1 }));
-}
-function verses() {
-  const lv = lyricVerses();
-  if (lv) return lv.map((v) => ({ a: K.phrases.findIndex((p) => p.t1 > v.t0 + 0.05), b: K.phrases.findLastIndex((p) => p.t0 < v.t1 - 0.05) })).filter((v) => v.a >= 0 && v.b >= v.a);
-  return K.entries.map((e, i) => {
-    const next = K.entries[i + 1], end = next ? next.from : K.notes.length ? K.notes[K.notes.length - 1][1] : songDur();
-    const a = K.phrases.findIndex((p) => p.t1 > e.t), b = K.phrases.findLastIndex((p) => p.t0 < end);
-    return a < 0 || b < a ? null : { a, b };
-  }).filter(Boolean);
-}
-function recItems() {
-  const n = verses().length;
-  return Object.entries(REC_MODES).filter(([v]) => v !== "v2" || n > 1).map(([v, t]) => ({ v, t: tr(t) }));
-}
-// The icon (and R): per phrase, Record on and off as before; otherwise a take of the verse or the song, played from its
-// count-in and stopped at its end (rec.sec), or stopped early by pressing again.
+// How Record records (its label picks it, kept as "recMode"): free, a take each time the song plays, from Play to its
+// stop, as it always did; all, the whole song: from the very start (its count-in, a lead-in if the voice comes straight
+// in) to its end, as one take.
+const REC_MODES = { free: "Free", all: "Full song" };
+let recMode = REC_MODES[store.get("recMode", "free")] ? store.get("recMode", "free") : "free", recPick = null;
+const recItems = () => Object.entries(REC_MODES).map(([v, t]) => ({ v, t: tr(t) }));
+// The icon (and R): free, Record on and off; the whole song, back to its start and played through with Record on,
+// stopped at its end (R.sec), or early by pressing again.
 function recPress() {
-  if (recMode === "phrase" || R.armed) { if (R.armed) { if (R.sec) { R.sec = null; pauseSong(); } recOff(); } else setRec(true); return; }
-  const v = verses(), sec = recMode === "all" ? { a: 0, b: K.phrases.length - 1, all: true } : v[recMode === "v1" ? 0 : 1];
-  if (!sec) return;
+  if (R.armed) { if (R.sec) { R.sec = null; pauseSong(); } recOff(); return; }
+  if (recMode !== "all") { setRec(true); return; }
   setRec(true).then(() => {
     if (!R.armed) return;
-    R.sec = { end: sec.all ? songDur() : K.phrases[sec.b].to };
+    R.sec = { end: songDur() };
     if (P.playing) pauseSong();
-    if (sec.all) { K.cue = null; K.resume = null; seekWithin(0); } else phraseGo(sec.a);
+    K.cue = null; K.resume = null; seekWithin(0);
     songToggle();
   });
 }
-// Each frame while recording: per phrase, a new take where the phrase changes; a verse's take ends with the verse.
+// Each frame while recording: the whole song's take ends with it.
 function recTick(sn) {
-  if (!R.cap || !P.playing) return;
-  if (R.sec) { if (sn >= R.sec.end - 0.02) { R.sec = null; pauseSong(); recOff(); } return; }
-  if (recMode !== "phrase") return;
-  const ph = phraseAt(sn);
-  if (R.cap.ph === undefined) R.cap.ph = ph;
-  else if (ph !== R.cap.ph && ph != null) { const at = ac.currentTime; recEnd(at); recBegin(at); if (R.cap) R.cap.ph = ph; }
+  if (R.sec && R.cap && P.playing && sn >= R.sec.end - 0.05) { R.sec = null; pauseSong(); recOff(); }
 }
 
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
@@ -3836,6 +3838,8 @@ function renderTakes() {
   paintTakesShown();
   $("#tkEmpty").hidden = !T.loaded || T.list.length > 0;
   $("#tkMix").hidden = !T.list.length;
+  $("#tkStudio").hidden = !T.list.some((t) => !t.saving && !t.failed);
+  if (T.song) $("#tkStudio").href = `#stems/${T.song}/takes`;
   const days = new Map();
   for (const t of T.list) {
     const k = new Date(t.created * 1000).toDateString();
@@ -3971,6 +3975,204 @@ async function listenTake(t, mode = "take") {
   } else { p.yours = 0; pass(at, pos, p.gains, true); }
   p.at = at; p.pos = pos; p.total = p.yours + t.duration; // s of it, from its start
   paintListen();
+}
+// ---------- Takes Studio ----------
+// The page: the song's takes in one version (key and tempo: the band has to be the one they were sung with), which of
+// them are on (at first the newest, and any other that doesn't overlap one already on), and playing: from song time
+// pos at context time at, at the version's speed; srcs: what's sounding, voice: each take's source while it plays.
+const TS = { id: null, ver: null, on: new Set(), playing: false, pos: 0, at: 0, bus: null, gains: null, srcs: [], voice: new Map(), bufs: new Map(), peaks: new Map() };
+const verOf = (t) => `${t.key || 0}/${t.speed || 1}`;
+const tsSpeed = () => +(TS.ver || "0/1").split("/")[1];
+const tsTakes = () => T.list.filter((t) => !t.saving && !t.failed && verOf(t) === TS.ver);
+function verName(v) {
+  const [n, sp] = v.split("/").map(Number), bpm = P.song && P.song.bpm;
+  const parts = [n ? tr("Key {n}", { n: keySign(n) }) : "", sp !== 1 ? (bpm ? `${Math.round(bpm * sp)} BPM` : `${Math.round(sp * 100)} %`) : ""].filter(Boolean);
+  return parts.length ? parts.join(" · ") : tr("As the song is");
+}
+async function openTakesStudio(id) {
+  if (TS.id !== id) { tsStop(); Object.assign(TS, { id, ver: null, pos: 0 }); TS.on.clear(); TS.bufs.clear(); TS.peaks.clear(); }
+  const back = $("#tsBack"), practicing = K.on && K.song && K.song.id === id;
+  back.href = practicing ? "#practice" : `#stems/${id}`; say(back.lastChild, practicing ? "Practice" : "Studio");
+  let m = libCache.get(id);
+  if (!m) { try { m = (await (await fetch("/api/library", { cache: "no-store" })).json()).find((x) => x.id === id); } catch (e) { m = null; } }
+  if (!m) { location.replace("#stems"); return; }
+  $("#tsTitle").textContent = m.title;
+  if (!P.song || P.song.id !== id) await openSong(m); // the band's tracks
+  await loadTakes(m);
+  if (location.hash !== `#stems/${id}/takes`) return;
+  tsRender();
+}
+function tsRender() {
+  const all = T.list.filter((t) => !t.saving && !t.failed), vers = [...new Set(all.map(verOf))];
+  if (!vers.includes(TS.ver)) { TS.ver = all.length ? verOf(all.reduce((a, b) => (b.created > a.created ? b : a))) : null; TS.on.clear(); }
+  $("#tsEmpty").hidden = !!all.length; $("#tsTl").hidden = !all.length;
+  // versions: a choice only where takes were sung in more than one
+  const vb = $("#tsVers"); vb.hidden = vers.length < 2; vb.replaceChildren();
+  if (vers.length > 1) {
+    vb.append(el("span", null, tr("Sung in")));
+    for (const v of vers) {
+      const b = el("button", "btn sm", `${verName(v)} · ${all.filter((t) => verOf(t) === v).length}`); b.type = "button";
+      b.setAttribute("aria-pressed", String(v === TS.ver));
+      b.onclick = () => { if (v === TS.ver) return; tsStop(); TS.ver = v; TS.on.clear(); tsRender(); };
+      vb.append(b);
+    }
+  }
+  const takes = tsTakes(), sp = tsSpeed(), end = (t) => t.start + t.duration * sp;
+  if (!TS.on.size) { // the newest first; another only where it doesn't overlap one already on
+    for (const t of [...takes].sort((a, b) => b.created - a.created)) if (![...TS.on].some((id) => { const o = takes.find((x) => x.id === id); return o && t.start < end(o) && o.start < end(t); })) TS.on.add(t.id);
+  }
+  // lanes: each take in the first one it fits in without overlapping
+  const lanes = [];
+  for (const t of [...takes].sort((a, b) => a.start - b.start)) {
+    let lane = lanes.find((l) => l.end <= t.start + 0.01);
+    if (!lane) lanes.push((lane = { end: 0, takes: [] }));
+    lane.takes.push(t); lane.end = end(t);
+  }
+  const dur = songDur() || 1;
+  $("#tsLanes").replaceChildren(...lanes.map((l) => {
+    const row = el("div", "ts-lane");
+    for (const t of l.takes) {
+      const c = el("button", "ts-clip"), part = takePart(t);
+      c.type = "button"; c.dataset.id = t.id;
+      c.style.left = (t.start / dur) * 100 + "%"; c.style.width = ((t.duration * sp) / dur) * 100 + "%";
+      c.setAttribute("aria-pressed", String(TS.on.has(t.id)));
+      c.title = `${part.what} · ${part.more} · ${new Date(t.created * 1000).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" })}`;
+      c.append(el("canvas"), el("span", null, part.what));
+      c.onclick = (e) => { e.stopPropagation(); tsToggle(t); };
+      row.append(c);
+      tsVoice(t).then(() => tsClipWave(c, t)).catch(() => {});
+    }
+    return row;
+  }));
+  tsWave(); tsPaint();
+}
+// A take as recorded, decoded once for the page; its peaks for its clip.
+function tsVoice(t) {
+  if (!TS.bufs.has(t.id)) {
+    const job = fetch(`/library/${TS.id}/takes/${t.id}.flac`).then((r) => { if (!r.ok) throw new Error("That take is gone."); return r.arrayBuffer(); })
+      .then((b) => { ensureCtx(); return ac.decodeAudioData(b); });
+    job.catch(() => TS.bufs.delete(t.id));
+    TS.bufs.set(t.id, job);
+  }
+  return TS.bufs.get(t.id);
+}
+async function tsClipWave(c, t) {
+  const buf = await tsVoice(t), cv = c.querySelector("canvas"), r = c.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+  if (!r.width) return;
+  cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
+  const x = cv.getContext("2d"), data = buf.getChannelData(0), n = Math.max(1, Math.floor(cv.width / (3 * d))), step = Math.max(1, Math.floor(data.length / n));
+  let top = 0; const pk = new Float32Array(n);
+  for (let i = 0; i < n; i++) { let v = 0; for (let j = i * step, e = Math.min(data.length, j + step); j < e; j += 8) v = Math.max(v, Math.abs(data[j])); pk[i] = v; top = Math.max(top, v); }
+  x.fillStyle = C.voice; x.globalAlpha = 0.5;
+  const H = cv.height, mid = H / 2 + 6 * d; // under the label
+  for (let i = 0; i < n; i++) { const h = Math.max(d, (pk[i] / (top || 1)) * (H - 24 * d)); x.fillRect(i * 3 * d, mid - h / 2, 2 * d, h); }
+}
+// The band's waveform over the takes, as the Studio draws the song's
+function tsWave() {
+  const cv = $("#tsWave"), r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+  if (!r.width) return;
+  if (cv.width !== Math.round(r.width * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); }
+  const x = cv.getContext("2d"); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
+  if (!P.peaks) { x.fillStyle = C.muted; x.globalAlpha = 0.3; x.fillRect(0, cv.height / 2, cv.width, d); x.globalAlpha = 1; return; }
+  const prog = (songDur() ? tsPos() / songDur() : 0);
+  x.fillStyle = C.ink; waveBars(x, cv.width, cv.height, d, P.peaks, r.height - 8, prog, 0.75, 0.3, 1e9); // risen already
+}
+function tsPos() { return TS.playing ? Math.min(songDur(), TS.pos + Math.max(0, ac.currentTime - TS.at) * tsSpeed()) : TS.pos; }
+// Each frame on the page: the playhead, the time, the band's waveform lit to there; the song's end stops it.
+function tsPaint() {
+  const pos = tsPos(), dur = songDur() || 1, tl = $("#tsTl"), w = tl.clientWidth - 24;
+  $("#tsLine").style.left = 12 + (pos / dur) * w + "px";
+  $("#tsTime").textContent = `${fmtTime(pos)} / ${fmtTime(songDur())}`;
+  if (TS.playing && pos >= songDur() - 0.02) { tsStop(); TS.pos = 0; }
+  if (TS.playing) tsWave();
+}
+requestAnimationFrame(function tsLoop() { if (view === "stems" && stemsPage === "takes") tsPaint(); requestAnimationFrame(tsLoop); });
+// Play: the band (in the takes' version) from pos, and each take that's on where it falls; a take's voice is its
+// recording as it was, sample 0 at its song time (the delay of the speakers and the mic allowed for when it was made).
+async function tsPlay() {
+  if (TS.playing) { tsStop(true); return; }
+  if (!TS.ver) return;
+  ensureCtx();
+  const [n, sp] = TS.ver.split("/").map(Number), want = TS.ver;
+  let bufs;
+  try { [bufs] = await Promise.all([takeBand(n, sp), ...tsTakes().filter((t) => TS.on.has(t.id)).map(tsVoice)]); }
+  catch (e) { return; }
+  if (TS.ver !== want || stemsPage !== "takes" || TS.playing) return;
+  const at = ac.currentTime + 0.06, V = TS.pos / sp, guide = guideName();
+  TS.bus = ac.createGain(); TS.bus.gain.value = stemVol; TS.bus.connect(master);
+  TS.gains = { band: ac.createGain(), guide: ac.createGain() };
+  TS.gains.band.gain.value = T.mix.band; TS.gains.guide.gain.value = T.mix.guide;
+  TS.gains.band.connect(TS.bus); TS.gains.guide.connect(TS.bus);
+  TS.srcs = [];
+  for (const [name, buf] of Object.entries(bufs)) {
+    if (V >= buf.duration) continue;
+    const src = ac.createBufferSource(); src.buffer = buf; src.connect(name === guide ? TS.gains.guide : TS.gains.band); src.start(at, V); TS.srcs.push(src);
+  }
+  TS.playing = true; TS.at = at;
+  for (const t of tsTakes()) if (TS.on.has(t.id)) tsVoiceOn(t, at);
+  paintPlay($("#tsPlay"), true);
+}
+// A take's voice from where the song is (at: when the song is there), to its end
+async function tsVoiceOn(t, at = ac.currentTime + 0.03) {
+  const buf = await tsVoice(t), sp = tsSpeed();
+  if (!TS.playing || !TS.on.has(t.id) || TS.voice.has(t.id)) return;
+  const V = (TS.pos + Math.max(0, at - TS.at) * sp) / sp, vs = t.start / sp;
+  if (V >= vs + t.duration) return;
+  const from = Math.max(0, V - vs), g = ac.createGain(), src = ac.createBufferSource();
+  g.gain.value = T.mix.voice * (t.gain || 1); g.connect(TS.bus); src.buffer = buf; src.connect(g);
+  src.start(at + Math.max(0, vs - V), from, t.duration - from);
+  TS.voice.set(t.id, { src, g });
+}
+function tsVoiceOff(id) {
+  const v = TS.voice.get(id);
+  if (!v) return;
+  TS.voice.delete(id);
+  v.g.gain.setTargetAtTime(0, ac.currentTime, 0.01); try { v.src.stop(ac.currentTime + 0.05); } catch (e) {}
+}
+// keep: a pause, so Play carries on from here
+function tsStop(keep) {
+  if (!TS.playing) return;
+  const pos = tsPos();
+  TS.playing = false; TS.pos = keep ? pos : TS.pos;
+  for (const id of [...TS.voice.keys()]) tsVoiceOff(id);
+  const bus = TS.bus; if (bus) { bus.gain.setTargetAtTime(0, ac.currentTime, 0.01); setTimeout(() => bus.disconnect(), 200); }
+  TS.srcs.forEach((x) => { try { x.stop(ac.currentTime + 0.05); } catch (e) {} });
+  TS.srcs = []; TS.bus = null;
+  paintPlay($("#tsPlay"), false); tsWave();
+}
+function tsToggle(t) {
+  const on = !TS.on.has(t.id);
+  if (on) TS.on.add(t.id); else TS.on.delete(t.id);
+  document.querySelector(`#tsLanes .ts-clip[data-id="${t.id}"]`)?.setAttribute("aria-pressed", String(on));
+  if (TS.playing) { if (on) tsVoiceOn(t); else tsVoiceOff(t.id); }
+}
+function tsSeek(pos) {
+  const was = TS.playing;
+  tsStop(); TS.pos = Math.max(0, Math.min(songDur(), pos));
+  if (was) tsPlay(); else tsPaint();
+  tsWave();
+}
+function tsGains() {
+  if (!TS.gains) return;
+  const now = ac.currentTime;
+  TS.gains.band.gain.setTargetAtTime(T.mix.band, now, 0.015); TS.gains.guide.gain.setTargetAtTime(T.mix.guide, now, 0.015);
+  for (const [id, v] of TS.voice) { const t = T.list.find((x) => x.id === id); v.g.gain.setTargetAtTime(T.mix.voice * ((t && t.gain) || 1), now, 0.015); }
+}
+function initTakesStudio() {
+  $("#tsBack").prepend(icon("back"));
+  $("#tsPlay").onclick = tsPlay;
+  $("#tsTl").onclick = (e) => { const r = $("#tsTl").getBoundingClientRect(); tsSeek(((e.clientX - r.left - 12) / (r.width - 24)) * songDur()); };
+  for (const [id, k] of [["#tsVoice", "voice"], ["#tsBand", "band"], ["#tsGuide", "guide"]]) {
+    const s = $(id); s.value = T.mix[k];
+    s.addEventListener("input", () => { T.mix[k] = +s.value; store.set("takeMix", T.mix); tsGains(); listenGains(); const o = $({ voice: "#tkVoice", band: "#tkBand", guide: "#tkGuide" }[k]); if (o) o.value = s.value; });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (!(view === "stems" && stemsPage === "takes") || typing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === "Space") { e.preventDefault(); tsPlay(); }
+    else if (e.code === "Home") { e.preventDefault(); tsSeek(0); }
+  });
+  let w = 0; // laid out again for another width (not for its own height, as lanes come and go)
+  new ResizeObserver(([e]) => { const now = Math.round(e.contentRect.width); if (now !== w && stemsPage === "takes") { w = now; tsRender(); } }).observe($("#tsTl"));
 }
 // A take's pitch (stems.take_pitch), fetched once: [[s into the take, midi or null], …]
 function takePitch(t) {
@@ -4458,8 +4660,10 @@ let view = "stems", stemsPage = "lib";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
 // Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
 function stemsRoute(sub, extra) {
-  stemsPage = !sub ? "lib" : sub === "add" ? "add" : extra === "info" ? "info" : "song";
-  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib"; $("#sSongActs").hidden = stemsPage !== "song";
+  stemsPage = !sub ? "lib" : sub === "add" ? "add" : extra === "info" ? "info" : extra === "takes" ? "takes" : "song";
+  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib" || stemsPage === "takes"; $("#sSongActs").hidden = stemsPage !== "song";
+  $("#sTakesStudio").hidden = stemsPage !== "takes";
+  if (stemsPage === "takes") openTakesStudio(sub); else tsStop();
   $("#sLibPage").hidden = stemsPage !== "lib"; $("#sAddPage").hidden = stemsPage !== "add"; $("#sPlayer").hidden = stemsPage !== "song";
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
@@ -4497,6 +4701,7 @@ function route() {
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   if (view === "practice") {
     $("#overlay").hidden = true;
+    if (!K.studio) practiceMix(); // back from the Takes Studio
     loadSamples(); // for the keyboard
     renderStart();
     // size and draw the stage now, so the view's first frame is complete rather than an empty stage
@@ -4776,7 +4981,10 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Original key": "원래 키", "original": "원래", "Higher": "높은 키", "Lower": "낮은 키", "Changing key… {pct}": "키 바꾸는 중… {pct}", "Originally {key}": "원래 {key}",
   "{n} or more semitones can sound processed.": "{n}반음 이상은 소리가 어색할 수 있어요.", "Couldn’t change the key.": "키를 바꾸지 못했어요.",
   // Practice
-  "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "How to record": "녹음 방식", "Per phrase": "소절마다", "Verse 1": "1절", "Verse 2": "2절", "Whole song": "전체", "Guide vocal": "가이드 보컬", "Guide vocal volume": "가이드 보컬 볼륨",
+  "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "How to record": "녹음 방식", "Free": "자유 녹음", "Full song": "곡 전체", "Takes Studio": "테이크 스튜디오", "Studio": "스튜디오", "Sung in": "부른 버전",
+  "As the song is": "원곡 그대로", "Key {n}": "키 {n}",
+  "No takes yet. Record in Practice and they're laid out here, each where you sang it.": "아직 테이크가 없어요. 연습에서 녹음하면 부른 자리에 맞춰 여기에 놓여요.",
+  "The song: click to go there": "곡 전체: 누르면 그 자리로 가요", "Guide vocal": "가이드 보컬", "Guide vocal volume": "가이드 보컬 볼륨",
   "Band": "반주", "Band volume": "반주 볼륨", "Click on/off (follows the beat)": "메트로놈 켜기/끄기 (박자를 따라가요)", "Click volume": "메트로놈 볼륨",
   "Bars": "음정 바", "Octave of the note bars": "음정 바의 옥타브", "octave down": "한 옥타브 아래", "as sung": "부른 그대로", "octave up": "한 옥타브 위",
   "Previous phrase": "이전 소절", "Previous phrase (←)": "이전 소절 (←)", "Next phrase": "다음 소절", "Next phrase (→)": "다음 소절 (→)",
