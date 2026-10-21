@@ -765,6 +765,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* Phrases: one block per line of the song; click one to jump there, Loop repeats it */
 .phrase-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
 .phrase-row output { min-width: 84px; text-align: center; }
+.phrase-row > .kfield:first-child { margin-right: 8px; } /* the count-in first, a little apart from the phrases' controls */
 .songbar .btn:disabled, .songbar .tog:disabled, #vPractice .bb-acts .btn:disabled { opacity: 0.35; pointer-events: none; }
 .strip { position: relative; flex: 1 1 240px; height: 28px; border-radius: 6px; background: var(--fill); cursor: pointer; }
 .strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: 3px; background: rgba(var(--fg), 0.14); cursor: pointer; }
@@ -941,11 +942,11 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <div class="keyctl" role="group" aria-label="Key"><span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span></div>
       </div>
       <div class="phrase-row">
+        <label class="kfield">Count-in <button class="pick" id="kCount" type="button"></button></label>
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
         <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them"></button>
-        <label class="kfield">Count-in <button class="pick" id="kCount" type="button"></button></label>
         <div class="strip" id="kStrip" role="group" aria-label="Phrases" title="Click a phrase to go to it · Shift+click another to loop the run between them"></div>
       </div>
     </div>
