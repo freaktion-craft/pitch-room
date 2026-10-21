@@ -5005,8 +5005,14 @@ function renderMic() { // the header's chip, and the one by the sensitivity in t
       slash.classList.add("slash"); slash.setAttribute("pathLength", "1"); // drawn in by its dash
       b.querySelector(".mic-ico").append(on, off);
     }
+    const was = b.classList.contains("on");
     b.classList.toggle("on", micOn);
     b.setAttribute("aria-pressed", String(micOn)); b.title = tr(micOn ? "Turn the mic off" : "Turn the mic on");
+    // turned off: the mic shakes as the slash strikes it, settling as it's done
+    if (was && !micOn && !stillMotion()) {
+      b.querySelector(".mic-ico").animate([{ transform: "none" }, { transform: "rotate(-12deg)", offset: 0.14 }, { transform: "rotate(9deg)", offset: 0.34 },
+        { transform: "rotate(-5deg)", offset: 0.54 }, { transform: "rotate(2deg)", offset: 0.74 }, { transform: "none" }], { duration: 440, delay: 110, easing: "ease-out" });
+    }
   }
 }
 // Why the mic didn't start: over the stage in Practice, else in a panel under the mic chip, for a few seconds.
