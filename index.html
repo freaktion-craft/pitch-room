@@ -221,13 +221,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 .stage-lyric .next a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .plot { position: relative; flex: 1; min-height: 0; }
 .plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.hud-r { position: absolute; top: 16px; right: 16px; pointer-events: none; text-align: right; display: grid; justify-items: end; gap: 8px; }
-.note-big { font: 600 48px/1 var(--font); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.note-sub { font: 12.5px/1.2 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.gauge { position: relative; width: 140px; height: 4px; border-radius: 2px; background: rgba(var(--fg), 0.08); }
-.gauge .zone { position: absolute; top: 0; bottom: 0; left: 50%; width: 16%; transform: translateX(-50%); border-radius: 2px; background: rgba(var(--fg), 0.12); }
-.gauge .needle { position: absolute; top: -4px; width: 2px; height: 12px; margin-left: -1px; left: 50%; border-radius: 1px; background: var(--dim); transition: left 60ms linear; }
-.gauge-labels { display: flex; justify-content: space-between; width: 140px; font: 10px/1 var(--mono); color: var(--faint); }
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
    drawn there during an intro or break, while the coming bars arrive from the right */
@@ -269,7 +262,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 
 @media (max-width: 760px) {
   header { margin-bottom: 40px; }
-  .note-big { font-size: 34px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
@@ -696,12 +688,6 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
       <div class="stage-lyric" id="kLyric" hidden><span class="num" id="kLyNum"></span><span class="cur" id="kLyCur"></span><span class="next" id="kLyNext"></span></div>
       <div class="plot">
         <canvas id="cv"></canvas>
-        <div class="hud-r" aria-live="off">
-          <div class="note-big" id="noteBig">–</div>
-          <div class="note-sub" id="noteSub">Waiting for sound</div>
-          <div class="gauge" aria-hidden="true"><div class="zone"></div><div class="needle" id="needle"></div></div>
-          <div class="gauge-labels" aria-hidden="true"><span>flat</span><span>centre</span><span>sharp</span></div>
-        </div>
         <div class="countin" id="countIn" hidden><span id="countLbl"></span><div class="dots" id="countDots" aria-hidden="true"></div><span class="sr" id="countNum" aria-live="assertive"></span></div>
         <div class="overlay" id="overlay" hidden></div>
       </div>
@@ -3498,22 +3484,10 @@ function activeNote(t) { const e = songNote(t); if (e) lastTarget = e; return e;
 // ---------- UI ----------
 let shown = {};
 const setText = (id, v) => { if (shown[id] !== v) { shown[id] = v; document.getElementById(id).textContent = v; } };
+// The note to sing and the one you're singing on the piano, and the stage's head line. (How far off you are is your
+// line against the bars: no readout of it.)
 function renderHud(now, m) {
   const tgt = activeNote(now), tm = tgt ? Math.round(tgt.midi) : null;
-  if (m == null) {
-    setText("noteBig", "–");
-    setText("noteSub", micOn || testOsc ? (tgt ? tr("target {note} · sing now", { note: absName(tm) }) : tr("Waiting for sound")) : tr("Mic is off"));
-    $("#needle").style.left = "50%"; $("#needle").style.background = C.muted;
-  } else {
-    const ref = tgt ? tgt.midi : Math.round(m), c = (m - ref) * 100;
-    setText("noteBig", absName(m));
-    const hz = mf(m).toFixed(1) + " Hz";
-    const off = Math.abs(c) >= 50 ? tr(c > 0 ? "{n} st sharp" : "{n} st flat", { n: Math.abs(c / 100).toFixed(1) }) : `${c > 0 ? "+" : ""}${Math.round(c)}¢`;
-    setText("noteSub", tgt ? tr("target {note} · {off}", { note: absName(tm), off }) : `${hz} · ${off}`);
-    const k = Math.max(-1, Math.min(1, c / 60));
-    const n = $("#needle"); n.style.left = (50 + k * 46) + "%";
-    n.style.background = Math.abs(c) <= 10 ? C.good : Math.abs(c) <= 25 ? C.warn : C.bad;
-  }
   renderKeys(tm, m);
   const rec = R.cap ? tr("Recording {t}", { t: fmtTime(Math.max(0, songPos() - R.cap.start)) }) : tr("Practice");
   setText("hudRep", `${rec} · ${tr(K.oct ? (K.oct > 0 ? "bars an octave up" : "bars an octave down") : "bars as sung")}`);
@@ -3854,8 +3828,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)", "Phrases": "소절", "Phrase –": "소절 –",
   "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
   "Intro": "전주", "Break": "간주", "{kind} · vocals in {s} s": "{kind} · {s}초 뒤 보컬",
-  "Pitch display": "음정 화면", "Waiting for sound": "소리를 기다리는 중", "Mic is off": "마이크 꺼짐", "flat": "낮음", "centre": "정확", "sharp": "높음",
-  "target {note} · sing now": "목표 {note} · 지금 부르세요", "target {note} · {off}": "목표 {note} · {off}", "{n} st sharp": "{n}반음 높음", "{n} st flat": "{n}반음 낮음",
+  "Pitch display": "음정 화면",
   "Recording {t}": "녹음 중 {t}", "bars as sung": "음정 바: 부른 그대로", "bars an octave up": "음정 바: 한 옥타브 위", "bars an octave down": "음정 바: 한 옥타브 아래",
   "Original singer": "원곡 가수", "You": "나",
   "Piano keyboard (tap to hear a note)": "피아노 건반 (누르면 소리가 나요)", "Piano samples:": "피아노 샘플:",
