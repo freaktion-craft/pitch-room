@@ -3828,7 +3828,21 @@ function wrapLyric(text, room) {
 }
 
 // ---------- main loop ----------
-let med = [], cur = null, miss = 0, level = 0;
+// Your pitch: the median of the last few readings. A reading can be an octave off for a frame or two (mostly an octave
+// down, as a note starts or fades), and drawn that's a sudden plunge. So a note starts, and a leap past a fourth counts,
+// only once its readings agree for 50 ms; until then the line holds where it was.
+const LEAP = 5, HOLD = 50;
+let med = [], cur = null, miss = 0, level = 0, leap = null;
+const middle = (a) => [...a].sort((x, y) => x - y)[a.length >> 1];
+function reading(m) {
+  if (m == null) { if (++miss > 3) { med = []; cur = null; leap = null; } return; }
+  miss = 0;
+  if (cur != null && Math.abs(m - cur) <= LEAP) { leap = null; med.push(m); while (med.length > 5) med.shift(); cur = middle(med); return; }
+  const now = performance.now();
+  if (!leap || Math.abs(m - middle(leap.ms)) > 2) leap = { at: now, ms: [] };
+  leap.ms.push(m); while (leap.ms.length > 5) leap.ms.shift();
+  if (now - leap.at >= HOLD && leap.ms.length >= 3) { med = leap.ms; cur = middle(med); leap = null; }
+}
 function loop() {
   let m = null;
   if (ac && (micOn || testOsc)) {
@@ -3841,8 +3855,7 @@ function loop() {
     level = Math.sqrt(s / tbuf.length);
     if (level > S.gate) { const r = yin(tbuf, ac.sampleRate); if (r && r.f > 60 && r.f < 1500) m = 69 + 12 * Math.log2(r.f / A4); }
   } else level = 0;
-  if (m == null) { if (++miss > 3) { med = []; cur = null; } }
-  else { miss = 0; med.push(m); while (med.length > 5) med.shift(); const so = [...med].sort((a, b) => a - b); cur = so[so.length >> 1]; }
+  reading(m);
   drawSpectrum(); // the mic chip is in the header on every page
   paintGate();
   if (K.on && view === "practice") practiceFrame();
