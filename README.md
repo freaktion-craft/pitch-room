@@ -24,7 +24,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 
 ## What's inside
 
-**Library** — paste a YouTube link or drop an audio file and the song is split into vocals, drums, bass and other (or 6 stems with guitar and piano) by [Demucs](https://github.com/facebookresearch/demucs). A karaoke model then splits the vocals into the lead and the backing vocals. The beat is tracked with librosa, so a click track follows the song’s own tempo. In the player:
+**Library** — paste a YouTube link or drop an audio file and the song is split into vocals, drums, bass and other (or 6 stems with guitar and piano) by [Demucs](https://github.com/facebookresearch/demucs). A karaoke model then splits the vocals into the lead and the backing vocals. The beat is tracked with librosa, so a click track follows the song’s own tempo. Each song gets its **album art** beside it in the list: the cover inside an uploaded file, or else looked up on iTunes or Deezer by the song’s title (its title and nothing else is sent), or else the YouTube video’s thumbnail. In the player:
 
 - mute / solo / volume per track, plus the click (accent shift, 2/4–6/4),
 - waveform overview to jump around, Space to play / pause, Home / End to go to the start / the end,
@@ -67,4 +67,5 @@ Run the server directly with `.venv/bin/python server.py` (port 5178) if you pre
 - Font: [Pretendard](https://github.com/orioncactus/pretendard) (SIL OFL 1.1), loaded from jsDelivr.
 - Icons: [Hugeicons](https://hugeicons.com) (MIT).
 - Stems: [Demucs](https://github.com/facebookresearch/demucs) (htdemucs / htdemucs_6s) on PyTorch; lead and backing vocals with [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) and the BS-Roformer karaoke model by frazer & becruily; beats, key and pitch tracking with [librosa](https://librosa.org) ([Praat](https://www.fon.hum.uva.nl/praat/) through parselmouth as a fallback); downloads with [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://deno.com) as its JavaScript runtime; ffmpeg via imageio-ffmpeg.
+- Album art: the [iTunes Search API](https://performance-partners.apple.com/search-api) and the [Deezer API](https://developers.deezer.com/api), or YouTube’s thumbnail.
 - Lyrics: [LRCLIB](https://lrclib.net), lined up with the voice by OpenAI’s [Whisper](https://github.com/openai/whisper) (turbo) through [stable-ts](https://github.com/jianfch/stable-ts).

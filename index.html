@@ -500,7 +500,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sJobs { display: grid; gap: 8px; }
 #sJobs:empty { display: none; }
 #sLib { overflow: hidden; }
-#sLib .row { cursor: pointer; transition: background-color 0.15s; }
+#sLib .row { padding-block: 16px; cursor: pointer; transition: background-color 0.15s; } /* the cover as far from the top and bottom as from the left */
 #sLib .row:hover { background: rgba(var(--fg), 0.03); }
 #sLib:empty { display: none; } /* until the list has loaded */
 /* an empty library: the list itself is the way to add the first song */
@@ -511,6 +511,14 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sLib .first b { display: block; font-weight: 500; font-size: 15px; }
 #sLib .first small { color: var(--muted); font-size: 13px; }
 #sLib:has(.first) { box-shadow: none; background: none; }
+/* the album art (covers.py), as tall as the title and its details beside it: a square the row has from the start, so
+   nothing moves when the picture comes in (fading); a quiet tile until then, or for good when there's none. A hairline
+   inside, for a white cover on the white list. */
+#sLib .cover { position: relative; flex: none; align-self: flex-start; width: 48px; height: 48px; margin-right: -4px; border-radius: 6px; overflow: hidden; background: rgba(var(--fg), 0.06); }
+#sLib .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(var(--fg), 0.08); }
+#sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
+#sLib .cover img.in { opacity: 1; }
+#sLib .song { flex: 1 1 0; }
 .song { display: grid; gap: 4px; min-width: 0; }
 .song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .song small { color: var(--faint); font-size: 12.5px; }
@@ -1508,6 +1516,7 @@ async function renderLibrary() {
   if (!lib.length) return;
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
+    row.dataset.id = m.id;
     link.href = "#stems/" + m.id; link.append(el("b", null, m.title));
     info.append(link, el("small", null, libLine(m)));
     keyOf(m).then(() => { info.querySelector("small").textContent = libLine(m); });
@@ -1518,8 +1527,42 @@ async function renderLibrary() {
     const more = mkBtn("", () => songMenu(more, m));
     more.classList.add("icon"); more.title = tr("More"); more.setAttribute("aria-label", tr("More for {title}", { title: m.title }));
     more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false"); more.append(icon("more"));
-    acts.append(more); row.append(info, acts); box.append(row);
+    acts.append(more); row.append(coverTile(m), info, acts); box.append(row);
   });
+  awaitCovers(lib);
+}
+// A song's album art in the list: the tile, and the picture in it once there is one.
+function coverTile(m) {
+  const tile = el("span", "cover");
+  tile.setAttribute("aria-hidden", "true");
+  paintCover(tile, m);
+  return tile;
+}
+function paintCover(tile, m) {
+  if (!m.cover || tile.querySelector("img")) return;
+  const img = new Image();
+  img.alt = ""; img.decoding = "async"; img.onload = () => img.classList.add("in");
+  img.src = `/library/${m.id}/cover.jpg?v=${m.cover.at}`;
+  tile.append(img);
+}
+// Covers still being looked for (a song just added, or ones from before there were covers): the list asks again in a
+// few seconds, a minute at most, and puts each in as it's found.
+let coverTimer = 0;
+function awaitCovers(lib, tries = 0) {
+  clearTimeout(coverTimer);
+  if (tries >= 20 || !lib.some((m) => !("cover" in m))) return;
+  coverTimer = setTimeout(async () => {
+    if (!(view === "stems" && stemsPage === "lib")) return; // the list asks again when it's shown again
+    let now;
+    try { now = await (await fetch("/api/library", { cache: "no-store" })).json(); } catch (e) { return; }
+    if (!Array.isArray(now)) return;
+    for (const m of now) {
+      const known = libCache.get(m.id), tile = $("#sLib").querySelector(`.row[data-id="${m.id}"] .cover`);
+      if (known && "cover" in m) known.cover = m.cover;
+      if (tile) paintCover(tile, m);
+    }
+    awaitCovers(now, tries + 1);
+  }, 3000);
 }
 // Key names spelled the usual way for each key (D♭ major, C♯ minor).
 const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];

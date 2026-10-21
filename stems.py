@@ -8,6 +8,7 @@ Songs live in ./library/<id>/ :
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model)
     lyrics.json     the lyrics, each line timed to the voice (Practice's phrases), or none found; once asked for (lyrics.py)
+    cover.jpg       the album art, as the library shows it (covers.py)
     meta.json       title, duration, bpm, beat times, key, stems, model, keep (parts of tracks that play while muted)
     keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
     takes/          you, singing along in Practice: <take>.flac and <take>.json (when, which part, key, scores)
@@ -409,8 +410,78 @@ def library() -> list[dict]:
             if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
                 _backfilled.add(d)
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
+            if "cover" not in meta:
+                _want_cover(d)
             out.append(meta)
     return sorted(out, key=lambda m: m.get("created", 0), reverse=True)
+
+
+# meta.json's "cover": {"from": "file", "itunes", "deezer" or "youtube", "at"} once cover.jpg is saved (covers.py), None
+# when there's none to be had, absent until it's been looked for. Looked for one song at a time, in the background: as
+# a song is added, and for the songs added before covers were (or while offline) as the library is listed.
+_cover_line: list[str] = []
+_cover_asked: set[str] = set()
+_cover_lock = threading.Lock()
+
+
+def _want_cover(song_id: str):
+    with _cover_lock:
+        if song_id in _cover_asked:
+            return
+        _cover_asked.add(song_id)
+        _cover_line.append(song_id)
+        if len(_cover_line) == 1:
+            threading.Thread(target=_cover_worker, daemon=True).start()
+
+
+def _cover_worker():
+    while True:
+        with _cover_lock:
+            if not _cover_line:
+                return
+            song_id = _cover_line[0]
+        try:
+            _find_cover(song_id)
+        except Exception as e:  # noqa: BLE001  (the song works without one; it's looked for again next time)
+            print(f"No cover for library/{song_id}: {e}", file=sys.stderr)
+        with _cover_lock:
+            _cover_line.pop(0)
+            if not _cover_line:
+                return
+        time.sleep(1)  # the sites ask for a few searches a second at most
+
+
+def _find_cover(song_id: str):
+    import covers
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if "cover" in meta:
+        return
+    out, got = os.path.join(folder, "cover.jpg"), None
+    src = _saved(folder, "source")
+    from_link = re.match(r"^https?://", meta.get("source") or "")
+    if src and not from_link and (i := covers.attached(ffmpeg_exe(), os.path.join(folder, src))) is not None:
+        got = "file" if covers.save(ffmpeg_exe(), os.path.join(folder, src), out, stream=i) else None
+    failed = None
+    if not got:
+        hint = ""
+        with contextlib.suppress(OSError, ValueError, TypeError):
+            s = _load_json(os.path.join(folder, "lyrics.json")).get("source") or {}
+            hint = f"{s['artist']} {s['track']}" if s.get("artist") else ""
+        try:
+            found = covers.online(meta["title"], float(meta["duration"]), hint)
+            if found and (data := covers.fetch(found[0])) and covers.save(ffmpeg_exe(), data, out):
+                got = found[1]
+        except RuntimeError as e:
+            failed = e
+    if not got and from_link and (url := covers.youtube(meta["source"])):
+        with contextlib.suppress(RuntimeError):
+            if (data := covers.fetch(url)) and covers.save(ffmpeg_exe(), data, out, letterboxed=True):
+                got = "youtube"
+    if not got and failed:
+        raise failed  # couldn't ask: left to look for again
+    if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
+        _update_meta(folder, cover={"from": got, "at": round(time.time())} if got else None)
 
 
 def delete_song(song_id: str):
@@ -671,6 +742,7 @@ def _pipeline(job, src: dict, model_name: str):
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
+    _want_cover(song_id)
 
 
 # ---------- lyrics ----------
