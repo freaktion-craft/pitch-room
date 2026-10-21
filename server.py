@@ -212,11 +212,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(500, {"error": f"{e.__class__.__name__}: {e}"})
 
     def _page(self):
-        """index.html with the settings in it, so the page starts as it was left, at any port and before first paint."""
+        """index.html with the settings in it, so the page starts as it was left, at any port and before first paint;
+        and the library and the songs being added, so the list is there in the first paint too, not a moment after."""
         with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
             html = f.read()
-        data = json.dumps(stems.get_settings(), ensure_ascii=False).replace("</", "<\\/")
-        body = html.replace("/*SETTINGS*/null", data, 1).encode()
+        js = lambda v: json.dumps(v, ensure_ascii=False).replace("</", "<\\/")  # noqa: E731
+        body = html.replace("/*SETTINGS*/null", js(stems.get_settings()), 1)
+        body = body.replace("/*LIBRARY*/null", js({"lib": stems.library(), "jobs": stems.active_jobs()}), 1).encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

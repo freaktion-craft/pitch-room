@@ -600,6 +600,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sLib .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(var(--fg), 0.08); }
 #sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
 #sLib .cover img.in { opacity: 1; }
+#sLib .cover img.now { transition: none; }
 #sLib .cover[role="button"] { cursor: zoom-in; }
 #sLib .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 /* A cover, pressed: it flies up from the list to the middle of the page (.cv-fly) and faces you there. As the pointer
@@ -807,6 +808,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 </style>
 <script>/* the settings, put in by the server as it sends the page (server.py); null when the page is opened some other way */
 const SAVED = /*SETTINGS*/null;
+/* the library and the songs being added, as the server had them as it sent the page: the list's first drawing */
+const SAVED_LIB = /*LIBRARY*/null;
 /* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
 try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}</script>
 </head>
@@ -1610,10 +1613,14 @@ const libDrawn = new Promise((res) => { libDrawnNow = res; });
 async function renderLibrary() {
   try { await drawLibrary(); } finally { libDrawnNow(); }
 }
+// The first drawing is from what came with the page (SAVED_LIB), at once, before the page is first shown; a reload
+// then shows the list as it was rather than an empty page filling in. Later ones ask the server.
+let libSent = SAVED_LIB && Array.isArray(SAVED_LIB.lib) ? SAVED_LIB : null;
 async function drawLibrary() {
   const box = $("#sLib");
   let lib = [], jobs = [];
-  [lib, jobs] = await Promise.all(["/api/library", "/api/jobs"].map((u) => fetch(u, { cache: "no-store" }).then((r) => r.json()).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])));
+  if (libSent) { ({ lib, jobs } = libSent); libSent = null; }
+  else [lib, jobs] = await Promise.all(["/api/library", "/api/jobs"].map((u) => fetch(u, { cache: "no-store" }).then((r) => r.json()).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])));
   libCache = new Map(lib.map((m) => [m.id, m]));
   libRows = new Map();
   // songs still being added (this page was reloaded, or opened in a second tab meanwhile) get their cards back
@@ -1726,7 +1733,10 @@ function coverTile(m) {
 function paintCover(tile, m) {
   if (!m.cover || tile.querySelector("img")) return;
   const img = new Image();
-  img.alt = ""; img.decoding = "async"; img.onload = () => img.classList.add("in");
+  // fading in only when it had to be fetched: one the browser already holds (a reload) is simply there
+  const asked = performance.now();
+  img.alt = ""; img.decoding = "async";
+  img.onload = () => { if (performance.now() - asked < 100) img.classList.add("now"); img.classList.add("in"); };
   img.src = `/library/${m.id}/cover.jpg?v=${m.cover.at}`;
   tile.append(img);
   tile.removeAttribute("aria-hidden"); tile.setAttribute("role", "button"); tile.tabIndex = 0;
