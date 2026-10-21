@@ -355,14 +355,20 @@ input[type="range"]:disabled { opacity: 0.4; }
    left on the line (that big shifts can sound processed, or why a change failed). The dropdown has a fixed width and
    the note takes no room of its own, so nothing moves as they change. */
 .keyctl { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-.keypick { width: 168px; flex: none; font-size: 13px; } /* one width whatever key it says, or how far it's got */
+.keypick { width: 200px; flex: none; font-size: 13px; } /* one width whatever key it says, or how far it's got */
+.keypick .pre { flex: none; margin-right: 8px; color: var(--muted); } /* "Key", inside the box */
 /* the tempo, a number to type (BPM, or % for a song with no steady beat); while that tempo is being made its field
    fills up from the left, so nothing beside it moves */
-.tempo { flex: none; display: inline-flex; align-items: center; gap: 8px; margin-left: 4px; }
-.tempo input { width: 56px; padding: 0 8px; text-align: center; font-size: 13px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums;
-  border: 1px solid transparent; -moz-appearance: textfield; appearance: textfield; }
+/* one box like the key's: "BPM" then the number, which is the field */
+.tempo { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding-left: 12px; border: 1px solid transparent; border-radius: 8px;
+  background-color: var(--surface-2); font-size: 13px; color: var(--muted); cursor: text; }
+.tempo:hover { background-color: var(--hover-2); }
+.tempo:focus-within { border-color: var(--ink); background-color: var(--surface); }
+.tempo input { width: 44px; height: 30px; padding: 0 12px 0 0; border: 0; background: transparent; text-align: left; font-size: 13px; font-weight: 500;
+  color: var(--ink); font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
+.tempo input:hover { background: transparent; }
 .tempo input::-webkit-inner-spin-button, .tempo input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.tempo input:focus { outline: none; border-color: var(--ink); }
+.tempo input:focus { outline: none; }
 .tempo.changed input { color: var(--voice); } /* not the song's own tempo */
 /* up to two lines (32 px) where the line is short: within the height of the row's 40 px play button. With less room
    than its min-width for it, the control moves to the next line. */
@@ -588,6 +594,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 .stage-head .rep.rec::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--bad); vertical-align: 1px; }
 @media (prefers-reduced-motion: reduce) { .btn.rec.on .ico { animation: none; } }
 
+/* Practice: the song's bar, stage and piano; beside them (under them on a narrow screen) the takes, once there's
+   something for them: Record on, or takes of the song */
+.pr-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.pr-main { min-width: 0; }
 /* Takes: what you recorded in Practice, by day, newest first, like notes to self. The sliders in the head set how a
    take sounds, played here and downloaded. */
 .takes { display: grid; gap: 16px; margin-top: 40px; }
@@ -634,6 +644,21 @@ input[type="range"]:disabled { opacity: 0.4; }
   .tk-confirm { grid-area: 1 / 2; } /* in the part's place while asked */
   .take.armed .tk-part { visibility: hidden; }
 }
+/* beside Practice, where there's room: a column as wide as the takes' rows need, the sliders one under another, a
+   take's words over its phrase and times */
+@media (min-width: 1080px) {
+  .pr-cols.with-takes { grid-template-columns: minmax(0, 1fr) 360px; }
+  .pr-cols.with-takes .takes { margin-top: -4px; } /* level with the bar, which sits 4 px up */
+  .pr-cols.with-takes .tk-mix { flex: 1 1 100%; display: grid; gap: 8px; }
+  .pr-cols.with-takes .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
+  .pr-cols.with-takes .tk-mix input[type="range"] { width: 100%; }
+  .pr-cols.with-takes .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px; gap: 8px; }
+  .pr-cols.with-takes .tk-when { display: none; }
+  .pr-cols.with-takes .tk-part { grid-area: 1 / 2; flex-direction: column; align-items: stretch; gap: 0; }
+  .pr-cols.with-takes .tk-confirm { grid-area: 1 / 2; }
+  .pr-cols.with-takes .take.armed .tk-part { visibility: hidden; }
+  .pr-cols.with-takes .tk-empty { padding: 16px; font-size: 13.5px; }
+}
 
 </style>
 <script>/* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
@@ -662,6 +687,8 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     <div class="play-bar">
       <h1 class="title" id="playTitle"></h1>
     </div>
+    <div class="pr-cols" id="prCols">
+    <div class="pr-main">
     <div class="songbar" id="songBar">
       <div class="sb-main">
         <button class="btn dark round" id="startBtn" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
@@ -702,7 +729,8 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
     </section>
     <div class="keys-wrap" id="keysWrap"><div class="keys" id="keys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
     <p class="credit">Piano samples: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> · Alexander Holm, CC-BY 3.0</p>
-    <section class="takes" id="takes" aria-labelledby="tkTitle">
+    </div>
+    <section class="takes" id="takes" aria-labelledby="tkTitle" hidden>
       <div class="tk-head">
         <h2 class="group-label" id="tkTitle">Takes</h2>
         <div class="tk-mix" id="tkMix" role="group" aria-label="How takes sound, played and downloaded" hidden>
@@ -712,8 +740,9 @@ try { const a = JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.
         </div>
       </div>
       <div class="tk-days" id="tkList"></div>
-      <p class="tk-empty" id="tkEmpty" hidden>Press record, then play.</p>
+      <p class="tk-empty" id="tkEmpty" hidden>Recording is on. Play, and each time you sing along is kept here.</p>
     </section>
+    </div>
   </main>
   <main id="vStems" aria-label="Stems" hidden>
     <div class="intro" id="sIntro">
@@ -2388,9 +2417,9 @@ function paintTempo() {
   });
 }
 function initTempo(box, after) {
-  const t = el("span", "tempo"), f = el("input"), unit = el("span", null, "BPM");
+  const t = el("label", "tempo"), f = el("input"), unit = el("span", null, "BPM");
   f.type = "number"; f.step = 1; f.inputMode = "numeric";
-  t.append(f, unit); after.after(t);
+  t.append(unit, f); after.after(t);
   const take = () => {
     const m = P.song, v = Math.round(+f.value);
     if (!m || !Number.isFinite(v) || !f.value.trim()) { paintTempo(); return; }
@@ -2404,9 +2433,9 @@ function initTempo(box, after) {
 }
 (function initKey() {
   for (const box of document.querySelectorAll(".keyctl")) {
-    const btn = el("button", "pick keypick"); btn.type = "button";
+    const btn = el("button", "pick keypick"); btn.type = "button"; btn.append(el("span", "pre", "Key")); // the choice goes after it
     box.note = box.dataset.note ? $(box.dataset.note) : el("span", "knote"); // the Studio's goes under the title
-    box.append(el("span", null, "Key"), btn);
+    box.append(btn);
     initTempo(box, btn);
     if (!box.dataset.note) box.append(box.note);
     box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n, P.rateWant), minWidth: 240, foot: keyFoot });
@@ -2912,7 +2941,7 @@ async function singSong(m, btn) {
   $("#kClick").setAttribute("aria-pressed", String(!P.tracks.click.mute)); $("#kClickVol").value = P.tracks.click.vol;
   $("#kClick").disabled = $("#kClickVol").disabled = !(m.beats && m.beats.length);
   setText("playTitle", m.title);
-  loadTakes(m);
+  await loadTakes(m); // in first, so Practice opens with its takes beside it, rather than them pushing in after
   go("practice");
 }
 function showMicSet(on) { if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); } $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on)); }
@@ -3086,6 +3115,7 @@ function paintRec() {
   const b = $("#kRec");
   b.setAttribute("aria-pressed", String(R.armed)); b.classList.toggle("on", !!R.cap);
   b.title = tr(R.armed ? "Stop recording (R)" : "Record yourself as you sing (R)");
+  paintTakesShown();
 }
 
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
@@ -3144,7 +3174,13 @@ function takePart(t) {
   return { what: which, more: `${range} · ${len}` };
 }
 // Takes by day, newest first.
+// Takes beside Practice once there's something for them: Record on, or takes of the song (saved, being saved, or not)
+function paintTakesShown() {
+  const show = R.armed || T.list.length > 0;
+  $("#takes").hidden = !show; $("#prCols").classList.toggle("with-takes", show);
+}
 function renderTakes() {
+  paintTakesShown();
   $("#tkEmpty").hidden = !T.loaded || T.list.length > 0;
   $("#tkMix").hidden = !T.list.length;
   const days = new Map();
@@ -3904,7 +3940,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Reading the melody… (up to a minute the first time)": "멜로디 읽는 중… (처음엔 1분쯤 걸려요)", "Couldn’t read the melody.": "멜로디를 읽지 못했어요.",
   // takes
   "Takes": "테이크", "How takes sound, played and downloaded": "테이크를 듣고 내려받을 때의 소리", "Your voice": "내 목소리", "Your voice volume": "내 목소리 볼륨",
-  "Band volume in takes": "테이크의 반주 볼륨", "Guide vocal volume in takes": "테이크의 가이드 보컬 볼륨", "Press record, then play.": "녹음을 켜고 재생하세요.",
+  "Band volume in takes": "테이크의 반주 볼륨", "Guide vocal volume in takes": "테이크의 가이드 보컬 볼륨", "Recording is on. Play, and each time you sing along is kept here.": "녹음이 켜져 있어요. 재생하면 부를 때마다 여기 남아요.", "Press record, then play.": "녹음을 켜고 재생하세요.",
   "This browser can’t record takes. A current Chrome, Edge or Firefox can.": "이 브라우저로는 테이크를 녹음할 수 없어요. 최신 Chrome, Edge, Firefox에서는 돼요.",
   "Stop recording (R)": "녹음 끄기 (R)", "Record yourself as you sing (R)": "부르는 동안 녹음하기 (R)",
   "Today": "오늘", "Yesterday": "어제", "{n} s": "{n}초",
