@@ -1850,7 +1850,7 @@ function paintCover(tile, m) {
 // you. With the pointer over it, it leans up to TILT degrees, pressed where the pointer is; as the pointer comes near
 // it starts to lean, from NEAR (a share of its half-width) beyond its edge, most of the way already halfway in. The light: one from the upper left, its
 // reflection where the card's tilt sends it (opposite to the way it turns, as in a mirror), brighter the more it leans.
-const TILT = 16, NEAR = 1.2;
+const TILT = 16, NEAR = 1.2, CV_DEPTH = 900; // px: the eye's distance for the tilt (about twice the cover's size)
 const CV = { tile: null, x: 0, y: 0, tx: 0, ty: 0, raf: 0, closing: false };
 const stillMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const CV_FLAT = "0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 1px rgba(255, 255, 255, 0.06)"; // its shadow, none: as it leaves and lands on the tile
@@ -1895,8 +1895,10 @@ async function hideCover() {
 function tiltTick() {
   const card = $("#coverView .cv-card"), k = 0.14;
   CV.x += (CV.tx - CV.x) * k; CV.y += (CV.ty - CV.y) * k;
-  // x: how far it's turned to face right (its right edge going back), y: to face down (its bottom going back)
-  if (!CV.closing) card.style.transform = `rotateX(${(-CV.y * TILT).toFixed(2)}deg) rotateY(${(CV.x * TILT).toFixed(2)}deg)`;
+  // x: how far it's turned to face right (its right edge going back), y: to face down (its bottom going back). Seen in
+  // perspective from its own transform: the view's perspective doesn't reach it through .cv-fly, and turned without
+  // it, a cover looks the same turned left as right (only narrower)
+  if (!CV.closing) card.style.transform = `perspective(${CV_DEPTH}px) rotateX(${(-CV.y * TILT).toFixed(2)}deg) rotateY(${(CV.x * TILT).toFixed(2)}deg)`;
   card.style.setProperty("--lx", (38 - CV.x * 40).toFixed(1) + "%"); card.style.setProperty("--ly", (30 - CV.y * 40).toFixed(1) + "%");
   card.style.setProperty("--sx", (50 - CV.x * 40).toFixed(1) + "%");
   card.style.setProperty("--glow", (0.5 + 0.5 * Math.min(1, Math.hypot(CV.x, CV.y))).toFixed(3));
