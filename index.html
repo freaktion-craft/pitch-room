@@ -2658,7 +2658,7 @@ function playSong() {
   if (P.offset >= songDur() - 0.05) P.offset = 0;
   P.bus = ac.createGain(); P.bus.gain.value = stemVol; P.bus.connect(master);
   const at = ac.currentTime + 0.06 + (P.lead || 0) / P.rate; // after the lead-in, if a count-in comes before the song
-  P.lead = 0;
+  P.lead = 0; P.counted = null; // a count-in, if one comes with this start, says so after (countClicks)
   recEnd(at); // a key change swaps the sources without a pause: the take so far ends where the new ones start
   P.sources = [];
   const tracks = ac.createGain(); tracks.gain.value = 0; fadeIn(tracks.gain, at); tracks.connect(P.bus);
@@ -2734,8 +2734,8 @@ function stemsTick() {
   if (!P.playing || !P.song) return;
   const pos = songPos(), beats = P.song.beats || [], c = P.tracks.click;
   while (P.clickNext < beats.length && beats[P.clickNext] < pos + 0.25 * P.rate) {
-    const b = beats[P.clickNext], at = P.startAt + (b - P.offset) / P.rate;
-    if (at >= ac.currentTime - 0.01) clickTick(Math.max(at, ac.currentTime), ((P.clickNext - c.offset) % c.bpb + c.bpb) % c.bpb === 0);
+    const b = beats[P.clickNext], at = P.startAt + (b - P.offset) / P.rate, counted = P.counted && P.counted.some((x) => Math.abs(x - b) < 0.03);
+    if (at >= ac.currentTime - 0.01 && !counted) clickTick(Math.max(at, ac.currentTime), ((P.clickNext - c.offset) % c.bpb + c.bpb) % c.bpb === 0);
     P.clickNext++;
   }
   if (pos >= songDur() - 0.02) { pauseSong(); P.offset = songDur(); }
@@ -3429,10 +3429,12 @@ function countsBefore(t0, beats, beat, n = S.countIn) {
   while (out.length < n) out.unshift((out.length ? out[0] : beats[0]) - step);
   return out;
 }
-// The count-in heard: a tick on each of its beats (the first higher; a little lower than the click track's, to tell
-// them apart), unless the click track is on and plays them anyway
+// The count-in heard, whenever there is one: a tick on each of its beats (the first higher; a little lower than the
+// click track's, to tell them apart). With the click track on too, its own ticks on those beats are left out
+// (P.counted, stemsTick), so they aren't heard twice; before the song's start it has none anyway.
 function countClicks(counts) {
-  if (!P.playing || !counts || !counts.length || audible("click")) return;
+  if (!P.playing || !counts || !counts.length) return;
+  P.counted = counts;
   counts.forEach((c, i) => {
     const at = P.startAt + (c - P.offset) / P.rate;
     if (at < ac.currentTime - 0.01) return;
