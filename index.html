@@ -376,8 +376,12 @@ input[type="range"]:disabled { opacity: 0.4; }
 .job .x:disabled { opacity: 0.4; pointer-events: none; }
 .job .x .ico { width: 16px; height: 16px; }
 .job.err .top span { color: var(--bad); white-space: normal; }
-.job.err .bar { display: none; }
-.job.err .x { grid-row: 1; }
+.job.err .bar, .job.done .bar { display: none; }
+.job.err .x, .job.done .x { grid-row: 1; }
+/* in: the way to it, the panel's one strong button */
+.job .x.go { background: var(--ink); color: var(--on-ink); }
+.job .x.go:hover { background: var(--ink-strong); color: var(--on-ink); }
+#jobsBtn.ready .ring circle + circle { stroke: var(--ink); } /* all in */
 
 .player { background: var(--surface); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 16px; display: grid; gap: 16px; margin-bottom: 32px; }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; } /* Info's title and buttons */
@@ -1624,6 +1628,7 @@ Object.assign(ICONS, {
   mic: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C15.8824 18 18.7174 15.3914 19 12M12 22H15M12 22H9"/><path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6V11C16 13.2091 14.2091 15 12 15C9.79086 15 8 13.2091 8 11V6Z"/>', // Mic02
   micOff: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C14.0193 18 15.443 17.4658 16.5665 16.5665M12 22H15M12 22H9M19 12C18.93 12.8406 18.7031 13.6331 18.3497 14.3497"/><path d="M8.3535 4.3535C8.98114 2.96566 10.3778 2 12 2C14.2091 2 16 3.79086 16 6V11C16 11.309 15.965 11.6098 15.8987 11.8987M8 8V11C8 13.2091 9.79086 15 12 15C12.8492 15 13.6365 14.7354 14.2841 14.2841"/><path d="M2 2L22 22"/>', // MicOff02
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
+  goTo: '<path d="M9 6.65032C9 6.65032 15.9383 6.10759 16.9154 7.08463C17.8924 8.06167 17.3496 15 17.3496 15M16.5 7.5L6.5 17.5"/>', // ArrowUpRight01
   practice: '<path d="M7 6.5C7 4.01472 9.01472 2 11.5 2C13.9853 2 16 4.01472 16 6.5V11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5V6.5Z"/><path d="M11.5 19H11.0828C7.57267 19 4.57706 16.4623 4 13M11.5 19H11.9172C15.4273 19 18.4229 16.4623 19 13M11.5 19V22"/>', // Mic01
   video: '<path d="M2 11C2 7.70017 2 6.05025 3.02513 5.02513C4.05025 4 5.70017 4 9 4H10C13.2998 4 14.9497 4 15.9749 5.02513C17 6.05025 17 7.70017 17 11V13C17 16.2998 17 17.9497 15.9749 18.9749C14.9497 20 13.2998 20 10 20H9C5.70017 20 4.05025 20 3.02513 18.9749C2 17.9497 2 16.2998 2 13V11Z"/><path d="M17 8.90585L17.1259 8.80196C19.2417 7.05623 20.2996 6.18336 21.1498 6.60482C22 7.02628 22 8.42355 22 11.2181V12.7819C22 15.5765 22 16.9737 21.1498 17.3952C20.2996 17.8166 19.2417 16.9438 17.1259 15.198L17 15.0941"/><circle cx="11.5" cy="9.5" r="1.5"/>', // Video01
   videoOff: '<path d="M2.00189 1.99988L21.9772 21.9999"/><path d="M16.8516 16.8677C16.7224 17.8061 16.4665 18.4668 15.9595 18.9744C14.9356 19.9996 13.2877 19.9996 9.992 19.9996H8.99323C5.69749 19.9996 4.04961 19.9996 3.02575 18.9744C2.00189 17.9493 2.00189 16.2994 2.00189 12.9996V10.9996C2.00189 7.69971 2.00189 6.04979 3.02575 5.02466C3.36827 4.68172 3.78062 4.45351 4.30114 4.30164"/><path d="M8.23627 4.0004C8.47815 3.99988 8.72995 3.99988 8.99217 3.99988H9.99093C13.2867 3.99988 14.9346 3.99988 15.9584 5.02501C16.9822 6.05013 16.9822 7.70005 16.9822 10.9999V12.7573M16.9822 9.2313L19.3018 7.52901C20.7729 6.54061 21.4489 7.17184 21.6674 7.64835C22.1191 8.92801 21.9768 11.3935 21.9768 14.5416C21.8703 16.5549 21.5952 16.7718 21.3137 16.9938L21.3107 16.9961"/>', // VideoOff
@@ -2217,59 +2222,74 @@ function renderInfoRange(s) {
   }
   box.append(listen);
 }
-// Songs being added, by job: {name, status, stage, progress, ahead, cancel, error, stopping, done}, in the order they
-// were started. The ring beside the mic shows them while there are any: as full as they are together, each counted
-// whole once it's in, until the last is; spinning while none has started. Pressed, its panel lists those still on
-// their way: each one's name (a link's video title once it's known), what it's doing or how many are ahead of it, and
-// a button to stop it. One that failed stays, saying why, until it's cleared.
+// Songs being added, by job: {name, status, stage, progress, ahead, cancel, error, stopping, done, songId, seen}, in
+// the order they were started. The ring beside the mic shows them while there are any: as full as they are together,
+// each counted whole once it's in; spinning while none has started; full and bright once all are in. Pressed, its
+// panel lists each one: its name (a link's video title once it's known, the song's own once it's in), what it's doing
+// or how many are ahead of it, and a button to stop it. One that's in has a button to open it instead, and stays until
+// it's opened or the panel is closed having shown it (seen); one that failed stays, saying why, until it's cleared.
 const adding = new Map();
-let jobsGone = null;
 function addingJob(id, j) { adding.set(id, { ...(adding.get(id) || {}), ...j }); paintJobs(); }
 function paintJobs() {
-  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && j.status !== "error");
+  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && j.status !== "error"), ready = jobs.filter((j) => j.done);
   const counted = jobs.filter((j) => j.status !== "error"), failed = jobs.length > counted.length;
   const p = counted.length ? counted.reduce((s, j) => s + (j.done ? 1 : j.progress || 0), 0) / counted.length : 1;
-  const btn = $("#jobsBtn");
+  const btn = $("#jobsBtn"), open = !$("#jobsPop").hidden;
   if (!btn.querySelector(".ring")) btn.append(progRing(0));
   const ring = btn.querySelector(".ring"), arc = ring.lastElementChild;
   showJobsBtn(jobs.length > 0);
   const waiting = live.length > 0 && !live.some((j) => j.status === "running") && p === 0;
   ring.classList.toggle("spin", waiting && !stillMotion());
-  btn.classList.toggle("err", failed && !live.length && !counted.some((j) => j.done));
+  btn.classList.toggle("err", failed && !live.length && !ready.length);
+  btn.classList.toggle("ready", !live.length && ready.length > 0);
   arc.style.strokeDasharray = `${btn.classList.contains("err") ? 100 : Math.max(6, waiting ? 25 : p * 100)} 100`;
   const pct = Math.round(p * 100);
-  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : failed ? "Couldn’t add a song" : "Added", { n: live.length, pct }, "title");
-  // the panel: a row for each on its way or failed, kept from one paint to the next (a button keeps its hover and focus)
+  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : ready.length > 1 ? "{n} songs added"
+    : ready.length ? "Song added" : "Couldn’t add a song", { n: live.length || ready.length, pct }, "title");
+  // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
+  say($("#jobsPop > b"), !live.length && ready.length ? "Songs added" : "Adding songs");
   for (const [id, j] of adding) {
+    if (j.done && open) j.seen = true; // in while the panel's open: shown
     let row = document.getElementById("job-" + id);
-    if (j.done) { row?.remove(); continue; }
     if (!row) {
       row = el("div", "job"); row.id = "job-" + id;
       const top = el("div", "top"); top.append(el("b"), el("span"));
       const bar = el("div", "bar"); bar.append(el("i")); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
-      const x = el("button", "x"); x.type = "button"; x.append(icon("close")); x.onclick = () => cancelJob(id);
+      const x = el("button", "x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
       row.append(top, bar, x); list.append(row);
     }
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err, at = Math.round((j.progress || 0) * 100);
-    row.classList.toggle("err", err);
-    row.querySelector("b").textContent = j.name ? j.name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song");
+    row.classList.toggle("err", err); row.classList.toggle("done", !!j.done);
+    const name = (j.done && libCache.get(j.songId)?.title) || j.name;
+    row.querySelector("b").textContent = name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song");
     const state = row.querySelector(".top span");
-    if (err) say(state, j.error || "That didn’t work.");
+    if (j.done) say(state, "Added");
+    else if (err) say(state, j.error || "That didn’t work.");
     else if (stopping) say(state, "Cancelling…");
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
     else say(state, "{stage} · {pct}%", { stage: () => tr(j.stage || ""), pct: at });
     row.querySelector(".bar i").style.width = at + "%"; row.querySelector(".bar").setAttribute("aria-valuenow", at);
-    const x = row.querySelector(".x");
-    say(x, err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping;
+    // cancel, or clear one that failed; once it's in, open it
+    const x = row.querySelector(".x"), kind = j.done ? "goTo" : "close";
+    if (x.dataset.icon !== kind) { x.replaceChildren(icon(kind)); x.dataset.icon = kind; }
+    x.classList.toggle("go", !!j.done);
+    say(x, j.done ? "Open song" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping;
   }
-  // all in: the ring full a moment, then gone (one that failed stays until it's cleared)
-  clearTimeout(jobsGone);
-  if (!live.length) jobsGone = setTimeout(() => {
-    let gone = false;
-    for (const [id, j] of adding) if (j.done) { adding.delete(id); gone = true; }
-    if (gone) paintJobs();
-  }, 800);
+}
+// An added song, opened from the panel: it leaves the panel, which closes.
+function openAdded(id) {
+  const j = adding.get(id);
+  if (!j) return;
+  adding.delete(id); document.getElementById("job-" + id)?.remove();
+  showJobs(false); paintJobs();
+  go("stems/" + j.songId);
+}
+// A song opened another way (from the list) needn't be offered in the panel any more.
+function forgetAdded(songId) {
+  let gone = false;
+  for (const [id, j] of adding) if (j.done && j.songId === songId) { adding.delete(id); document.getElementById("job-" + id)?.remove(); gone = true; }
+  if (gone) paintJobs();
 }
 // The ring comes in and goes out beside the mic, which stays where it is.
 function showJobsBtn(on) {
@@ -2289,8 +2309,13 @@ function showJobsBtn(on) {
   a.finished.then(() => { if (b.dataset.leaving) { delete b.dataset.leaving; b.hidden = true; a.cancel(); } }).catch(() => {});
 }
 function showJobs(on) {
+  const was = !$("#jobsPop").hidden;
   $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
-  if (on) showMicSet(false);
+  if (on) { showMicSet(false); paintJobs(); } // marks those in as seen
+  else if (was) { // closed: the songs it showed as in have been seen
+    for (const [id, j] of adding) if (j.done && j.seen) { adding.delete(id); document.getElementById("job-" + id)?.remove(); }
+    paintJobs();
+  }
 }
 // Stop a song that's being added (the server stops within a second or so and throws its files away); one that
 // failed is just cleared away.
@@ -2314,6 +2339,7 @@ function dropJob(id) {
 async function songArrived(songId) {
   const box = $("#sLib"), had = !!box.querySelector(".row"), from = box.offsetHeight, searchHidden = $("#sSearchBox").hidden;
   await renderLibrary();
+  paintJobs(); // the panel names it as the library does
   if (!(view === "stems" && stemsPage === "lib") || stillMotion()) return;
   const node = had ? libRows.get(songId) : box;
   if (node?.isConnected) unfold(node, had ? 0 : from);
@@ -2356,8 +2382,8 @@ function watchJob(id, kind, forSong) {
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
     } else if (j.status !== "cancelled") {
-      const { name, status, stage, progress, ahead, cancel, error } = j;
-      addingJob(id, { ...(name ? { name } : {}), status, stage, progress, ahead, cancel, error, done: status === "done" });
+      const { name, status, stage, progress, ahead, cancel, error, songId } = j;
+      addingJob(id, { ...(name ? { name } : {}), status, stage, progress, ahead, cancel, error, songId, done: status === "done" });
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
@@ -4825,6 +4851,7 @@ function go(v) { if (location.hash !== "#" + v) location.hash = v; else route();
 // Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
 function stemsRoute(sub, extra) {
   stemsPage = !sub ? "lib" : sub === "add" ? "add" : extra === "info" ? "info" : extra === "takes" ? "takes" : "song";
+  if (sub && sub !== "add") forgetAdded(sub);
   $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib" || stemsPage === "takes"; $("#sSongActs").hidden = stemsPage !== "song";
   $("#sTakesStudio").hidden = stemsPage !== "takes";
   if (stemsPage === "takes") openTakesStudio(sub); else tsStop();
@@ -5086,6 +5113,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.": "사용할 권리가 있는 오디오만 쓰세요. YouTube에서 내려받으면 YouTube 서비스 약관에 어긋날 수 있어요.",
   "Songs being added": "추가 중인 곡", "Adding songs": "곡 추가 중", "Adding {n} songs · {pct}%": "{n}곡 추가 중 · {pct}%",
   "Adding a song · {pct}%": "곡 추가 중 · {pct}%", "Couldn’t add a song": "곡을 추가하지 못했어요", "Added": "추가됨", "A song": "곡",
+  "{n} songs added": "{n}곡 추가됨", "Song added": "곡 추가됨", "Open song": "곡 열기", "Songs added": "추가된 곡",
   "{stage} · {pct}%": "{stage} · {pct}%", "Your first song is on its way. How it’s going shows beside the mic.": "첫 곡을 추가하고 있어요. 진행 상황은 마이크 옆에 보여요.",
   "Starting…": "시작하는 중…", "Uploading…": "올리는 중…", "Progress": "진행률", "Cancel": "취소", "Clear": "지우기", "Cancelling…": "취소하는 중…",
   "The server didn’t answer properly.": "서버가 제대로 답하지 않았어요.", "That didn’t work.": "잘 안 됐어요.", "Couldn’t reach the server.": "서버에 연결하지 못했어요.",
