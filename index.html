@@ -586,6 +586,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #listFade { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; height: 192px; pointer-events: none; }
 #listFade > * { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s; }
 #listFade.on > * { opacity: 1; }
+#listFade.now > * { transition: none; }
 #listFade > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
 #listFade > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }
 #listFade > i:nth-child(3) { backdrop-filter: blur(2px); mask: linear-gradient(transparent 33.3%, #000 50%, #000 66.7%, transparent 83.3%); }
@@ -1950,10 +1951,12 @@ function initLibSearch() {
   addEventListener("scroll", paintFade, { passive: true });
   addEventListener("resize", paintFade);
 }
-// The fade at the page's foot: on the library while the page runs on below the window.
-function paintFade() {
-  const more = document.documentElement.scrollHeight - (scrollY + innerHeight) > 4;
-  $("#listFade").classList.toggle("on", view === "stems" && stemsPage === "lib" && more);
+// The fade at the page's foot: on the library while the page runs on below the window. now: a change of page, where
+// it's there (or gone) at once with the page, not fading in after it.
+function paintFade(now) {
+  const more = document.documentElement.scrollHeight - (scrollY + innerHeight) > 4, f = $("#listFade");
+  if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
+  f.classList.toggle("on", view === "stems" && stemsPage === "lib" && more);
 }
 function initCoverView() {
   const view = $("#coverView"), card = view.querySelector(".cv-card");
@@ -5158,6 +5161,7 @@ function route() {
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } // takes are recorded and played in Practice only
   if (view === "stems") stemsRoute(sub, extra);
+  paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   // back in the library: the song (still loaded) starts from the top when it's opened again, in the Studio or Practice
   if (view === "stems" && stemsPage === "lib" && P.song) { P.offset = 0; P.lead = 0; K.cue = null; K.resume = null; }
