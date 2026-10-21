@@ -740,6 +740,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #earRows { display: grid; gap: 8px; }
 .ear-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 32px; }
 .ear-row > span { color: var(--muted); }
+.ear-sub { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); font-weight: 500; } /* the comparison's ears, under a hairline */
 .seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill); }
 .seg button { min-width: 48px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; }
 .seg button:hover { color: var(--ink); }
@@ -1142,10 +1143,10 @@ const store = (() => {
 const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4, ears: null };
 for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
 // ears: which ear each part plays in, in Practice (EARS)
-const EAR_DEFAULT = { band: "both", guide: "both", click: "both" };
+const EAR_DEFAULT = { band: "both", guide: "both", click: "both", left: "orig", right: "yours" };
 S.ears = Object.fromEntries(Object.entries(EAR_DEFAULT).map(([k, d]) => {
-  const v = S.ears && S.ears[k];
-  return [k, ["l", "both", "r"].includes(v) ? v : d];
+  const v = S.ears && S.ears[k], ok = k === "left" || k === "right" ? ["orig", "yours"] : ["l", "both", "r"];
+  return [k, ok.includes(v) ? v : d];
 }));
 const save = () => store.set("settings", S);
 const A4 = 440;
@@ -3742,12 +3743,18 @@ async function hearMe(on) {
   b.setAttribute("aria-pressed", String(on)); say(b, on ? "Stop hearing" : "Hear yourself");
 }
 // Headphones, in Practice (S.ears): which ear the band, the guide vocal and the metronome (its count-in too) play in,
-// "l", "r" or "both". A part in one ear is both its channels there, at 0.7 each, about as loud as it was in both (the
-// limiter keeps the peaks). The Studio plays everything in both ears. (Your own voice isn't offered back: through the
+// "l", "r" or "both"; and, when a take is compared, what each ear hears (left, right: "orig", the song as it is, or
+// "yours", the take as set in the Takes sliders), so the original can be in one ear and yours in the other, or either
+// in both. A part in one ear is both its channels there, at 0.7 each, about as loud as it was in both (the limiter
+// keeps the peaks). The Studio plays everything in both ears. (Your own voice isn't offered back live: through the
 // browser it comes 30 ms or more late, too late to sing with.)
 const EARS = { band: "Band", guide: "Guide vocal", click: "Metronome" };
 const EAR_SIDES = [["l", "Left"], ["both", "Both"], ["r", "Right"]];
-const earOf = (part) => (view === "practice" ? S.ears[part] : "both");
+const CMP_EARS = { left: "Left ear", right: "Right ear" }, CMP_SIDES = [["orig", "Original"], ["yours", "Your take"]];
+function earOf(part) {
+  if (part === "orig" || part === "yours") { const l = S.ears.left === part, r = S.ears.right === part; return l && r ? "both" : l ? "l" : r ? "r" : "off"; }
+  return view === "practice" ? S.ears[part] : "both";
+}
 function earNode(part, dest) {
   const pan = ac.createStereoPanner(), g = ac.createGain();
   pan.connect(g); g.connect(dest);
@@ -3756,22 +3763,22 @@ function earNode(part, dest) {
   return n;
 }
 function setEar(n, now) {
-  const e = earOf(n.part), pan = e === "l" ? -1 : e === "r" ? 1 : 0, gain = e === "both" ? 1 : 0.7;
+  const e = earOf(n.part), pan = e === "l" ? -1 : e === "r" ? 1 : 0, gain = e === "off" ? 0 : e === "both" ? 1 : 0.7;
   if (now) { n.pan.pan.value = pan; n.g.gain.value = gain; return; }
   n.pan.pan.setTargetAtTime(pan, ac.currentTime, 0.01); n.g.gain.setTargetAtTime(gain, ac.currentTime, 0.01);
 }
-// After a change, or a change of page: the song's parts as they play.
+// After a change, or a change of page: the song's parts as they play, and a comparison's.
 function applyEars() {
   paintEarsBtn();
-  if (ac && P.ears) for (const n of Object.values(P.ears)) setEar(n);
+  if (!ac) return;
+  for (const ears of [P.ears, T.play && T.play.ears]) if (ears) for (const n of Object.values(ears)) setEar(n);
 }
 function paintEarsBtn() { $("#kEars").classList.toggle("set", Object.entries(EAR_DEFAULT).some(([k, d]) => S.ears[k] !== d)); }
 function renderEars() {
-  const rows = $("#earRows");
-  rows.replaceChildren(...Object.entries(EARS).map(([part, name]) => {
-    const row = el("div", "ear-row"), seg = el("div", "seg");
+  const row = (part, name, sides) => {
+    const r = el("div", "ear-row"), seg = el("div", "seg");
     seg.setAttribute("role", "radiogroup"); seg.setAttribute("aria-label", tr(name));
-    for (const [v, t] of EAR_SIDES) {
+    for (const [v, t] of sides) {
       const b = el("button", null, tr(t));
       b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(S.ears[part] === v));
       b.onclick = () => {
@@ -3780,9 +3787,11 @@ function renderEars() {
       };
       seg.append(b);
     }
-    row.append(el("span", null, tr(name)), seg);
-    return row;
-  }));
+    r.append(el("span", null, tr(name)), seg);
+    return r;
+  };
+  $("#earRows").replaceChildren(...Object.entries(EARS).map(([part, name]) => row(part, name, EAR_SIDES)),
+    el("span", "ear-sub", tr("Comparing a take")), ...Object.entries(CMP_EARS).map(([part, name]) => row(part, name, CMP_SIDES)));
 }
 function showEars(on) {
   $("#earsPop").hidden = !on; $("#kEars").setAttribute("aria-expanded", String(on));
@@ -4142,7 +4151,7 @@ function takeRow(t) {
   const cmp = el("button", "dl tk-cmp"), dl = el("button", "dl"), del = el("button", "dl tk-del");
   cmp.type = dl.type = del.type = "button"; cmp.append(icon("compare")); dl.append(icon("download")); del.append(icon("trash"));
   cmp.disabled = dl.disabled = !!(t.saving || t.failed); del.disabled = !!t.saving;
-  cmp.title = tr("Compare: the original singer's part, then yours"); cmp.setAttribute("aria-label", cmp.title); cmp.setAttribute("aria-pressed", "false");
+  cmp.title = tr("Compare: the original in one ear, yours in the other (set under Headphones)"); cmp.setAttribute("aria-label", cmp.title); cmp.setAttribute("aria-pressed", "false");
   cmp.onclick = () => listenTake(t, "compare");
   dl.title = tr("Download as WAV, mixed as set above"); dl.setAttribute("aria-label", tr("Download this take as WAV"));
   del.title = tr(t.failed ? "Dismiss" : "Delete this take"); del.setAttribute("aria-label", del.title);
@@ -4203,14 +4212,13 @@ async function takeWav(t) {
 
 // Listening: your voice with the band (every track but the guide vocal) and the guide at its own volume, in the key the
 // take was sung in, from the take's start (or where it was paused). Playing a take stops the song, and the song stops it.
-// mode: "take", the take over the band as set above; "compare", the original singer's part first (the band with the
-// guide vocal at full), then, a breath later (COMPARE_GAP), yours as set above. Pressing the same again pauses a take
-// (Play goes on from there) and stops a comparison.
-const COMPARE_GAP = 0.8;
+// mode: "take", the take over the band as set above; "compare", both at once, the original (every track at full, the
+// singer too) in one ear and yours as set above in the other, each where the Headphones panel puts it. Pressing the
+// same again pauses a take (Play goes on from there) and stops a comparison.
 async function listenTake(t, mode = "take") {
   if (T.play && T.play.id === t.id && T.play.mode === mode) { listenStop(mode === "take"); return; }
   listenStop(); pauseSong(); ensureCtx();
-  const pos = mode === "take" && T.at && T.at.id === t.id ? T.at.pos : 0, p = { id: t.id, take: t, mode };
+  const pos = T.at && T.at.id === t.id ? T.at.pos : 0, p = { id: t.id, take: t, mode };
   T.play = p; paintListen();
   // usually a moment; a take in a key not played yet waits for its tracks to be made (about 10 s)
   const sp = t.speed || 1;
@@ -4229,8 +4237,8 @@ async function listenTake(t, mode = "take") {
   p.bus = ac.createGain(); p.bus.gain.value = stemVol; p.bus.connect(master); // the Studio's volume, as for the song
   p.srcs = [];
   // the band from the take's place in the song (at its tempo), and your voice, from `from` s into the take, at `when`
-  const pass = (when, from, gains, withVoice) => {
-    for (const g of Object.values(gains)) g.connect(p.bus);
+  const pass = (when, from, gains, withVoice, to = p.bus) => {
+    for (const g of Object.values(gains)) g.connect(to);
     for (const [name, buf] of Object.entries(bufs)) {
       const s = ac.createBufferSource(); s.buffer = buf; s.connect(name === guide ? gains.guide : gains.band); s.start(when, t.start / sp + from, t.duration - from); p.srcs.push(s);
     }
@@ -4238,12 +4246,12 @@ async function listenTake(t, mode = "take") {
   };
   const mix = (v, b, gd) => { const g = { voice: ac.createGain(), band: ac.createGain(), guide: ac.createGain() }; g.voice.gain.value = v; g.band.gain.value = b; g.guide.gain.value = gd; return g; };
   p.gains = mix(T.mix.voice * (t.gain || 1), T.mix.band, T.mix.guide); // yours, as set above (listenGains follows the sliders)
-  if (mode === "compare") {
-    pass(at, 0, mix(0, T.mix.band, 1), false); // the original singer
-    p.yours = t.duration + COMPARE_GAP; // s after `at` that yours starts
-    pass(at + p.yours, 0, p.gains, true);
-  } else { p.yours = 0; pass(at, pos, p.gains, true); }
-  p.at = at; p.pos = pos; p.total = p.yours + t.duration; // s of it, from its start
+  if (mode === "compare") { // the original and yours together, each to its ear
+    p.ears = { orig: earNode("orig", p.bus), yours: earNode("yours", p.bus) };
+    pass(at, pos, mix(0, 1, 1), false, p.ears.orig.in);
+    pass(at, pos, p.gains, true, p.ears.yours.in);
+  } else pass(at, pos, p.gains, true);
+  p.at = at; p.pos = pos; p.total = t.duration;
   paintListen();
 }
 // ---------- Takes Studio ----------
@@ -4494,9 +4502,8 @@ function paintListen() {
     if (t) drawTakeWave(t);
   }
 }
-// A take's waveform, under its row: your voice, lit in your colour as far as it has played (or is paused at); in a
-// comparison the original singer's pass lights it in the ink first, then yours in your colour. A press on it (or a drag,
-// let go where you want) plays the take from there; ← and → move 5 s. Its peaks are worked out from the recording the
+// A take's waveform, under its row: your voice, lit in your colour as far as it has played (or is paused at). A press
+// on it (or a drag, let go where you want) plays the take from there, compared if it was; ← and → move 5 s. Its peaks are worked out from the recording the
 // first time its row is in view, and kept while the song is open (T.peaks: id → {v, job}).
 const TK_WAVE_H = 28;
 const takeWaveIO = new IntersectionObserver((es) => {
@@ -4530,9 +4537,7 @@ function takeWaveAt(t) {
   const p = T.play;
   if (p && p.id === t.id) {
     if (!p.srcs) return { f: p.pos / t.duration }; // still loading
-    const pos = p.pos + Math.max(0, ac.currentTime - p.at);
-    if (pos < p.yours) return { f: Math.min(1, pos / t.duration), orig: true }; // comparing: the original singer's pass
-    return { f: Math.min(1, (pos - p.yours) / t.duration) };
+    return { f: Math.min(1, (p.pos + Math.max(0, ac.currentTime - p.at)) / t.duration) };
   }
   return T.at && T.at.id === t.id ? { f: T.at.pos / t.duration, paused: true } : null;
 }
@@ -4563,18 +4568,19 @@ function drawTakeWave(t) {
   if (!pk) { x.fillStyle = C.ink; x.globalAlpha = 0.18; x.fillRect(0, Math.round((cv.height - d) / 2), cv.width, d); x.globalAlpha = 1; return; }
   const f = scrub ? w._scrub : now ? now.f : 0, maxH = TK_WAVE_H - 4;
   x.fillStyle = C.ink; waveBars(x, cv.width, cv.height, d, pk, maxH, 0, 0, 0.22, Infinity);
-  if (f > 0) { x.fillStyle = now && now.orig && !scrub ? C.ink : C.voice; waveBars(x, cv.width, cv.height, d, pk, maxH, f, now && now.paused && !scrub ? 0.6 : 1, 0, Infinity); }
+  if (f > 0) { x.fillStyle = C.voice; waveBars(x, cv.width, cv.height, d, pk, maxH, f, now && now.paused && !scrub ? 0.6 : 1, 0, Infinity); }
   x.setTransform(1, 0, 0, 1, 0, 0);
   if (now || scrub) { x.fillStyle = C.voice; x.fillRect(Math.round(f * cv.width - d), 0, 2 * d, cv.height); } // where it is
   if (w._hover != null && !scrub) { x.fillStyle = C.ink; x.globalAlpha = 0.4; x.fillRect(Math.round(w._hover * cv.width), 0, d, cv.height); x.globalAlpha = 1; }
   const s = String(Math.round(f * t.duration));
   if (w.getAttribute("aria-valuenow") !== s) w.setAttribute("aria-valuenow", s);
 }
-// A press on a take's waveform: the take plays from there (whatever else was playing gives way)
+// A press on a take's waveform: the take plays from there, compared if it was (whatever else was playing gives way)
 function takeSeek(t, pos) {
+  const mode = T.play && T.play.id === t.id ? T.play.mode : "take";
   listenStop();
   T.at = { id: t.id, pos: Math.max(0, Math.min(t.duration - 0.1, pos)) };
-  listenTake(t);
+  listenTake(t, mode);
 }
 // The take as recorded, decoded once (the last few kept).
 function takeVoice(t) {
@@ -4904,19 +4910,19 @@ function practiceFrame() {
   renderHud(sn, cur); renderCountIn(sn); renderLyric();
 }
 // While a take plays, the stage follows it: the bars in the key and octave it was sung in, where it is in the song, and
-// the line you sang, drawn as it goes, the dot where it is now (in a comparison, only once it's your turn).
+// the line you sang, drawn as it goes, the dot where it is now (compared too: the original is in the other ear).
 function takeFrame(tp) {
-  const tk = tp.take, sp = tk.speed || 1, gone = tp.pos + Math.max(0, ac.currentTime - tp.at), yours = gone >= tp.yours;
-  const now = tk.start + Math.max(0, yours ? gone - tp.yours : gone) * sp, sh = (tk.oct || 0) * 12 + (tk.key || 0);
+  const tk = tp.take, sp = tk.speed || 1, gone = tp.pos + Math.max(0, ac.currentTime - tp.at);
+  const now = tk.start + gone * sp, sh = (tk.oct || 0) * 12 + (tk.key || 0);
   if (!tp.evs) tp.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const hist = [];
-  if (yours && tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + t * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m }); }
+  if (tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + t * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m }); }
   const last = hist[hist.length - 1], cur = last && now - last.t < 0.1 ? last.m : null;
   songView();
   draw(now, cur, hist, tp.evs, { pts: K.contour, shift: sh });
   setText("kTime", `${fmtTime(now)} / ${fmtTime(songDur())}`);
   renderHud(now, cur); renderLyric();
-  setText("hudRep", tr(tp.mode !== "compare" ? "Playing a take" : yours ? "Comparing · yours" : "Comparing · the original singer"));
+  setText("hudRep", tr(tp.mode !== "compare" ? "Playing a take" : "Comparing with the original"));
   $("#countIn").hidden = true;
 }
 // The mic chip's spectrum: 7 bands from 90 Hz to 4 kHz, where a voice's energy is, spaced evenly in pitch. Each bar is
@@ -5349,8 +5355,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)",
   "Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them": "이 소절 반복 (L) · 소절 막대에서 Shift+클릭하면 여러 소절을 묶어 반복해요",
   "Click a phrase to go to it · Shift+click another to loop the run between them": "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요",
-  "Compare: the original singer's part, then yours": "비교: 원곡 가수가 부른 부분, 그다음 내 테이크", "Playing a take": "테이크 듣는 중",
-  "Comparing · the original singer": "비교 중 · 원곡 가수", "Comparing · yours": "비교 중 · 내 테이크",
+  "Compare: the original in one ear, yours in the other (set under Headphones)": "비교: 한쪽 귀엔 원곡, 다른 쪽엔 내 테이크 (헤드폰에서 설정)",
+  "Comparing a take": "테이크 비교", "Left ear": "왼쪽 귀", "Right ear": "오른쪽 귀", "Original": "원곡", "Your take": "내 테이크", "Playing a take": "테이크 듣는 중",
+  "Comparing with the original": "원곡과 비교 중",
   "Headphones": "헤드폰", "Headphones: which ear each part plays in": "헤드폰: 소리마다 어느 쪽 귀로 들을지", "Left": "왼쪽", "Both": "양쪽", "Right": "오른쪽",
   "Count-in": "카운트인", "Off": "없음", "1 beat": "1박", "{n} beats": "{n}박", "From {t}": "{t}부터", "Phrases": "소절", "Phrase –": "소절 –",
   "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
