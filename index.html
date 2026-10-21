@@ -513,6 +513,22 @@ input[type="range"]:disabled { opacity: 0.4; }
 #pSave:not(:disabled) { background: var(--ink); color: var(--on-ink); }
 #pSave:not(:disabled):hover { background: var(--ink-strong); }
 .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; } /* 16 px to the list with the group's 12 */
+/* Search, beside Add song: the songs whose title or artist has every word typed, as it's typed; a field like the
+   others, 32 px, its glass inside on the left. / goes to it; Esc empties it. */
+.lib-acts { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
+.search .ico { position: absolute; left: 10px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
+.search input { width: 100%; height: 32px; padding: 0 12px 0 32px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2);
+  color: inherit; font: 13px/20px var(--font); transition: border-color 0.15s, background-color 0.15s; }
+.search input::placeholder { color: rgba(var(--fg), 0.38); }
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.search input:hover { background: var(--hover-2); }
+.search input:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+#sLib .lib-none { margin: 0; padding: 24px 12px; color: var(--faint); font-size: 14px; }
+/* A long list: the page's foot fades into the background while there's more below, and clears at the end */
+#listFade { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; height: 96px; pointer-events: none; opacity: 0; transition: opacity 0.2s;
+  background: linear-gradient(to bottom, transparent, var(--bg)); }
+#listFade.on { opacity: 1; }
 #sJobs { display: grid; gap: 8px; }
 #sJobs:empty { display: none; }
 /* The list: flat, nothing behind it, a hairline between songs. It reaches 12 px past the page's edges, so a song's
@@ -885,7 +901,9 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     </section>
 
     <section class="group" id="sLibPage">
-      <div class="lib-head"><div class="group-label">Library</div><a class="btn sm dark" id="sAddBtn" href="#stems/add">Add song</a></div>
+      <div class="lib-head"><div class="group-label">Library</div><div class="lib-acts">
+        <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
+        <a class="btn sm dark" id="sAddBtn" href="#stems/add">Add song</a></div></div>
       <div id="sJobs"></div>
       <div class="rows" id="sLib"></div>
     </section>
@@ -964,6 +982,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
   <div class="cv-fly"><div class="cv-card"><img alt=""><i class="cv-light"></i><i class="cv-sheen"></i></div></div>
 </div>
 
+<div id="listFade" aria-hidden="true"></div>
 <div id="boot" aria-hidden="true"><div class="bar"><i></i></div></div>
 
 <script src="icons.local.js"></script>
@@ -1480,6 +1499,7 @@ function resetOnDblClick(input, def) {
 // replaces them by name with another style the owner of this copy holds a Hugeicons Pro license for.
 // The <svg> gets its stroke from .ico and round caps and joins from icon(), which a shape can override.
 const ICONS = {
+  search: '<path d="M17 17L21 21"/><path d="M19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19C15.4183 19 19 15.4183 19 11Z"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 8V12L14 14"/>',
   sortUp: '<path d="M12 5.5V19"/><path d="M18 11C18 11 13.5811 5.00001 12 5C10.4188 4.99999 6 11 6 11"/>',
   sortDown: '<path d="M12 18.502V5.00195"/><path d="M18 13.002C18 13.002 13.5811 19.0019 12 19.002C10.4188 19.002 6 13.002 6 13.002"/>',
@@ -1582,6 +1602,7 @@ async function drawLibrary() {
   let lib = [], jobs = [];
   [lib, jobs] = await Promise.all(["/api/library", "/api/jobs"].map((u) => fetch(u, { cache: "no-store" }).then((r) => r.json()).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])));
   libCache = new Map(lib.map((m) => [m.id, m]));
+  libRows = new Map();
   // songs still being added (this page was reloaded, or opened in a second tab meanwhile) get their cards back
   for (const j of jobs) {
     if (pollers[j.id] || document.getElementById("job-" + j.id)) continue;
@@ -1594,6 +1615,7 @@ async function drawLibrary() {
   // nothing yet (and nothing on its way): the list becomes the one big way in, in place of the button beside its title
   const first = !lib.length && !$("#sJobs").children.length;
   $("#sAddBtn").hidden = first;
+  $("#sSearchBox").hidden = !lib.length;
   if (first) {
     const a = el("a", "first"), plus = el("span", "plus"), text = el("span");
     a.href = "#stems/add"; plus.append(icon("plus"));
@@ -1608,18 +1630,18 @@ async function drawLibrary() {
     if (c.icon) lab.append(icon(c.icon));
     lab.append(tr(c.label));
     b.type = "button"; b.dataset.by = by; b.append(lab, sortArrow("sortBoth"));
-    b.onclick = () => { libSort = libSort.by === by ? { by, desc: !libSort.desc } : { by, desc: c.desc }; store.set("libSort", libSort); sortRows(); };
+    b.onclick = () => { libSort = libSort.by === by ? { by, desc: !libSort.desc } : { by, desc: c.desc }; store.set("libSort", libSort); arrangeRows(); };
     head.append(b);
   }
   head.append(el("span"));
   box.append(head);
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
-    row.dataset.id = m.id;
+    row.dataset.id = m.id; libRows.set(m.id, row);
     link.href = "#stems/" + m.id; link.title = m.title; link.setAttribute("aria-label", libLine(m)); link.append(el("b", null, m.title));
     info.append(link, el("small", null, m.artist || ""));
     const key = el("span", "c wide", keyName(m.key));
-    keyOf(m).then(() => { key.textContent = keyName(m.key); link.setAttribute("aria-label", libLine(m)); if (libSort.by === "key") sortRows(); });
+    keyOf(m).then(() => { key.textContent = keyName(m.key); link.setAttribute("aria-label", libLine(m)); if (libSort.by === "key") arrangeRows(); });
     // a click that starts while the title is being renamed (in its field, or beside it to finish) doesn't open the song
     row.onpointerdown = () => { row.dataset.renaming = row.querySelector(".rename") ? "1" : ""; };
     row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
@@ -1632,7 +1654,7 @@ async function drawLibrary() {
       el("span", "c num wide", dayOf(m.created)), el("span", "c num end", fmtTime(m.duration)), acts);
     box.append(row);
   });
-  sortRows();
+  arrangeRows();
   awaitCovers(lib);
 }
 // The list's order: by a column, either way, kept (store "libSort"); newest first until another is chosen. desc: the
@@ -1647,16 +1669,32 @@ const SORTS = {
 };
 let libSort = (() => { const v = store.get("libSort", null); return v && SORTS[v.by] ? { by: v.by, desc: !!v.desc } : { by: "added", desc: true }; })();
 function sortArrow(name) { const a = icon(name); a.classList.add("arrow"); return a; }
-function sortRows() {
+// The list's songs, in order, those the search finds: rows moved, taken out and put back, never made again (covers
+// stay loaded, a rename stays open). libRows: each song's row, shown or not.
+let libRows = new Map();
+const folded = (t) => String(t || "").normalize("NFKC").toLocaleLowerCase();
+function arrangeRows() {
   const box = $("#sLib"), c = SORTS[libSort.by], way = libSort.desc ? -1 : 1;
   const words = new Intl.Collator(locale(), { numeric: true, sensitivity: "base" });
-  const rows = [...box.querySelectorAll(".row[data-id]")].map((r) => [r, libCache.get(r.dataset.id)]).filter(([, m]) => m);
-  rows.sort(([, a], [, b]) => {
+  const typed = $("#sSearch").value.trim(), want = folded(typed).split(/\s+/).filter(Boolean);
+  const songs = [...libRows.keys()].map((id) => libCache.get(id)).filter(Boolean);
+  songs.sort((a, b) => {
     const x = c.by(a), y = c.by(b);
     if (x == null || y == null) return (x == null) - (y == null) || b.created - a.created;
     return (c.text ? words.compare(x, y) : x - y) * way || b.created - a.created;
   });
-  for (const [r] of rows) box.append(r); // moved, not made again: covers stay loaded, a rename stays open
+  let shown = 0;
+  for (const m of songs) {
+    const row = libRows.get(m.id), text = folded(`${m.title} ${m.artist || ""} ${m.sourceTitle || ""}`);
+    if (want.every((w) => text.includes(w))) { box.append(row); shown++; } else row.remove();
+  }
+  let none = box.querySelector(".lib-none");
+  if (!shown && songs.length) {
+    none ??= el("p", "lib-none");
+    none.textContent = tr("No songs match “{q}”", { q: typed });
+    box.append(none);
+  } else none?.remove();
+  paintFade();
   for (const b of box.querySelectorAll(".lib-cols .sort")) {
     const on = b.dataset.by === libSort.by, label = tr(SORTS[b.dataset.by].label);
     b.classList.toggle("on", on);
@@ -1739,6 +1777,28 @@ function tiltTick() {
   card.style.setProperty("--glow", (0.5 + 0.5 * Math.min(1, Math.hypot(CV.x, CV.y))).toFixed(3));
   CV.raf = requestAnimationFrame(tiltTick);
 }
+function initLibSearch() {
+  const f = $("#sSearch");
+  f.before(icon("search"));
+  f.oninput = arrangeRows;
+  f.onkeydown = (e) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault(); e.stopPropagation();
+    if (f.value) { f.value = ""; arrangeRows(); } else f.blur();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || CV.tile) return;
+    if (!(view === "stems" && stemsPage === "lib") || $("#sSearchBox").hidden) return;
+    e.preventDefault(); f.focus(); f.select();
+  });
+  addEventListener("scroll", paintFade, { passive: true });
+  addEventListener("resize", paintFade);
+}
+// The fade at the page's foot: on the library while the page runs on below the window.
+function paintFade() {
+  const more = document.documentElement.scrollHeight - (scrollY + innerHeight) > 4;
+  $("#listFade").classList.toggle("on", view === "stems" && stemsPage === "lib" && more);
+}
 function initCoverView() {
   const view = $("#coverView"), card = view.querySelector(".cv-card");
   view.addEventListener("pointermove", (e) => {
@@ -1770,7 +1830,7 @@ function awaitCovers(lib, tries = 0) {
     try { now = await (await fetch("/api/library", { cache: "no-store" })).json(); } catch (e) { return; }
     if (!Array.isArray(now)) return;
     for (const m of now) {
-      const known = libCache.get(m.id), tile = $("#sLib").querySelector(`.row[data-id="${m.id}"] .cover`);
+      const known = libCache.get(m.id), tile = libRows.get(m.id)?.querySelector(".cover");
       if (known && "cover" in m) known.cover = m.cover;
       if (tile) paintCover(tile, m);
     }
@@ -2987,6 +3047,7 @@ function initStems() {
   });
   initSongMenu();
   initCoverView();
+  initLibSearch();
   $("#pVol").value = stemVol;
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
   resetOnDblClick($("#pVol"), 1);
@@ -4290,6 +4351,7 @@ function route() {
     if (K.on) practiceFrame();
   }
   window.scrollTo(0, 0);
+  paintFade();
 }
 window.addEventListener("hashchange", route);
 // ---------- opening ----------
@@ -4476,7 +4538,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Split a song into tracks and practice it phrase by phrase, with your pitch on screen.": "곡을 트랙별로 나누고, 화면에서 내 음정을 보며 한 소절씩 연습하세요.",
   "Library": "라이브러리", "Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",
   "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요. 트랙별로 나뉘어 바로 연습할 수 있어요.",
-  "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Sort by {col}": "{col} 순으로 정렬", "Sorted by {col}, {way}": "{col} 순, {way}",
+  "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Search songs": "곡 검색", "No songs match “{q}”": "“{q}”에 맞는 곡이 없어요", "Sort by {col}": "{col} 순으로 정렬", "Sorted by {col}, {way}": "{col} 순, {way}",
   "ascending": "오름차순", "descending": "내림차순", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
   "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
   "no steady beat": "일정한 박자 없음", "{n} tracks": "트랙 {n}개", "major": "장조", "minor": "단조",
