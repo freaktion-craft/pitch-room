@@ -1097,9 +1097,9 @@ def _parts_mask(n: int, ranges: list) -> np.ndarray:
     return m
 
 
-def _vocal_parts(folder: str, key: int = 0) -> dict:
-    """{lead, backing}, (2, n) each, in that key, cut to the same length."""
-    lead, back = _decode_stereo(_track_path(folder, "lead", key)), _decode_stereo(_track_path(folder, "backing", key))
+def _vocal_parts(folder: str, key: int = 0, speed: float = 1.0) -> dict:
+    """{lead, backing}, (2, n) each, in that key at that speed, cut to the same length."""
+    lead, back = _decode_stereo(_track_path(folder, "lead", key, speed)), _decode_stereo(_track_path(folder, "backing", key, speed))
     n = min(lead.shape[1], back.shape[1])
     return {"lead": lead[:, :n], "backing": back[:, :n]}
 
@@ -1172,13 +1172,16 @@ def get_melody(song_id: str) -> dict:
         return _splice(data, ranges)
 
 
-# ---------- key change ----------
-# A song can be moved up to KEYS semitones up or down. Each pitched track is rendered once per key into keys/<n>/ with
-# ffmpeg's rubberband filter, at the original's length and in time with it; the drums aren't pitched and keep playing
-# from the original. Voices keep their formants, so they sound like the same singer rather than sped up or slowed down.
-# A track is written under a temporary name and renamed once complete, so a cancelled or failed render leaves nothing
-# that looks finished.
+# ---------- key and tempo ----------
+# A song can be moved up to KEYS semitones up or down, and played slower or faster (RATE_MIN to RATE_MAX times its
+# tempo) without its pitch changing. Each version is rendered once, with ffmpeg's rubberband filter: in key n at the
+# song's own tempo into keys/<n>/, the pitched tracks only (the drums aren't pitched and keep playing from the
+# original), each as long as the original and in time with it; at speed s into keys/<n>@<s>/, every track, drums too,
+# each 1/s as long, song time t at t/s. Voices keep their formants, so they sound like the same singer rather than sped
+# up or slowed down. A track is written under a temporary name and renamed once complete, so a cancelled or failed
+# render leaves nothing that looks finished.
 KEYS = 6
+RATE_MIN, RATE_MAX = 0.5, 1.5
 VOCALS = ("vocals", "lead", "backing")
 PREPAD = 8192  # samples of silence fed in first: going up, the filter's output runs early and would lose the start
 _key_jobs: dict[tuple[str, int], str] = {}  # (song id, n) -> its render, so a key asked for twice renders once
@@ -1195,12 +1198,30 @@ def _semitones(n) -> int:
     return n
 
 
-def _key_file(folder: str, n: int, name: str) -> str:
-    return os.path.join(folder, "keys", f"{n:+d}", name + ".mp3")
+def _speed(s) -> float:
+    """A speed (1 the song's own tempo, 0.75 three quarters of it), to the thousandth, as versions are named."""
+    try:
+        s = float(s)
+    except (TypeError, ValueError):
+        raise ValueError("The tempo is a number.") from None
+    if not math.isfinite(s) or not RATE_MIN <= s <= RATE_MAX:
+        raise ValueError(f"The tempo goes from {RATE_MIN:.0%} to {RATE_MAX:.0%} of the song's.")
+    return round(s, 3)
 
 
-def _track_path(folder: str, name: str, key: int = 0) -> str:
-    """A track's file in key n: the rendered one for pitched tracks, the original for drums (and for key 0)."""
+def _key_dir(folder: str, n: int, s: float = 1.0) -> str:
+    return os.path.join(folder, "keys", f"{n:+d}" + ("" if s == 1 else f"@{s:.3f}"))
+
+
+def _key_file(folder: str, n: int, name: str, s: float = 1.0) -> str:
+    return os.path.join(_key_dir(folder, n, s), name + ".mp3")
+
+
+def _track_path(folder: str, name: str, key: int = 0, speed: float = 1.0) -> str:
+    """A track's file in key n at speed s: the rendered one, except the original for drums at the song's own tempo (and
+    for every track in its own key and tempo)."""
+    if speed != 1:
+        return _key_file(folder, key, name, speed)
     return _key_file(folder, key, name) if key and name != "drums" else os.path.join(folder, name + ".mp3")
 
 
@@ -1221,34 +1242,38 @@ def _rubberband_ffmpeg() -> str:
     raise ValueError("This copy of ffmpeg can’t change the key (it has no rubberband filter).")
 
 
-def _rubberband(n: int, vocal: bool) -> str:
-    return f"rubberband=pitch={2 ** (n / 12):.8f}:transients=crisp" + (":formant=preserved" if vocal else "")
+def _rubberband(n: int, vocal: bool, s: float = 1.0) -> str:
+    return ("rubberband=" + (f"tempo={s:.6f}:" if s != 1 else "") + f"pitch={2 ** (n / 12):.8f}:transients=crisp"
+            + (":formant=preserved" if vocal else ""))
 
 
 @lru_cache(maxsize=64)
-def _key_offset(n: int, vocal: bool) -> int:
-    """Samples by which the rubberband filter moves the audio at this shift: later going down, earlier going up (about
-    ±690 at 6 semitones with ffmpeg 7.1), so measured once per shift. The probe is noise switched on and off every
-    50 ms; its loudness envelope survives a pitch shift, so cross-correlating the envelopes before and after finds
-    the offset to within a few samples."""
+def _key_offset(n: int, vocal: bool, s: float = 1.0) -> int:
+    """Samples by which the rubberband filter moves the audio at this shift and speed (in the output's samples): later
+    going down, earlier going up (about ±690 at 6 semitones with ffmpeg 7.1), so measured once per version. The probe
+    is noise switched on and off every 50 ms; its loudness envelope survives a pitch shift (and, laid out at the new
+    tempo, a stretch), so cross-correlating the envelopes before and after finds the offset to within a few samples."""
     rng = np.random.default_rng(12)
     size = 4 * SR
     x = (rng.standard_normal(size) * np.repeat(rng.random(size // 2205 + 1) < 0.5, 2205)[:size] * 0.2).astype(np.float32)
     out = subprocess.run([_rubberband_ffmpeg(), "-v", "error", "-f", "f32le", "-ar", str(SR), "-ac", "2", "-i", "pipe:0",
-                          "-af", f"adelay=delays={PREPAD}S:all=1,apad=pad_len={SR},{_rubberband(n, vocal)}", "-f", "f32le", "pipe:1"],
+                          "-af", f"adelay=delays={PREPAD}S:all=1,apad=pad_len={SR},{_rubberband(n, vocal, s)}", "-f", "f32le", "pipe:1"],
                          input=np.repeat(x, 2).tobytes(), capture_output=True, check=False)
     y = np.frombuffer(out.stdout, dtype=np.float32).reshape(-1, 2).mean(1)
-    if len(y) < size:
+    pre, stretched = round(PREPAD / s), round(size / s)
+    if len(y) < stretched:
         raise RuntimeError("Changing the key failed: " + out.stderr.decode(errors="ignore").strip()[-200:])
 
     def env(s):
         e = np.convolve(np.abs(s), np.ones(256) / 256, "same")
         return e - e.mean()
     a, b = env(x), env(y)
+    if s != 1:  # where each moment of the probe lands at this tempo
+        a = np.interp(np.arange(stretched) * s, np.arange(size), a)
     m = len(a) + len(b)
     c = np.fft.irfft(np.fft.rfft(b, m) * np.conj(np.fft.rfft(a, m)), m)  # c[k]: a against b k samples later
-    lo = PREPAD - 4096
-    return lo + int(np.argmax(c[lo: PREPAD + 4096])) - PREPAD
+    lo = pre - 4096
+    return lo + int(np.argmax(c[lo: pre + 4096])) - pre
 
 
 def _frames(path: str) -> int:
@@ -1260,15 +1285,17 @@ def _frames(path: str) -> int:
     return n // 2
 
 
-def _shift_track(folder: str, name: str, n: int, stop, progress):
-    """One track n semitones up or down, into keys/<n>/<name>.mp3: as many samples as the original, each where the
-    original has it (the filter's offset is trimmed off), encoded like the original. stop() says when to give up
-    (raises Cancelled); progress(0…1) as it goes."""
-    src, dst = os.path.join(folder, name + ".mp3"), _key_file(folder, n, name)
+def _shift_track(folder: str, name: str, n: int, stop, progress, s: float = 1.0):
+    """One track n semitones up or down at speed s, into its version's folder: 1/s as many samples as the original
+    (as many at its own tempo), the original's sample t at t/s (the filter's offset is trimmed off), encoded like the
+    original. The drums keep their pitch. stop() says when to give up (raises Cancelled); progress(0…1) as it goes."""
+    src, dst = os.path.join(folder, name + ".mp3"), _key_file(folder, n, name, s)
+    shift = 0 if name == "drums" else n
     frames = _frames(src)
-    start = PREPAD + _key_offset(n, name in VOCALS)
-    af = (f"adelay=delays={PREPAD}S:all=1,apad=pad_len={SR},{_rubberband(n, name in VOCALS)},"
-          f"atrim=start_sample={start}:end_sample={start + frames},asetpts=PTS-STARTPTS,apad=whole_len={frames}")
+    out = round(frames / s)
+    start = round(PREPAD / s) + _key_offset(shift, name in VOCALS, s)
+    af = (f"adelay=delays={PREPAD}S:all=1,apad=pad_len={SR},{_rubberband(shift, name in VOCALS, s)},"
+          f"atrim=start_sample={start}:end_sample={start + out},asetpts=PTS-STARTPTS,apad=whole_len={out}")
     tmp = dst + ".part"
     p = subprocess.Popen([_rubberband_ffmpeg(), "-v", "error", "-nostdin", "-y", "-i", src, "-af", af, "-c:a", "libmp3lame",
                           "-b:a", "256k", "-f", "mp3", "-progress", "pipe:1", "-nostats", tmp],
@@ -1278,12 +1305,12 @@ def _shift_track(folder: str, name: str, n: int, stop, progress):
         for line in p.stdout:  # key=value lines about twice a second; anything else is an error message
             key, _, value = line.strip().partition("=")
             if key == "out_time_us" and value.isdigit():
-                progress(min(1.0, int(value) / 1e6 * SR / frames))
+                progress(min(1.0, int(value) / 1e6 * SR / out))
             elif line.strip() and not re.fullmatch(r"\w+", key):
                 errors.append(line.strip())
             stop()
         if p.wait() != 0:
-            raise RuntimeError("Changing the key failed: " + " ".join(errors)[-200:])
+            raise RuntimeError(("Changing the key failed: " if s == 1 else "Changing the tempo failed: ") + " ".join(errors)[-200:])
         os.replace(tmp, dst)
     finally:
         if p.poll() is None:
@@ -1293,10 +1320,10 @@ def _shift_track(folder: str, name: str, n: int, stop, progress):
             os.remove(tmp)
 
 
-def _render_key(folder: str, n: int, names: list[str], job=None):
-    """Render names into keys/<n>/, one ffmpeg per track, side by side. Stops early when the job is cancelled, a track
-    fails or the song is deleted."""
-    out = os.path.join(folder, "keys", f"{n:+d}")
+def _render_key(folder: str, n: int, names: list[str], job=None, s: float = 1.0):
+    """Render names in key n at speed s into their version's folder, one ffmpeg per track, side by side. Stops early
+    when the job is cancelled, a track fails or the song is deleted."""
+    out = _key_dir(folder, n, s)
     os.makedirs(out, exist_ok=True)
     done, failed = [0.0] * len(names), threading.Event()
 
@@ -1311,7 +1338,7 @@ def _render_key(folder: str, n: int, names: list[str], job=None):
             if job:
                 _set(job, progress=0.02 + 0.96 * sum(done) / len(done))
         try:
-            _shift_track(folder, name, n, stop, progress)
+            _shift_track(folder, name, n, stop, progress, s)
         except BaseException:
             failed.set()  # the others stop too
             raise
@@ -1329,32 +1356,35 @@ def _render_key(folder: str, n: int, names: list[str], job=None):
             os.rmdir(out)  # only goes if nothing was finished (cancelled at once)
 
 
-def start_key(song_id: str, n) -> dict:
-    """A song's pitched tracks n semitones up or down: {"ready": True} when they're there (or n is 0), else {"job": id}
-    of their render, which takes about as long as one track takes alone since they run side by side (about 10 s for a
-    4-minute song). A render already under way for the same key is returned instead of starting another."""
-    folder, n = _song_dir(song_id), _semitones(n)
+def start_key(song_id: str, n, speed=1) -> dict:
+    """A song's tracks n semitones up or down at speed s (1: its own tempo): {"ready": True} when they're there (or
+    it's the original), else {"job": id} of their render, which takes about as long as one track takes alone since they
+    run side by side (about 10 s for a 4-minute song at its own tempo, longer slowed down). A render already under way
+    for the same version is returned instead of starting another."""
+    folder, n, s = _song_dir(song_id), _semitones(n), _speed(speed)
     names = _pitched(folder, _read_meta(folder))
+    if s != 1:  # every track, the drums too; not the whole vocal stem once split (only Info plays it, at its own tempo)
+        names = [t for t in names if not (t == "vocals" and "lead" in names)] + ["drums"] * os.path.isfile(os.path.join(folder, "drums.mp3"))
     with _key_lock:
-        todo = [t for t in names if n and not os.path.isfile(_key_file(folder, n, t))]
+        todo = [t for t in names if (n or s != 1) and not os.path.isfile(_key_file(folder, n, t, s))]
         if not todo:
             return {"ready": True}
-        running = get_job(_key_jobs.get((song_id, n), ""))
+        running = get_job(_key_jobs.get((song_id, n, s), ""))
         if running and running["status"] in ("queued", "running"):
             return {"job": running["id"]}
         job = _new_job("key")
-        _key_jobs[(song_id, n)] = job["id"]
+        _key_jobs[(song_id, n, s)] = job["id"]
 
     def work(job):
-        _set(job, status="running", stage="Changing key", songId=song_id)
-        _render_key(folder, n, todo, job)
+        _set(job, status="running", stage="Changing key" if s == 1 else "Changing tempo" if not n else "Changing key and tempo", songId=song_id)
+        _render_key(folder, n, todo, job, s)
 
     return {"job": _run(job, work)}
 
 
-def _key_ready(song_id: str, n: int):
-    """Wait until a song's tracks in key n are there, rendering them first if needed."""
-    r = start_key(song_id, n)
+def _key_ready(song_id: str, n: int, s: float = 1.0):
+    """Wait until a song's tracks in key n at speed s are there, rendering them first if needed."""
+    r = start_key(song_id, n, s)
     while r.get("job"):
         j = get_job(r["job"])
         if j["status"] in ("queued", "running"):
@@ -1362,7 +1392,7 @@ def _key_ready(song_id: str, n: int):
             continue
         if j["status"] == "error":
             raise ValueError(j["error"])
-        r = start_key(song_id, n)  # done: ready now; cancelled (another key was chosen meanwhile): start it again
+        r = start_key(song_id, n, s)  # done: ready now; cancelled (another version was chosen meanwhile): start it again
 
 
 # ---------- export ----------
@@ -1411,16 +1441,17 @@ def _limit(x: np.ndarray, sr: int = SR) -> np.ndarray:
     return (x * g[look - 1:]).astype(x.dtype)  # the gain worked out look - 1 samples on (the page plays that late)
 
 
-def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple[bytes, str]:
+def export(song_id: str, tracks: list[dict], click: dict | None, key=0, speed=1) -> tuple[bytes, str]:
     """tracks: [{name, gain, only?}] of the tracks heard (only: a muted track's kept parts, where alone it plays); click:
-    {gain, offset, beatsPerBar} or None; key: semitones up or down, as played. Returns (mp3 bytes, filename)."""
-    folder, key = _song_dir(song_id), _semitones(key)
+    {gain, offset, beatsPerBar} or None; key: semitones up or down, and speed, the tempo, as played. Returns (mp3 bytes,
+    filename)."""
+    folder, key, speed = _song_dir(song_id), _semitones(key), _speed(speed)
     meta = _read_meta(folder)
     names, vocal = _tracks(folder, meta), None
     if not any(t.get("name") in names and t.get("name") != "drums" and float(t.get("gain", 1)) > 0 for t in tracks):
         key = 0  # the drums (or the click) alone sound the same in any key
-    if key:
-        _key_ready(song_id, key)
+    if key or speed != 1:
+        _key_ready(song_id, key, speed)
     mix = None
     used = []
     for t in tracks:
@@ -1428,17 +1459,17 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple
         if name not in names or gain <= 0:
             continue
         if name in ("lead", "backing"):
-            vocal = vocal or _vocal_parts(folder, key)
+            vocal = vocal or _vocal_parts(folder, key, speed)
             wav = vocal[name] * gain
         else:
-            wav = _decode_stereo(_track_path(folder, name, key)) * gain
-        if "only" in t:  # a muted track: just its kept parts
-            wav = wav * _parts_mask(wav.shape[1], _parts(float(meta["duration"]), t["only"]))
+            wav = _decode_stereo(_track_path(folder, name, key, speed)) * gain
+        if "only" in t:  # a muted track: just its kept parts (song times, where they fall at this tempo)
+            wav = wav * _parts_mask(wav.shape[1], [[a / speed, b / speed] for a, b in _parts(float(meta["duration"]), t["only"])])
         mix = wav if mix is None else mix[:, : wav.shape[1]] + wav[:, : mix.shape[1]]
         used.append(name)
     if click and meta.get("beats") and float(click.get("gain", 1)) > 0:
-        n = mix.shape[1] if mix is not None else int(meta["duration"] * SR)
-        ck = _click_track(meta["beats"], n / SR, int(click.get("offset", 0)), int(click.get("beatsPerBar", 4))) * float(click.get("gain", 1))
+        n = mix.shape[1] if mix is not None else int(meta["duration"] / speed * SR)
+        ck = _click_track([b / speed for b in meta["beats"]], n / SR, int(click.get("offset", 0)), int(click.get("beatsPerBar", 4))) * float(click.get("gain", 1))
         ck = ck[:, :n]
         mix = ck if mix is None else mix[:, : ck.shape[1]] + ck
         used.append("click")
@@ -1464,9 +1495,11 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple
     else:
         label = " + ".join(on)
     if "click" in used and on:
-        label += f" + click {round(meta['bpm'])} BPM" if meta.get("bpm") else " + click"
-    if key:
-        label += f" ({key:+d})"
+        label += f" + click {round(meta['bpm'] * speed)} BPM" if meta.get("bpm") else " + click"
+    said = "click" in used and on and meta.get("bpm")  # the click's BPM already says the tempo
+    tags = [f"{key:+d}" if key else "", (f"{round(meta['bpm'] * speed)} BPM" if meta.get("bpm") else f"{speed:.0%}") if speed != 1 and not said else ""]
+    if any(tags):
+        label += f" ({', '.join(t for t in tags if t)})"
     return data, f"{safe} - {label}.mp3"
 
 
@@ -1528,7 +1561,8 @@ def _singer_loud(path: str, _mtime: float) -> float:
 
 def save_take(song_id: str, data: bytes, info: dict) -> dict:
     """Keep a take. data: a 16-bit PCM WAV of the mic. info: start (song time of its first sample, s), key (semitones
-    the song played in), oct (the bars' octave, -1…1) and latency (the speaker and mic delay allowed for, s).
+    the song played in), speed (its tempo, 1 its own: a take at 0.8 covers 0.8 s of the song a second), oct (the bars'
+    octave, -1…1) and latency (the speaker and mic delay allowed for, s).
     Returns the take's json: those, plus id, created, end, duration, sampleRate and gain: how much to turn the take up or down to sound as loud as the song's own singer, so "Your voice"
     at 100% sits in the band like the original vocal (the file keeps the recording as it was)."""
     folder = _song_dir(song_id)
@@ -1546,11 +1580,11 @@ def save_take(song_id: str, data: bytes, info: dict) -> dict:
     if dur < TAKE_MIN:
         raise ValueError(f"Takes under {TAKE_MIN:g} seconds aren’t kept.")
     start = _num(info, "start", 0, float(meta["duration"]))
-    key = _semitones(info.get("key", 0))
+    key, speed = _semitones(info.get("key", 0)), _speed(info.get("speed", 1))
     singer = next((p for p in (os.path.join(folder, n + ".mp3") for n in ("lead", "vocals")) if os.path.isfile(p)), None)
     loud, ref = _loud(x, rate), singer and _singer_loud(singer, os.path.getmtime(singer))
     take = {"id": secrets.token_hex(6), "created": round(time.time(), 3), "start": round(start, 4),
-            "end": round(start + dur, 4), "duration": round(dur, 4), "key": key, "oct": int(_num(info, "oct", -1, 1)),
+            "end": round(start + dur * speed, 4), "duration": round(dur, 4), "key": key, "speed": speed, "oct": int(_num(info, "oct", -1, 1)),
             "latency": round(_num(info, "latency", 0, 2), 4), "sampleRate": rate,
             "gain": round(float(np.clip(ref / loud, *TAKE_GAIN)), 3) if ref and loud > 1e-4 else 1.0}
     out = os.path.join(folder, "takes")
@@ -1622,19 +1656,20 @@ def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
     folder = _song_dir(song_id)
     meta, take = _read_meta(folder), _take(song_id, tid)
     voice, band, guide = _gain(mix, "voice", 1), _gain(mix, "band", 1), _gain(mix, "guide", 0)
-    s0, n, key = int(round(take["start"] * SR)), int(round(take["duration"] * SR)), _semitones(take["key"])
+    key, speed = _semitones(take["key"]), _speed(take.get("speed", 1))
+    s0, n = int(round(take["start"] / speed * SR)), int(round(take["duration"] * SR))  # the band at the take's tempo
     names = _tracks(folder, meta)
     lead = "lead" if "lead" in names else "vocals"
     parts = [(t, g) for t, g in [(t, band) for t in names if t != lead] + [(lead, guide)] if g > 0]
-    if key and any(t != "drums" for t, _ in parts):
-        _key_ready(song_id, key)
+    if (key and any(t != "drums" for t, _ in parts)) or speed != 1:
+        _key_ready(song_id, key, speed)
     out, vocal = np.zeros((2, n), dtype=np.float32), None
     for t, g in parts:
         if t in ("lead", "backing"):
-            vocal = vocal or _vocal_parts(folder, key)
+            vocal = vocal or _vocal_parts(folder, key, speed)
             wav = vocal[t]
         else:
-            wav = _decode_stereo(_track_path(folder, t, key))
+            wav = _decode_stereo(_track_path(folder, t, key, speed))
         seg = wav[:, s0: s0 + n]
         out[:, : seg.shape[1]] += seg * g
     if voice > 0:
@@ -1647,5 +1682,6 @@ def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
         m = out[:, i].shape[1]
         out[:, i] *= np.linspace(0, 1, m, dtype=np.float32)[::k]
     when = time.strftime("%Y-%m-%d %H-%M", time.localtime(take["created"]))
-    return _wav(out), f"{_file_title(meta)} - take {when}{f' ({key:+d})' if key else ''}.wav"
+    tags = [f"{key:+d}" if key else "", (f"{round(meta['bpm'] * speed)} BPM" if meta.get("bpm") else f"{speed:.0%}") if speed != 1 else ""]
+    return _wav(out), f"{_file_title(meta)} - take {when}" + (f" ({', '.join(t for t in tags if t)})" if any(tags) else "") + ".wav"
 

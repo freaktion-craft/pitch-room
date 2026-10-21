@@ -28,6 +28,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 
 - mute / solo / volume per track, plus the click (accent shift, 2/4–6/4),
 - waveform overview to jump around, Space to play / pause, Home / End to go to the start / the end,
+- **Key** and **tempo** beside the title: move the song up or down by up to 6 semitones, or type a tempo (50–150 % of the song’s) and it plays slower or faster at the same pitch. Each version is made once with Rubber Band (about ten seconds) and kept; Practice, the click, exports and takes follow it,
 - to keep the vocals of some part in even with the lead muted, drag across it on the waveform and press **Keep vocals here** (its vocals move to the backing track); × on a shaded part lets it go,
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that track,
 - **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.

@@ -356,6 +356,14 @@ input[type="range"]:disabled { opacity: 0.4; }
    the note takes no room of its own, so nothing moves as they change. */
 .keyctl { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .keypick { width: 168px; flex: none; font-size: 13px; } /* one width whatever key it says, or how far it's got */
+/* the tempo, a number to type (BPM, or % for a song with no steady beat); while that tempo is being made its field
+   fills up from the left, so nothing beside it moves */
+.tempo { flex: none; display: inline-flex; align-items: center; gap: 8px; margin-left: 4px; }
+.tempo input { width: 56px; padding: 0 8px; text-align: center; font-size: 13px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums;
+  border: 1px solid transparent; -moz-appearance: textfield; appearance: textfield; }
+.tempo input::-webkit-inner-spin-button, .tempo input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.tempo input:focus { outline: none; border-color: var(--ink); }
+.tempo.changed input { color: var(--voice); } /* not the song's own tempo */
 /* up to two lines (32 px) where the line is short: within the height of the row's 40 px play button. With less room
    than its min-width for it, the control moves to the next line. */
 .knote { flex: 1 1 0; width: 0; min-width: 140px; font-size: 12.5px; line-height: 16px; max-height: 32px; overflow: hidden;
@@ -1634,7 +1642,7 @@ async function hearAt(s, t0, t1, btn) {
   if (!infoVox || infoVox.id !== s.id || infoVox.file !== file || infoVox.n !== n) {
     btn.disabled = true;
     try {
-      if (n && !(await keyRendered(s.id, n))) throw new Error("cancelled");
+      if (n && !(await keyRendered(s.id, n, 1))) throw new Error("cancelled");
       infoVox = { id: s.id, file, n, buf: await ac.decodeAudioData(await (await fetch(trackUrl(s.id, file, n))).arrayBuffer()) };
     } catch (e) { btn.disabled = false; return; }
     btn.disabled = false;
@@ -1815,8 +1823,8 @@ async function openSong(m) {
   P.keep = keepOf(m); P.tsel = P.mark = null;
   applyMix(m.mix); savedMix = JSON.stringify(mixNow()); // the saved mix, which Save compares with
   renderTracks(); autoSplit(m);
-  P.keyWant = savedKey(m.id); paintKey();
-  if (P.keyWant) loadKey(m, P.keyWant); // alongside the originals, so a key already rendered is there as they are
+  P.keyWant = savedKey(m.id); P.rateWant = savedRate(m.id); paintKey();
+  if (P.keyWant || P.rateWant !== 1) loadKey(m, P.keyWant, P.rateWant); // alongside the originals, so a version already made is there as they are
   const loaded = await Promise.all(trackNames(m).map(async (name) => {
     const r = await fetch(`/library/${m.id}/${name}.mp3`);
     return [name, await ac.decodeAudioData(await r.arrayBuffer())];
@@ -1824,20 +1832,20 @@ async function openSong(m) {
   if (P.song !== m) return;
   P.buffers = Object.fromEntries(loaded);
   P.orig = { ...P.buffers }; // as decoded, for key 0
-  if (P.shifted && P.shifted.n === P.keyWant) applyKey(P.keyWant); // the remembered key came in first
+  if (P.shifted && P.shifted.n === P.keyWant && P.shifted.s === P.rateWant) applyKey(P.keyWant, P.rateWant); // the remembered version came in first
   computePeaks(); P.peaksAt = performance.now(); // the waveform rises in from here
   paintMeta();
   drawWave();
 }
-// under the Studio's title, after the key: tempo, length and tracks
+// under the Studio's title, after the key and tempo: length and tracks
 function paintMeta() {
   const m = P.song;
-  if (m) $("#pMeta").textContent = [m.bpm ? `${m.bpm} BPM` : "", fmtTime(m.duration), Object.keys(P.buffers).length ? tr("{n} tracks", { n: trackNames(m).length }) : tr("loading tracks…")].filter(Boolean).join(" · ");
+  if (m) $("#pMeta").textContent = [fmtTime(m.duration), Object.keys(P.buffers).length ? tr("{n} tracks", { n: trackNames(m).length }) : tr("loading tracks…")].filter(Boolean).join(" · ");
 }
 function closeSong() {
   pauseSong();
   P.song = null; P.buffers = {}; P.peaks = null; P.keep = {}; P.tsel = P.mark = null;
-  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
+  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.rate = P.rateWant = 1; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
 }
@@ -1872,6 +1880,7 @@ function syncVideo() {
   const v = $("#pVideo");
   if ($("#pVideoBox").hidden || !v.getAttribute("src") || v.readyState < 1 || v.seeking) return;
   const pos = songPos(), past = pos >= v.duration - 0.05;
+  if (v.playbackRate !== P.rate) v.playbackRate = P.rate; // the picture's own clock is song time
   if (P.playing && !past) {
     if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); }
     else if (Math.abs(v.currentTime - pos) > 0.15) v.currentTime = pos;
@@ -1884,7 +1893,7 @@ setInterval(syncVideo, 100);
 function songDur() { return P.song ? P.song.duration : 0; }
 // Playback starts a moment after Play (startAt, 60 ms ahead); until then the song is still at its offset, so a pause
 // or seek that soon never stores a position before it (below 0:00, start() throws).
-function songPos() { return P.playing ? Math.min(songDur(), P.offset + Math.max(0, ac.currentTime - P.startAt)) : P.offset; }
+function songPos() { return P.playing ? Math.min(songDur(), P.offset + Math.max(0, ac.currentTime - P.startAt) * P.rate) : P.offset; }
 function audible(name) {
   const t = P.tracks[name], anySolo = Object.values(P.tracks).some((x) => x.solo);
   return anySolo ? t.solo : !t.mute;
@@ -1901,7 +1910,7 @@ function applyGains() {
     g.cancelScheduledValues(now);
     const parts = name !== "click" && t.mute && !anySolo && P.playing ? (P.keep[name] || []) : [];
     if (!parts.length) { g.setTargetAtTime(audible(name) ? t.vol : 0, now, 0.015); continue; }
-    const pos = songPos(), at = (s) => P.startAt + (s - P.offset); // the context time song second s plays at
+    const pos = songPos(), at = (s) => P.startAt + (s - P.offset) / P.rate; // the context time song second s plays at
     g.setTargetAtTime(parts.some(([a, b]) => pos >= a && pos < b) ? t.vol : 0, now, 0.015);
     for (const [a, b] of parts) {
       if (b <= pos) continue;
@@ -1922,7 +1931,7 @@ function playSong() {
   P.sources = [];
   for (const [name, buf] of Object.entries(P.buffers)) {
     const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.bus);
-    const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(at, P.offset);
+    const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(at, P.offset / P.rate); // song time → its time in this version
     P.tracks[name].gain = g; P.sources.push(s);
   }
   const cg = ac.createGain(); cg.gain.value = audible("click") ? P.tracks.click.vol : 0; cg.connect(P.bus); P.tracks.click.gain = cg;
@@ -1987,8 +1996,8 @@ function clickTick(at, accent) {
 function stemsTick() {
   if (!P.playing || !P.song) return;
   const pos = songPos(), beats = P.song.beats || [], c = P.tracks.click;
-  while (P.clickNext < beats.length && beats[P.clickNext] < pos + 0.25) {
-    const b = beats[P.clickNext], at = P.startAt + (b - P.offset);
+  while (P.clickNext < beats.length && beats[P.clickNext] < pos + 0.25 * P.rate) {
+    const b = beats[P.clickNext], at = P.startAt + (b - P.offset) / P.rate;
     if (at >= ac.currentTime - 0.01) clickTick(Math.max(at, ac.currentTime), ((P.clickNext - c.offset) % c.bpb + c.bpb) % c.bpb === 0);
     P.clickNext++;
   }
@@ -2202,7 +2211,7 @@ async function exportMix(tracks, click, btn) {
   if (!tracks.length && !click) { say(state, "Turn on at least one track."); return; }
   btn.disabled = true; say(state, "Mixing the MP3…");
   try {
-    const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click, key: P.key }) });
+    const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click, key: P.key, speed: P.rate }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
     say(state, "Saved “{name}” to your downloads.", { name: await saveDownload(r, "export.mp3") });
   } catch (e) { say(state, e.message); }
@@ -2235,18 +2244,31 @@ function exportAudible() {
 // orig: the tracks as decoded; shifted: {n, bufs} for the last other key loaded; keyProg: how far its render is (0…1,
 // null when none is running); keyNote, keyErr: why it failed
 Object.assign(P, { key: 0, keyWant: 0, orig: {}, shifted: null, keyProg: null, keyNote: "", keyErr: false, keyJob: null, keyTimer: 0 });
+// Tempo the same way: rate, the speed P.buffers play the song at (1 its own tempo, 0.75 three quarters of it), and
+// rateWant, the one chosen; a version is a key at a speed (shifted: {n, s, bufs}). Song time stays the song's own
+// throughout (bars, beats, lyrics, kept parts, takes' starts); only what plays converts: song second t of a version
+// at speed s is at t / s in its buffers, and a second of it passes in 1 / s.
+Object.assign(P, { rate: 1, rateWant: 1 });
+const RATE_MIN = 0.5, RATE_MAX = 1.5;
+const rateOf = (x) => Math.round(Math.max(RATE_MIN, Math.min(RATE_MAX, x)) * 1000) / 1000; // to the thousandth, as the server names them
+const rateMap = () => { const r = store.get("tempos", {}); return r && typeof r === "object" ? r : {}; }; // song id -> speed
+const savedRate = (id) => (Number.isFinite(+rateMap()[id]) ? rateOf(+rateMap()[id]) : 1);
+function saveRate(id, s) { const r = rateMap(); if (s !== 1) r[id] = s; else delete r[id]; store.set("tempos", r); }
 const KEYS = 6, KEY_WARN = 4; // from KEY_WARN semitones on, the processing can be heard
 const keySign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n); // +2, −3, 0
 const keyAfter = (k, n) => k && { pc: (((k.pc + n) % 12) + 12) % 12, mode: k.mode };
 const keyMap = () => { const k = store.get("keys", {}); return k && typeof k === "object" ? k : {}; }; // song id -> n
 const savedKey = (id) => Math.max(-KEYS, Math.min(KEYS, Math.round(+keyMap()[id] || 0)));
 function saveKey(id, n) { const k = keyMap(); if (n) k[id] = n; else delete k[id]; store.set("keys", k); }
-// A track's file in key n (keys/+2/bass.mp3); the drums aren't pitched.
-const trackUrl = (id, name, n) => (n && name !== "drums" ? `/library/${id}/keys/${n > 0 ? "%2B" : ""}${n}/${name}.mp3` : `/library/${id}/${name}.mp3`);
-// Resolves true once the song's tracks in key n are on the server, rendering them first if needed (onJob(id) when a
-// render runs, onProgress(0…1) as it goes); false if that render was cancelled or the server forgot it (restarted).
-async function keyRendered(id, n, onProgress, onJob) {
-  const r = await fetch(`/api/library/${id}/key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ n }) });
+// A track's file in key n at speed s (keys/+2/bass.mp3, keys/+2@0.750/bass.mp3); at the song's own tempo the drums
+// aren't pitched and play from the original. The tracks a version has: the pitched ones, every one at another tempo.
+const trackUrl = (id, name, n, s = 1) => (s === 1 && (!n || name === "drums") ? `/library/${id}/${name}.mp3`
+  : `/library/${id}/keys/${n >= 0 ? "%2B" : "-"}${Math.abs(n)}${s === 1 ? "" : "@" + s.toFixed(3)}/${name}.mp3`);
+const versionTracks = (m, s) => trackNames(m).filter((k) => s !== 1 || k !== "drums");
+// Resolves true once the song's tracks in key n at speed s are on the server, rendering them first if needed (onJob(id)
+// when a render runs, onProgress(0…1) as it goes); false if that render was cancelled or the server forgot it (restarted).
+async function keyRendered(id, n, s, onProgress, onJob) {
+  const r = await fetch(`/api/library/${id}/key`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ n, speed: s }) });
   const j = await r.json().catch(() => ({ error: "The server didn’t answer properly." }));
   if (!r.ok) throw new Error(j.error || "Couldn’t change the key.");
   if (j.ready) return true;
@@ -2260,53 +2282,57 @@ async function keyRendered(id, n, onProgress, onJob) {
     if (onProgress) onProgress(s.progress || 0);
   }
 }
-function setKey(n) {
+const setKey = (n) => setVersion(Math.max(-KEYS, Math.min(KEYS, n)), P.rateWant);
+const setRate = (s) => setVersion(P.keyWant, rateOf(s));
+function setVersion(n, s) {
   const m = P.song;
-  n = Math.max(-KEYS, Math.min(KEYS, n));
-  if (!m || n === P.keyWant) return;
-  P.keyWant = n; saveKey(m.id, n); P.keyProg = keyHere(n) ? null : 0; P.keyNote = ""; P.keyErr = false;
+  if (!m || (n === P.keyWant && s === P.rateWant)) return;
+  P.keyWant = n; P.rateWant = s; saveKey(m.id, n); saveRate(m.id, s); P.keyProg = keyHere(n, s) ? null : 0; P.keyNote = ""; P.keyErr = false;
   paintKey();
   clearTimeout(P.keyTimer);
-  P.keyTimer = setTimeout(() => loadKey(m, n), 0); // picked from a list, so no clicks on the way to wait out
+  P.keyTimer = setTimeout(() => loadKey(m, n, s), 0); // picked from a list or typed in, so no steps on the way to wait out
 }
-const keyHere = (n) => n === P.key || !n || !!(P.shifted && P.shifted.n === n); // its buffers are loaded: no wait
-async function loadKey(m, n) {
-  if (P.keyJob && P.keyJob.n !== n) { fetch(`/api/jobs/${P.keyJob.id}/cancel`, { method: "POST" }).catch(() => {}); P.keyJob = null; } // nobody wants it now
-  const still = () => P.song === m && P.keyWant === n;
+// its buffers are loaded: no wait
+const keyHere = (n, s) => (n === P.key && s === P.rate) || (!n && s === 1) || !!(P.shifted && P.shifted.n === n && P.shifted.s === s);
+async function loadKey(m, n, s) {
+  if (P.keyJob && (P.keyJob.n !== n || P.keyJob.s !== s)) { fetch(`/api/jobs/${P.keyJob.id}/cancel`, { method: "POST" }).catch(() => {}); P.keyJob = null; } // nobody wants it now
+  const still = () => P.song === m && P.keyWant === n && P.rateWant === s;
   const say = (prog, err) => { if (still()) { P.keyProg = prog; P.keyNote = err || ""; P.keyErr = !!err; paintKey(); } };
-  if (n === P.key) return say(null);
-  if (keyHere(n)) { say(null); return applyKey(n); }
+  if (n === P.key && s === P.rate) return say(null);
+  if (keyHere(n, s)) { say(null); return applyKey(n, s); }
   say(0);
   try {
     // cancelled: by a newer choice (then stop), or from elsewhere (then ask again)
-    while (!(await keyRendered(m.id, n, (p) => say(p), (id) => { if (still()) P.keyJob = { n, id }; })))
+    while (!(await keyRendered(m.id, n, s, (p) => say(p), (id) => { if (still()) P.keyJob = { n, s, id }; })))
       if (!still()) return;
     if (!still()) return;
     say(1); // rendered; the files are loading
-    const bufs = Object.fromEntries(await Promise.all(trackNames(m).filter((k) => k !== "drums").map(async (k) =>
-      [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n))).arrayBuffer())])));
+    const bufs = Object.fromEntries(await Promise.all(versionTracks(m, s).map(async (k) =>
+      [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n, s))).arrayBuffer())])));
     if (!still()) return;
-    P.shifted = { n, bufs }; P.keyProg = null; applyKey(n);
+    P.shifted = { n, s, bufs }; P.keyProg = null; applyKey(n, s);
     document.querySelectorAll(".keyctl").forEach((box) => box.pick.close()); // its list stayed open to show it coming along
   } catch (e) { say(null, e instanceof TypeError ? "Couldn’t reach the server." : e.message); } // kept in English: paintKey translates
-  finally { if (P.song === m && P.keyJob && P.keyJob.n === n) P.keyJob = null; }
+  finally { if (P.song === m && P.keyJob && P.keyJob.n === n && P.keyJob.s === s) P.keyJob = null; }
 }
-// Key n's buffers in place: the shifted tracks and the original drums, or all the originals for 0. While playing, the
-// song carries on from the same moment.
-function applyKey(n) {
+// Key n at speed s in place: the version's tracks (with the original drums at the song's own tempo), or all the
+// originals. While playing, the song carries on from the same moment.
+function applyKey(n, s) {
   if (!Object.keys(P.orig).length) return; // the originals aren't in yet: openSong applies it when they are
-  const bufs = (n && P.shifted && P.shifted.n === n && P.shifted.bufs) || {};
-  P.key = n;
+  const bufs = ((n || s !== 1) && P.shifted && P.shifted.n === n && P.shifted.s === s && P.shifted.bufs) || {};
+  const was = P.rate;
+  P.key = n; P.rate = s;
   P.buffers = Object.fromEntries(Object.entries(P.orig).map(([k, b]) => [k, bufs[k] || b]));
-  if (P.playing) swapSources();
+  if (P.playing) swapSources(was);
   if (K.on && K.song === P.song) songEvs();
   paintKey();
 }
 // New buffers while playing: the new sources start where the old ones are by then, fading in as the old ones fade out.
-function swapSources() {
+// was: the speed the old ones play at.
+function swapSources(was) {
   // where the old sources will be when playSong starts the new ones, 0.06 s from now (not songPos(), which holds still
   // until a start has begun, so a swap right after Play would jump)
-  const oldBus = P.bus, old = P.sources, pos = P.offset + (ac.currentTime + 0.06 - P.startAt);
+  const oldBus = P.bus, old = P.sources, pos = P.offset + (ac.currentTime + 0.06 - P.startAt) * was;
   if (pos >= songDur() - 0.05) return; // the song is ending anyway
   P.playing = false; P.offset = pos;
   playSong();
@@ -2339,14 +2365,51 @@ function paintKey() {
     box.pick.set(items, n);
     box.note.textContent = box.note.title = note; box.note.classList.toggle("err", P.keyErr); box.note.classList.toggle("warn", !P.keyErr && !!note);
   });
+  paintTempo();
+}
+// The tempo field: the song's BPM at the speed chosen (a percentage for a song with no steady beat). A tempo typed in
+// (Enter, or leaving the field; ↑ ↓ step it) goes to the nearest speed from RATE_MIN to RATE_MAX; while its version is
+// made the field fills up from the left.
+const bpmAt = (m, s) => Math.round(m.bpm * s);
+function paintTempo() {
+  const m = P.song, s = P.rateWant, busy = P.keyProg != null && !keyHere(P.keyWant, s);
+  document.querySelectorAll(".keyctl .tempo").forEach((t) => {
+    const f = t.querySelector("input"), unit = t.querySelector("span");
+    t.hidden = !m;
+    if (!m) return;
+    if (document.activeElement !== f) f.value = m.bpm ? bpmAt(m, s) : Math.round(s * 100);
+    unit.textContent = m.bpm ? "BPM" : "%";
+    f.min = m.bpm ? Math.ceil(m.bpm * RATE_MIN) : RATE_MIN * 100; f.max = m.bpm ? Math.floor(m.bpm * RATE_MAX) : RATE_MAX * 100;
+    t.classList.toggle("changed", s !== 1);
+    f.style.background = busy ? `linear-gradient(90deg, var(--hover-2) ${Math.round(P.keyProg * 100)}%, var(--surface-2) 0)` : "";
+    f.title = (m.bpm ? tr("Originally {bpm} BPM", { bpm: Math.round(m.bpm) }) : tr("The song’s own speed is 100%"))
+      + (s !== 1 ? ` · ${Math.round(s * 100)}%` : "") + (busy ? ` · ${tr("Changing tempo… {pct}", { pct: Math.round(P.keyProg * 100) + "%" })}` : "");
+    f.setAttribute("aria-label", tr(m.bpm ? "Tempo (BPM)" : "Speed (%)"));
+  });
+}
+function initTempo(box, after) {
+  const t = el("span", "tempo"), f = el("input"), unit = el("span", null, "BPM");
+  f.type = "number"; f.step = 1; f.inputMode = "numeric";
+  t.append(f, unit); after.after(t);
+  const take = () => {
+    const m = P.song, v = Math.round(+f.value);
+    if (!m || !Number.isFinite(v) || !f.value.trim()) { paintTempo(); return; }
+    setRate(m.bpm ? v / m.bpm : v / 100); paintTempo();
+  };
+  f.addEventListener("change", take);
+  f.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); f.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); f.value = ""; f.blur(); paintTempo(); }
+  });
 }
 (function initKey() {
   for (const box of document.querySelectorAll(".keyctl")) {
     const btn = el("button", "pick keypick"); btn.type = "button";
     box.note = box.dataset.note ? $(box.dataset.note) : el("span", "knote"); // the Studio's goes under the title
     box.append(el("span", null, "Key"), btn);
+    initTempo(box, btn);
     if (!box.dataset.note) box.append(box.note);
-    box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n), minWidth: 240, foot: keyFoot });
+    box.pick = makePick(btn, "Key", (n) => setKey(n), { stayOpen: (n) => !keyHere(n, P.rateWant), minWidth: 240, foot: keyFoot });
   }
   paintKey();
 })();
@@ -2802,7 +2865,7 @@ function renderCountIn(sn) {
   e.counts.forEach((c, i) => { if (sn >= c) n = e.counts.length - i; });
   box.hidden = false;
   const kind = e.cue ? e.kind : tr(e.kind); // Intro, Break (a phrase's comes translated)
-  setText("countLbl", n || e.cue ? kind : tr("{kind} · vocals in {s} s", { kind, s: Math.ceil(e.t - sn) }));
+  setText("countLbl", n || e.cue ? kind : tr("{kind} · vocals in {s} s", { kind, s: Math.ceil((e.t - sn) / P.rate) })); // seconds as they pass
   setText("countNum", n ? String(n) : "");
   const dots = $("#countDots"), N = e.counts.length, done = n ? N - n + 1 : 0, key = `${N}/${done}`;
   if (dots.dataset.key === key) return;
@@ -2973,7 +3036,7 @@ function recLatency() {
 function recBegin(at) {
   if (!R.armed || !R.node || !micOn || !K.on || view !== "practice" || !K.song || !P.song || K.song.id !== P.song.id) return;
   const lat = recLatency();
-  R.cap = { song: P.song.id, start: P.offset + (at - P.startAt), key: P.key, oct: K.oct, lat, from: Math.round((at + lat) * ac.sampleRate), to: null,
+  R.cap = { song: P.song.id, start: P.offset + (at - P.startAt) * P.rate, key: P.key, rate: P.rate, oct: K.oct, lat, from: Math.round((at + lat) * ac.sampleRate), to: null,
     parts: [], n: 0 };
   R.node.port.postMessage(true);
   paintRec();
@@ -3044,11 +3107,11 @@ async function loadTakes(m) {
   renderTakes();
 }
 async function takeSave(c, wav) {
-  const t = c.entry || { id: "new" + Math.random().toString(16).slice(2), song: c.song, created: Date.now() / 1000, start: c.start, duration: c.n / ac.sampleRate, key: c.key };
+  const t = c.entry || { id: "new" + Math.random().toString(16).slice(2), song: c.song, created: Date.now() / 1000, start: c.start, duration: c.n / ac.sampleRate, key: c.key, speed: c.rate };
   c.entry = t; t.saving = true; t.failed = null;
   if (!T.unsaved.includes(t)) T.unsaved.push(t);
   if (T.song === c.song) { if (!T.list.includes(t)) T.list.unshift(t); renderTakes(); }
-  const q = new URLSearchParams({ start: c.start.toFixed(4), key: c.key, oct: c.oct, latency: c.lat.toFixed(4) });
+  const q = new URLSearchParams({ start: c.start.toFixed(4), key: c.key, speed: c.rate, oct: c.oct, latency: c.lat.toFixed(4) });
   let saved = null;
   try {
     const r = await fetch(`/api/library/${c.song}/takes?${q}`, { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav });
@@ -3072,7 +3135,7 @@ const dayName = (d) => tr(["Today", "Yesterday"][daysAgo(d)]) || longDate(d);
 const fmtLen = (d) => (d < 59.5 ? tr("{n} s", { n: Math.round(d) }) : fmtTime(d));
 // The part of the song a take is of: the phrases whose middle it covers, or its times where it has none.
 function takePart(t) {
-  const end = t.start + t.duration, ps = [];
+  const end = t.start + t.duration * (t.speed || 1), ps = []; // a take at 0.8 covers 0.8 s of the song a second
   K.phrases.forEach((p, i) => { const mid = (p.t0 + p.t1) / 2; if (mid >= t.start && mid <= end) ps.push(i + 1); });
   const range = `${fmtTime(t.start)}–${fmtTime(end)}`, len = fmtLen(t.duration);
   if (!ps.length) return { what: range, more: len };
@@ -3181,9 +3244,10 @@ async function listenTake(t) {
   const pos = T.at && T.at.id === t.id ? T.at.pos : 0, p = { id: t.id, take: t };
   T.play = p; paintListen();
   // usually a moment; a take in a key not played yet waits for its tracks to be made (about 10 s)
-  const slow = setTimeout(() => takeNote(t.id, t.key === P.key ? "Loading…" : "Getting the band in key {n}…", false, { n: keySign(t.key) }), 400);
+  const sp = t.speed || 1;
+  const slow = setTimeout(() => takeNote(t.id, t.key === P.key && sp === P.rate ? "Loading…" : sp !== 1 ? "Getting the band at that tempo…" : "Getting the band in key {n}…", false, { n: keySign(t.key) }), 400);
   let voice, bufs;
-  try { [voice, bufs] = await Promise.all([takeVoice(t), takeBand(t.key)]); }
+  try { [voice, bufs] = await Promise.all([takeVoice(t), takeBand(t.key, sp)]); }
   catch (e) {
     clearTimeout(slow);
     if (T.play === p) { T.play = null; paintListen(); takeNote(t.id, e instanceof TypeError ? "Couldn’t reach the server." : e.message, true); }
@@ -3198,7 +3262,7 @@ async function listenTake(t) {
   p.gains.voice.gain.value = T.mix.voice * (t.gain || 1); p.gains.band.gain.value = T.mix.band; p.gains.guide.gain.value = T.mix.guide;
   p.srcs = [];
   for (const [name, buf] of Object.entries(bufs)) {
-    const s = ac.createBufferSource(); s.buffer = buf; s.connect(name === guide ? p.gains.guide : p.gains.band); s.start(at, t.start + pos, left); p.srcs.push(s);
+    const s = ac.createBufferSource(); s.buffer = buf; s.connect(name === guide ? p.gains.guide : p.gains.band); s.start(at, t.start / sp + pos, left); p.srcs.push(s);
   }
   const v = ac.createBufferSource(); v.buffer = voice; v.connect(p.gains.voice); v.start(at, pos, left); p.srcs.push(v);
   p.at = at; p.pos = pos;
@@ -3255,21 +3319,21 @@ function takeVoice(t) {
   }
   return T.voice.get(t.id);
 }
-// The song's tracks in key n, as Practice plays them: what's loaded when n is the key it's in; else key n's (rendered on
-// the server first if need be) with the original drums, kept for the next take in that key.
-async function takeBand(n) {
+// The song's tracks in key n at speed s, as Practice played them for a take: what's loaded when it's the version in
+// place; else that version's (made on the server first if need be), kept for the next take in it.
+async function takeBand(n, s) {
   const m = P.song;
-  if (n === P.key) return P.buffers;
-  if (T.band && T.band.id === m.id && T.band.n === n) return T.band.bufs;
-  let shifted = n && P.shifted && P.shifted.n === n ? P.shifted.bufs : null;
-  if (n && !shifted) {
-    if (!(await keyRendered(m.id, n))) throw new Error("Couldn’t change the key.");
-    shifted = Object.fromEntries(await Promise.all(trackNames(m).filter((k) => k !== "drums").map(async (k) =>
-      [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n))).arrayBuffer())])));
+  if (n === P.key && s === P.rate) return P.buffers;
+  if (T.band && T.band.id === m.id && T.band.n === n && T.band.s === s) return T.band.bufs;
+  let shifted = (n || s !== 1) && P.shifted && P.shifted.n === n && P.shifted.s === s ? P.shifted.bufs : null;
+  if ((n || s !== 1) && !shifted) {
+    if (!(await keyRendered(m.id, n, s))) throw new Error(s !== 1 ? "Couldn’t change the tempo." : "Couldn’t change the key.");
+    shifted = Object.fromEntries(await Promise.all(versionTracks(m, s).map(async (k) =>
+      [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n, s))).arrayBuffer())])));
   }
   if (P.song !== m) throw new Error("The song changed.");
   const bufs = { ...P.orig, ...(shifted || {}) };
-  T.band = { id: m.id, n, bufs };
+  T.band = { id: m.id, n, s, bufs };
   return bufs;
 }
 
@@ -3721,6 +3785,8 @@ const KO_SERVER = {
   "The key goes up or down by {n} semitones at most.": "키는 최대 {n}반음까지 올리거나 내릴 수 있어요.",
   "This copy of ffmpeg can’t change the key (it has no rubberband filter).": "이 ffmpeg로는 키를 바꿀 수 없어요 (rubberband 필터가 없어요).",
   "Changing the key failed: {why}": "키를 바꾸지 못했어요: {why}", "Changing key": "키 바꾸는 중",
+  "Changing the tempo failed: {why}": "템포를 바꾸지 못했어요: {why}", "Changing tempo": "템포 바꾸는 중", "Changing key and tempo": "키와 템포 바꾸는 중",
+  "The tempo is a number.": "템포는 숫자로 입력해 주세요.", "The tempo goes from 50% to 150% of the song's.": "템포는 원곡의 50%에서 150%까지예요.",
   "Turn on at least one track to export.": "내보내려면 트랙을 하나 이상 켜세요.",
   "That take is gone.": "그 테이크는 이제 없어요.", "The take came without its {key}.": "테이크에 {key} 값이 없어요.", "The take's {key} is out of range.": "테이크의 {key} 값이 범위를 벗어났어요.",
   "Send the take as a WAV file.": "테이크를 WAV 파일로 보내 주세요.", "Send the take as 16-bit PCM.": "테이크를 16비트 PCM으로 보내 주세요.",
@@ -3781,7 +3847,10 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "{n} semitones": "{n}반음", " · mostly {lo}–{hi}": " · 주로 {lo}–{hi}",
   "lead": "리드 보컬", "backing": "백킹 보컬", "vocals": "보컬", "drums": "드럼", "bass": "베이스", "guitar": "기타", "piano": "피아노", "other": "나머지",
   "Where the melody sits": "멜로디 음역",
-  "Lyrics": "가사", "Search": "찾기", "Search LRCLIB": "LRCLIB에서 찾기", "Look again": "다시 찾기", "Paste lyrics": "가사 붙여넣기",
+  "Lyrics": "가사",
+  "Originally {bpm} BPM": "원래 {bpm} BPM", "The song’s own speed is 100%": "원곡 속도가 100%예요", "Changing tempo… {pct}": "템포 바꾸는 중… {pct}",
+  "Tempo (BPM)": "템포 (BPM)", "Speed (%)": "속도 (%)", "Getting the band at that tempo…": "그 템포의 반주를 준비하는 중…",
+  "Couldn’t change the tempo.": "템포를 바꾸지 못했어요.", "Search": "찾기", "Search LRCLIB": "LRCLIB에서 찾기", "Look again": "다시 찾기", "Paste lyrics": "가사 붙여넣기",
   "Practise without lyrics": "가사 없이 연습", "Line them up with the voice": "목소리에 맞추기", "Use these": "이 가사 쓰기", "Searching…": "찾는 중…",
   "timed": "줄별 시간 있음", "words only": "가사만", "Play this line of the vocal track": "보컬 트랙에서 이 줄 듣기",
   "Paste the lyrics here, a line of the song to each line.": "가사를 여기에 붙여넣어 주세요. 한 줄에 노래 한 줄씩이요.",
