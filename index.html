@@ -367,8 +367,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #jobsBtn .ring { width: 16px; height: 16px; transform: rotate(-90deg); }
 #jobsBtn .ring circle + circle { transition: stroke-dasharray 0.4s var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
-#jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the first song sent off lands in it */
-.sendoff { position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none; background: var(--ink); } /* sendOff */
+#jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */
 #jobsPop > b { font-weight: 500; }
 #jobsList { display: grid; gap: 16px; }
 .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 8px; align-items: center; }
@@ -2469,77 +2468,62 @@ async function submitYoutube(e) {
   e.preventDefault();
   const field = $("#sYtUrl"), urls = field.value.split(/\s+/).filter(Boolean); if (!urls.length) return;
   addMsg("Starting…");
-  // where each link was: its line of the field (the whole field, for one line), for it to fly off from
-  const box = field.getBoundingClientRect(), lines = field.value.split("\n"), top = field.scrollTop;
-  const lineOf = (url) => {
-    if (lines.length < 2) return box;
-    const i = Math.max(0, lines.findIndex((l) => l.includes(url))), y = Math.max(box.top, Math.min(box.bottom - 20, box.top + 6 + i * 20 - top));
-    return { left: box.left, right: box.right, width: box.width, top: y, height: 20 };
-  };
-  const failed = [], folds = [];
+  const failed = [];
+  let sent = 0;
   for (const url of urls) {
     try {
       const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" });
-      folds.push(sendOff(lineOf(url), folds.length)); jobStarted(id, url);
+      if (!sent++) holdRing();
+      jobStarted(id, url);
     } catch (err) { failed.push(url); addMsg(urls.length > 1 ? tr("{url}: {why}", { url, why: () => tr(err.message) }) : err.message, true); }
   }
-  field.value = failed.join("\n"); // what didn't start stays, to fix
-  if (!failed.length) addMsg("");
-  await Promise.all(folds); // the links fold up here (the field keeps its lines meanwhile), then the panel goes as they fly
-  fitLinks();
-  if (!failed.length) showAdd(false); // one that couldn't start keeps it open, saying why, its link left to fix
+  field.value = failed.join("\n"); fitLinks(); // what didn't start stays, to fix
+  if (!failed.length) { addMsg(""); await tuckAway(); } // all sent: the panel goes into the ring
+  else if (sent) landRing(); // some sent: the ring shows them; the panel stays, saying why the rest couldn't start
 }
 async function submitFiles(files) {
   files = [...(files || [])]; if (!files.length) return;
-  let ok = 0, fold = null;
-  const from = $("#sDrop span").getBoundingClientRect(); // they fly off from the drop zone's words
+  let ok = 0;
   for (const [i, file] of files.entries()) {
     addMsg(files.length > 1 ? tr("Uploading {i} of {n}…", { i: i + 1, n: files.length }) : "Uploading…");
     try {
       const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}`, file);
-      fold = sendOff(from); jobStarted(id, file.name.replace(/\.[^.]+$/, "")); ok++;
+      if (!ok++) holdRing();
+      jobStarted(id, file.name.replace(/\.[^.]+$/, ""));
     }
-    catch (err) { addMsg(files.length > 1 ? tr("{url}: {why}", { url: file.name, why: () => tr(err.message) }) : err.message, true); return; }
+    catch (err) { addMsg(files.length > 1 ? tr("{url}: {why}", { url: file.name, why: () => tr(err.message) }) : err.message, true); if (ok) landRing(); return; }
   }
-  addMsg(""); await fold; if (ok) showAdd(false);
+  addMsg(""); await tuckAway();
 }
-// A song sent off: where it was given (its line of the links field, the drop zone) folds into a little square with a
-// bounce, which flies in an arc to the ring by the mic; the ring comes in as the first one lands (or gives a nudge,
-// there already). Several go a beat apart (i). Sent before the song's job is shown, so the ring waits for it unseen.
-// Returns when it has folded (the page can go on to the library while it flies).
-function sendOff(from, i = 0) {
-  if (stillMotion()) return Promise.resolve();
-  const btn = $("#jobsBtn");
-  if (btn.hidden || btn.dataset.leaving) btn.dataset.await = "1";
-  const bit = el("i", "sendoff"); document.body.append(bit);
-  const at = (x, y) => `translate(${x}px, ${y}px)`, cx = from.right - 24, cy = from.top + from.height / 2;
-  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue("--ink").trim(), field = css.getPropertyValue("--surface-2").trim();
-  const fold = bit.animate([
-    { transform: at(from.left, from.top), width: from.width + "px", height: from.height + "px", borderRadius: "8px", backgroundColor: field },
-    { transform: at(cx - 10, cy - 10), width: "20px", height: "20px", borderRadius: "6px", backgroundColor: ink, offset: 0.7 },
-    { transform: at(cx - 8, cy - 8), width: "16px", height: "16px", borderRadius: "5px", backgroundColor: ink },
-  ], { duration: 320, delay: i * 90, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "both" });
-  const folded = fold.finished;
-  folded.then(() => {
-    // the arc: a curve pulled up and a little over, from the square to the ring's middle, shrinking to round as it goes
-    const r = btn.getBoundingClientRect(), tx = r.left + r.width / 2, ty = r.top + r.height / 2;
-    const qx = cx + (tx - cx) * 0.2, qy = Math.max(8, Math.min(cy, ty) - 48), frames = [];
-    for (let k = 0; k <= 20; k++) {
-      const s = k / 20, u = 1 - s, x = u * u * cx + 2 * u * s * qx + s * s * tx, y = u * u * cy + 2 * u * s * qy + s * s * ty;
-      frames.push({ transform: `${at(x - 8, y - 8)} rotate(${s * 90}deg) scale(${1 - 0.3 * s})`, borderRadius: `${5 + 3 * s}px`, opacity: Math.min(1, (1 - s) / 0.15) });
-    }
-    const fly = bit.animate(frames, { duration: 560, easing: "cubic-bezier(0.45, 0, 0.2, 1)", fill: "forwards" });
-    bit.style.width = bit.style.height = "16px"; fold.cancel();
-    return fly.finished;
-  }).then(() => {
-    bit.remove();
-    if (btn.hidden) return;
-    const first = !!btn.dataset.await;
-    delete btn.dataset.await;
-    btn.animate(first ? [{ transform: "scale(0.5)", opacity: 0 }, { transform: "scale(1.12)", opacity: 1, offset: 0.55 }, { transform: "none", opacity: 1 }]
-      : [{ transform: "none" }, { transform: "scale(1.1)", offset: 0.4 }, { transform: "none" }], { duration: first ? 380 : 260, easing: "ease-out" });
-  }).catch(() => bit.remove());
-  return folded.then(() => {}, () => {});
+// A song sent: the whole panel draws in, shrinking smoothly into the ring by the mic, where the songs being added
+// show; the page behind clears as it goes, and the ring comes in as it arrives (or gives a nudge, there already).
+// holdRing, before the first song's job shows: the ring keeps its place unseen until then.
+function holdRing() {
+  const ring = $("#jobsBtn");
+  if (!stillMotion() && (ring.hidden || ring.dataset.leaving)) ring.dataset.await = "1";
+}
+function landRing() {
+  const ring = $("#jobsBtn"), first = !!ring.dataset.await;
+  delete ring.dataset.await;
+  if (ring.hidden || stillMotion()) return;
+  ring.animate(first ? [{ transform: "scale(0.5)", opacity: 0 }, { transform: "scale(1.12)", opacity: 1, offset: 0.55 }, { transform: "none", opacity: 1 }]
+    : [{ transform: "none" }, { transform: "scale(1.1)", offset: 0.4 }, { transform: "none" }], { duration: first ? 380 : 260, easing: "ease-out" });
+}
+async function tuckAway() {
+  const pop = $("#addPop"), ring = $("#jobsBtn");
+  if (stillMotion() || ring.hidden || pop.hidden) { showAdd(false); landRing(); return; }
+  const a = pop.getBoundingClientRect(), r = ring.getBoundingClientRect();
+  const dx = r.left + r.width / 2 - (a.left + a.width / 2), dy = r.top + r.height / 2 - (a.top + a.height / 2), s = r.width / a.width;
+  $("#addVeil").classList.remove("on");
+  const fly = pop.animate([
+    { transform: "none", opacity: 1, borderRadius: "12px" },
+    { transform: "scale(0.96)", offset: 0.16 }, // a breath in
+    { opacity: 1, offset: 0.6 },
+    { transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 0, borderRadius: `${Math.min(a.width, a.height) / 2}px` },
+  ], { duration: 560, easing: "cubic-bezier(0.55, 0, 0.25, 1)", fill: "forwards" });
+  await fly.finished.catch(() => {});
+  showAdd(false); fly.cancel();
+  landRing();
 }
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
 // The new songs' progress shows beside the mic; they land in the library.
