@@ -318,9 +318,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 .yt { display: flex; gap: 8px; }
 /* flex-basis auto (not 0) so the field keeps its height when the row stacks on narrow screens */
 /* same height as the app's other fields (selects, small buttons) */
-/* links, a line each: one line tall, growing with them (to five) */
+/* links, a line each: one line tall, growing with them (to five). A long link stays on its line (it scrolls sideways
+   under the caret) rather than wrapping, so the field grows only for another link */
 .yt textarea { flex: 1 1 auto; min-width: 0; height: 32px; max-height: 112px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2);
-  padding: 5px 12px; font: 14px/20px var(--font); color: inherit; resize: none; overflow-y: auto; transition: border-color 0.15s, background-color 0.15s; }
+  padding: 5px 12px; font: 14px/20px var(--font); color: inherit; resize: none; white-space: pre; overflow-x: hidden; overflow-y: auto; transition: border-color 0.15s, background-color 0.15s; }
 .yt textarea::placeholder { color: rgba(var(--fg), 0.38); }
 .yt textarea:hover { background: var(--hover-2); }
 .yt textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
@@ -816,7 +817,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="panel-card" id="sAdd" hidden>
       <b>Add a song</b>
       <form class="yt" id="sYtForm">
-        <textarea id="sYtUrl" rows="1" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
+        <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
         <button class="btn sm dark" type="submit">Separate</button>
       </form>
       <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
