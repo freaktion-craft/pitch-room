@@ -1071,6 +1071,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
     if (to !== undefined) { e.preventDefault(); e.stopPropagation(); os[Math.max(0, Math.min(os.length - 1, to))].focus(); } // not Practice's Home/End
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); show(false); btn.focus(); }
     else if (e.key === "Tab") show(false);
+    else e.stopPropagation(); // the list's keys stay in it: R, L and ← → don't reach Practice
   });
   // a click elsewhere closes it (the path, not contains(): a click on a row that redraws the list leaves its target out)
   document.addEventListener("click", (e) => { const path = e.composedPath(); if (!list.hidden && !path.includes(list) && !path.includes(btn)) show(false); });
@@ -1180,8 +1181,11 @@ function resetOnDblClick(input, def) {
   document.addEventListener("keydown", (e) => {
     const s = e.target;
     if (!s.matches || !s.matches('input[type="range"]') || !/^(Arrow|Page|Home|End)/.test(e.key)) return;
-    clearTimeout(keyTimer); keyTimer = setTimeout(() => { keyTimer = 0; if (!held) show(null); }, 900);
-    requestAnimationFrame(() => show(s)); // after the key has moved it
+    requestAnimationFrame(() => { // after the key has moved it (unless the player took the key: ownKeys)
+      if (e.defaultPrevented) return;
+      clearTimeout(keyTimer); keyTimer = setTimeout(() => { keyTimer = 0; if (!held) show(null); }, 900);
+      show(s);
+    });
   }, true);
   document.addEventListener("focusout", (e) => { if (e.target.matches?.('input[type="range"]') && !held) show(null); }, true);
   addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true });
@@ -2308,7 +2312,7 @@ function keepTarget() {
   return [P.keepTarget, "voices", "lead", "vocals"].find((n) => n && rows.includes(n)) || rows[0];
 }
 document.addEventListener("keydown", (e) => {
-  if (!(view === "stems" && stemsPage === "song" && P.song) || e.target.closest("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!(view === "stems" && stemsPage === "song" && P.song) || typing(e.target) || inList(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.code === "KeyJ") { const name = keepTarget(); if (name) { e.preventDefault(); P.mark = { name, a: songPos() }; } }
   else if (e.code === "KeyK" && P.mark) {
     e.preventDefault();
@@ -2391,7 +2395,7 @@ function initStems() {
 // ---------- practice (singing a song from the library) ----------
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
-const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1 };
+const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, oct: 0, hist: [], guideVol: 0.5, bandVol: 1, studio: null };
 function songEvs() {
   const sh = K.oct * 12 + P.key; // the bars move with the octave picked and the key the song plays in
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
@@ -2582,6 +2586,8 @@ async function singSong(m, btn) {
   K.entries = songEntries(K.notes, m.beats, m.bpm);
   K.phrases = songPhrases(K.notes, m.beats, m.bpm, songDur()); K.cue = null; setLoop(false); renderPhrases();
   songEvs(); songView(true);
+  // Practice sets the tracks its own way (Guide vocal, Band); the Studio's mix is put back on the way out (route)
+  K.studio = mixNow();
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
   renderTracks(); applyGains();
   octPick.set(octItems(), K.oct); $("#kGuide").value = K.guideVol; $("#kBand").value = K.bandVol;
@@ -3290,7 +3296,7 @@ function stemsRoute(sub, extra) {
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
   if (stemsPage === "song" && (!P.song || P.song.id !== sub || P.song.stale)) openSongById(sub);
-  else if (stemsPage === "song") renderTracks(); // volumes changed in Practice show on the track sliders
+  else if (stemsPage === "song") renderTracks(); // the mix as it was before Practice
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
 // The song as the library list last read it opens at once, so its page appears whole. Otherwise (a reload, a link,
@@ -3310,7 +3316,12 @@ function route() {
   const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
   const singing = v === "practice" && K.on && P.song && K.song.id === P.song.id;
   if (v !== "stems" && !singing) { location.replace("#stems"); return; }
+  const was = view;
   view = v;
+  if (was === "practice" && view !== "practice" && K.studio) { // the Studio's mix, as it was before Practice
+    if (P.song && K.song && K.song.id === P.song.id) { applyMix(K.studio); applyGains(); }
+    K.studio = null;
+  }
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems";
   showMicSet(false);
   if (view !== "practice") { recOff(); listenStop(); } // takes are recorded and played in Practice only
@@ -3329,15 +3340,25 @@ function route() {
 window.addEventListener("hashchange", route);
 $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = () => (micOn ? stopMic() : startMic());
+// Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest
+// still play, seek and step (Record clicked, then Space, plays rather than ending the take). One reached with Tab
+// keeps its own keys, so a button presses with Space and a slider goes to its ends with Home and End. Text fields and
+// an open list or menu always keep theirs.
+let tabbed = false;
+addEventListener("pointerdown", () => { tabbed = false; }, true);
+addEventListener("keydown", (e) => { if (e.key === "Tab") tabbed = true; }, true);
+function typing(t) { return !!t.closest?.('textarea, select, [contenteditable="true"], input:not([type="range"]):not([type="checkbox"]):not([type="radio"])'); }
+function inList(t) { return !!t.closest?.(".pick-list, .menu"); }
+const ownKeys = (e) => typing(e.target) || inList(e.target) || (tabbed && !!e.target.closest?.("button, input, a[href], [tabindex]"));
 document.addEventListener("keydown", (e) => {
-  if (e.code === "Space" && view === "stems" && stemsPage === "song" && P.song &&!e.target.closest("input, select, button, textarea")) { e.preventDefault(); P.playing ? pauseSong() : playSong(); return; }
-  // Home / End from anywhere but fields, which keep them for their own text or value
-  if ((e.code === "Home" || e.code === "End") && view === "stems" && stemsPage === "song" && P.song && !e.target.closest("input, select, textarea") && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault(); if (e.code === "Home") seekSong(0); else seekEnd(); return;
+  if (ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (view === "stems" && stemsPage === "song" && P.song) {
+    if (e.code === "Space") { e.preventDefault(); if (!e.repeat) P.playing ? pauseSong() : playSong(); }
+    else if (e.code === "Home" || e.code === "End") { e.preventDefault(); if (e.code === "Home") seekSong(0); else seekEnd(); }
+    return;
   }
-  if (view === "practice" && K.on) { // Space on a focused button presses that button; the other keys work from anywhere but fields
-    if (e.target.closest("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === "Space" && e.target.closest("button")) return;
+  if (view === "practice" && K.on) {
+    if (e.repeat && e.code === "Space") { e.preventDefault(); return; }
     const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: () => setRec(!R.armed),
       Home: songStart, End: songEnd }[e.code];
     if (act) { e.preventDefault(); act(); }
