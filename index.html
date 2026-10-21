@@ -583,7 +583,7 @@ input[type="range"]:disabled { opacity: 0.4; }
    what's under it is hidden more and blurred more: six blurs (0.5 px doubling to 16 px), each in its own band of the
    fade, overlapping the next, under the background coming in on an eased curve. Each layer fades itself in and out
    (an opacity on the box would cut the blurs off from what's behind it). */
-#listFade, #listFadeTop { position: fixed; left: 0; right: 0; z-index: 5; height: 192px; pointer-events: none; --dir: to bottom; }
+#listFade, #listFadeTop { position: fixed; left: 0; right: 0; z-index: 5; height: 0; pointer-events: none; --dir: to bottom; } /* height: paintFade */
 #listFade { bottom: 0; }
 /* and the same under the library's pinned top, the other way up, while rows have gone under it */
 #listFadeTop { top: var(--mast, 0px); z-index: 3; --dir: to top; }
@@ -616,10 +616,10 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib { margin-inline: -12px; background: none; box-shadow: none; border-radius: 0; }
 #sLib .row { position: relative; padding: 16px 12px; border-radius: 8px; cursor: pointer; transition: background-color 0.15s; }
 #sLib .row + .row { border-top: 0; }
-#sLib .row + .row::before, #sLib .lib-cols::after { content: ""; position: absolute; left: 12px; right: 12px; height: 1px; background: var(--line); transition: opacity 0.15s; }
+#sLib .row + .row::before { content: ""; position: absolute; left: 12px; right: 12px; height: 1px; background: var(--line); transition: opacity 0.15s; }
 #sLib .row + .row::before { top: 0; }
 #sLib .row:hover { background: rgba(var(--fg), 0.04); }
-#sLib .row:hover::before, #sLib .row:hover + .row::before, #sLib .lib-cols:has(+ .row:hover)::after { opacity: 0; }
+#sLib .row:hover::before, #sLib .row:hover + .row::before { opacity: 0; }
 #sLib:empty { display: none; } /* until the list has loaded */
 /* an empty library: the list itself is the way to add the first song */
 #sLib .first { display: flex; align-items: center; gap: 16px; width: 100%; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2);
@@ -643,7 +643,6 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .row, #sLib .lib-cols { display: grid; grid-template-columns: 48px minmax(0, 4fr) minmax(56px, 1fr) minmax(104px, 1.5fr) minmax(96px, 1.5fr) 56px 32px;
   column-gap: 16px; align-items: center; }
 #sLib .lib-cols { position: relative; height: 40px; padding: 0 12px; }
-#sLib .lib-cols::after { bottom: 0; }
 #sLib .lib-cols .sort { justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0; border: 0; background: none;
   color: var(--faint); font-size: 12px; cursor: pointer; transition: color 0.15s; }
 #sLib .lib-cols .sort[data-by="title"] { grid-column: 1 / 3; }
@@ -1989,13 +1988,16 @@ function pinLibTop() {
   root.classList.add("lib-top");
 }
 addEventListener("resize", pinLibTop);
-// The fades: at the page's foot on the library while the page runs on below the window, and under its pinned top once
-// rows have gone under it. now: a change of page, where they're there (or gone) at once with the page, not fading in.
+// The fades on the library, each as tall as there's list beyond it, up to FADE_H: under its pinned top it grows in
+// with the scroll as rows go under, and at its foot it draws back as the end comes up. now: a change of page, where
+// they're there (or gone) at once with the page, not fading in.
+const FADE_H = 192;
 function paintFade(now) {
-  const lib = view === "stems" && stemsPage === "lib", more = document.documentElement.scrollHeight - (scrollY + innerHeight) > 4;
-  for (const [f, on] of [[$("#listFade"), lib && more], [$("#listFadeTop"), lib && scrollY > 4]]) {
+  const lib = view === "stems" && stemsPage === "lib", below = document.documentElement.scrollHeight - (scrollY + innerHeight);
+  for (const [f, px] of [[$("#listFade"), below], [$("#listFadeTop"), scrollY]]) {
     if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
-    f.classList.toggle("on", on);
+    f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
+    f.classList.toggle("on", lib && px > 0);
   }
 }
 function initCoverView() {
