@@ -41,7 +41,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 - After an intro or a break, a count-in shows when the voice comes back.
 - The bars can move an octave up or down if the song sits outside your range.
 - **Record** (R) keeps a take each time the song plays: your voice, timed to the band (the delay of your speakers and mic is allowed for), named by the lyrics it covers. Under the keyboard, **Takes** lists them by day, like notes to self; play one back over the band, or download it as a WAV mixed with your own voice and band volumes. Takes are kept with the song in `library/<song>/takes/`. Record's label picks **Free** (a take each time you play) or **Full song** (back to the start, the whole song as one take).
-- **Headphones** (beside Find lyrics) sends each part to the ear you want: the band, the guide vocal and the metronome to the left, the right or both, and your own voice back to you as you sing (off by default; through headphones, a little late, as browsers are).
+- **Headphones** (beside Find lyrics) sends each part to the ear you want: the band, the guide vocal and the metronome (its count-in too) each to the left, the right or both, live as the song plays.
 - **Takes Studio** (beside Takes) lays your takes out on the song's timeline, each where you sang it: switch any of them on and play them with the band, in time.
 
 Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp, audio-separator, Whisper — about 3–4 GB, into `.venv` and `models/`). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.

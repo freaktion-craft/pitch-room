@@ -920,7 +920,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 
   <main id="vPractice" aria-label="Practice" hidden>
     <div class="backbar"><button class="btn sm back" id="kLeave" type="button">Studio</button>
-      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b>Headphones</b><div id="earRows"></div><p class="hint" id="earHint"></p></div></span><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
+      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b>Headphones</b><div id="earRows"></div></div></span><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
     <div class="pr-cols" id="prCols">
     <div class="pr-main">
     <div class="songbar" id="songBar">
@@ -1144,10 +1144,10 @@ const store = (() => {
 const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4, ears: null };
 for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
 // ears: which ear each part plays in, in Practice (EARS)
-const EAR_DEFAULT = { band: "both", guide: "both", click: "both", me: "off" };
+const EAR_DEFAULT = { band: "both", guide: "both", click: "both" };
 S.ears = Object.fromEntries(Object.entries(EAR_DEFAULT).map(([k, d]) => {
   const v = S.ears && S.ears[k];
-  return [k, ["l", "both", "r"].includes(v) || (k === "me" && v === "off") ? v : d];
+  return [k, ["l", "both", "r"].includes(v) ? v : d];
 }));
 const save = () => store.set("settings", S);
 const A4 = 440;
@@ -1345,7 +1345,7 @@ async function startMic() {
   }
   stopTest();
   micNode = ac.createMediaStreamSource(micStream); micNode.connect(micBus); onMicEnd(micStream);
-  micOn = true; renderMic(); listMics(); applyEars(); return true; // heard back in Practice, if so set
+  micOn = true; renderMic(); listMics(); return true;
 }
 // The chosen input if it's still there, else the system default: an unplugged mic is no error.
 async function openMic() {
@@ -3736,14 +3736,13 @@ async function hearMe(on) {
   const b = $("#hearMe");
   b.setAttribute("aria-pressed", String(on)); say(b, on ? "Stop hearing" : "Hear yourself");
 }
-// Headphones, in Practice (S.ears): which ear the band, the guide vocal, the metronome (its count-in too) and your own
-// voice play in: "l", "r" or "both", and your voice "off" too (on, the mic is heard back as you sing). A part in one
-// ear is both its channels there, at 0.7 each, about as loud as it was in both (the limiter keeps the peaks). The
-// Studio plays everything in both ears, and your voice not at all.
-const EARS = { band: "Band", guide: "Guide vocal", click: "Metronome", me: "Your voice" };
-const EAR_SIDES = [["off", "Mute"], ["l", "Left"], ["both", "Both"], ["r", "Right"]];
-const earOf = (part) => (view === "practice" ? S.ears[part] : part === "me" ? "off" : "both");
-let meEar = null; // your voice's way to the headphones, made the first time it's wanted
+// Headphones, in Practice (S.ears): which ear the band, the guide vocal and the metronome (its count-in too) play in,
+// "l", "r" or "both". A part in one ear is both its channels there, at 0.7 each, about as loud as it was in both (the
+// limiter keeps the peaks). The Studio plays everything in both ears. (Your own voice isn't offered back: through the
+// browser it comes 30 ms or more late, too late to sing with.)
+const EARS = { band: "Band", guide: "Guide vocal", click: "Metronome" };
+const EAR_SIDES = [["l", "Left"], ["both", "Both"], ["r", "Right"]];
+const earOf = (part) => (view === "practice" ? S.ears[part] : "both");
 function earNode(part, dest) {
   const pan = ac.createStereoPanner(), g = ac.createGain();
   pan.connect(g); g.connect(dest);
@@ -3752,18 +3751,14 @@ function earNode(part, dest) {
   return n;
 }
 function setEar(n, now) {
-  const e = earOf(n.part), pan = e === "l" ? -1 : e === "r" ? 1 : 0, gain = e === "off" ? 0 : e === "both" ? 1 : 0.7;
+  const e = earOf(n.part), pan = e === "l" ? -1 : e === "r" ? 1 : 0, gain = e === "both" ? 1 : 0.7;
   if (now) { n.pan.pan.value = pan; n.g.gain.value = gain; return; }
   n.pan.pan.setTargetAtTime(pan, ac.currentTime, 0.01); n.g.gain.setTargetAtTime(gain, ac.currentTime, 0.01);
 }
-// After a change, or a change of page: the song's parts as they play, and your voice, straight to the output (not
-// through the limiter, whose look-ahead would make it later still).
+// After a change, or a change of page: the song's parts as they play.
 function applyEars() {
   paintEarsBtn();
-  if (!ac) return;
-  if (P.ears) for (const n of Object.values(P.ears)) setEar(n);
-  if (!meEar && micBus && earOf("me") !== "off") { meEar = earNode("me", ac.destination); micBus.connect(meEar.in); }
-  if (meEar) setEar(meEar);
+  if (ac && P.ears) for (const n of Object.values(P.ears)) setEar(n);
 }
 function paintEarsBtn() { $("#kEars").classList.toggle("set", Object.entries(EAR_DEFAULT).some(([k, d]) => S.ears[k] !== d)); }
 function renderEars() {
@@ -3772,24 +3767,17 @@ function renderEars() {
     const row = el("div", "ear-row"), seg = el("div", "seg");
     seg.setAttribute("role", "radiogroup"); seg.setAttribute("aria-label", tr(name));
     for (const [v, t] of EAR_SIDES) {
-      if (v === "off" && part !== "me") continue;
       const b = el("button", null, tr(t));
       b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(S.ears[part] === v));
       b.onclick = () => {
         S.ears[part] = v; save(); applyEars();
         for (const x of seg.children) x.setAttribute("aria-checked", String(x === b));
-        paintEarHint();
       };
       seg.append(b);
     }
     row.append(el("span", null, tr(name)), seg);
     return row;
   }));
-  paintEarHint();
-}
-function paintEarHint() {
-  say($("#earHint"), S.ears.me === "off" ? "Your voice: hear the mic back as you sing, with headphones on."
-    : "Your voice comes back a little late (the browser's delay), and only while the mic is on.");
 }
 function showEars(on) {
   $("#earsPop").hidden = !on; $("#kEars").setAttribute("aria-expanded", String(on));
@@ -5278,9 +5266,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Click a phrase to go to it · Shift+click another to loop the run between them": "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요",
   "Compare: the original singer's part, then yours": "비교: 원곡 가수가 부른 부분, 그다음 내 테이크", "Playing a take": "테이크 듣는 중",
   "Comparing · the original singer": "비교 중 · 원곡 가수", "Comparing · yours": "비교 중 · 내 테이크",
-  "Headphones": "헤드폰", "Headphones: which ear each part plays in": "헤드폰: 소리마다 어느 쪽 귀로 들을지", "Mute": "끔", "Left": "왼쪽", "Both": "양쪽", "Right": "오른쪽",
-  "Your voice: hear the mic back as you sing, with headphones on.": "내 목소리: 부르는 동안 마이크 소리를 다시 들려줘요. 헤드폰을 끼고 쓰세요.",
-  "Your voice comes back a little late (the browser's delay), and only while the mic is on.": "내 목소리는 브라우저 지연 때문에 살짝 늦게 들리고, 마이크가 켜져 있을 때만 들려요.",
+  "Headphones": "헤드폰", "Headphones: which ear each part plays in": "헤드폰: 소리마다 어느 쪽 귀로 들을지", "Left": "왼쪽", "Both": "양쪽", "Right": "오른쪽",
   "Count-in": "카운트인", "Off": "없음", "1 beat": "1박", "{n} beats": "{n}박", "From {t}": "{t}부터", "Phrases": "소절", "Phrase –": "소절 –",
   "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
   "Intro": "전주", "Break": "간주", "{kind} · vocals in {s} s": "{kind} · {s}초 뒤 보컬",
