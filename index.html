@@ -645,9 +645,10 @@ input[type="range"]:disabled { opacity: 0.4; }
   .take.armed .tk-part { visibility: hidden; }
 }
 /* beside Practice, where there's room: a column as wide as the takes' rows need, the sliders one under another, a
-   take's words over its phrase and times */
+   take's words over its phrase and times. It opens out into the page's right margin (--out of it, set by
+   paintTakesShown), so the stage keeps its width; where the margin is narrower the stage gives up the rest. */
 @media (min-width: 1080px) {
-  .pr-cols.with-takes { grid-template-columns: minmax(0, 1fr) 360px; }
+  .pr-cols.with-takes { grid-template-columns: minmax(0, 1fr) 360px; margin-right: calc(-1 * var(--out, 0px)); }
   .pr-cols.with-takes .takes { margin-top: -4px; } /* level with the bar, which sits 4 px up */
   .pr-cols.with-takes .tk-mix { flex: 1 1 100%; display: grid; gap: 8px; }
   .pr-cols.with-takes .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
@@ -3174,11 +3175,17 @@ function takePart(t) {
   return { what: which, more: `${range} · ${len}` };
 }
 // Takes by day, newest first.
-// Takes beside Practice once there's something for them: Record on, or takes of the song (saved, being saved, or not)
+// Takes beside Practice once there's something for them: Record on, or takes of the song (saved, being saved, or not).
+// They open out to the right, into as much of the page's margin as their column (and the gap before it) needs, the
+// page's own 24 px edge kept.
 function paintTakesShown() {
-  const show = R.armed || T.list.length > 0;
-  $("#takes").hidden = !show; $("#prCols").classList.toggle("with-takes", show);
+  const show = R.armed || T.list.length > 0, cols = $("#prCols"), main = $("#vPractice");
+  $("#takes").hidden = !show; cols.classList.toggle("with-takes", show);
+  if (main.hidden) return; // measured once it shows (route)
+  const room = document.documentElement.clientWidth - main.getBoundingClientRect().right - 24;
+  cols.style.setProperty("--out", Math.max(0, Math.min(376, Math.floor(room))) + "px");
 }
+addEventListener("resize", paintTakesShown);
 function renderTakes() {
   paintTakesShown();
   $("#tkEmpty").hidden = !T.loaded || T.list.length > 0;
@@ -3687,7 +3694,7 @@ function route() {
     loadSamples(); // for the keyboard
     renderStart();
     // size and draw the stage now, so the view's first frame is complete rather than an empty stage
-    resize(); centerKeys();
+    paintTakesShown(); resize(); centerKeys();
     if (K.on) practiceFrame();
   }
   window.scrollTo(0, 0);
