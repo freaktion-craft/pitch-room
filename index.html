@@ -2769,17 +2769,12 @@ function setPhrases() {
   K.lyricRows = lyricRows();
   K.cue = null; K.lyricKey = null; setLoop(false); renderPhrases();
 }
-// The lyrics' words, a row to each phrase, for the stage to draw under the bars: [{lo, hi, words: [{t0, t1, w}]}], lo
-// and hi the phrase's lowest and highest notes as sung (null without any). A word goes with the phrase it starts in,
-// or the nearer one in the gap between two.
+// Where each phrase's lyrics go on the stage: [{lo, hi}], its lowest and highest notes as sung (null without any).
 function lyricRows() {
   if (!K.lyrics) return [];
-  const words = K.lyrics.flatMap((l) => l.words || []).filter(([a, b, w]) => b > a && w && w.trim()).map(([t0, t1, w]) => ({ t0, t1, w: w.trim() }));
-  return K.phrases.map((p, i) => {
-    const prev = K.phrases[i - 1], next = K.phrases[i + 1];
-    const from = prev ? (prev.t1 + p.t0) / 2 : -Infinity, to = next ? (p.t1 + next.t0) / 2 : Infinity;
+  return K.phrases.map((p) => {
     const ms = K.notes.filter(([a, b]) => b > p.t0 && a < p.t1).map((n) => n[2]);
-    return { lo: ms.length ? Math.min(...ms) : null, hi: ms.length ? Math.max(...ms) : null, words: words.filter((x) => x.t0 >= from && x.t0 < to) };
+    return { lo: ms.length ? Math.min(...ms) : null, hi: ms.length ? Math.max(...ms) : null };
   });
 }
 // The phrase you're on: the one playing, or the next one during a rest; during the count-in after a jump, the one you
@@ -3559,29 +3554,26 @@ function draw(now, cur, hist, evs, guide) {
     if (pen) g.lineTo(x, y); else { g.moveTo(x, y); pen = true; }
   }
   g.strokeStyle = C.voice; g.lineWidth = 3; g.lineJoin = "round"; g.lineCap = "round"; g.stroke();
-  // the lyrics: under each phrase's lowest bar (over its highest where there's no room below), each word where it's
-  // sung, pushed along where words crowd, outlined in the stage's colour so the lines behind don't cut them; the
-  // ones sung already fade back
+  // the lyrics, a phrase at a time: its line from where the phrase starts, under its lowest bar (over its highest
+  // where there's no room below), on two lines if it runs into the next phrase's; how it's sung is yours to phrase.
+  // Outlined in the stage's colour so the lines behind don't cut it; phrases sung already fade back.
   if (K.lyricRows.length) {
-    const sh = K.oct * 12 + P.key, tL = now - (hitX - GUT) / pps, tR = now + (W - hitX) / pps;
-    g.font = "500 13px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "top";
+    const sh = K.oct * 12 + P.key, LH = 20;
+    g.font = "500 14px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "top";
     g.lineJoin = "round"; g.lineWidth = 4; g.strokeStyle = C.surface; g.fillStyle = C.ink;
     let lo = null;
-    for (const r of K.lyricRows) {
+    K.phrases.forEach((p, i) => {
+      const r = K.lyricRows[i], next = K.phrases[i + 1];
       lo = r.lo ?? lo; // a phrase without notes: under the one before's
-      const ws = r.words;
-      if (lo == null || !ws.length || ws[ws.length - 1].t1 < tL - 2 || ws[0].t0 > tR) continue;
-      let y = Y(lo + sh) + bh / 2 + 6;
-      if (y + 16 > H - 4) y = Y((r.hi ?? lo) + sh) - bh / 2 - 22;
-      let right = -Infinity;
-      for (const w of ws) {
-        const x = Math.max(X(w.t0), right + 5), wd = g.measureText(w.w).width;
-        right = x + wd;
-        if (right < GUT || x > W) continue;
-        g.globalAlpha = w.t1 < now ? 0.4 : 1;
-        g.strokeText(w.w, x, y); g.fillText(w.w, x, y);
-      }
-    }
+      const x = X(p.t0);
+      if (lo == null || !p.text || x > W || (next ? X(next.t0) : X(p.t1) + 400) < GUT) return;
+      const room = Math.max(120, (next ? X(next.t0) : W + 400) - x - 16);
+      const lines = wrapLyric(p.text.replace(/ \/ /g, "   "), room);
+      let y = Y(lo + sh) + bh / 2 + 8;
+      if (y + lines.length * LH > H - 4) y = Y((r.hi ?? lo) + sh) - bh / 2 - 8 - lines.length * LH;
+      g.globalAlpha = p.t1 < now ? 0.4 : 1;
+      lines.forEach((ln, k) => { g.strokeText(ln, x, y + k * LH); g.fillText(ln, x, y + k * LH); });
+    });
     g.globalAlpha = 1;
   }
   g.restore();
@@ -3633,6 +3625,23 @@ function drawAurora() {
     c.fillStyle = grad; c.fillRect(cx - half, ch - hgt, half * 2, hgt);
   }
   c.filter = "none";
+}
+
+// A phrase's lyrics in lines no wider than room (the context's font): two at most, the second cut short with … if need be
+function wrapLyric(text, room) {
+  const words = text.split(" "), lines = [""];
+  for (const w of words) {
+    const cur = lines[lines.length - 1], tryLine = cur ? cur + " " + w : w;
+    if (g.measureText(tryLine).width <= room || !cur) lines[lines.length - 1] = tryLine;
+    else if (lines.length < 2) lines.push(w);
+    else { lines[1] += " " + w; }
+  }
+  if (lines[1] && g.measureText(lines[1]).width > room) {
+    let t = lines[1];
+    while (t.length > 1 && g.measureText(t + "…").width > room) t = t.slice(0, -1);
+    lines[1] = t.trimEnd() + "…";
+  }
+  return lines.map((l) => l.trim()).filter(Boolean);
 }
 
 // ---------- main loop ----------
