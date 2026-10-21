@@ -1193,6 +1193,34 @@ def _click_track(beats: list[float], dur: float, offset: int, beats_per_bar: int
     return np.vstack([out, out])
 
 
+# The limiter the page plays through (index.html LIMIT), for exports and take WAVs, so they peak where the song did as
+# you heard it, rather than being turned down as a whole. Per sample: R, how far down the louder channel must go to stay
+# under LIMIT_CEILING, held and falling back over LIMIT_RELEASE s; its largest over the last LIMIT_LOOK samples; that
+# averaged over LIMIT_LOOK samples, eased in ahead of each peak.
+LIMIT_CEILING, LIMIT_LOOK, LIMIT_RELEASE = 10 ** (-0.3 / 20), 64, 0.12
+
+
+def _limit(x: np.ndarray, sr: int = SR) -> np.ndarray:
+    """x (channels, n), its peaks over LIMIT_CEILING turned down."""
+    peak = np.abs(x).max(0).astype(np.float64)
+    if not x.shape[1] or peak.max() <= LIMIT_CEILING:
+        return x
+    look = LIMIT_LOOK
+    r = np.concatenate([np.where(peak > LIMIT_CEILING, 1 - LIMIT_CEILING / np.maximum(peak, 1e-12), 0.0), np.zeros(look - 1)])
+    # R[i] = max(r[i], a R[i - 1]) all at once: in logs, a running maximum of log r[i] - i log a
+    la, i = -1 / (LIMIT_RELEASE * sr), np.arange(len(r))
+    with np.errstate(divide="ignore"):
+        R = np.exp(np.maximum.accumulate(np.log(r) - i * la) + i * la)
+    h, w = R.copy(), 1  # the largest R over the last `look` samples, the window doubling each step
+    while w < look:
+        step = min(w, look - w)
+        h[step:] = np.maximum(h[step:], h[:-step])
+        w += step
+    c = np.concatenate([np.zeros(look), np.cumsum(h)])
+    g = 1 - (c[look:] - c[:-look]) / look  # averaged over the last `look` samples
+    return (x * g[look - 1:]).astype(x.dtype)  # the gain worked out look - 1 samples on (the page plays that late)
+
+
 def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple[bytes, str]:
     """tracks: [{name, gain, only?}] of the tracks heard (only: a muted track's kept parts, where alone it plays); click:
     {gain, offset, beatsPerBar} or None; key: semitones up or down, as played. Returns (mp3 bytes, filename)."""
@@ -1226,9 +1254,7 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0) -> tuple
         used.append("click")
     if mix is None:
         raise ValueError("Turn on at least one track to export.")
-    peak = float(np.abs(mix).max())
-    if peak > 0.99:  # avoid clipping when stems are summed loudly
-        mix = mix * (0.99 / peak)
+    mix = _limit(mix)
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "out.mp3")
         _encode_mp3(mix.astype(np.float32), path, "320k")
@@ -1426,9 +1452,7 @@ def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
                               "-ar", str(SR), "-f", "f32le", "pipe:1"], capture_output=True, check=False).stdout
         v = np.frombuffer(raw, dtype=np.float32)[:n] * (voice * float(take.get("gain", 1)))
         out[:, : len(v)] += v
-    peak = float(np.abs(out).max()) if n else 0.0
-    if peak > 0.99:  # loud gains summed: turn the whole down rather than clip
-        out *= 0.99 / peak
+    out = _limit(out)
     for i, k in ((slice(0, int(0.005 * SR)), 1), (slice(max(0, n - int(0.02 * SR)), n), -1)):  # no click at either end
         m = out[:, i].shape[1]
         out[:, i] *= np.linspace(0, 1, m, dtype=np.float32)[::k]

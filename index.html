@@ -834,10 +834,54 @@ function say(node, en, vars, attr) {
 // ---------- audio ----------
 let ac = null, analyser = null, tbuf = null, master = null, noiseBuf = null;
 let micStream = null, micNode = null, micBus = null, micOn = false, testOsc = null, testOffset = 0;
+// Everything the page plays meets in master, then goes through a limiter on its way out: tracks summed loud (or turned
+// up past 100, or moved to another key) peak over full scale, which the sound system would clip. The limiter turns
+// down just those peaks and leaves the rest as it is: it reads LIMIT.look samples ahead, so each peak is eased into
+// within that time rather than cut, and lets go over LIMIT.release s. The server's exports and take WAVs go through the
+// same one (stems.py _limit). Until its worklet has loaded (or where there's none) master plays straight out.
+const LIMIT = { ceiling: 10 ** (-0.3 / 20), look: 64, release: 0.12 };
+const LIMIT_WORKLET = `registerProcessor("stem-limit", class extends AudioWorkletProcessor {
+  constructor(o) {
+    super(); const p = o.processorOptions;
+    this.c = p.ceiling; this.L = p.look; this.a = Math.exp(-1 / (p.release * sampleRate)); this.R = 0; this.i = 0; this.quiet = 0;
+    this.rs = new Float64Array(this.L); this.hs = new Float64Array(this.L); this.d = [new Float32Array(this.L), new Float32Array(this.L)];
+  }
+  // per sample: R, how far down the loudest channel must go (held, falling back over the release); its largest over the
+  // last L samples; that averaged over L samples, the gain's ramp; applied to the sample L - 1 back
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0], L = this.L, d0 = this.d[0], d1 = this.d[1];
+    for (let k = 0; k < out[0].length; k++) {
+      const i = this.i, x0 = inp.length ? inp[0][k] : 0, x1 = inp.length > 1 ? inp[1][k] : x0, peak = Math.max(Math.abs(x0), Math.abs(x1));
+      this.R = Math.max(peak > this.c ? 1 - this.c / peak : 0, this.R * this.a);
+      if (this.R < 1e-6) this.R = 0;
+      this.quiet = this.R ? 0 : this.quiet + 1;
+      let h = 0, s = 0;
+      this.rs[i] = this.R;
+      if (this.quiet <= 2 * L) { for (let j = 0; j < L; j++) if (this.rs[j] > h) h = this.rs[j]; }
+      this.hs[i] = h;
+      if (this.quiet <= 2 * L) { for (let j = 0; j < L; j++) s += this.hs[j]; }
+      d0[i] = x0; d1[i] = x1;
+      const j = (i + 1) % L, g = 1 - s / L;
+      out[0][k] = d0[j] * g;
+      if (out.length > 1) out[1][k] = d1[j] * g;
+      this.i = j;
+    }
+    return true;
+  }
+});`;
+let limitDelay = 0; // s the limiter holds the sound back by, once it's in (the takes allow for it: recLatency)
+async function limitInit() {
+  const url = URL.createObjectURL(new Blob([LIMIT_WORKLET], { type: "text/javascript" }));
+  try { await ac.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
+  const lim = new AudioWorkletNode(ac, "stem-limit", { outputChannelCount: [2], processorOptions: LIMIT });
+  master.disconnect(); master.connect(lim); lim.connect(ac.destination);
+  limitDelay = (LIMIT.look - 1) / ac.sampleRate;
+}
 function ensureCtx() {
   if (!ac) {
     ac = new (window.AudioContext || window.webkitAudioContext)();
     master = ac.createGain(); master.gain.value = 1; master.connect(ac.destination);
+    if (ac.audioWorklet) limitInit().catch(() => {});
     analyser = ac.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
     // the mic goes in here, so the pitch tracker and the take recorder hear the same input, whichever one is plugged in
     micBus = ac.createGain(); micBus.connect(analyser);
@@ -2710,7 +2754,7 @@ function recOff() {
 }
 function recLatency() {
   const tk = micStream && micStream.getAudioTracks()[0], s = (tk && tk.getSettings && tk.getSettings()) || {};
-  return Math.min(1, Math.max(0, (ac.baseLatency || 0) + (ac.outputLatency || 0) + (+s.latency || 0)));
+  return Math.min(1, Math.max(0, (ac.baseLatency || 0) + (ac.outputLatency || 0) + (+s.latency || 0) + limitDelay));
 }
 // A take starts with the song (at: a context time the song has started by)…
 function recBegin(at) {
