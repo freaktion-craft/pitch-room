@@ -43,17 +43,25 @@ def _get(path: str, params: dict | None = None, tries: int = 4):
 NOISE = re.compile(r"(?i)\b(official|(music |lyric )?video|official audio|lyrics?|visualizer|m/?v|karaoke|remaster(ed)?|가사|노래방|tj|금영)\b")
 TAG = re.compile(r"(?i)가사|노래방|lyric|karaoke|official|m/?v\b|\btj|금영")  # a bracket that only says what kind of video it is
 FEAT = re.compile(r"(?i)\b(feat|ft)\b\.?.*?(?=\s-\s|$)")
-CUT = re.compile(r"[|ㅣᅵ]|\s/\s")  # where a channel's own tags start: a bar (or the Korean ㅣ used as one), " / "
+# where a channel's own tags start: a bar (or the Korean ㅣ, or a lone small l, typed for one), " / "
+CUT = re.compile(r"[|ㅣᅵ]|\s/\s|\sl\s")
+# a name in square brackets before " - " is the artist's, not a tag: "[[ MilliMax ]] - Zombie" is MilliMax's
+LEAD = re.compile(r"^\s*[\[【]+\s*([^\[\]【】]+?)\s*[\]】]+(?=\s*-\s)")
 
 
 def _clean(s: str) -> str:
     return " ".join(NOISE.sub(" ", FEAT.sub(" ", re.sub(r"[\"“”‘’'`]", "", s))).split())
 
 
+def _head(title: str) -> str:
+    """A video's title up to the channel's tags, its artist out of square brackets."""
+    return LEAD.sub(r"\1", CUT.split(unicodedata.normalize("NFKC", title))[0])
+
+
 def split_title(title: str) -> tuple[str, str]:
     """A video's title as (artist, song), for a song found nowhere: "Giwon (기원) - 신호는 잘 지켜 (signs) [가사]" gives
     ("Giwon", "신호는 잘 지켜"). Without " - " it's all song."""
-    t = CUT.split(unicodedata.normalize("NFKC", title))[0]
+    t = _head(title)
     t = re.sub(r"\[[^\]]*\]|【[^】]*】|\([^)]*\)", " ", t)
     artist, _, song = t.partition(" - ") if " - " in t else ("", "", t)
     return _clean(artist), _clean(song)
@@ -63,7 +71,7 @@ def queries(title: str) -> list[str]:
     """Searches to try for a video's title, most specific first: "Giwon (기원) - 신호는 잘 지켜 (signs) [가사]" gives
     "Giwon 신호는 잘 지켜", "신호는 잘 지켜", then the other names in brackets ("Giwon signs", "signs", …). What's after
     a bar or " / " goes (the channel's tags), as do featured artists and words like Lyrics."""
-    t = CUT.split(unicodedata.normalize("NFKC", title))[0]
+    t = _head(title)
     alts = [a.strip() for a in re.findall(r"\(([^)]*)\)|\[([^\]]*)\]|【([^】]*)】", t) for a in a if a.strip() and not TAG.search(a)]
     t = re.sub(r"\[[^\]]*\]|【[^】]*】|\([^)]*\)", " ", t)
     clean = _clean

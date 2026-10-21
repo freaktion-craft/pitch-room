@@ -98,16 +98,14 @@ def online(title: str, duration: float, hint: str = "", cover: bool = False, cha
     (within 10 s or 8 %, as a video can run longer than the record) and shares a word with the title, or is within 3 s
     of it: a search for a few words alone can bring up another song of a similar length. A cover can run longer or
     shorter, so for one the record's whole title has to be in the video's, within 30 s or 20 %.
-    A title that's the song's name alone ("Love Again") says nothing of whose it is, and many songs share a name: the
-    channel's name (channel; an artist's own, often) is searched with it first, and a record by someone neither it nor
-    the title names has to be within 2 s of the song."""
+    Many songs share a name ("Zombie", "Love Again"), so a record by someone neither the title, the hint nor the
+    channel names has to be within 2 s of the song. A title that's the song's name alone says nothing of whose it is:
+    the channel's name (channel; an artist's own, often) is searched with it first."""
     if cover:
         title = COVER.sub(" ", COVER_BY.sub(" ", title))
     artist, song = lyrics.split_title(title)
     who = "" if artist or hint else channel_artist(channel)
-    unsure = not artist and not hint
-    named_by = lyrics._words(f"{title} {who}")
-    tw = lyrics._words(f"{title} {hint} {who}")
+    tw = named_by = lyrics._words(f"{title} {hint} {who}")
     by = [f"{n} {song or title}" for n in ([who, *_spellings(who)] if who else [])]
     qs = list(dict.fromkeys(by + ([hint] if hint else []) + lyrics.queries(title)))
     failed = None
@@ -123,7 +121,7 @@ def online(title: str, duration: float, hint: str = "", cover: bool = False, cha
                 off, shared = abs(r["duration"] - duration), len(tw & lyrics._words(f"{r['artist']} {r['track']} {r['album']}"))
                 named = bool(lyrics._words(r["track"])) and lyrics._words(lyrics.split_title(r["track"])[1] or r["track"]) <= tw
                 fits = off <= max(30.0, 0.2 * duration) and named if cover else off <= max(10.0, 0.08 * duration) and (shared or off <= 3)
-                if unsure and not cover and not lyrics._words(r["artist"]) & named_by:
+                if not cover and not lyrics._words(r["artist"]) & named_by:
                     fits = fits and off <= 2
                 if r["duration"] and fits:
                     ok.append((-shared, off, i))
