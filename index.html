@@ -4023,10 +4023,10 @@ function paintRec() {
   b.title = tr(R.armed ? "Stop recording (R)" : "Record yourself as you sing (R)");
   paintTakesShown();
 }
-// How Record records (its label picks it, kept as "recMode"): free, a take each time the song plays, from Play to its
-// stop, as it always did; all, the whole song: from the very start (its count-in, a lead-in if the voice comes straight
-// in) to its end, as one take.
-const REC_MODES = { free: "Free", all: "Full song" };
+// How Record records (its label picks it, kept as "recMode"): free ("Each play"), a take each time the song plays, from
+// Play to its stop (a looped phrase, a take each pass); all, the whole song: from the very start (its count-in, a
+// lead-in if the voice comes straight in) to its end, as one take.
+const REC_MODES = { free: "Each play", all: "Full song" };
 let recMode = REC_MODES[store.get("recMode", "free")] ? store.get("recMode", "free") : "free", recPick = null;
 const recItems = () => Object.entries(REC_MODES).map(([v, t]) => ({ v, t: tr(t) }));
 // The icon (and R): free, Record on and off; the whole song, back to its start and played through with Record on,
@@ -5348,7 +5348,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Original key": "원래 키", "original": "원래", "Higher": "높은 키", "Lower": "낮은 키", "Changing key… {pct}": "키 바꾸는 중… {pct}", "Originally {key}": "원래 {key}",
   "{n} or more semitones can sound processed.": "{n}반음 이상은 소리가 어색할 수 있어요.", "Couldn’t change the key.": "키를 바꾸지 못했어요.",
   // Practice
-  "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "How to record": "녹음 방식", "Free": "자유 녹음", "Full song": "곡 전체", "Takes Studio": "테이크 스튜디오", "Studio": "스튜디오", "Sung in": "부른 버전",
+  "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "How to record": "녹음 방식", "Each play": "재생마다", "Full song": "곡 전체", "Takes Studio": "테이크 스튜디오", "Studio": "스튜디오", "Sung in": "부른 버전",
   "As the song is": "원곡 그대로", "Key {n}": "키 {n}",
   "No takes yet. Record in Practice and they're laid out here, each where you sang it.": "아직 테이크가 없어요. 연습에서 녹음하면 부른 자리에 맞춰 여기에 놓여요.",
   "The song: click to go there": "곡 전체: 누르면 그 자리로 가요", "Guide vocal": "가이드 보컬", "Guide vocal volume": "가이드 보컬 볼륨",
