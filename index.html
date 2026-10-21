@@ -295,11 +295,13 @@ input[type="range"]:disabled { opacity: 0.4; }
 .yt { display: flex; gap: 8px; }
 /* flex-basis auto (not 0) so the field keeps its height when the row stacks on narrow screens */
 /* same height as the app's other fields (selects, small buttons) */
-.yt input { flex: 1 1 auto; min-width: 0; height: 32px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2);
-  padding: 0 12px; font-size: 14px; transition: border-color 0.15s, background-color 0.15s; }
-.yt input::placeholder { color: rgba(var(--fg), 0.38); }
-.yt input:hover { background: var(--hover-2); }
-.yt input:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+/* links, a line each: one line tall, growing with them (to five) */
+.yt textarea { flex: 1 1 auto; min-width: 0; height: 32px; max-height: 112px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2);
+  padding: 5px 12px; font: 14px/20px var(--font); color: inherit; resize: none; overflow-y: auto; transition: border-color 0.15s, background-color 0.15s; }
+.yt textarea::placeholder { color: rgba(var(--fg), 0.38); }
+.yt textarea:hover { background: var(--hover-2); }
+.yt textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+.yt .btn { align-self: flex-start; }
 .yt .btn { flex: none; }
 .job { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px; border-radius: 10px; background: var(--bg); font-size: 13.5px; }
 .job > .top, .job > .bar { grid-column: 1; }
@@ -783,10 +785,10 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="panel-card" id="sAdd" hidden>
       <b>Add a song</b>
       <form class="yt" id="sYtForm">
-        <input type="url" id="sYtUrl" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false" aria-label="YouTube link">
+        <textarea id="sYtUrl" rows="1" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
         <button class="btn sm dark" type="submit">Separate</button>
       </form>
-      <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*"><span>or choose an audio file · drop it here</span></label>
+      <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
       <div class="row-actions">
         <label class="inline-field" title="6 tracks instead of 4. The piano track often picks up other instruments."><input type="checkbox" class="switch" id="s6">Also split out guitar and piano</label>
         <span class="muted" id="sDevice"></span>
@@ -1817,7 +1819,8 @@ function watchJob(id, kind, forSong) {
     } else {
       const card = jobCard(id), x = card.querySelector(".x"), pct = Math.round(j.progress * 100);
       const stopping = (j.cancel || card.classList.contains("stopping")) && j.status !== "error";
-      say(card.querySelector(".top span"), j.status === "error" ? j.error : stopping ? "Cancelling…" : j.stage);
+      if (j.status === "queued" && j.ahead != null && !stopping) say(card.querySelector(".top span"), j.ahead ? "Waiting · {n} ahead" : "Starting next…", { n: j.ahead });
+      else say(card.querySelector(".top span"), j.status === "error" ? j.error : stopping ? "Cancelling…" : j.stage);
       card.classList.toggle("err", j.status === "error");
       say(x, j.status === "error" ? "Clear" : "Cancel", null, "title"); x.disabled = stopping;
       card.querySelector(".bar i").style.width = pct + "%"; card.querySelector(".bar").setAttribute("aria-valuenow", pct);
@@ -1856,26 +1859,38 @@ async function postJob(url, body, headers) {
 }
 // 4 stems unless the switch asks for guitar and piano too (the 6-stem model; its piano track bleeds, so it's opt-in)
 const stemModel = () => ($("#s6").checked ? "htdemucs_6s" : "htdemucs");
+// Several at once: links a line each (or spaces between), files several at a time. Each is sent in the order given;
+// the server takes them in that order, one at a time, the rest waiting with how many are ahead of them. Once one is
+// in, the library shows their progress; one that couldn't start says why here, the others going on.
 async function submitYoutube(e) {
   e.preventDefault();
-  const url = $("#sYtUrl").value.trim(); if (!url) return;
+  const field = $("#sYtUrl"), urls = field.value.split(/\s+/).filter(Boolean); if (!urls.length) return;
   addMsg("Starting…");
-  try {
-    const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" });
-    $("#sYtUrl").value = ""; jobStarted(id, "Starting…");
-  } catch (err) { addMsg(err.message, true); }
+  const failed = [];
+  for (const url of urls) {
+    try { jobStarted(await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" }), "Starting…"); }
+    catch (err) { failed.push(url); addMsg(urls.length > 1 ? tr("{url}: {why}", { url, why: () => tr(err.message) }) : err.message, true); }
+  }
+  field.value = failed.join("\n"); fitLinks(); // what didn't start stays, to fix
+  if (!failed.length) addMsg("");
+  if (failed.length < urls.length) toLibrary();
 }
-async function submitFile(file) {
-  if (!file) return;
-  addMsg("Uploading…");
-  try {
-    const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}`, file);
-    jobStarted(id, "Uploading…");
-  } catch (err) { addMsg(err.message, true); }
+async function submitFiles(files) {
+  files = [...(files || [])]; if (!files.length) return;
+  let ok = 0;
+  for (const [i, file] of files.entries()) {
+    addMsg(files.length > 1 ? tr("Uploading {i} of {n}…", { i: i + 1, n: files.length }) : "Uploading…");
+    try { jobStarted(await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}`, file), "Uploading…"); ok++; }
+    catch (err) { addMsg(files.length > 1 ? tr("{url}: {why}", { url: file.name, why: () => tr(err.message) }) : err.message, true); return; }
+  }
+  addMsg(""); if (ok) toLibrary();
 }
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
-// The new song's progress shows in the library, where it will land.
-function jobStarted(id, text) { addMsg(""); say(jobCard(id).querySelector(".top span"), text); watchJob(id, "separate"); if (view === "stems" && stemsPage === "add") go("stems"); }
+// The new songs' progress shows in the library, where they will land.
+function jobStarted(id, text) { say(jobCard(id).querySelector(".top span"), text); watchJob(id, "separate"); }
+function toLibrary() { if (view === "stems" && stemsPage === "add") go("stems"); }
+// the links field: a line tall, growing with what's in it (CSS stops it at five)
+function fitLinks() { const f = $("#sYtUrl"); f.style.height = ""; f.style.height = Math.max(32, f.scrollHeight + 2) + "px"; }
 
 // player
 async function openSong(m) {
@@ -2685,11 +2700,13 @@ function initStems() {
   v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
   v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));
   v.addEventListener("error", () => { if (!v.getAttribute("src")) return; $("#pVideoWait").classList.add("err"); say($("#pVideoWait"), "Couldn’t load the video."); });
-  $("#sFile").onchange = (e) => { submitFile(e.target.files[0]); e.target.value = ""; };
+  $("#sFile").onchange = (e) => { submitFiles(e.target.files); e.target.value = ""; };
+  $("#sYtUrl").addEventListener("input", fitLinks);
+  $("#sYtUrl").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#sYtForm").requestSubmit(); } }); // Shift+Enter: another line
   const drop = $("#sDrop");
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
   drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); submitFile(e.dataTransfer.files[0]); });
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); submitFiles(e.dataTransfer.files); });
   $("#pPlay").onclick = () => (P.playing ? pauseSong() : playSong());
   $("#pBack").onclick = () => seekSong(songPos() - 5);
   $("#pFwd").onclick = () => seekSong(songPos() + 5);
@@ -4012,8 +4029,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "One-time setup": "처음 한 번 설치",
   "Stem separation uses Demucs (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Lyrics come from LRCLIB and are lined up with the voice by Whisper. Together they’re a 3–4 GB download, installed into this app’s own folder.":
     "스템 분리에는 <a href=\"https://github.com/facebookresearch/demucs\" target=\"_blank\" rel=\"noopener\">Demucs</a>(PyTorch), 박자 분석에는 librosa, YouTube 링크에는 yt-dlp를 써요. 연습 화면의 음정 바는 리드 보컬만으로 만드는데, 이 리드 보컬은 카라오케 모델(audio-separator)이 백킹 보컬과 보컬 찹에서 떼어 내요. 가사는 <a href=\"https://lrclib.net\" target=\"_blank\" rel=\"noopener\">LRCLIB</a>에서 받아 <a href=\"https://github.com/openai/whisper\" target=\"_blank\" rel=\"noopener\">Whisper</a>로 목소리에 맞춰요. 모두 합쳐 3–4 GB를 내려받아 이 앱의 폴더에 설치해요.",
-  "Install stem tools": "스템 도구 설치", "Add a song": "새 곡 추가", "Paste a YouTube link": "YouTube 링크 붙여넣기", "YouTube link": "YouTube 링크", "Separate": "분리",
-  "or choose an audio file · drop it here": "또는 오디오 파일 선택 · 여기로 끌어다 놓기",
+  "Install stem tools": "스템 도구 설치", "Add a song": "새 곡 추가", "Separate": "분리",
   "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
   "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
   "This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).":
@@ -4041,6 +4057,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "lead": "리드 보컬", "backing": "백킹 보컬", "vocals": "보컬", "drums": "드럼", "bass": "베이스", "guitar": "기타", "piano": "피아노", "other": "나머지",
   "Where the melody sits": "멜로디 음역",
   "Lyrics": "가사",
+  "Paste YouTube links, one per line": "YouTube 링크를 붙여넣으세요 (한 줄에 하나씩)", "YouTube links": "YouTube 링크",
+  "or choose audio files · drop them here": "또는 오디오 파일을 고르거나 · 여기에 놓으세요", "Uploading {i} of {n}…": "{n}개 중 {i}번째 올리는 중…",
+  "{url}: {why}": "{url}: {why}", "Waiting · {n} ahead": "대기 중 · 앞에 {n}곡", "Starting next…": "곧 시작해요…",
   "Originally {bpm} BPM": "원래 {bpm} BPM", "The song’s own speed is 100%": "원곡 속도가 100%예요", "Changing tempo… {pct}": "템포 바꾸는 중… {pct}",
   "Tempo (BPM)": "템포 (BPM)", "Speed (%)": "속도 (%)", "Getting the band at that tempo…": "그 템포의 반주를 준비하는 중…",
   "Couldn’t change the tempo.": "템포를 바꾸지 못했어요.", "Search": "찾기", "Search LRCLIB": "LRCLIB에서 찾기", "Look again": "다시 찾기", "Paste lyrics": "가사 붙여넣기",

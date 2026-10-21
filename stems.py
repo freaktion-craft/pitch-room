@@ -53,6 +53,7 @@ MODEL_DIR = os.path.join(ROOT, "models")
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _work_lock = threading.Lock()  # one separation at a time; others wait as "queued"
+_line: list[str] = []  # the jobs waiting for _work_lock (the one holding it first), in the order they asked
 _model_cache: dict = {}
 
 
@@ -73,9 +74,15 @@ def active_jobs() -> list[dict]:
 
 
 def get_job(job_id: str) -> dict | None:
+    """A job as it stands; a song waiting its turn says how many songs are ahead of it (ahead)."""
     with _jobs_lock:
         job = _jobs.get(job_id)
-        return None if job is None else {k: v for k, v in job.items() if k != "log"} | {"log": job["log"][-6:]}
+        if job is None:
+            return None
+        out = {k: v for k, v in job.items() if k != "log"} | {"log": job["log"][-6:]}
+        if job["kind"] == "separate" and job["status"] == "queued" and job_id in _line:
+            out["ahead"] = sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate")
+        return out
 
 
 def _set(job, **kw):
@@ -113,14 +120,27 @@ def _stage(job, stage: str, progress: float):
 
 @contextlib.contextmanager
 def _turn(job):
-    """Hold _work_lock for a job, waiting for it in short steps so a job cancelled while queued stops at once."""
-    while not _work_lock.acquire(timeout=0.25):
-        _check(job)
+    """Hold _work_lock for a job, once the jobs that asked before it have had theirs (a lock alone would let any of the
+    waiting ones in next), waiting in short steps so a job cancelled while queued stops at once."""
+    with _jobs_lock:
+        _line.append(job["id"])
     try:
-        _check(job)
-        yield
+        while True:
+            _check(job)
+            with _jobs_lock:
+                first = _line[0] == job["id"]
+            if first and _work_lock.acquire(timeout=0.25):
+                break
+            if not first:
+                time.sleep(0.1)
+        try:
+            _check(job)
+            yield
+        finally:
+            _work_lock.release()
     finally:
-        _work_lock.release()
+        with _jobs_lock:
+            _line.remove(job["id"])
 
 
 def _run(job, fn, *args):
