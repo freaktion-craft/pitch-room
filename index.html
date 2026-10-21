@@ -513,9 +513,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 #pSave:not(:disabled) { background: var(--ink); color: var(--on-ink); }
 #pSave:not(:disabled):hover { background: var(--ink-strong); }
 .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; } /* 16 px to the list with the group's 12 */
-/* Search, beside Add song: the songs whose title or artist has every word typed, as it's typed; a field like the
-   others, 32 px, its glass inside on the left. / goes to it; Esc empties it. */
-.lib-acts { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* Search, heading the list in place of a "Library" that said nothing: the songs whose title or artist has every word
+   typed, as it's typed; a field like the others, 32 px, its glass inside on the left. / goes to it; Esc empties it.
+   Add song stays at the right, with the search there or not. */
+#sAddBtn { margin-left: auto; }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
 .search .ico { position: absolute; left: 10px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
 .search input { width: 100%; height: 32px; padding: 0 12px 0 32px; border: 1px solid transparent; border-radius: 8px; background: var(--surface-2);
@@ -900,10 +901,10 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <pre class="log" id="sInstallLog" hidden></pre>
     </section>
 
-    <section class="group" id="sLibPage">
-      <div class="lib-head"><div class="group-label">Library</div><div class="lib-acts">
+    <section class="group" id="sLibPage" aria-label="Library">
+      <div class="lib-head">
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
-        <a class="btn sm dark" id="sAddBtn" href="#stems/add">Add song</a></div></div>
+        <a class="btn sm dark" id="sAddBtn" href="#stems/add">Add song</a></div>
       <div id="sJobs"></div>
       <div class="rows" id="sLib"></div>
     </section>
@@ -1616,6 +1617,7 @@ async function drawLibrary() {
   const first = !lib.length && !$("#sJobs").children.length;
   $("#sAddBtn").hidden = first;
   $("#sSearchBox").hidden = !lib.length;
+  $("#sLibPage .lib-head").hidden = first; // nothing to search, and the list itself is the way to add
   if (first) {
     const a = el("a", "first"), plus = el("span", "plus"), text = el("span");
     a.href = "#stems/add"; plus.append(icon("plus"));
