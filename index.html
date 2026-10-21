@@ -1885,7 +1885,7 @@ function paintMeta() {
 }
 function closeSong() {
   pauseSong();
-  P.song = null; P.buffers = {}; P.peaks = null; P.keep = {}; P.tsel = P.mark = null;
+  P.song = null; P.buffers = {}; P.peaks = P.trackPeaks = null; P.keep = {}; P.tsel = P.mark = null; // waveforms flat until the next song's peaks are in
   clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.rate = P.rateWant = 1; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
@@ -2137,9 +2137,13 @@ function voicesPeaks() {
   if (!P.trackPeaks.voices) P.trackPeaks.voices = l.map((v, i) => Math.max(v, b[i] || 0));
   return P.trackPeaks.voices;
 }
+// Each rises in after the song's own, a row later each (WAVE_STAGGER ms), so the rise runs down the list like a wave.
+const WAVE_STAGGER = 90;
 function drawTrackWaves(prog, rise) {
   const d = Math.min(2, devicePixelRatio || 1);
+  let row = 0;
   for (const c of document.querySelectorAll("#pTracks .twave")) {
+    const later = rise - ++row * WAVE_STAGGER;
     const r = c.getBoundingClientRect(), name = c.dataset.name;
     if (!r.width) continue;
     if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(TWAVE_H * d); }
@@ -2156,7 +2160,7 @@ function drawTrackWaves(prog, rise) {
     const peaks = P.trackPeaks && (group ? voicesPeaks() : P.trackPeaks[name]), on = group ? audible("lead") || audible("backing") : audible(name);
     if (!peaks) { x.globalAlpha = 0.3; x.fillRect(0, (TWAVE_H - 1) / 2, r.width, 1); x.globalAlpha = 1; continue; }
     if (!peaks.scaled) { let top = 0; for (const v of peaks) if (v > top) top = v; peaks.scaled = Math.min(3, 1 / (top || 1)); }
-    waveBars(x, c.width, Math.round(TWAVE_H * d), d, peaks, (TWAVE_H - 4) * peaks.scaled, prog, on ? 1 : 0.3, on ? 0.3 : 0.12, rise);
+    waveBars(x, c.width, Math.round(TWAVE_H * d), d, peaks, (TWAVE_H - 4) * peaks.scaled, prog, on ? 1 : 0.3, on ? 0.3 : 0.12, later);
   }
 }
 // Where the playhead is drawn, as a fraction of the song: where the song is, except just after a jump (a click on the
