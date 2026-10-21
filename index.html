@@ -6,11 +6,17 @@
 <title>Stem</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script>
-  // the page waits behind the opening bar (boot() lets it in); never longer than 8 s, should the script fail
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  // The page waits behind the opening bar (boot() lets it in) the first time the app opens in a tab: not on a reload,
+  // a step back or forward, or a second load in the same tab, when there's nothing worth waiting for. Never longer
+  // than 8 s, should the script fail.
+  (() => {
+    const nav = performance.getEntriesByType("navigation")[0];
+    let again = false;
+    try { again = sessionStorage.getItem("stem:opened") === "1"; sessionStorage.setItem("stem:opened", "1"); } catch (e) { again = false; }
+    if (again || (nav && nav.type !== "navigate") || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     document.documentElement.classList.add("booting");
     setTimeout(() => document.documentElement.classList.remove("booting"), 8000);
-  }
+  })();
 </script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
