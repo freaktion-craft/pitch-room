@@ -551,7 +551,14 @@ input[type="range"]:disabled { opacity: 0.4; }
    typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
    to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. Add song
    stays at the right, with the search there or not. */
-#sAddBtn { margin-left: auto; }
+/* Add song: a panel under its button (links, files, the options), not a page of its own */
+.add-at { position: relative; display: inline-flex; margin-left: auto; }
+.add-at .pop { width: min(520px, calc(100vw - 32px)); font-size: 14px; }
+.add-form { display: grid; gap: 12px; }
+.add-form > b { font-weight: 500; font-size: 15px; }
+.add-form p, #sAddSetup { margin: 0; }
+.add-form .drop { justify-content: center; } /* not the panel's label rows */
+.add-form .inline-field { justify-content: flex-start; gap: 8px; }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
 /* the glyph (2 px in from its box each way) 10 px from the field's left, top and bottom, and from the text */
 .search .ico { position: absolute; left: 8px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
@@ -595,7 +602,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sLib .row:hover::before, #sLib .row:hover + .row::before, #sLib .lib-cols:has(+ .row:hover)::after { opacity: 0; }
 #sLib:empty { display: none; } /* until the list has loaded */
 /* an empty library: the list itself is the way to add the first song */
-#sLib .first { display: flex; align-items: center; gap: 16px; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2); }
+#sLib .first { display: flex; align-items: center; gap: 16px; width: 100%; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+/* an empty library: the Add song panel opens in the big button's place, in the flow */
+#sLib > .pop.inline { position: static; width: auto; margin-inline: 12px; box-shadow: 0 0 0 1px var(--line); }
 #sLib .first:hover { border-color: rgba(var(--fg), 0.4); background: rgba(var(--fg), 0.03); }
 #sLib .first .plus { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
 #sLib .first .plus .ico { width: 20px; height: 20px; stroke-width: 1.6px; }
@@ -1009,33 +1019,32 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
-        <a class="btn sm dark" id="sAddBtn" href="#stems/add">Add song</a></div>
+        <span class="add-at" id="sAddAt"><button class="btn sm dark" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button>
+        <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
+          <div class="add-form" id="sAdd" hidden>
+            <b>Add a song</b>
+            <form class="yt" id="sYtForm">
+              <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
+              <button class="btn sm dark" type="submit">Separate</button>
+            </form>
+            <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
+            <div class="row-actions">
+              <label class="inline-field" title="6 tracks instead of 4. The piano track often picks up other instruments."><input type="checkbox" class="switch" id="s6">Also split out guitar and piano</label>
+              <span class="muted" id="sDevice"></span>
+            </div>
+            <div class="gpu-row" id="sGpu" hidden>
+              <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
+              <button class="btn sm dark" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
+              <div class="bar" hidden id="sGpuBar"><i></i></div>
+              <span class="muted" id="sGpuState"></span>
+            </div>
+            <p class="muted" id="sAddMsg" hidden></p>
+            <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
+          </div>
+          <p class="muted" id="sAddSetup" hidden>Install the stem tools first: see One-time setup above.</p>
+        </div></span></div>
       <div class="rows" id="sLib"></div>
     </section>
-
-    <div id="sAddPage" hidden>
-
-    <section class="panel-card" id="sAdd" hidden>
-      <b>Add a song</b>
-      <form class="yt" id="sYtForm">
-        <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
-        <button class="btn sm dark" type="submit">Separate</button>
-      </form>
-      <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
-      <div class="row-actions">
-        <label class="inline-field" title="6 tracks instead of 4. The piano track often picks up other instruments."><input type="checkbox" class="switch" id="s6">Also split out guitar and piano</label>
-        <span class="muted" id="sDevice"></span>
-      </div>
-      <div class="gpu-row" id="sGpu" hidden>
-        <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
-        <button class="btn sm dark" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
-        <div class="bar" hidden id="sGpuBar"><i></i></div>
-        <span class="muted" id="sGpuState"></span>
-      </div>
-      <p class="muted" id="sAddMsg" hidden></p>
-      <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
-    </section>
-    </div>
 
     <section class="ts" id="sTakesStudio" aria-label="Takes Studio" hidden>
       <div class="ts-top"><a class="btn sm back" id="tsBack" href="#stems">Practice</a><b id="tsTitle"></b></div>
@@ -1703,8 +1712,9 @@ async function stemsRefresh() {
   $("#sServer").hidden = !!st || !!err;
   $("#sErr").hidden = !err;
   if (err) say($("#sErr"), "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err: () => tr(err) });
-  $("#sInstall").hidden = !st || st.installed || (stemsPage !== "lib" && stemsPage !== "add");
+  $("#sInstall").hidden = !st || st.installed || stemsPage !== "lib";
   $("#sAdd").hidden = !st || !st.installed;
+  $("#sAddSetup").hidden = !st || st.installed; // the Add song panel points at the setup until the tools are in
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
   if (st && st.installed) {
     say($("#sDevice"), st.restartNeeded ? "Restart the app (close its window and open it again) to switch to the GPU."
@@ -1739,19 +1749,23 @@ async function drawLibrary() {
     addingJob(j.id, j);
     watchJob(j.id, "separate");
   }
+  const addOpen = !$("#addPop").hidden;
+  $("#sAddAt").append($("#addPop")); // out of the list before it's cleared (an empty library shows it there)
   box.innerHTML = "";
   // nothing yet (and nothing on its way): the list becomes the one big way in, in place of the button beside its title
   const coming = [...adding.values()].some((j) => j.status !== "error");
   const first = !lib.length && !coming;
-  $("#sAddBtn").hidden = first;
+  $("#sAddAt").hidden = first;
   $("#sSearchBox").hidden = !lib.length;
   $("#sLibPage .lib-head").hidden = first; // nothing to search, and the list itself is the way to add
   if (first) {
-    const a = el("a", "first"), plus = el("span", "plus"), text = el("span");
-    a.href = "#stems/add"; plus.append(icon("plus"));
+    const a = el("button", "first"), plus = el("span", "plus"), text = el("span");
+    a.type = "button"; a.onclick = (e) => { e.stopPropagation(); showAdd(true); };
+    plus.append(icon("plus"));
     text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.")));
     a.append(plus, text); box.append(a);
   }
+  if (addOpen || addOnShow) { addOnShow = false; showAdd(true); } // kept open through a redraw, or asked for by a link
   if (!lib.length && coming) box.append(el("p", "lib-none", tr("Your first song is on its way. How it’s going shows beside the mic.")));
   if (!lib.length) return;
   const head = el("div", "lib-cols");
@@ -2467,9 +2481,9 @@ async function submitYoutube(e) {
   }
   field.value = failed.join("\n"); // what didn't start stays, to fix
   if (!failed.length) addMsg("");
-  await Promise.all(folds); // the links fold up here (the field keeps its lines meanwhile), then off to the library as they fly
+  await Promise.all(folds); // the links fold up here (the field keeps its lines meanwhile), then the panel goes as they fly
   fitLinks();
-  if (failed.length < urls.length) toLibrary();
+  if (!failed.length) showAdd(false); // one that couldn't start keeps it open, saying why, its link left to fix
 }
 async function submitFiles(files) {
   files = [...(files || [])]; if (!files.length) return;
@@ -2483,7 +2497,7 @@ async function submitFiles(files) {
     }
     catch (err) { addMsg(files.length > 1 ? tr("{url}: {why}", { url: file.name, why: () => tr(err.message) }) : err.message, true); return; }
   }
-  addMsg(""); await fold; if (ok) toLibrary();
+  addMsg(""); await fold; if (ok) showAdd(false);
 }
 // A song sent off: where it was given (its line of the links field, the drop zone) folds into a little square with a
 // bounce, which flies in an arc to the ring by the mic; the ring comes in as the first one lands (or gives a nudge,
@@ -2526,7 +2540,22 @@ function sendOff(from, i = 0) {
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
 // The new songs' progress shows beside the mic; they land in the library.
 function jobStarted(id, name) { addingJob(id, { name, status: "queued", progress: 0 }); watchJob(id, "separate"); }
-function toLibrary() { if (view === "stems" && stemsPage === "add") go("stems"); }
+// Add song: a panel under its button (an empty library shows it in the list's place, where its one big button was).
+// It opens with the links field ready to type in; a click elsewhere, Escape or a song sent off closes it.
+let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
+function showAdd(on) {
+  const pop = $("#addPop"), btn = $("#sAddBtn");
+  if (on) {
+    const first = $("#sLibPage .lib-head").hidden;
+    pop.classList.toggle("inline", first);
+    if (first) $("#sLib").replaceChildren(pop); // in the big button's place
+    showMicSet(false); showJobs(false);
+  }
+  const was = !pop.hidden;
+  pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
+  if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
+  if (!on && pop.classList.contains("inline")) { pop.classList.remove("inline"); $("#sAddAt").append(pop); renderLibrary(); } // the big button back
+}
 // the links field: a line tall, growing with what's in it (CSS stops it at five)
 function fitLinks() { const f = $("#sYtUrl"); f.style.height = ""; f.style.height = Math.max(32, f.scrollHeight + 2) + "px"; }
 
@@ -3381,6 +3410,14 @@ function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { say($("#sInstallState"), e.message); $("#sInstallBtn").disabled = false; } };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { say($("#sGpuState"), e.message); $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
+  // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it
+  const addPop = $("#addPop");
+  $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
+  document.addEventListener("click", (e) => { if (!addPop.hidden && !e.composedPath().includes(addPop)) showAdd(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !addPop.hidden) { showAdd(false); if (!$("#sAddAt").hidden) $("#sAddBtn").focus(); } });
+  addEventListener("dragenter", (e) => {
+    if (view === "stems" && stemsPage === "lib" && addPop.hidden && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) showAdd(true);
+  });
   $("#s6").checked = store.get("sixStems", false);
   $("#s6").onchange = (e) => store.set("sixStems", e.target.checked);
   $("#pGetVideo").onclick = async () => {
@@ -5089,14 +5126,17 @@ function centerKeys() { // the song's middle note in the middle
 // ---------- routes ----------
 let view = "stems", stemsPage = "lib";
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
-// Stems pages: the library (#stems), adding a song (#stems/add) and one song (#stems/<id>).
+// Stems pages: the library (#stems) and one song (#stems/<id>, its Info and its Takes Studio). Adding a song is a panel
+// in the library; an old link to #stems/add opens the library with it up.
 function stemsRoute(sub, extra) {
-  stemsPage = !sub ? "lib" : sub === "add" ? "add" : extra === "info" ? "info" : extra === "takes" ? "takes" : "song";
-  if (sub && sub !== "add") forgetAdded(sub);
+  if (sub === "add") { addOnShow = true; location.replace("#stems"); return; }
+  stemsPage = !sub ? "lib" : extra === "info" ? "info" : extra === "takes" ? "takes" : "song";
+  if (sub) forgetAdded(sub);
+  if (stemsPage !== "lib") showAdd(false);
   $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib" || stemsPage === "takes"; $("#sSongActs").hidden = stemsPage !== "song";
   $("#sTakesStudio").hidden = stemsPage !== "takes";
   if (stemsPage === "takes") openTakesStudio(sub); else tsStop();
-  $("#sLibPage").hidden = stemsPage !== "lib"; $("#sAddPage").hidden = stemsPage !== "add"; $("#sPlayer").hidden = stemsPage !== "song";
+  $("#sLibPage").hidden = stemsPage !== "lib"; $("#sPlayer").hidden = stemsPage !== "song";
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
   if (stemsPage === "song" && (!P.song || P.song.id !== sub || P.song.stale)) openSongById(sub);
