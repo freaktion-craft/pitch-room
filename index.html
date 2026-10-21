@@ -271,6 +271,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .drop { position: relative; display: flex; align-items: center; justify-content: center; min-height: 72px; padding: 12px; border-radius: 10px;
   border: 1px dashed rgba(var(--fg), 0.18); background: var(--bg); color: var(--muted); font-size: 13.5px; text-align: center; cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
 .drop:hover, .drop.over { border-color: var(--ink); color: var(--ink); }
+.drop:has(input:focus-visible) { outline: 2px solid var(--voice); outline-offset: 2px; } /* the file field in it is see-through */
 .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 /* Stems page */
@@ -1057,6 +1058,14 @@ function splitInput(label) {
 // in, so a click on it counts as inside that panel; Escape closes the list only. Changing the items while it's open
 // redraws it in place, focus and scroll kept. name is English (tr'd where it's shown); the items come translated.
 const picks = []; // every dropdown, relabelled on a language switch
+// Tab out of a list or menu that hangs elsewhere in the page (a dropdown's list at the end of its panel, the library's
+// menu at the end of the page) goes on from the button that opened it: to the control after it, or before it with Shift.
+function focusFrom(btn, back) {
+  const all = [...document.querySelectorAll('a[href], button, input, textarea, select, [tabindex]')]
+    .filter((n) => n.tabIndex >= 0 && !n.disabled && n.getClientRects().length && !n.closest(".pick-list, .menu"));
+  const i = all.indexOf(btn);
+  (all[back ? i - 1 : i + 1] || btn).focus();
+}
 function progRing(p) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   s.setAttribute("viewBox", "0 0 16 16"); s.setAttribute("class", "ring" + (p ? "" : " spin")); s.setAttribute("aria-hidden", "true");
@@ -1122,7 +1131,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
     const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: os.length - 1 }[e.key];
     if (to !== undefined) { e.preventDefault(); e.stopPropagation(); os[Math.max(0, Math.min(os.length - 1, to))].focus(); } // not Practice's Home/End
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); show(false); btn.focus(); }
-    else if (e.key === "Tab") show(false);
+    else if (e.key === "Tab") { e.preventDefault(); show(false); focusFrom(btn, e.shiftKey); }
     else e.stopPropagation(); // the list's keys stay in it: R, L and ← → don't reach Practice
   });
   // a click elsewhere closes it (the path, not contains(): a click on a row that redraws the list leaves its target out)
@@ -1420,6 +1429,13 @@ function initSongMenu() {
   };
   document.addEventListener("click", (e) => { if (menuBtn && !e.composedPath().some((n) => n === menuBtn || n === $("#songMenu"))) closeMenu(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuBtn) { const b = menuBtn; closeMenu(); b.focus(); } });
+  // ↑ ↓ (round and round), Home and End move between its items; Tab leaves it, on from the ⋮ button
+  $("#songMenu").addEventListener("keydown", (e) => {
+    const items = [...$("#songMenu").querySelectorAll("button")], i = items.indexOf(document.activeElement);
+    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (to !== undefined) { e.preventDefault(); items[(to + items.length) % items.length].focus(); }
+    else if (e.key === "Tab" && menuBtn) { e.preventDefault(); const b = menuBtn; closeMenu(); focusFrom(b, e.shiftKey); }
+  });
   for (const ev of ["scroll", "resize", "hashchange"]) addEventListener(ev, closeMenu, { passive: true });
 }
 // Rename, in place: a field over the row's title (a textarea, so a long title keeps its line breaks), all of it
@@ -2693,6 +2709,8 @@ function initSing() {
   setBtn.onclick = (e) => { e.stopPropagation(); showMicSet(pop.hidden); };
   document.addEventListener("click", (e) => { if (!pop.hidden && !e.composedPath().includes(pop)) showMicSet(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showMicSet(false); setBtn.focus(); } });
+  // tabbed out of it, it closes, so what the focus moved to (under it) shows
+  pop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!pop.hidden && to && !pop.contains(to) && to !== setBtn) showMicSet(false); });
   $("#gate").value = S.gate; $("#echo").checked = S.echo;
   $("#gate").oninput = (e) => { S.gate = +e.target.value; save(); };
   resetOnDblClick($("#gate"), 0.01);
