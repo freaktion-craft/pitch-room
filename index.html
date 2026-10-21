@@ -1569,7 +1569,7 @@ const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A",
 const KEY_MINOR = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"];
 const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${tr(k.mode)}` : ""); // G♯ minor, G♯ 단조
 const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : tr("no steady beat"), keyName(m.key)].filter(Boolean);
-const libLine = (m) => [...songFacts(m), tr("{n} tracks", { n: trackNames(m).length }), new Date(m.created * 1000).toLocaleDateString(locale())].join(" · ");
+const libLine = (m) => songFacts(m).join(" · "); // how long, how fast, what key: what picking a song to sing goes by
 // Songs added before keys were read get theirs from /info, which works it out once (about a second) and saves it.
 const keyJobs = new Map();
 function keyOf(m) {
