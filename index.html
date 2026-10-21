@@ -518,6 +518,22 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sLib .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(var(--fg), 0.08); }
 #sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
 #sLib .cover img.in { opacity: 1; }
+#sLib .cover[role="button"] { cursor: zoom-in; }
+#sLib .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* A cover, pressed: it flies up from the list to the middle of the page (.cv-fly), where it tilts toward the pointer
+   like a card held in the hand (.cv-card), a light gleaming off it where the pointer is and a sheen sliding across as
+   it turns. A click, a tap or Esc puts it back. */
+#coverView { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; perspective: 1200px; cursor: zoom-out;
+  background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); outline: none; }
+#coverView[hidden] { display: none; }
+.cv-fly { width: min(72vmin, 480px); aspect-ratio: 1; transform-origin: 50% 50%; }
+.cv-card { position: relative; width: 100%; height: 100%; border-radius: 12px; overflow: hidden; touch-action: none;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06); will-change: transform; }
+.cv-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cv-card i { position: absolute; inset: 0; pointer-events: none; opacity: var(--glow, 0); }
+.cv-card .cv-light { background: radial-gradient(circle at var(--lx, 50%) var(--ly, 50%), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.15) 30%, rgba(255, 255, 255, 0) 60%); mix-blend-mode: overlay; }
+.cv-card .cv-sheen { background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.3) 48%, rgba(255, 255, 255, 0.08) 54%, transparent 65%) var(--sx, 50%) 0 / 300% 100% no-repeat;
+  mix-blend-mode: overlay; }
 #sLib .song { flex: 1 1 0; }
 .song { display: grid; gap: 4px; min-width: 0; }
 .song b { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
@@ -887,6 +903,10 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <button type="button" role="menuitem" class="danger" id="mDelete"><span>Delete</span></button>
     </div>
   </main>
+</div>
+
+<div id="coverView" role="dialog" aria-label="Album art" tabindex="-1" hidden>
+  <div class="cv-fly"><div class="cv-card"><img alt=""><i class="cv-light"></i><i class="cv-sheen"></i></div></div>
 </div>
 
 <script src="icons.local.js"></script>
@@ -1544,6 +1564,81 @@ function paintCover(tile, m) {
   img.alt = ""; img.decoding = "async"; img.onload = () => img.classList.add("in");
   img.src = `/library/${m.id}/cover.jpg?v=${m.cover.at}`;
   tile.append(img);
+  tile.removeAttribute("aria-hidden"); tile.setAttribute("role", "button"); tile.tabIndex = 0;
+  tile.setAttribute("aria-label", tr("Album art of {title}", { title: m.title }));
+  tile.onclick = (e) => { e.stopPropagation(); showCover(tile); };
+  tile.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); showCover(tile); } };
+}
+// ---------- a cover, up close ----------
+// It flies from its tile to the middle (the tile's picture stays put, hidden, the big one standing in for it), then
+// leans toward the pointer: up to TILT degrees at the card's edges, easing there, with the light where the pointer is.
+const TILT = 14;
+const CV = { tile: null, x: 0, y: 0, tx: 0, ty: 0, glow: 0, tglow: 0, lx: 50, ly: 50, raf: 0, closing: false };
+const stillMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+// the transform that puts the big cover over the tile: the step between them, as a FLIP animation's first frame
+function overTile(tile, fly) {
+  const a = tile.getBoundingClientRect(), b = fly.getBoundingClientRect(), s = a.width / b.width;
+  return { t: `translate(${a.left + a.width / 2 - (b.left + b.width / 2)}px, ${a.top + a.height / 2 - (b.top + b.height / 2)}px) scale(${s})`, r: `${6 / s}px` };
+}
+function showCover(tile) {
+  if (CV.tile) return;
+  const view = $("#coverView"), fly = view.querySelector(".cv-fly"), card = view.querySelector(".cv-card");
+  card.querySelector("img").src = tile.querySelector("img").src;
+  CV.tile = tile; CV.closing = false; CV.x = CV.y = CV.tx = CV.ty = CV.glow = CV.tglow = 0;
+  card.style.transform = ""; card.style.setProperty("--glow", "0");
+  view.hidden = false; view.focus({ preventScroll: true });
+  tile.style.visibility = "hidden";
+  const from = overTile(tile, fly), ms = stillMotion() ? 0 : 420, ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+  fly.animate([{ transform: from.t }, { transform: "none" }], { duration: ms, easing: ease });
+  card.animate([{ borderRadius: from.r }, { borderRadius: "12px" }], { duration: ms, easing: ease });
+  view.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms * 0.7, easing: "ease-out" });
+  if (!stillMotion()) CV.raf = requestAnimationFrame(tiltTick);
+}
+async function hideCover() {
+  const tile = CV.tile;
+  if (!tile || CV.closing) return;
+  CV.closing = true; CV.tx = CV.ty = CV.tglow = 0;
+  const view = $("#coverView"), fly = view.querySelector(".cv-fly"), card = view.querySelector(".cv-card");
+  const to = overTile(tile, fly), ms = stillMotion() ? 0 : 340, ease = "cubic-bezier(0.4, 0, 0.2, 1)";
+  card.animate([{ transform: card.style.transform || "none" }, { transform: "none" }], { duration: ms * 0.6, easing: ease, fill: "forwards" });
+  card.animate([{ borderRadius: "12px" }, { borderRadius: to.r }], { duration: ms, easing: ease, fill: "forwards" });
+  view.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "ease-in", fill: "forwards" });
+  await fly.animate([{ transform: "none" }, { transform: to.t }], { duration: ms, easing: ease, fill: "forwards" }).finished.catch(() => {});
+  cancelAnimationFrame(CV.raf);
+  view.hidden = true;
+  for (const el of [view, fly, card]) el.getAnimations().forEach((a) => a.cancel());
+  tile.style.visibility = "";
+  CV.tile = null;
+  if (document.activeElement === view || document.activeElement === document.body) tile.focus({ preventScroll: true });
+}
+function tiltTick() {
+  const card = $("#coverView .cv-card"), k = 0.12;
+  CV.x += (CV.tx - CV.x) * k; CV.y += (CV.ty - CV.y) * k; CV.glow += (CV.tglow - CV.glow) * 0.1;
+  if (!CV.closing) card.style.transform = `rotateX(${(-CV.y * TILT).toFixed(2)}deg) rotateY(${(CV.x * TILT).toFixed(2)}deg)`;
+  card.style.setProperty("--glow", CV.glow.toFixed(3));
+  card.style.setProperty("--lx", CV.lx.toFixed(1) + "%"); card.style.setProperty("--ly", CV.ly.toFixed(1) + "%");
+  card.style.setProperty("--sx", (50 - CV.x * 40).toFixed(1) + "%");
+  CV.raf = requestAnimationFrame(tiltTick);
+}
+function initCoverView() {
+  const view = $("#coverView"), card = view.querySelector(".cv-card");
+  view.addEventListener("pointermove", (e) => {
+    if (!CV.tile || CV.closing) return;
+    const r = card.getBoundingClientRect(), clamp = (v) => Math.max(-1, Math.min(1, v));
+    CV.tx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2));
+    CV.ty = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2));
+    CV.lx = (CV.tx + 1) * 50; CV.ly = (CV.ty + 1) * 50;
+    const over = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    CV.tglow = over ? 1 : 0.35;
+  });
+  view.addEventListener("pointerleave", () => { CV.tx = CV.ty = 0; CV.tglow = 0; });
+  view.addEventListener("click", hideCover);
+  view.addEventListener("wheel", (e) => e.preventDefault(), { passive: false }); // the list stays where it was under it
+  document.addEventListener("keydown", (e) => {
+    if (!CV.tile) return;
+    if (e.key === "Escape" || e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); hideCover(); }
+    else if (e.key === "Tab") e.preventDefault(); // nothing else to go to while it's up
+  }, true);
 }
 // Covers still being looked for (a song just added, or ones from before there were covers): the list asks again in a
 // few seconds, a minute at most, and puts each in as it's found.
@@ -2771,6 +2866,7 @@ function initStems() {
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyS" && view === "stems" && stemsPage === "song") { e.preventDefault(); if (!$("#pSave").disabled) saveMix(); }
   });
   initSongMenu();
+  initCoverView();
   $("#pVol").value = stemVol;
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
   resetOnDblClick($("#pVol"), 1);
@@ -4233,7 +4329,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Split a song into tracks and practice it phrase by phrase, with your pitch on screen.": "곡을 트랙별로 나누고, 화면에서 내 음정을 보며 한 소절씩 연습하세요.",
   "Library": "라이브러리", "Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",
   "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요. 트랙별로 나뉘어 바로 연습할 수 있어요.",
-  "More": "더 보기", "More for {title}": "{title} 더 보기", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
+  "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
   "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
   "no steady beat": "일정한 박자 없음", "{n} tracks": "트랙 {n}개", "major": "장조", "minor": "단조",
   "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":

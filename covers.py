@@ -18,7 +18,7 @@ import urllib.request
 
 import lyrics
 
-SIZE = 240  # px: the list shows it at 48, sharp up to 5× that
+SIZE = 600  # px: the list shows it at 48, and pressed it's shown up to 480
 
 
 def fetch(url: str, tries: int = 3) -> bytes | None:

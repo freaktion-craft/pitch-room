@@ -410,18 +410,25 @@ def library() -> list[dict]:
             if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
                 _backfilled.add(d)
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
-            if "cover" not in meta:
+            if _cover_wanted(meta):
                 _want_cover(d)
             out.append(meta)
     return sorted(out, key=lambda m: m.get("created", 0), reverse=True)
 
 
-# meta.json's "cover": {"from": "file", "itunes", "deezer" or "youtube", "at"} once cover.jpg is saved (covers.py), None
-# when there's none to be had, absent until it's been looked for. Looked for one song at a time, in the background: as
-# a song is added, and for the songs added before covers were (or while offline) as the library is listed.
+# meta.json's "cover": {"from": "file", "itunes", "deezer" or "youtube", "at", "px"} once cover.jpg is saved (covers.py),
+# None when there's none to be had, absent until it's been looked for. Looked for one song at a time, in the background:
+# as a song is added, and for the songs added before covers were (or while offline, or saved smaller than covers.SIZE)
+# as the library is listed.
 _cover_line: list[str] = []
 _cover_asked: set[str] = set()
 _cover_lock = threading.Lock()
+
+
+def _cover_wanted(meta: dict) -> bool:
+    import covers
+    c = meta.get("cover", False)
+    return c is not None and (not c or c.get("px", 0) < covers.SIZE)
 
 
 def _want_cover(song_id: str):
@@ -455,7 +462,7 @@ def _find_cover(song_id: str):
     import covers
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
-    if "cover" in meta:
+    if not _cover_wanted(meta):
         return
     out, got = os.path.join(folder, "cover.jpg"), None
     src = _saved(folder, "source")
@@ -481,7 +488,7 @@ def _find_cover(song_id: str):
     if not got and failed:
         raise failed  # couldn't ask: left to look for again
     if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
-        _update_meta(folder, cover={"from": got, "at": round(time.time())} if got else None)
+        _update_meta(folder, cover={"from": got, "at": round(time.time()), "px": covers.SIZE} if got else None)
 
 
 def delete_song(song_id: str):
