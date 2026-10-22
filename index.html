@@ -282,14 +282,37 @@ input[type="range"]:disabled { opacity: 0.4; }
 .ly-note a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .plot { position: relative; flex: 1; min-height: 0; }
 .plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* the lyrics in the stretch already sung (left of the playhead), as Apple Music shows them: the phrase being sung in
+   the middle, filled in as it's sung, the next ones under it, the one before over it; a line up at a time */
+.lycol { position: absolute; top: 0; bottom: 0; overflow: hidden; pointer-events: none;
+  -webkit-mask: linear-gradient(transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(transparent, #000 12%, #000 88%, transparent); }
+.lycol[hidden], .lyblur[hidden] { display: none; }
+/* the bars under the lyrics, more out of focus the further back from the playhead: layers of blur, each taking over
+   further left (stacked, they add up) */
+.lyblur { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.lyblur i { position: absolute; inset: 0; -webkit-backdrop-filter: blur(var(--b)); backdrop-filter: blur(var(--b));
+  -webkit-mask: linear-gradient(to left, transparent var(--s), #000 calc(var(--s) + 20%)); mask: linear-gradient(to left, transparent var(--s), #000 calc(var(--s) + 20%)); }
+.lylist { padding: 0 16px 0 20px; transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.lylist p { margin: 0 0 12px; font-size: 15px; line-height: 24px; font-weight: 600; word-break: keep-all; color: var(--ink); opacity: 0;
+  transition: opacity 0.4s, translate 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.lylist p.now { opacity: 1; }
+.lylist p.now span { background: linear-gradient(90deg, var(--voice) var(--p, 0%), var(--ink) var(--p, 0%)); -webkit-background-clip: text;
+  background-clip: text; color: transparent; }
+.lylist p.n1 { opacity: 0.4; }
+.lylist p.n2, .lylist p.b1 { opacity: 0.2; }
+.lylist.wait p.above { translate: 0 var(--lift, 0); } /* room for the count-in over the line it leads into (renderLyrics) */
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
    drawn there during an intro or break, while the coming bars arrive from the right */
 /* The label over a row of dots, one per count: all bright to start, each count dims the next one, so the bright ones
    left are the counts to go. No width of its own, so the label and the dots centre on one fixed line whatever the label
    says; fixed heights, so nothing moves between counts. Dots 20 px, down to 10 where the stretch is narrow. */
-.countin { --dot: 20px; position: absolute; top: 50%; width: 0; transform: translateY(-50%); display: flex; flex-direction: column;
+.countin { --dot: 20px; position: absolute; left: var(--mid); top: 50%; width: 0; transform: translateY(-50%); display: flex; flex-direction: column;
   align-items: center; gap: 8px; pointer-events: none; text-align: center; }
+/* with lyrics, at their left edge (the gutter's 48 + 1 + the list's 20 px), smaller, over the line it counts into */
+.countin.ly { left: 69px; align-items: flex-start; text-align: left; }
+.countin.ly .dots { --dot: 10px; }
+#countLbl:empty { display: none; }
 .countin span { font-size: 13px; line-height: 20px; color: var(--muted); white-space: nowrap; }
 .countin .dots { display: flex; gap: calc(var(--dot) * 0.6); height: var(--dot); }
 .countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--ink); transition: opacity 0.15s; }
@@ -996,7 +1019,9 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       </div>
       <div class="plot">
         <canvas id="cv"></canvas>
+        <div class="lyblur" id="lyBlur" hidden><i style="--b: 0.5px; --s: 0%"></i><i style="--b: 1px; --s: 14%"></i><i style="--b: 2px; --s: 28%"></i><i style="--b: 3px; --s: 42%"></i><i style="--b: 5px; --s: 56%"></i><i style="--b: 8px; --s: 70%"></i></div>
         <div class="countin" id="countIn" hidden><span id="countLbl"></span><div class="dots" id="countDots" aria-hidden="true"></div><span class="sr" id="countNum" aria-live="assertive"></span></div>
+        <div class="lycol" id="lyCol" hidden><div class="lylist" id="lyList"></div></div>
         <div class="overlay" id="overlay" hidden></div>
       </div>
     </section>
@@ -3500,7 +3525,7 @@ function initStems() {
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
 const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, hist: [], guideVol: 0.5, bandVol: 1, studio: null, span: null, resume: null,
-  lyrics: null, lyricMsg: null, lyricKey: null, lyricRows: [] }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place
+  lyrics: null, lyricMsg: null, lyricKey: null }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place
 function songEvs() {
   const sh = P.key; // the bars move with the key the song plays in
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
@@ -3616,16 +3641,7 @@ function phraseTimes(spans, beats, bpm, dur) {
 function setPhrases() {
   const m = K.song;
   K.phrases = K.lyrics ? lyricPhrases(K.lyrics, m.beats, m.bpm, songDur()) : songPhrases(K.notes, m.beats, m.bpm, songDur());
-  K.lyricRows = lyricRows();
   K.cue = null; K.lyricKey = null; setLoop(false); renderPhrases();
-}
-// Where each phrase's lyrics go on the stage: [{lo, hi}], its lowest and highest notes as sung (null without any).
-function lyricRows() {
-  if (!K.lyrics) return [];
-  return K.phrases.map((p) => {
-    const ms = K.notes.filter(([a, b]) => b > p.t0 && a < p.t1).map((n) => n[2]);
-    return { lo: ms.length ? Math.min(...ms) : null, hi: ms.length ? Math.max(...ms) : null };
-  });
 }
 // The phrase you're on: the one playing, or the next one during a rest; during the count-in after a jump, the one you
 // jumped to. null after the last.
@@ -3772,6 +3788,42 @@ function renderLyric() {
   note.append(tr(K.lyricMsg.t, K.lyricMsg.v));
   if (K.lyricMsg.find) { const a = el("a", null, tr("Find them on the song’s Info page")); a.href = `#stems/${K.song.id}/info`; note.append(" ", a); } // after the sentence
 }
+// The lyrics left of the playhead: every phrase a line, the one being sung (or next, in a rest) in the middle of the
+// stage with its words filled in as they're sung; while counting in, the dots stand in its place and it waits under them.
+function renderLyrics(now) {
+  const col = $("#lyCol");
+  col.hidden = $("#lyBlur").hidden = !K.lyrics;
+  if (!K.lyrics) return;
+  if (K.lyFor !== K.phrases) {
+    K.lyFor = K.phrases; K.lyAt = null;
+    K.lyLines = K.phrases.map((ph) => {
+      const p = el("p"), mid = (l) => (l.t0 + l.t1) / 2;
+      const ws = K.lyrics.filter((l) => mid(l) >= ph.t0 - 0.05 && mid(l) <= ph.t1 + 0.05).flatMap((l) => l.words || [])
+        .map(([a, b, w]) => ({ a, b, s: el("span", null, w) }));
+      if (ws.length) p.append(...ws.flatMap((x, k) => (k ? [" ", x.s] : [x.s]))); else p.textContent = ph.text;
+      return { p, ws };
+    });
+    $("#lyList").replaceChildren(...K.lyLines.map((x) => x.p));
+  }
+  const i = Math.min(K.ph ?? K.phrases.length - 1, K.phrases.length - 1), ci = $("#countIn"), ch = ci.hidden ? 0 : ci.offsetHeight;
+  const key = `${i}|${ch}|${col.offsetHeight}`;
+  if (K.lyAt !== key) {
+    K.lyAt = key;
+    const list = $("#lyList"), mid = col.offsetHeight / 2;
+    K.lyLines.forEach((x, k) => {
+      x.p.className = (k === i ? "now" : k === i + 1 ? "n1" : k === i + 2 ? "n2" : k === i - 1 ? "b1" : "") + (k < i ? " above" : "");
+    });
+    list.classList.toggle("wait", ch > 0);
+    list.style.setProperty("--lift", -(ch + 20) + "px"); // the line before, as far over the count-in as the one it leads into is under it
+    const cur = K.lyLines[i];
+    if (cur) { // in the middle; while counting in, 16 px under the count-in (which is in the middle)
+      const y = ch ? mid + ch / 2 + 16 - cur.p.offsetTop : mid - cur.p.offsetTop - cur.p.offsetHeight / 2;
+      list.style.transform = `translateY(${Math.round(y)}px)`;
+    }
+  }
+  const cur = K.lyLines[i];
+  if (cur) for (const x of cur.ws) x.s.style.setProperty("--p", (Math.max(0, Math.min(1, (now - x.a) / Math.max(0.05, x.b - x.a))) * 100).toFixed(1) + "%");
+}
 // Every frame: keep the loop going, follow the playhead, move the strip's marker.
 function phraseTick(sn) {
   if (K.loop && P.playing && K.ph != null) { // round again: the phrase, or the run of them
@@ -3786,13 +3838,15 @@ function phraseTick(sn) {
   return sn;
 }
 // During an intro or break: "Intro · vocals in 12 s", then the last four beats as dots, one dimming on each (screen
-// readers hear 4 3 2 1). After a jump to a phrase: "Phrase 3" over its count-in.
+// readers hear 4 3 2 1). After a jump to a phrase: "Phrase 3" over its count-in, or just the dots where its lyrics are
+// under them.
 function renderCountIn(sn) {
   const box = $("#countIn");
+  box.classList.toggle("ly", !!K.lyrics);
   let e = null;
   if (K.on && K.cue != null) {
     const p = K.phrases[K.cue];
-    if (p && sn < p.t0) e = { kind: tr("Phrase {n}", { n: K.cue + 1 }), t: p.t0, counts: p.counts, cue: true }; else K.cue = null;
+    if (p && sn < p.t0) e = { kind: K.lyrics ? "" : tr("Phrase {n}", { n: K.cue + 1 }), t: p.t0, counts: p.counts, cue: true }; else K.cue = null;
   }
   if (!e && K.on && K.resume) { // played again after a pause: counted in to where it stopped
     if (sn < K.resume.t) e = { kind: tr("From {t}", { t: fmtTime(K.resume.t) }), t: K.resume.t, counts: K.resume.counts, cue: true }; else K.resume = null;
@@ -4784,8 +4838,12 @@ function resize() {
   // the count-in midway between the note names and the playhead, its four dots (and three gaps of 0.6 of one) inside
   // that stretch with 8 px to spare either side (on a phone, 10 px dots and less to spare)
   const left = (W - GUT) * HIT, ci = $("#countIn");
-  ci.style.left = Math.round(GUT + left / 2) + "px";
+  ci.style.setProperty("--mid", Math.round(GUT + left / 2) + "px");
   ci.style.setProperty("--dot", Math.max(10, Math.min(20, Math.floor((left - 16) / 5.8))) + "px");
+  // the lyrics over the same stretch, their blur stopping short of the playhead (or it smears it)
+  const lc = $("#lyCol"), lb = $("#lyBlur");
+  lc.style.left = lb.style.left = GUT + 1 + "px"; lc.style.width = Math.round(left) - 1 + "px"; lb.style.width = Math.round(left) - 2 + "px";
+  K.lyAt = null;
 }
 new ResizeObserver(resize).observe(cv);
 readColors();
@@ -4888,32 +4946,19 @@ function draw(now, cur, hist, evs, guide) {
     if (pen) g.lineTo(x, y); else { g.moveTo(x, y); pen = true; }
   }
   g.strokeStyle = C.voice; g.lineWidth = 3; g.lineJoin = "round"; g.lineCap = "round"; g.stroke();
-  // the lyrics, a phrase at a time: its line from where the phrase starts, under its lowest bar (over its highest
-  // where there's no room below), on two lines if it runs into the next phrase's; how it's sung is yours to phrase.
-  // Outlined in the stage's colour so the lines behind don't cut it; phrases sung already fade back.
-  if (K.lyricRows.length) {
-    const sh = P.key, LH = 20;
-    g.font = "500 14px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "top";
-    g.lineJoin = "round"; g.lineWidth = 4; g.strokeStyle = C.surface; g.fillStyle = C.ink;
-    let lo = null;
-    K.phrases.forEach((p, i) => {
-      const r = K.lyricRows[i], next = K.phrases[i + 1];
-      lo = r.lo ?? lo; // a phrase without notes: under the one before's
-      const x = X(p.t0);
-      if (lo == null || !p.text || x > W || (next ? X(next.t0) : X(p.t1) + 400) < GUT) return;
-      const room = Math.max(120, (next ? X(next.t0) : W + 400) - x - 16);
-      const lines = wrapLyric(p.text.replace(/ \/ /g, "   "), room);
-      let y = Y(lo + sh) + bh / 2 + 8;
-      if (y + lines.length * LH > H - 4) y = Y((r.hi ?? lo) + sh) - bh / 2 - 8 - lines.length * LH;
-      g.globalAlpha = p.t1 < now ? 0.4 : 1;
-      lines.forEach((ln, k) => { g.strokeText(ln, x, y + k * LH); g.fillText(ln, x, y + k * LH); });
-    });
+  g.restore();
+  // with lyrics, the stretch already sung is theirs (renderLyrics): a veil over it all the way to the playhead, densest
+  // on the left
+  if (K.lyrics) {
+    const a = GUT + 1;
+    g.fillStyle = C.surface;
+    for (let x = a; x < hitX; x += 2) { g.globalAlpha = 0.92 - 0.57 * ((x - a) / (hitX - a)) ** 1.5; g.fillRect(x, 0, Math.min(2, hitX - x), H); }
     g.globalAlpha = 1;
   }
-  g.restore();
   // while counting in, what's on the stretch already sung (where the count-in stands) fades back behind its lanes, so
-  // the dots read clearly over bars there (played on from the middle of a phrase): the stage under them, drawn again
-  K.veil = (K.veil || 0) + ((!$("#countIn").hidden ? 1 : 0) - (K.veil || 0)) * 0.2;
+  // the dots read clearly over bars there (played on from the middle of a phrase): the stage under them, drawn again.
+  // Not with lyrics, whose veil is there already
+  K.veil = (K.veil || 0) + ((!$("#countIn").hidden && !K.lyrics ? 1 : 0) - (K.veil || 0)) * 0.2;
   if (K.veil > 0.01) {
     const a = 0.85 * K.veil;
     g.save(); g.beginPath(); g.rect(GUT + 1, 0, hitX - GUT - 1, H); g.clip();
@@ -4971,22 +5016,6 @@ function drawAurora() {
   c.filter = "none";
 }
 
-// A phrase's lyrics in lines no wider than room (the context's font): two at most, the second cut short with … if need be
-function wrapLyric(text, room) {
-  const words = text.split(" "), lines = [""];
-  for (const w of words) {
-    const cur = lines[lines.length - 1], tryLine = cur ? cur + " " + w : w;
-    if (g.measureText(tryLine).width <= room || !cur) lines[lines.length - 1] = tryLine;
-    else if (lines.length < 2) lines.push(w);
-    else { lines[1] += " " + w; }
-  }
-  if (lines[1] && g.measureText(lines[1]).width > room) {
-    let t = lines[1];
-    while (t.length > 1 && g.measureText(t + "…").width > room) t = t.slice(0, -1);
-    lines[1] = t.trimEnd() + "…";
-  }
-  return lines.map((l) => l.trim()).filter(Boolean);
-}
 
 // ---------- main loop ----------
 // Your pitch: the median of the last few readings. A reading can be an octave off for a frame or two (mostly an octave
@@ -5040,7 +5069,7 @@ function practiceFrame() {
   songView();
   draw(heard, cur, K.hist, K.evs, { pts: K.contour, shift: P.key });
   setText("kTime", `${fmtTime(Math.max(0, heard))} / ${fmtTime(songDur())}`);
-  renderHud(heard, cur); renderCountIn(heard); renderLyric();
+  renderHud(heard, cur); renderCountIn(heard); renderLyric(); renderLyrics(heard);
 }
 // While a take plays, the stage follows it: the bars in the key and octave it was sung in, where it is in the song, and
 // the line you sang, drawn as it goes, the dot where it is now (compared too: the original is in the other ear).
