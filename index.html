@@ -645,8 +645,9 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .row:hover::before, #sLib .row:hover + .row::before { opacity: 0; }
 #sLib:empty { display: none; } /* until the list has loaded */
 /* an empty library: the list itself is the way to add the first song */
-#sLib .first { display: flex; align-items: center; gap: 16px; width: 100%; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2);
-  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+#sLib .first { display: flex; align-items: center; gap: 16px; width: calc(100% - 24px); margin-inline: 12px; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; } /* in line with the cards over it, as the rows' text is */
+#sInstall:not([hidden]) ~ #sLibPage #sLib .first { display: none; } /* one step at a time: the tools, then the first song */
 /* an empty library: the Add song panel opens in the big button's place, in the flow */
 #sLib > .pop.inline { position: relative; top: 0; right: 0; width: auto; margin-inline: 12px; box-shadow: 0 0 0 1px var(--line); }
 #sLib .first:hover { border-color: rgba(var(--fg), 0.4); background: rgba(var(--fg), 0.03); }
