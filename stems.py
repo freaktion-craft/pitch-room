@@ -1216,6 +1216,9 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
     import logging
 
     import soundfile as sf
+    if importlib.util.find_spec("audioread") is None:  # set up before librosa 1.0 stopped bringing it along
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "audioread>=3.0"])
+        importlib.invalidate_caches()
     from audio_separator.separator import Separator
     from audio_separator.separator.architectures import mdxc_separator
     mdxc_separator.tqdm = _checked  # the model's loop over the song's chunks then stops when the job is cancelled
