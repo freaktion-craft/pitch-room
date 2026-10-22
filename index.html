@@ -1054,7 +1054,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <!-- the tools to add songs, in the library and on Add song while they're missing (an update can add one) -->
     <section class="panel-card" id="sInstall" hidden>
       <b>One-time setup</b>
-      <p class="muted" data-html>Stem separation uses <a href="https://github.com/facebookresearch/demucs" target="_blank" rel="noopener">Demucs</a> (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Lyrics come from <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> and are lined up with the voice by <a href="https://github.com/openai/whisper" target="_blank" rel="noopener">Whisper</a>. Together they’re a 3–4 GB download, installed into this app’s own folder.</p>
+      <p class="muted">The tools that split songs, read their melody and time their lyrics: a 3–4 GB download, once, into this app’s folder.</p>
       <div class="row-actions"><button class="btn dark" id="sInstallBtn" type="button">Install stem tools</button><span class="muted" id="sInstallState"></span></div>
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
@@ -5454,8 +5454,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
     "Python 서버가 필요해요. OS에 맞는 <code>start-…</code> 파일로 앱을 시작한 뒤 <b>http://localhost:5178</b>에서 다시 여세요.",
   "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
   "One-time setup": "처음 한 번 설치",
-  "Stem separation uses Demucs (PyTorch), beat tracking uses librosa, YouTube links use yt-dlp, and the note bars in Practice come from the lead vocal alone, which a karaoke model (via audio-separator) splits from backing vocals and vocal chops. Lyrics come from LRCLIB and are lined up with the voice by Whisper. Together they’re a 3–4 GB download, installed into this app’s own folder.":
-    "스템 분리에는 <a href=\"https://github.com/facebookresearch/demucs\" target=\"_blank\" rel=\"noopener\">Demucs</a>(PyTorch), 박자 분석에는 librosa, YouTube 링크에는 yt-dlp를 써요. 연습 화면의 음정 바는 리드 보컬만으로 만드는데, 이 리드 보컬은 카라오케 모델(audio-separator)이 백킹 보컬과 보컬 찹에서 떼어 내요. 가사는 <a href=\"https://lrclib.net\" target=\"_blank\" rel=\"noopener\">LRCLIB</a>에서 받아 <a href=\"https://github.com/openai/whisper\" target=\"_blank\" rel=\"noopener\">Whisper</a>로 목소리에 맞춰요. 모두 합쳐 3–4 GB를 내려받아 이 앱의 폴더에 설치해요.",
+  "The tools that split songs, read their melody and time their lyrics: a 3–4 GB download, once, into this app’s folder.":
+    "곡을 나누고, 멜로디를 읽고, 가사를 맞추는 도구예요. 한 번만 3–4 GB를 받아 이 앱 폴더에 설치해요.",
   "Install stem tools": "스템 도구 설치", "Add a song": "새 곡 추가", "Separate": "분리",
   "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
   "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
