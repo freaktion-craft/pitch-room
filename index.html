@@ -177,7 +177,7 @@ html.booting #app { visibility: hidden; }
 #boot .bar i { width: 40%; transition: none; animation: boot-sweep 0.8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
 @keyframes boot-sweep { to { transform: translateX(150%); } }
 /* Page intro: the title, set apart from what follows */
-.intro { display: grid; gap: 2px; margin-bottom: 32px; }
+.intro { display: grid; gap: 2px; margin-bottom: 16px; }
 .group { display: grid; gap: 12px; }
 /* Section titles: they head the content, so they read stronger than it */
 .group-label { font-size: 15px; font-weight: 500; color: var(--ink); }
@@ -649,18 +649,15 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .row:hover { background: rgba(var(--fg), 0.04); }
 #sLib .row:hover::before, #sLib .row:hover + .row::before { opacity: 0; }
 #sLib:empty { display: none; } /* until the list has loaded */
-/* an empty library: the list itself is the way to add the first song */
-#sLib .first { display: flex; align-items: center; gap: 16px; width: calc(100% - 24px); margin-inline: 12px; padding: 24px 20px; border-radius: 14px; border: 1px dashed rgba(var(--fg), 0.2);
-  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; } /* in line with the cards over it, as the rows' text is */
-#sInstall:not([hidden]) ~ #sLibPage #sLib .first { display: none; } /* one step at a time: the tools, then the first song */
-/* an empty library: the Add song panel opens in the big button's place, in the flow */
-#sLib > .pop.inline { position: relative; top: 0; right: 0; width: auto; margin-inline: 12px; box-shadow: 0 0 0 1px var(--line); }
-#sLib .first:hover { border-color: rgba(var(--fg), 0.4); background: rgba(var(--fg), 0.03); }
-#sLib .first .plus { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
-#sLib .first .plus .ico { width: 20px; height: 20px; stroke-width: 1.6px; }
-#sLib .first b { display: block; font-weight: 500; font-size: 15px; }
-#sLib .first small { color: var(--muted); font-size: 13px; }
-#sLib:has(.first) { box-shadow: none; background: none; }
+/* an empty library: a row in the list that opens Add song, a dashed square with a plus where a cover would be */
+#sLib .add-first { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
+#sLib .add-first .plus { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 6px; border: 1px dashed rgba(var(--fg), 0.25);
+  color: var(--muted); transition: border-color 0.15s, color 0.15s; }
+#sLib .add-first:hover .plus { border-color: rgba(var(--fg), 0.45); color: var(--ink); }
+#sLib .add-first .plus .ico { width: 20px; height: 20px; }
+#sLib .add-first small { color: var(--muted); font-size: 13px; }
+/* one step at a time: with the tools still to install, an empty library waits under their banner */
+#sInstall:not([hidden]) ~ #sLibPage:has(.add-first) { display: none; }
 /* the album art (covers.py), as tall as the title and its details beside it: a square the row has from the start, so
    nothing moves when the picture comes in (fading); a quiet tile until then, or for good when there's none. A hairline
    inside, for a white cover on the white list. */
@@ -1797,25 +1794,10 @@ async function drawLibrary() {
     addingJob(j.id, j);
     watchJob(j.id, "separate");
   }
-  const addOpen = !$("#addPop").hidden;
-  $("#sAddAt").append($("#addPop")); // out of the list before it's cleared (an empty library shows it there)
   box.innerHTML = "";
-  // nothing yet (and nothing on its way): the list becomes the one big way in, in place of the button beside its title
   const coming = [...adding.values()].some((j) => j.status !== "error");
-  const first = !lib.length && !coming;
-  $("#sAddAt").hidden = first;
-  $("#sSearchBox").hidden = !lib.length;
-  $("#sLibPage .lib-head").hidden = first; // nothing to search, and the list itself is the way to add
-  if (first) {
-    const a = el("button", "first"), plus = el("span", "plus"), text = el("span");
-    a.type = "button"; a.onclick = (e) => { e.stopPropagation(); showAdd(true); };
-    plus.append(icon("plus"));
-    text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.")));
-    a.append(plus, text); box.append(a);
-  }
-  if (addOpen || addOnShow) { addOnShow = false; showAdd(true); } // kept open through a redraw, or asked for by a link
-  if (!lib.length && coming) box.append(el("p", "lib-none", tr("Your first song is on its way. How it’s going shows beside the mic.")));
-  if (!lib.length) return;
+  $("#sSearchBox").hidden = !lib.length; // nothing to search
+  if (addOnShow) { addOnShow = false; showAdd(true); } // asked for by a link
   const head = el("div", "lib-cols");
   for (const [by, c] of Object.entries(SORTS)) {
     const b = el("button", "sort" + (c.end ? " end" : "") + (c.wide ? " wide" : ""));
@@ -1828,6 +1810,16 @@ async function drawLibrary() {
   }
   head.append(el("span"));
   box.append(head);
+  // nothing yet: a row in the list's place that opens Add song, or (one on its way) a word on where it's at
+  if (!lib.length && coming) box.append(el("p", "lib-none", tr("Your first song is on its way. How it’s going shows beside the mic.")));
+  else if (!lib.length) {
+    const a = el("button", "row add-first"), plus = el("span", "plus"), text = el("span", "song");
+    a.type = "button"; a.onclick = (e) => { e.stopPropagation(); showAdd(true); };
+    plus.append(icon("plus"));
+    text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or drop an audio file.")));
+    a.append(plus, text); box.append(a);
+  }
+  if (!lib.length) { pinLibTop(); paintFade(); return; } // the column heads are new: pinned where they stand
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     row.dataset.id = m.id; libRows.set(m.id, row);
@@ -2452,7 +2444,7 @@ async function cancelJob(id) {
 function dropJob(id) {
   clearInterval(pollers[id]); delete pollers[id];
   adding.delete(id); document.getElementById("job-" + id)?.remove(); paintJobs();
-  renderLibrary(); // an empty library shows its "Add your first song" card again
+  renderLibrary(); // an empty library shows its "Add your first song" row again
 }
 // A song that's been added unfolds into the list where it sorts, fading in; the page stays where it is (it opens from
 // the list). The first one unfolds the whole list from the note that stood in for it.
@@ -2601,22 +2593,16 @@ async function tuckAway() {
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
 // The new songs' progress shows beside the mic; they land in the library.
 function jobStarted(id, name) { addingJob(id, { name, status: "queued", progress: 0 }); watchJob(id, "separate"); }
-// Add song: a panel under its button (an empty library shows it in the list's place, where its one big button was).
-// It opens with the links field ready to type in; a click elsewhere, Escape or a song sent off closes it.
+// Add song: a panel under its button (an empty library's row opens it there too). It opens with the links field ready
+// to type in; a click elsewhere, Escape or a song sent off closes it.
 let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
 function showAdd(on) {
   const pop = $("#addPop"), btn = $("#sAddBtn");
-  if (on) {
-    const first = $("#sLibPage .lib-head").hidden;
-    pop.classList.toggle("inline", first);
-    if (first) $("#sLib").replaceChildren(pop); // in the big button's place
-    showMicSet(false); showJobs(false);
-  }
+  if (on) { showMicSet(false); showJobs(false); }
   const was = !pop.hidden;
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
   $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // the page behind blurs back
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
-  if (!on && pop.classList.contains("inline")) { pop.classList.remove("inline"); $("#sAddAt").append(pop); renderLibrary(); } // the big button back
 }
 // the links field: a line tall, growing with what's in it (CSS stops it at five)
 function fitLinks() { const f = $("#sYtUrl"); f.style.height = ""; f.style.height = Math.max(32, f.scrollHeight + 2) + "px"; }
@@ -5447,7 +5433,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   // library and adding a song
   "Stems": "스템", "Practice any song": "어떤 곡이든 연습하세요",
   "Library": "라이브러리", "Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",
-  "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요. 트랙별로 나뉘어 바로 연습할 수 있어요.",
+  "Paste a YouTube link or drop an audio file.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요.",
   "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Search songs": "곡 검색", "No songs match “{q}”": "“{q}”에 맞는 곡이 없어요", "Sort by {col}": "{col} 순으로 정렬", "Sorted by {col}, {way}": "{col} 순, {way}",
   "ascending": "오름차순", "descending": "내림차순", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
   "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
