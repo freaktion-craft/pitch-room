@@ -301,7 +301,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, stems.start_key(parts[2], body.get("n"), body.get("speed", 1)))
             if parts[3] == "export":
                 body = json.loads(self._body(100_000) or b"{}")
-                data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"), body.get("key") or 0, body.get("speed") or 1)
+                data, filename = stems.export(parts[2], body.get("tracks", []), body.get("click"), body.get("key") or 0, body.get("speed") or 1,
+                                              body.get("span"))
                 return self._attachment(data, "audio/mpeg", filename, "export.mp3")
             if parts[3] == "lyrics":  # find them: {} on LRCLIB by the title, {"id": n} that entry, {"text": …} pasted
                 body = json.loads(self._body(60_000) or b"{}")

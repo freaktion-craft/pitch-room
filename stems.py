@@ -1829,10 +1829,10 @@ def _limit(x: np.ndarray, sr: int = SR) -> np.ndarray:
     return (x * g[look - 1:]).astype(x.dtype)  # the gain worked out look - 1 samples on (the page plays that late)
 
 
-def export(song_id: str, tracks: list[dict], click: dict | None, key=0, speed=1) -> tuple[bytes, str]:
+def export(song_id: str, tracks: list[dict], click: dict | None, key=0, speed=1, span=None) -> tuple[bytes, str]:
     """tracks: [{name, gain, only?}] of the tracks heard (only: a muted track's kept parts, where alone it plays); click:
-    {gain, offset, beatsPerBar} or None; key: semitones up or down, and speed, the tempo, as played. Returns (mp3 bytes,
-    filename)."""
+    {gain, offset, beatsPerBar} or None; key: semitones up or down, and speed, the tempo, as played; span: [start, end]
+    in song seconds to export just that stretch, or None for the whole song. Returns (mp3 bytes, filename)."""
     folder, key, speed = _song_dir(song_id), _semitones(key), _speed(speed)
     meta = _read_meta(folder)
     names, vocal = _tracks(folder, meta), None
@@ -1863,6 +1863,13 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0, speed=1)
         used.append("click")
     if mix is None:
         raise ValueError("Turn on at least one track to export.")
+    if span is not None:  # just the stretch picked on a waveform, faded in and out over FADE so it starts and ends clean
+        cut = _parts(float(meta["duration"]), [span])
+        if not cut:
+            raise ValueError("Pick a stretch at least 0.2 s long.")
+        span = cut[0]
+        i0, i1 = int(span[0] / speed * SR), min(mix.shape[1], int(span[1] / speed * SR))
+        mix = mix[:, i0:i1] * _parts_mask(i1 - i0, [[FADE, (i1 - i0) / SR - FADE]])
     mix = _limit(mix)
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "out.mp3")
@@ -1888,7 +1895,14 @@ def export(song_id: str, tracks: list[dict], click: dict | None, key=0, speed=1)
     tags = [f"{key:+d}" if key else "", (f"{round(meta['bpm'] * speed)} BPM" if meta.get("bpm") else f"{speed:.0%}") if speed != 1 and not said else ""]
     if any(tags):
         label += f" ({', '.join(t for t in tags if t)})"
+    if span is not None:
+        label += f" {_clock(span[0])}-{_clock(span[1])}"
     return data, f"{safe} - {label}.mp3"
+
+
+def _clock(t: float) -> str:
+    """Song seconds as 1m05s: a time a file name can hold (Windows forbids the colon)."""
+    return f"{int(t) // 60}m{int(t) % 60:02d}s"
 
 
 def _file_title(meta: dict) -> str:

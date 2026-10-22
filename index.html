@@ -444,7 +444,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .ph-line.wide { width: 4px; margin-left: -2px; border-radius: 2px; }
 .ph-line.hang { top: 20px; }
 /* A track's kept parts, over its waveform (drawn on it by drawTrackWaves): an × in each one's top right corner, shown
-   while you point at the part, and over a stretch being picked, its "Keep playing here" in its middle (paintKeeps) */
+   while you point at the part, and over a stretch being picked, its "Keep playing here" and a download of just that
+   stretch in its middle (paintKeeps) */
 .twrap { position: relative; grid-column: 1 / -1; }
 .tparts { position: absolute; inset: 0; pointer-events: none; }
 .tparts .part { position: absolute; top: 0; bottom: 0; }
@@ -453,8 +454,12 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tparts .x .ico { width: 10px; height: 10px; }
 .tparts .part.hover .x, .tparts .x:focus-visible { opacity: 1; }
 @media (hover: none) { .tparts .x { opacity: 1; } }
-.tparts .keep { position: absolute; top: 50%; transform: translate(-50%, -50%); height: 24px; padding: 0 10px; border: 0; border-radius: 6px; white-space: nowrap;
-  background: var(--ink); color: var(--on-ink); font-size: 12px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
+.tparts .selbar { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; gap: 4px; pointer-events: auto; }
+.tparts .selbar button { height: 24px; padding: 0 10px; border: 0; border-radius: 6px; white-space: nowrap;
+  background: var(--ink); color: var(--on-ink); font-size: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
+.tparts .selbar .cut { display: grid; place-items: center; width: 24px; padding: 0; }
+.tparts .selbar .cut .ico { width: 14px; height: 14px; }
+.tparts .selbar button:disabled { opacity: 0.5; }
 .transport-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .transport-row output { font: 13px var(--mono); color: rgba(var(--fg), 0.6); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .transport-row .ptracks { font-size: 13px; color: var(--muted); } /* how many tracks, after the time */
@@ -3110,12 +3115,12 @@ function trackRow(name, members, sub, open) {
   }
   return row;
 }
-async function exportMix(tracks, click, btn) {
+async function exportMix(tracks, click, btn, span) {
   const state = $("#pExportState");
   if (!tracks.length && !click) { say(state, "Turn on at least one track."); return; }
   btn.disabled = true; say(state, "Mixing the MP3…");
   try {
-    const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click, key: P.key, speed: P.rate }) });
+    const r = await fetch(`/api/library/${P.song.id}/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, click, key: P.key, speed: P.rate, span }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
     say(state, "Saved “{name}” to your downloads.", { name: await saveDownload(r, "export.mp3") });
   } catch (e) { say(state, e.message); }
@@ -3410,12 +3415,15 @@ function paintKeeps() {
       part.append(x); box.append(part);
     }
     if (P.tsel && P.tsel.name === name) {
-      const keep = el("button", "keep", tr("Keep playing here")), { a, b } = P.tsel;
-      keep.type = "button"; keep.title = tr("This stretch plays even while the track is muted");
+      const bar = el("div", "selbar"), keep = el("button", "keep", tr("Keep playing here")), cut = el("button", "cut"), { a, b } = P.tsel;
+      keep.type = cut.type = "button"; keep.title = tr("This stretch plays even while the track is muted");
       keep.onclick = () => addKeep(name, a, b);
-      box.append(keep);
-      const half = keep.offsetWidth / 2; // in the middle of the stretch, kept inside the waveform
-      keep.style.left = Math.max(half + 4, Math.min(w - half - 4, ((a + b) / 2 / dur) * w)) + "px";
+      cut.title = tr("Download {what}, {a}–{b} only (MP3)", { what: tr(name === "voices" ? "the vocals" : TRACK_TITLES[name] || name), a: fmtTime(a), b: fmtTime(b) });
+      cut.setAttribute("aria-label", cut.title); cut.append(icon("download"));
+      cut.onclick = () => exportMix(keepMembers(name).map((k) => ({ name: k, gain: 1 })), null, cut, [a, b]);
+      bar.append(keep, cut); box.append(bar);
+      const half = bar.offsetWidth / 2; // in the middle of the stretch, kept inside the waveform
+      bar.style.left = Math.max(half + 4, Math.min(w - half - 4, ((a + b) / 2 / dur) * w)) + "px";
     }
   }
 }
@@ -5550,6 +5558,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Saved “{name}” to your downloads.": "“{name}” 파일을 다운로드 폴더에 저장했어요.",
   "Couldn’t save that.": "저장하지 못했어요.", "Couldn’t save the mix.": "믹스를 저장하지 못했어요.",
   "Stop playing {a}–{b} while muted": "음소거 중에는 {a}–{b}도 재생하지 않기", "Keep playing here": "여기는 계속 재생",
+  "Download {what}, {a}–{b} only (MP3)": "{what}의 {a}–{b} 구간만 내려받기 (MP3)", "Pick a stretch at least 0.2 s long.": "0.2초 이상 구간을 골라 주세요.",
   "This stretch plays even while the track is muted": "트랙을 음소거해도 이 구간은 재생돼요",
   // key change
   "Original key": "원래 키", "original": "원래", "Higher": "높은 키", "Lower": "낮은 키", "Changing key… {pct}": "키 바꾸는 중… {pct}", "Originally {key}": "원래 {key}",
