@@ -14,7 +14,7 @@ Double-click the launcher for your system:
 
 The first run creates a private Python environment in `.venv` and installs the base tools (1–2 minutes). After that it starts in a couple of seconds and opens a tab in Chrome (or your default browser if Chrome isn't installed). Close the terminal window to stop it. Running the launcher again while it's already open just reopens the tab.
 
-**Needs:** Python 3.9 or newer. If it's missing, the launcher opens the download page — on Windows, tick **“Add python.exe to PATH”** while installing. Everything else (numpy, parselmouth, ffmpeg) is installed automatically.
+**Needs:** nothing installed beforehand. The launcher uses the computer's Python if it has 3.9 or newer; if not, it fetches its own (Python 3.11, through [uv](https://github.com/astral-sh/uv)) into the app's `.tools` folder, and nothing outside the folder changes. Everything else (numpy, parselmouth, ffmpeg) is installed automatically.
 
 **macOS note:** if double-clicking says the file can't be opened, right-click it → **Open** once. If it says permission denied, run `chmod +x start-mac.command` in Terminal.
 
