@@ -453,6 +453,16 @@ def _want_lookup(song_id: str):
             threading.Thread(target=_lookup_worker, daemon=True).start()
 
 
+def _looked_up(song_id: str, wait: float = 30.0):
+    """Wait (wait seconds at most) while a song is waiting to be looked up or being looked up."""
+    end = time.time() + wait
+    while time.time() < end:
+        with _lookup_lock:
+            if song_id not in _lookup_line:
+                return
+        time.sleep(0.25)
+
+
 def _lookup_worker():
     while True:
         with _lookup_lock:
@@ -571,16 +581,17 @@ def rename_song(song_id: str, title) -> str:
 
 
 # ---------- separation pipeline ----------
-def start_upload(data: bytes, filename: str, model: str) -> str:
+def start_upload(data: bytes, filename: str, model: str, lyrics: bool = False) -> str:
+    """lyrics: find the song's lyrics too, once it's in the library (start_lyrics)."""
     job = _new_job("separate", os.path.splitext(os.path.basename(filename or ""))[0])
-    return _run(job, _pipeline, {"kind": "upload", "data": data, "filename": filename}, model)
+    return _run(job, _pipeline, {"kind": "upload", "data": data, "filename": filename}, model, lyrics)
 
 
-def start_youtube(url: str, model: str) -> str:
+def start_youtube(url: str, model: str, lyrics: bool = False) -> str:
     if not re.match(r"^https?://", url or ""):
         raise ValueError("Paste a full link that starts with https://")
     job = _new_job("separate", url)
-    return _run(job, _pipeline, {"kind": "url", "url": url}, model)
+    return _run(job, _pipeline, {"kind": "url", "url": url}, model, lyrics)
 
 
 @lru_cache(maxsize=1)
@@ -738,7 +749,7 @@ def _beats(drums: np.ndarray, mix: np.ndarray, dur: float) -> tuple[float | None
     return round(60.0 / period, 1), [round(float(b), 3) for b in grid]
 
 
-def _pipeline(job, src: dict, model_name: str):
+def _pipeline(job, src: dict, model_name: str, lyrics: bool = False):
     if not installed():
         raise RuntimeError("Stem tools aren’t installed yet.")
     if model_name not in MODELS:
@@ -818,6 +829,11 @@ def _pipeline(job, src: dict, model_name: str):
         shutil.rmtree(folder, ignore_errors=True)
         raise
     _want_lookup(song_id)
+    if lyrics:
+        try:
+            start_lyrics(song_id, None)
+        except Exception as e:  # noqa: BLE001  (the song is in; its lyrics can be found from Practice)
+            print(f"Couldn't start finding library/{song_id}'s lyrics: {e}", file=sys.stderr)
 
 
 # ---------- lyrics ----------
@@ -1030,6 +1046,8 @@ def start_lyrics(song_id: str, how) -> str:
     def work(job):
         import covers
         _set(job, status="running", stage="Finding the lyrics", progress=0.02)
+        _looked_up(song_id)  # a song just added: what it is (its artist, its title) is asked of iTunes and Deezer first
+        meta = _read_meta(folder)
         voice = _voice16k(folder)
         mel = None
         with _turn(job):  # one model on the GPU at a time

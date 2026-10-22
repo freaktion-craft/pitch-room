@@ -271,10 +271,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1")})
         if url.path == "/api/stems/upload":
             name = (q.get("name") or ["upload"])[0]
-            return self._json(200, {"job": stems.start_upload(self._body(MAX_SONG), name, model)})
+            lyr = (q.get("lyrics") or ["0"])[0] == "1"
+            return self._json(200, {"job": stems.start_upload(self._body(MAX_SONG), name, model, lyr)})
         if url.path == "/api/stems/youtube":
             body = json.loads(self._body(10_000) or b"{}")
-            return self._json(200, {"job": stems.start_youtube(body.get("url", "").strip(), body.get("model", model))})
+            return self._json(200, {"job": stems.start_youtube(body.get("url", "").strip(), body.get("model", model), body.get("lyrics") is True)})
         parts = url.path.strip("/").split("/")  # api/library/<id>/<action>, api/jobs/<id>/cancel
         if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "cancel":
             return self._json(200, {"status": stems.cancel_job(parts[2])})

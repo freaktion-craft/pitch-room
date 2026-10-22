@@ -364,8 +364,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .panel-card a:not(.btn) { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .row-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .inline-field { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
-.fine { font-size: 12.5px; color: var(--faint); }
-.panel-card p.fine { max-width: none; } /* one line where there's room, not the card's 72ch measure */
+/* Add song's lyrics switch: its words on the left, the switch at the panel's right edge, under the Separate button */
+.add-opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); cursor: pointer; }
 /* the one-time setup: a banner, its line and its button; once it's started, how it's going in the line's place */
 #sInstall { padding: 12px 12px 12px 16px; }
 #sInstall .setup-line { display: flex; align-items: center; gap: 16px; }
@@ -1081,8 +1081,8 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
               <div class="bar" hidden id="sGpuBar"><i></i></div>
               <span class="muted" id="sGpuState"></span>
             </div>
+            <label class="add-opt">Find the lyrics too <input type="checkbox" class="switch" id="sAddLyr"></label>
             <p class="muted" id="sAddMsg" hidden></p>
-            <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
           </div>
           <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
         </div></span></div>
@@ -2526,6 +2526,8 @@ async function postJob(url, body, headers) {
 }
 // 4 stems: vocals, drums, bass and the rest (the 6-stem model's piano track bleeds, so it isn't offered)
 const stemModel = () => "htdemucs";
+// Find the lyrics too (the switch, kept as last set): the server finds them once the song is in the library
+const addLyrics = () => $("#sAddLyr").checked;
 // Several at once: links a line each (or spaces between), files several at a time. Each is sent in the order given;
 // the server takes them in that order, one at a time, the rest waiting with how many are ahead of them. Once one is
 // in, the library shows their progress; one that couldn't start says why here, the others going on.
@@ -2537,7 +2539,7 @@ async function submitYoutube(e) {
   let sent = 0;
   for (const url of urls) {
     try {
-      const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" });
+      const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel(), lyrics: addLyrics() }), { "Content-Type": "application/json" });
       if (!sent++) holdRing();
       jobStarted(id, url);
     } catch (err) { failed.push(url); addMsg(urls.length > 1 ? tr("{url}: {why}", { url, why: () => tr(err.message) }) : err.message, true); }
@@ -2552,7 +2554,7 @@ async function submitFiles(files) {
   for (const [i, file] of files.entries()) {
     addMsg(files.length > 1 ? tr("Uploading {i} of {n}…", { i: i + 1, n: files.length }) : "Uploading…");
     try {
-      const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}`, file);
+      const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}&lyrics=${addLyrics() ? 1 : 0}`, file);
       if (!ok++) holdRing();
       jobStarted(id, file.name.replace(/\.[^.]+$/, ""));
     }
@@ -3458,6 +3460,8 @@ function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { say($("#sInstallState"), e.message); $("#sInstallBtn").disabled = false; } };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { say($("#sGpuState"), e.message); $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
+  $("#sAddLyr").checked = store.get("addLyrics", false);
+  $("#sAddLyr").onchange = (e) => store.set("addLyrics", e.target.checked);
   // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it
   const addPop = $("#addPop");
   $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
@@ -5455,7 +5459,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Runs on your Apple GPU — about 30 s for a 4-minute song.": "Apple GPU에서 돌아가요. 4분짜리 곡에 30초쯤 걸려요.",
   "Runs on your NVIDIA GPU{name} — usually under a minute.": "NVIDIA GPU{name}에서 돌아가요. 보통 1분이 안 걸려요.",
   "Runs on the CPU — a 4-minute song can take several minutes.": "CPU에서 돌아가요. 4분짜리 곡이면 몇 분 걸릴 수 있어요.",
-  "Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.": "사용할 권리가 있는 오디오만 쓰세요. YouTube에서 내려받으면 YouTube 서비스 약관에 어긋날 수 있어요.",
+  "Find the lyrics too": "가사도 가져오기",
   "Songs being added": "추가 중인 곡", "Adding songs": "곡 추가 중", "Adding {n} songs · {pct}%": "{n}곡 추가 중 · {pct}%",
   "Adding a song · {pct}%": "곡 추가 중 · {pct}%", "Couldn’t add a song": "곡을 추가하지 못했어요", "Added": "추가됨", "A song": "곡",
   "{n} songs added": "{n}곡 추가됨", "Song added": "곡 추가됨", "Open song": "곡 열기", "Songs added": "추가된 곡",
