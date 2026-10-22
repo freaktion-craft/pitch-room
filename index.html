@@ -372,6 +372,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sInstall .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
 #sInstallState:empty, #sInstall .setup-line:has(#sInstallState:not(:empty)) p { display: none; }
 #sInstallBtn:disabled { opacity: 0.4; pointer-events: none; } /* while it installs */
+#sInstallState .ico { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; color: var(--good); } /* Installed's tick */
 .gpu-row { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--note-bg); color: var(--note-ink); font-size: 13.5px; }
 .gpu-row .btn { justify-self: start; }
 .gpu-row .muted { color: var(--note-ink); opacity: 0.8; }
@@ -1744,13 +1745,19 @@ const fmtTime = (t) => { t = Math.max(0, t || 0); return `${Math.floor(t / 60)}:
 const fmtClock = (t) => fmtTime(t).padStart(5, "0"); // 01:23
 let stemsStatus = null, pollers = {};
 
-async function stemsRefresh() {
-  renderLibrary(); // doesn't wait for the tools check, which can take a while
-  let st = null, err = null; // err: the server answered but the check failed, which is not "server not running"
+// The tools check: {st} as the server has it, or {err} when the server answered but the check failed (which is not
+// "server not running", st null).
+async function stemsCheck() {
   try {
     const r = await fetch("/api/stems/status", { cache: "no-store" });
-    if (r.ok) st = await r.json(); else err = (await r.json().catch(() => ({}))).error || `HTTP ${r.status}`;
-  } catch (e) { st = null; }
+    if (r.ok) return { st: await r.json(), err: null };
+    return { st: null, err: (await r.json().catch(() => ({}))).error || `HTTP ${r.status}` };
+  } catch (e) { return { st: null, err: null }; }
+}
+// list: false when the list is drawn already; got: a check made already
+async function stemsRefresh(list = true, got = null) {
+  if (list) renderLibrary(); // doesn't wait for the tools check, which can take a while
+  const { st, err } = got || await stemsCheck();
   stemsStatus = st;
   $("#sServer").hidden = !!st || !!err;
   $("#sErr").hidden = !err;
@@ -1771,6 +1778,27 @@ async function stemsRefresh() {
     }
   }
   pinLibTop(); // a notice or the setup above the list moves it down
+}
+// The tools in: the banner says so for a moment and folds away, and an empty library, which waited under it, rises in
+// where it was, as it does on opening. With reduced motion, at once.
+async function installDone() {
+  const box = $("#sInstall"), page = $("#sLibPage");
+  if (box.hidden || matchMedia("(prefers-reduced-motion: reduce)").matches) return stemsRefresh();
+  const waited = getComputedStyle(page).display === "none";
+  $("#sInstallBtn").disabled = true; // done with
+  say($("#sInstallState"), "Installed").prepend(icon("tick"));
+  // meanwhile the check (the server's first look at the new tools takes a few seconds) and the list, drawn while
+  // still out of sight, so what rises is what stays
+  const [got] = await Promise.all([stemsCheck(), renderLibrary(), sleep(900)]);
+  box.style.overflow = "hidden";
+  const fold = box.animate([{ height: box.offsetHeight + "px", opacity: 1, marginBottom: "24px", paddingTop: "12px", paddingBottom: "12px" },
+    { height: "0px", opacity: 0, marginBottom: "0px", paddingTop: "0px", paddingBottom: "0px" }], { duration: 360, easing: RISE_EASE, fill: "forwards" });
+  await fold.finished;
+  await stemsRefresh(false, got);
+  fold.cancel(); box.style.overflow = "";
+  if (!box.hidden || !waited) return;
+  // each part on its own, not the list as a whole: rising, the list would take its pinned column heads under the mast
+  rise($("#sLibPage .lib-head"), 0); rise($("#sLib .lib-cols"), 90); rise($("#sLib .add-first"), 180, 6, 6);
 }
 // The library's first drawing, which the opening waits for.
 let libDrawnNow;
@@ -2500,7 +2528,8 @@ function watchJob(id, kind, forSong) {
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
       if (j.status === "cancelled") return dropJob(id);
-      if ((kind === "install" || kind === "gpu") && j.status === "done") stemsRefresh();
+      if (kind === "install" && j.status === "done") installDone();
+      if (kind === "gpu" && j.status === "done") stemsRefresh();
       if (kind === "video") videoFetched(forSong, j.status === "done");
       if (kind === "lyrics") lyricsDone(forSong, j.status === "done");
       if (kind === "split") {
@@ -5260,6 +5289,10 @@ window.addEventListener("hashchange", route);
 // list, its songs one by one. Another page (a song, opened by a link) just comes into focus.
 const BOOT_MIN = 800;
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+// a node rising out of a blur into place, delay ms from now (the opening's, and the library's once the tools are in)
+const RISE_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const rise = (node, delay, dy = 8, blur = 8) => node && node.animate([{ opacity: 0, transform: `translateY(${dy}px)`, filter: `blur(${blur}px)` },
+  { opacity: 1, transform: "none", filter: "blur(0)" }], { duration: 640, delay, easing: RISE_EASE, fill: "backwards" });
 async function boot() {
   const root = document.documentElement;
   if (!root.classList.contains("booting")) return;
@@ -5268,9 +5301,6 @@ async function boot() {
   await $("#boot").animate([{ opacity: 1, filter: "blur(0)" }, { opacity: 0, filter: "blur(4px)" }], { duration: 240, easing: "ease-out", fill: "forwards" }).finished;
   root.classList.remove("booting");
   $("#boot").getAnimations().forEach((a) => a.cancel());
-  const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
-  const rise = (node, delay, dy = 8, blur = 8) => node && node.animate([{ opacity: 0, transform: `translateY(${dy}px)`, filter: `blur(${blur}px)` },
-    { opacity: 1, transform: "none", filter: "blur(0)" }], { duration: 640, delay, easing: ease, fill: "backwards" });
   rise($("#app > header"), 0, 0, 6);
   if (!(view === "stems" && stemsPage === "lib")) { rise($("#app main:not([hidden])"), 60, 4, 6); return; }
   let t = 80;
@@ -5447,7 +5477,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
   "First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.":
     "처음 한 번, 곡을 나누고 멜로디와 가사를 읽는 도구를 받아요 (3–4 GB).",
-  "Install": "설치", "Install the tools first, from the banner above.": "먼저 위 배너에서 도구를 설치하세요.", "Add a song": "새 곡 추가", "Add": "추가",
+  "Install": "설치", "Installed": "설치 완료", "Install the tools first, from the banner above.": "먼저 위 배너에서 도구를 설치하세요.", "Add a song": "새 곡 추가", "Add": "추가",
   "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
   "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
   "This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).":
