@@ -1072,7 +1072,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
             <b>Add a song</b>
             <form class="yt" id="sYtForm">
               <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
-              <button class="btn sm dark" type="submit">Separate</button>
+              <button class="btn sm dark" type="submit">Add</button>
             </form>
             <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
             <div class="gpu-row" id="sGpu" hidden>
@@ -3480,7 +3480,7 @@ function initStems() {
   $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
   // text buttons with an icon in front of the label
   [["#sAddBtn", "plus"], ["#sBack", "back"], ["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
-    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "separate"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
+    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   $("#pSave").onclick = saveMix;
   document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyS" && view === "stems" && stemsPage === "song") { e.preventDefault(); if (!$("#pSave").disabled) saveMix(); }
@@ -5447,7 +5447,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
   "First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.":
     "처음 한 번, 곡을 나누고 멜로디와 가사를 읽는 도구를 받아요 (3–4 GB).",
-  "Install": "설치", "Install the tools first, from the banner above.": "먼저 위 배너에서 도구를 설치하세요.", "Add a song": "새 곡 추가", "Separate": "분리",
+  "Install": "설치", "Install the tools first, from the banner above.": "먼저 위 배너에서 도구를 설치하세요.", "Add a song": "새 곡 추가", "Add": "추가",
   "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
   "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
   "This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).":
