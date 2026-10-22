@@ -166,7 +166,6 @@ header { position: relative; }
 .swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c) 50%, transparent); }
 
 .title { margin: 0; font-size: 15px; font-weight: 500; }
-.lede { margin: 0; font-size: 16px; line-height: 1.5; max-width: 62ch; text-wrap: pretty; } /* 24 px lines, like the title's */
 .muted { color: var(--muted); }
 
 /* Opening the page: the bar of a job in progress, in the middle, its white part sweeping from side to side while the
@@ -177,7 +176,7 @@ html.booting #app { visibility: hidden; }
 #boot .bar { width: 160px; }
 #boot .bar i { width: 40%; transition: none; animation: boot-sweep 0.8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
 @keyframes boot-sweep { to { transform: translateX(150%); } }
-/* Page intro: title and lede read as one block, set apart from what follows */
+/* Page intro: the title, set apart from what follows */
 .intro { display: grid; gap: 2px; margin-bottom: 32px; }
 .group { display: grid; gap: 12px; }
 /* Section titles: they head the content, so they read stronger than it */
@@ -367,6 +366,12 @@ input[type="range"]:disabled { opacity: 0.4; }
 .inline-field { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .fine { font-size: 12.5px; color: var(--faint); }
 .panel-card p.fine { max-width: none; } /* one line where there's room, not the card's 72ch measure */
+/* the one-time setup: a banner, its line and its button; once it's started, how it's going in the line's place */
+#sInstall { padding: 12px 12px 12px 16px; }
+#sInstall .setup-line { display: flex; align-items: center; gap: 16px; }
+#sInstall .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
+#sInstallState:empty, #sInstall .setup-line:has(#sInstallState:not(:empty)) p { display: none; }
+#sInstallBtn:disabled { opacity: 0.4; pointer-events: none; } /* while it installs */
 .gpu-row { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--note-bg); color: var(--note-ink); font-size: 13.5px; }
 .gpu-row .btn { justify-self: start; }
 .gpu-row .muted { color: var(--note-ink); opacity: 0.8; }
@@ -1046,7 +1051,6 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
   <main id="vStems" aria-label="Stems" hidden>
     <div class="intro" id="sIntro">
       <h1 class="title">Practice any song</h1>
-      <p class="lede">Split a song into tracks and practice it phrase by phrase, with your pitch on screen.</p>
     </div>
     <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)">Save</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
@@ -1054,9 +1058,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 
     <!-- the tools to add songs, in the library and on Add song while they're missing (an update can add one) -->
     <section class="panel-card" id="sInstall" hidden>
-      <b>One-time setup</b>
-      <p class="muted">The tools that split songs, read their melody and time their lyrics: a 3–4 GB download, once, into this app’s folder.</p>
-      <div class="row-actions"><button class="btn dark" id="sInstallBtn" type="button">Install stem tools</button><span class="muted" id="sInstallState"></span></div>
+      <div class="setup-line"><p class="muted">First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.</p><span class="muted" id="sInstallState"></span><button class="btn sm dark" id="sInstallBtn" type="button">Install</button></div>
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
     </section>
@@ -1085,7 +1087,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
             <p class="muted" id="sAddMsg" hidden></p>
             <p class="fine">Use audio you have the right to use. Downloading from YouTube may go against YouTube’s Terms of Service.</p>
           </div>
-          <p class="muted" id="sAddSetup" hidden>Install the stem tools first: see One-time setup above.</p>
+          <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
         </div></span></div>
       <div class="rows" id="sLib"></div>
     </section>
@@ -5444,7 +5446,6 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "No microphone found. Check it’s connected, then try again.": "마이크를 찾지 못했어요. 연결돼 있는지 확인한 뒤 다시 해 보세요.",
   // library and adding a song
   "Stems": "스템", "Practice any song": "어떤 곡이든 연습하세요",
-  "Split a song into tracks and practice it phrase by phrase, with your pitch on screen.": "곡을 트랙별로 나누고, 화면에서 내 음정을 보며 한 소절씩 연습하세요.",
   "Library": "라이브러리", "Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",
   "Paste a YouTube link or drop an audio file. It’s split into tracks, ready to practice.": "YouTube 링크를 붙여넣거나 오디오 파일을 끌어다 놓으세요. 트랙별로 나뉘어 바로 연습할 수 있어요.",
   "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Search songs": "곡 검색", "No songs match “{q}”": "“{q}”에 맞는 곡이 없어요", "Sort by {col}": "{col} 순으로 정렬", "Sorted by {col}, {way}": "{col} 순, {way}",
@@ -5454,10 +5455,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":
     "Python 서버가 필요해요. OS에 맞는 <code>start-…</code> 파일로 앱을 시작한 뒤 <b>http://localhost:5178</b>에서 다시 여세요.",
   "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
-  "One-time setup": "처음 한 번 설치",
-  "The tools that split songs, read their melody and time their lyrics: a 3–4 GB download, once, into this app’s folder.":
-    "곡을 나누고, 멜로디를 읽고, 가사를 맞추는 도구예요. 한 번만 3–4 GB를 받아 이 앱 폴더에 설치해요.",
-  "Install stem tools": "스템 도구 설치", "Add a song": "새 곡 추가", "Separate": "분리",
+  "First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.":
+    "처음 한 번, 곡을 나누고 멜로디와 가사를 읽는 도구를 받아요 (3–4 GB).",
+  "Install": "설치", "Install the tools first, from the banner above.": "먼저 위 배너에서 도구를 설치하세요.", "Add a song": "새 곡 추가", "Separate": "분리",
   "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
   "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
   "This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).":
