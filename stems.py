@@ -844,9 +844,10 @@ def _pipeline(job, src: dict, model_name: str):
 # share of the words Whisper is fairly sure it hears where they've been put (probability over 0.5). The song's own
 # lyrics score about 0.75 and another song's 0 to 0.05, so an entry under MATCH_MIN is taken for another song.
 MATCH_MIN = 0.3
-# lyrics.json's "v": how its lines were lined up. 2: lines the lead doesn't sing looked for on the whole vocal
-# (_reheard); 1 (no "v"), on the lead alone. Bump it when that changes: songs' lyrics are lined up again (start_upgrades).
-LYRICS_VERSION = 2
+# lyrics.json's "v": how its lines were lined up. 3: lines put where the lead is silent looked for again, on the lead,
+# then on the whole vocal (_reheard); 2: only lines squeezed into nothing, on the whole vocal; 1 (no "v"), on the lead
+# alone. Bump it when that changes: songs' lyrics are lined up again (start_upgrades).
+LYRICS_VERSION = 3
 
 
 def _whisper_bar(job, share: tuple[float, float]):
@@ -967,9 +968,9 @@ def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, 
         r = model.align(voice, "\n".join(lines), language=lyrics.language(lines), original_split=True, verbose=None)
     probs = [w.probability for s in r.segments for w in s.words]
     out = lyrics.aligned(r)
-    if whole is not None and len(out) == len(lines):
+    if len(out) == len(lines):
         _check(job)
-        out = _reheard(model, whole, lines, out)
+        out = _reheard(model, voice, whole, lines, out)
     return out, round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
 
 
@@ -979,28 +980,57 @@ def _unheard(line: dict) -> bool:
     return not w or 2 * sum(b - a < 0.1 for a, b, _ in w) >= len(w)
 
 
-def _reheard(model, whole: np.ndarray, lines: list[str], out: list[dict]) -> list[dict]:
-    """Lines the lead doesn't sing (the backing vocals have them alone: a scat, a call between the lead's lines), which
-    Whisper squeezed into nothing on the lead (_unheard), looked for again on the whole vocal stem: each run of them in
-    the stretch between the lines either side, and kept where they're found there."""
+def _loudness(voice: np.ndarray) -> np.ndarray:
+    """voice's loudness (dB) every 50 ms (mono, 16 kHz)."""
+    n = len(voice) // 800
+    return 20 * np.log10(np.sqrt((voice[: n * 800].reshape(n, 800) ** 2).mean(1)) + 1e-9)
+
+
+def _misplaced(line: dict, loud: np.ndarray, quiet: float) -> bool:
+    """A line Whisper put where it isn't sung: squeezed into nothing (_unheard), or with a word where the voice (loud)
+    is silent all through it and 0.1 s either side (under quiet): pushed into the rest before the line, or a line the
+    lead doesn't sing at all."""
+    if _unheard(line):
+        return True
+    for a, b, _ in line["words"]:
+        span = loud[max(0, int((a - 0.1) / 0.05)): int((b + 0.1) / 0.05) + 1]
+        if len(span) and span.max() < quiet:
+            return True
+    return False
+
+
+def _reheard(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str], out: list[dict]) -> list[dict]:
+    """Lines Whisper put where they aren't sung (_misplaced), looked for again, each run of them in the stretch between
+    the lines either side of it: on the lead (voice) first, then, for those the lead doesn't sing (the backing vocals
+    have them alone: a scat, a call between the lead's lines), on the whole vocal stem (whole, when the lead was split
+    from it). A line is kept where it's found if it's sung there; else it stays as it was."""
     import lyrics
-    i, dur = 0, len(whole) / 16000
+    loud = _loudness(voice)
+    quiet = float(np.percentile(loud, 90)) - 35  # silence, by the voice's own loudness when it sings
+    bad = lambda line: _misplaced(line, loud, quiet)  # noqa: E731
+    i, dur = 0, len(voice) / 16000
     while i < len(out):
-        if not _unheard(out[i]):
+        if not bad(out[i]):
             i += 1
             continue
         j = i
-        while j + 1 < len(out) and _unheard(out[j + 1]):
+        while j + 1 < len(out) and bad(out[j + 1]):
             j += 1
         a, b = out[i - 1]["t1"] if i else 0.0, out[j + 1]["t0"] if j + 1 < len(out) else dur
-        if b - a >= 0.5:
-            run = lines[i: j + 1]
-            r = model.align(whole[int(a * 16000): int(b * 16000)], "\n".join(run), language=lyrics.language(run), original_split=True, verbose=None)
-            again = lyrics.aligned(r)
-            for k, line in enumerate(again if len(again) == len(run) else []):
-                if not _unheard(line):
-                    out[i + k] = {"t0": round(line["t0"] + a, 3), "t1": round(line["t1"] + a, 3), "text": line["text"],
-                                  "words": [[round(w0 + a, 3), round(w1 + a, 3), w] for w0, w1, w in line["words"]]}
+        run = lines[i: j + 1]
+        # on the lead, taken only if it sings every line of the run there (one it doesn't sing is pulled onto the one it
+        # does); on the whole vocal, each line taken that's found sung
+        for src, lead in ((voice, True), (whole, False)):
+            if src is None or b - a < 0.5 or not any(bad(out[k]) for k in range(i, j + 1)):
+                continue
+            r = model.align(src[int(a * 16000): int(b * 16000)], "\n".join(run), language=lyrics.language(run), original_split=True, verbose=None)
+            again = [{"t0": round(line["t0"] + a, 3), "t1": round(line["t1"] + a, 3), "text": line["text"],
+                      "words": [[round(w0 + a, 3), round(w1 + a, 3), w] for w0, w1, w in line["words"]]} for line in lyrics.aligned(r)]
+            if len(again) != len(run) or (lead and any(bad(line) for line in again)):
+                continue
+            for k, line in enumerate(again):
+                if bad(out[i + k]) and not _unheard(line):
+                    out[i + k] = line
         i = j + 1
     return out
 
