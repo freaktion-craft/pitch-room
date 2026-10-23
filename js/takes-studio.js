@@ -379,9 +379,10 @@ function initTakes() {
   $("#kRec").onclick = recPress;
   recPick = makePick($("#kRecMode"), "How to record", (v) => { recMode = v; store.set("recMode", v); });
   recPick.set(recItems(), recMode);
-  $("#kLyr").onclick = () => { // again after a failure; not while a search runs
+  $("#kLyr").onclick = () => { // again after a failure; not while a search runs; none on LRCLIB: pasted on the Info page
     const id = K.song && K.song.id, j = id && lyricJobs.get(id);
     if (!id || (j && !j.err)) return;
+    if (K.lyrNone) { infoPaste = id; go(`stems/${id}/info`); return; }
     lyricJobs.set(id, { t: "Looking for the lyrics…" }); K.lyricMsg = null; startLyrics(id, {}); // busy at once
   };
   paintRec();

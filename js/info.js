@@ -55,6 +55,7 @@ function drawInfo() {
 // The song's lyrics: where they came from, each line where it's sung (a click plays it in the vocal track), and ways to
 // get others: look again, search LRCLIB, paste them in, or do without (phrases then fall between breaths).
 let infoLyrics = null; // {id, data: lyrics.json or null}
+let infoPaste = null; // the song whose Info page opens with the box to paste lyrics in (Practice's Paste lyrics)
 async function renderInfoLyrics(id) {
   let lyr = null;
   try { lyr = await (await fetch(`/api/library/${id}/lyrics`, { cache: "no-store" })).json(); } catch (e) { lyr = null; }
@@ -107,6 +108,7 @@ async function renderInfoLyrics(id) {
     box.append(ol);
   }
   paintInfoLyrics();
+  if (infoPaste === id) { infoPaste = null; paste.hidden = false; text.focus(); }
 }
 // The Info page's line about the lyrics, and its buttons off while they're being found
 function paintInfoLyrics() {

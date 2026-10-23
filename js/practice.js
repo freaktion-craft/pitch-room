@@ -6,7 +6,7 @@
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
 const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, hist: [], guideVol: 0.5, bandVol: 1, studio: null, span: null, resume: null,
-  lyrics: null, lyricMsg: null, lyricKey: null, marks: [] }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place; marks: phraseMarks
+  lyrics: null, lyrNone: false, lyricMsg: null, lyricKey: null, marks: [] }; // lyrics: the song's lines (lyrics.json); lyrNone: looked for, none found; lyricMsg: what's said in their place; marks: phraseMarks
 function songEvs() {
   const sh = P.key; // the bars move with the key the song plays in
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
@@ -363,6 +363,7 @@ const lyricJobs = new Map();
 function lyricsFor(m, lyr) {
   const data = lyr && lyr.lyrics;
   K.lyrics = (data && data.lines) || null;
+  K.lyrNone = !!data && !data.lines && !data.dropped; // none on LRCLIB: looking again finds none again, so they're pasted in
   K.lyricMsg = null;
   if (lyr && lyr.job) watchJob(lyr.job, "lyrics", m.id); // being found from the Info page
 }
@@ -407,17 +408,18 @@ async function lyricsDone(id, ok) {
   if (infoShown && infoShown.id === id) renderInfoLyrics(id);
 }
 // Practice's Find lyrics button: there while the song has no lyrics; pressed, it opens out with a spinner at its left
-// while they're found and lined up (half a minute at most), and goes once they're in.
+// while they're found and lined up (half a minute at most), and goes once they're in. Once LRCLIB has none for the
+// song it's Paste lyrics, the Info page's box for them.
 function paintLyrBtn() {
   const b = $("#kLyr"), id = K.song && K.song.id, job = id && lyricJobs.get(id), busy = !!job && !job.err;
-  const key = `${id}|${!!K.lyrics}|${busy}|${lang}`;
+  const key = `${id}|${!!K.lyrics}|${K.lyrNone}|${busy}|${lang}`;
   if (b.dataset.key === key) return;
   b.dataset.key = key;
   const w0 = b.hidden ? 0 : b.offsetWidth;
   b.hidden = !id || !!K.lyrics;
   if (b.hidden) return;
   b.classList.toggle("busy", busy); b.setAttribute("aria-busy", String(busy));
-  b.replaceChildren(...(busy ? [progRing(0), tr("Finding lyrics…")] : [tr("Find lyrics")]));
+  b.replaceChildren(...(busy ? [progRing(0), tr("Finding lyrics…")] : [tr(K.lyrNone ? "Paste lyrics" : "Find lyrics")]));
   const w1 = b.offsetWidth;
   if (w0 && w0 !== w1 && !matchMedia("(prefers-reduced-motion: reduce)").matches)
     b.animate([{ width: w0 + "px" }, { width: w1 + "px" }], { duration: 240, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
