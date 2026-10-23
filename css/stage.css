@@ -50,6 +50,7 @@
   transition: opacity var(--duration-slower); }
 .lylist .countin .dots { --dot: 10px; }
 .lylist .countin.past { opacity: 0; }
+.lylist .countin.next { opacity: 0.4; } /* before its turn, as the next line is */
 .countin .lbl:empty { display: none; }
 .countin span { font-size: var(--text-sm); line-height: 20px; color: var(--muted); white-space: nowrap; }
 .countin .dots { display: flex; gap: calc(var(--dot) * 0.6); height: var(--dot); }

@@ -126,9 +126,15 @@ function phraseTimes(spans, beats, bpm, dur) {
   });
 }
 // Practice's phrases: the song's lyric lines once it has them, else the stretches between breaths.
+// The count-ins (songEntries) come in after the rests between them: with lyrics, between their lines, where a line
+// sung by the backing vocals alone is singing too (the lead's notes stop there); each from its first note of the lead,
+// where it has one (Whisper can start a line a little early), else from where the line starts.
 function setPhrases() {
   const m = K.song;
   K.phrases = K.lyrics ? lyricPhrases(K.lyrics, m.beats, m.bpm, songDur()) : songPhrases(K.notes, m.beats, m.bpm, songDur());
+  K.entries = songEntries(K.lyrics ? K.phrases.map((p) => [K.notes.find(([a]) => a >= p.t0 - 0.3 && a < p.t1)?.[0] ?? p.t0, p.t1])
+    : K.notes, m.beats, m.bpm);
+  K.entryFor = new Map(K.entries.map((e) => [K.phrases.findIndex((p) => e.t < p.to), e])); // phrase -> the count-in before it
   K.cue = null; K.lyricKey = null; setLoop(false); renderPhrases();
 }
 // The phrase you're on: the one playing, or the next one during a rest; during the count-in after a jump, the one you
@@ -384,7 +390,6 @@ async function melodyAgain(id) {
   try { const r = await fetch("/api/melody/" + id); mel = await r.json(); if (!r.ok) return; } catch (e) { return; }
   if (!K.song || K.song.id !== id) return;
   K.notes = mel.notes; K.contour = mel.contour; A4 = mel.a4 || 440;
-  K.entries = songEntries(K.notes, K.song.beats, K.song.bpm);
   setPhrases();
 }
 async function lyricsDone(id, ok) {
@@ -456,17 +461,20 @@ function renderLyrics(now) {
     });
     list.replaceChildren(...K.lyLines.map((x) => x.p));
   }
-  const i = Math.min(K.ph ?? K.phrases.length - 1, K.phrases.length - 1), cur = K.lyLines[i], cnt = lyCount(), counting = !!K.counting;
-  const key = `${i}|${counting}|${col.offsetHeight}`;
+  // the line on now: the one the count-in is over while it's the count-in's turn (renderCountIn: K.lyRow)
+  const row = K.lyRow, now_ = row && row.state === "now", i = now_ ? row.at : Math.min(K.ph ?? K.phrases.length - 1, K.phrases.length - 1);
+  const cur = K.lyLines[i], cnt = lyCount(), at = row ? row.at : null;
+  const key = `${i}|${at}|${row && row.state}|${col.offsetHeight}`;
   if (K.lyAt !== key && cur) {
     K.lyAt = key;
-    // the count-in in over the line it counts into, or out of the list once the lines have moved on past it; the list
+    // the count-in over the line it counts into, or out of the list once the lines have moved on past it; the list
     // first held where it stood (its lines moved by what came in or went), then sent on to where it's going
     const from = cur.p.getBoundingClientRect().top;
     let moved = false;
-    if (counting && K.lyCountAt !== i) { list.insertBefore(cnt, cur.p); K.lyCountAt = i; moved = true; }
-    else if (!counting && K.lyCountAt != null && K.lyCountAt !== i) { cnt.remove(); K.lyCountAt = null; moved = true; }
-    cnt.classList.toggle("past", !counting);
+    if (at != null && K.lyCountAt !== at) { list.insertBefore(cnt, K.lyLines[at].p); moved = true; }
+    else if (at == null && K.lyCountAt != null) { cnt.remove(); moved = true; }
+    K.lyCountAt = at;
+    cnt.className = "countin" + (row && row.state !== "now" ? " " + row.state : "");
     if (moved && K.lyY != null) {
       list.style.transition = "none";
       list.style.transform = `translateY(${K.lyY + from - cur.p.getBoundingClientRect().top}px)`;
@@ -474,8 +482,8 @@ function renderLyrics(now) {
       list.style.transition = "";
     }
     K.lyLines.forEach((x, k) => { x.p.className = k === i ? "now" : k === i + 1 ? "n1" : k === i + 2 ? "n2" : k === i - 1 ? "b1" : ""; });
-    const mid = col.offsetHeight / 2, at = counting ? cnt : cur.p; // the count-in in the middle while it counts, else the line
-    K.lyY = Math.round(mid - at.offsetTop - at.offsetHeight / 2);
+    const mid = col.offsetHeight / 2, centre = now_ ? cnt : cur.p; // the count-in in the middle on its turn, else the line
+    K.lyY = Math.round(mid - centre.offsetTop - centre.offsetHeight / 2);
     list.style.transform = `translateY(${K.lyY}px)`;
   }
   if (cur) for (const x of cur.ws) x.s.style.setProperty("--p", (Math.max(0, Math.min(1, (now - x.a) / Math.max(0.05, x.b - x.a))) * 100).toFixed(1) + "%");
@@ -495,7 +503,8 @@ function phraseTick(sn) {
 }
 // During an intro or break: "Intro · vocals in 12 s", then the last four beats as dots, one dimming on each (screen
 // readers hear 4 3 2 1). After a jump to a phrase: "Phrase 3" over its count-in, or just the dots where its lyrics are
-// under them.
+// under them. The intro's is there from the song's start (the voice comes in after it whatever happens); a break's
+// half a second after the singing stops, so it doesn't flash up at every short rest.
 function renderCountIn(sn) {
   let e = null;
   if (K.on && K.cue != null) {
@@ -505,17 +514,30 @@ function renderCountIn(sn) {
   if (!e && K.on && K.resume) { // played again after a pause: counted in to where it stopped
     if (sn < K.resume.t) e = { kind: tr("From {t}", { t: fmtTime(K.resume.t) }), t: K.resume.t, counts: K.resume.counts, cue: true }; else K.resume = null;
   }
-  if (!e && K.on) e = K.entries.find((x) => sn >= x.from + 0.5 && sn < x.t);
-  K.counting = !!e; // with lyrics, it's a line of them (renderLyrics), and the stage's own stays hidden
-  $("#countIn").hidden = !e || !!K.lyrics;
-  if (!e) { setText("countNum", ""); return; }
+  if (!e && K.on) e = K.entries.find((x) => sn >= x.from + (x.kind === "Intro" ? 0 : 0.5) && sn < x.t);
+  K.counting = !!e;
+  $("#countIn").hidden = !e || !!K.lyrics; // with lyrics, it's a line of them instead (lyCount)
+  setText("countNum", "");
+  // With lyrics, the count-in's line (K.lyRow, laid out by renderLyrics): "now", in the middle, from as the line before
+  // it is let go of until it's counted; "past" after, gone up, until the lines move on; and before its turn "next", under
+  // the line on now, as the next line is.
+  if (K.lyrics) {
+    const base = Math.min(K.ph ?? K.phrases.length - 1, K.phrases.length - 1), mine = K.entryFor.get(base), next = K.entryFor.get(base + 1);
+    K.lyRow = e ? { at: e.cue && K.cue != null ? K.cue : K.phrases.findIndex((p) => e.t < p.to), state: "now", e }
+      : mine && sn < mine.t ? { at: base, state: "now", e: mine }
+      : K.lyCountAt === base ? { at: base, state: "past", e: null }
+      : next ? { at: base + 1, state: "next", e: next } : null;
+    if (K.lyRow && K.lyRow.at < 0) K.lyRow = null;
+    e = K.lyRow && K.lyRow.e;
+  }
+  if (!e) return;
   const box = K.lyrics ? lyCount() : $("#countIn");
   let n = 0;
   e.counts.forEach((c, i) => { if (sn >= c) n = e.counts.length - i; });
   const kind = e.cue ? e.kind : tr(e.kind); // Intro, Break (a phrase's comes translated)
   const lbl = box.querySelector(".lbl"), text = n || e.cue ? kind : tr("{kind} · vocals in {s} s", { kind, s: Math.ceil((e.t - sn) / P.rate) }); // seconds as they pass
   if (lbl.textContent !== text) lbl.textContent = text;
-  setText("countNum", n ? String(n) : "");
+  if (K.counting) setText("countNum", n ? String(n) : "");
   const dots = box.querySelector(".dots"), N = e.counts.length, done = n ? N - n + 1 : 0, key = `${N}/${done}`;
   if (dots.dataset.key === key) return;
   dots.dataset.key = key;
@@ -550,7 +572,6 @@ async function singSong(m, btn) {
   } finally { clearTimeout(slow); if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } }
   show(was);
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.on = true; A4 = mel.a4 || 440;
-  K.entries = songEntries(K.notes, m.beats, m.bpm);
   K.song = m; K.marks = Array.isArray(m.phraseMarks) ? m.phraseMarks : []; lyricsFor(m, lyr); setPhrases();
   songEvs(); songView(true);
   // Practice sets the tracks its own way (Guide vocal, Band); the Studio's mix is put back on the way out (route)
@@ -681,7 +702,7 @@ function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (
 function initSing() {
   countPick = makePick($("#kCount"), "Count-in", (v) => {
     S.countIn = v; save();
-    if (K.song) { K.entries = songEntries(K.notes, K.song.beats, K.song.bpm); setPhrases(); } // the phrases start from their count-ins
+    if (K.song) setPhrases(); // the phrases start from their count-ins
   });
   countPick.set(countItems(), S.countIn);
   $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
