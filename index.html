@@ -69,6 +69,9 @@
   --space-half: 2px; --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
   --space-8: 32px; --space-10: 40px; --space-16: 64px; --space-18: 72px;
   /* a box inside another one, with padding p between them, takes the outer radius less p, so their curves run together */
+  /* controls: buttons and fields stand on these heights, their icons on these sizes */
+  --control-xs: 24px; --control-sm: 28px; --control-md: 32px; --control-lg: 40px;
+  --icon-xs: 14px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px;
   --radius-xs: 4px; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px; --radius-xl: 12px; --radius-2xl: 14px; --radius-pill: 999px;
 
   /* ---- depth ---- */
@@ -119,21 +122,17 @@ a { color: inherit; text-decoration: none; }
 .app { max-width: 1440px; margin: 0 auto; padding-block: var(--space-6) var(--space-16);
   padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
 
-/* Top bar: app name, mic chip, settings */
+/* Top bar: app name, then its chips (quiet small buttons): songs being added, the mic, settings */
 header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-18); } /* the chips 8 px apart, as buttons side by side are elsewhere */
 .brand { margin-right: auto; font-size: var(--text-lg); font-weight: var(--weight-medium); }
-.chipbtn { height: 32px; padding: 0 var(--space-3); white-space: nowrap; display: inline-flex; align-items: center; gap: var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill);
-  font-size: var(--text-sm); color: var(--muted); transition: background-color var(--duration-fast); }
-.chipbtn:hover { background: var(--fg-8); }
-.iconchip { width: 32px; padding: 0; justify-content: center; }
 /* The mic chip: a square with the mic struck through while it's off; turned on, it slides open to show the spectrum.
    Both icons share one cell. */
-.chipbtn.mic { padding: 0 var(--space-2); transition: background-color var(--duration-fast), color var(--duration-fast); }
+.btn.quiet.mic { padding: 0 var(--space-2); transition: background-color var(--duration-fast), color var(--duration-fast); }
 /* off: a light red tint, so a mic that isn't listening gets noticed */
-.chipbtn.mic:not(.on) { background: color-mix(in oklab, var(--bad) 14%, transparent); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
-.chipbtn.mic:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, transparent); }
+.btn.quiet.mic:not(.on) { background: color-mix(in oklab, var(--bad) 14%, transparent); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
+.btn.quiet.mic:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, transparent); }
 .mic-ico { display: inline-grid; }
-.mic-ico > .ico { grid-area: 1 / 1; width: 16px; height: 16px; }
+.mic-ico > .ico { grid-area: 1 / 1; width: var(--icon-sm); height: var(--icon-sm); }
 .mic.on .mic-ico { color: var(--ink); }
 .mic.on .if-off { visibility: hidden; }
 /* turned off: a beat after the chip starts to close, the slash draws across the whole mic, top left to bottom right;
@@ -163,7 +162,6 @@ header { position: relative; }
 #micNote p { margin: 0; color: var(--muted); }
 /* the input menu keeps one width whatever the inputs are called (a long name ends in …) */
 #micDev { flex: 0 1 200px; }
-.iconchip .ico { width: 16px; height: 16px; }
 /* Mic sensitivity, as in Discord: what the mic hears, live, on a bar (louder to the right), and the threshold as a line
    on it to drag. Past the line the bar is in your colour: that sound counts as singing; short of it, it's grey. The bar
    lines up with the rows above; the slider reaches half its handle past each end, so the line sits exactly where the
@@ -217,7 +215,7 @@ html.booting #app { visibility: hidden; }
 .row + .row { border-top: 1px solid var(--line); }
 .row > span:first-child { font-size: var(--text-md); }
 .row em { font-style: normal; color: var(--faint); font-size: var(--text-xs); margin-left: var(--space-2); }
-select, .pick, input[type="number"] { height: 32px; border: 0; border-radius: var(--radius-md); background-color: var(--surface-2); padding: 0 var(--space-3); font-size: var(--text-md); max-width: 100%; }
+select, .pick, input[type="number"] { height: var(--control-md); border: 0; border-radius: var(--radius-md); background-color: var(--surface-2); padding: 0 var(--space-3); font-size: var(--text-md); max-width: 100%; }
 select:hover, .pick:hover, input[type="number"]:hover { background-color: var(--hover-2); }
 /* Our own chevron instead of the OS one: same 1.5px stroke and grey as the rest of the UI, centred, with room on the right */
 select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(--space-8); cursor: pointer;
@@ -234,18 +232,18 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(-
 .pick-list .grp { padding: var(--space-3) var(--space-3) var(--space-1); font-size: var(--text-xs); line-height: 16px; color: var(--faint); } /* lined up with the names */
 .pick-list .grp:first-child { padding-top: var(--space-1); }
 .pick-list .foot { margin: var(--space-1) 0 0; padding: var(--space-2) var(--space-3) var(--space-1); border-top: 1px solid var(--line); font-size: var(--text-xs); line-height: 16px; color: var(--muted); }
-.pick-list [role="option"] { display: flex; align-items: center; gap: var(--space-3); width: 100%; height: 32px; padding: 0 var(--space-2) 0 var(--space-3); border: 0; border-radius: var(--radius-sm);
+.pick-list [role="option"] { display: flex; align-items: center; gap: var(--space-3); width: 100%; height: var(--control-md); padding: 0 var(--space-2) 0 var(--space-3); border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--ink); font-size: var(--text-md); text-align: left; }
 .pick-list [role="option"]:hover, .pick-list [role="option"]:focus-visible { background: var(--fill); outline: none; }
 .pick-list [role="option"] span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pick-list [role="option"] .ico { width: 16px; height: 16px; flex: none; margin-left: auto; visibility: hidden; }
+.pick-list [role="option"] .ico { width: var(--icon-sm); height: var(--icon-sm); flex: none; margin-left: auto; visibility: hidden; }
 .pick-list [role="option"] .side { margin-left: auto; padding-left: var(--space-4); min-width: 56px; text-align: right; font: var(--text-xs) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .pick-list [role="option"] .side + .ico, .pick-list [role="option"] .side + .ring { margin-left: 0; } /* 12 px after the note, as after a name */
 .pick-list [role="option"] .side.accent { color: var(--muted); } /* the natural-sounding ones: as the notes are; the far ones fainter */
 .pick-list [role="option"] .side.faint, .pick-list .foot b { color: var(--faint); }
 .pick-list .foot b { font: var(--text-xs) var(--mono); }
 /* how far a choice that takes a while has got, where its tick will be: a ring filling up (spinning until it knows) */
-.pick-list .ring { width: 16px; height: 16px; flex: none; margin-left: auto; transform: rotate(-90deg); }
+.pick-list .ring { width: var(--icon-sm); height: var(--icon-sm); flex: none; margin-left: auto; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 2; }
 .ring circle:first-child { stroke: var(--ring); }
 .ring circle + circle { stroke: var(--muted); stroke-linecap: round; }
@@ -278,19 +276,36 @@ input[type="range"]:disabled { opacity: 0.4; }
 .credit { margin: var(--space-3) 0 0; color: var(--faint); font-size: var(--text-xs); }
 .credit a { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 
-.btn { height: 40px; padding: 0 var(--space-4); border: 0; border-radius: var(--radius-md); background: var(--surface-2); color: var(--ink); font-size: var(--text-md);
-  display: inline-flex; align-items: center; gap: var(--space-2); transition: transform var(--duration-base) var(--ease), background-color var(--duration-fast); }
+/* Buttons: one component, .btn, set on three axes.
+   size:  40 px by default, .sm 32, .xs 24 (--btn-h); padding, text and icon follow it
+   tone:  surface-2 by default; .primary, the ink, for the one strong action in a group; .quiet, a faint fill (the
+          header's chips); .ghost, nothing until pointed at (an icon action in a row or a list)
+   shape: .icon, a square, and .round, a circle: an icon alone
+   An icon before a label gets less padding on its side, so icon and label read as centred together, and 6 px between
+   them (the icon's own margin adds a little), so they read as one. Disabled, it fades and takes no clicks. */
+.btn { --btn-h: var(--control-lg); height: var(--btn-h); padding: 0 var(--space-4); border: 0; border-radius: var(--radius-md); background: var(--surface-2); color: var(--ink);
+  font-size: var(--text-md); display: inline-flex; align-items: center; gap: var(--space-2);
+  transition: transform var(--duration-base) var(--ease), background-color var(--duration-fast); }
 .btn:hover { background: var(--hover-2); }
 .btn:active { transform: scale(0.985); }
-.btn.sm { height: 32px; padding: 0 var(--space-3); font-size: var(--text-sm); }
-/* an icon in front of a label: the icon's side gets less padding, so icon and label read as centred together, and
-   6 px between them (the icon's own margin adds a little), so they read as one */
-.btn > .ico { width: 18px; height: 18px; }
-.btn.sm > .ico { width: 16px; height: 16px; }
-.btn:not(.icon):has(> .ico:first-child) { padding-left: var(--space-3); gap: 6px; }
-.btn.sm:not(.icon):has(> .ico:first-child) { padding-left: var(--space-2); gap: 6px; }
-.btn.dark { background: var(--ink); color: var(--on-ink); }
-.btn.dark:hover { background: var(--ink-strong); }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+.btn.sm { --btn-h: var(--control-md); padding: 0 var(--space-3); font-size: var(--text-sm); }
+.btn.xs { --btn-h: var(--control-xs); padding: 0 var(--space-2); border-radius: var(--radius-sm); font-size: var(--text-xs); }
+.btn > .ico { width: var(--icon-md); height: var(--icon-md); }
+.btn.sm > .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.btn:not(.icon, .round):has(> .ico:first-child) { padding-left: var(--space-3); gap: 6px; }
+.btn.sm:not(.icon, .round):has(> .ico:first-child) { padding-left: var(--space-2); }
+.btn.icon, .btn.round { width: var(--btn-h); padding: 0; justify-content: center; }
+.btn.icon .ico { width: var(--icon-md); height: var(--icon-md); }
+.btn.xs > .ico { width: var(--icon-xs); height: var(--icon-xs); }
+.btn.round { border-radius: 50%; }
+.btn.primary { background: var(--ink); color: var(--on-ink); }
+.btn.primary:hover { background: var(--ink-strong); }
+.btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
+.btn.quiet:hover { background: var(--fg-8); }
+.btn.quiet > .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.btn.ghost { background: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--fill); color: var(--ink); }
 
 /* Sing view */
 /* The stage: a line on top (what Practice is doing, and whose line is whose) over the bars, so no bar is ever under a
@@ -401,8 +416,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 #sInstall .setup-line { display: flex; align-items: center; gap: var(--space-4); }
 #sInstall .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
 #sInstallState:empty, #sInstall .setup-line:has(#sInstallState:not(:empty)) p { display: none; }
-#sInstallBtn:disabled { opacity: 0.4; pointer-events: none; } /* while it installs */
-#sInstallState .ico { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; color: var(--good); } /* Installed's tick */
+#sInstallState .ico { width: var(--icon-sm); height: var(--icon-sm); margin-right: 6px; vertical-align: -3px; color: var(--good); } /* Installed's tick */
 .gpu-row { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--note-bg); color: var(--note-ink); font-size: var(--text-sm); }
 .gpu-row .btn { justify-self: start; }
 .gpu-row .muted { color: var(--note-ink); opacity: 0.8; }
@@ -414,7 +428,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* same height as the app's other fields (selects, small buttons) */
 /* links, a line each: one line tall, growing with them (to five). A long link stays on its line (it scrolls sideways
    under the caret) rather than wrapping, so the field grows only for another link */
-.yt textarea { flex: 1 1 auto; min-width: 0; height: 32px; max-height: 112px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2);
+.yt textarea { flex: 1 1 auto; min-width: 0; height: var(--control-md); max-height: 112px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2);
   padding: 5px var(--space-3); font: var(--text-md)/20px var(--font); color: inherit; resize: none; white-space: pre; overflow-x: hidden; overflow-y: auto; transition: border-color var(--duration-fast), background-color var(--duration-fast); }
 .yt textarea::placeholder { color: var(--placeholder); }
 .yt textarea:hover { background: var(--hover-2); }
@@ -423,7 +437,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .yt .btn { flex: none; }
 /* Songs being added: a ring beside the mic while there are any, as full as they are together; pressed, a panel with
    each one's name, how it's going (or how many are ahead of it in line), and a button to stop it */
-#jobsBtn .ring { width: 16px; height: 16px; transform: rotate(-90deg); }
+#jobsBtn .ring { width: var(--icon-sm); height: var(--icon-sm); transform: rotate(-90deg); }
 #jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
 #jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */
@@ -435,17 +449,11 @@ input[type="range"]:disabled { opacity: 0.4; }
 .job .top b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .job .top span { color: var(--muted); font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* cancel (or, once it has failed, clear away): beside both rows */
-.job .x { grid-column: 2; grid-row: 1 / span 2; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-md);
-  background: transparent; color: var(--muted); display: grid; place-items: center; }
-.job .x:hover { background: var(--fill); color: var(--ink); }
-.job .x:disabled { opacity: 0.4; pointer-events: none; }
-.job .x .ico { width: 16px; height: 16px; }
+.job .x { grid-column: 2; grid-row: 1 / span 2; }
+.job .x > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .job.err .top span { color: var(--bad); white-space: normal; }
 .job.err .bar, .job.done .bar { display: none; }
 .job.err .x, .job.done .x { grid-row: 1; }
-/* in: the way to it, the panel's one strong button */
-.job .x.go { background: var(--ink); color: var(--on-ink); }
-.job .x.go:hover { background: var(--ink-strong); color: var(--on-ink); }
 #jobsBtn.ready .ring circle + circle { stroke: var(--ink); } /* all in */
 
 .player { background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); padding: var(--space-4); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
@@ -485,11 +493,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tparts .part.hover .x, .tparts .x:focus-visible { opacity: 1; }
 @media (hover: none) { .tparts .x { opacity: 1; } }
 .tparts .selbar { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; gap: var(--space-1); pointer-events: auto; }
-.tparts .selbar button { height: 24px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); white-space: nowrap;
-  background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); box-shadow: var(--shadow-raised); }
-.tparts .selbar .cut { display: grid; place-items: center; width: 24px; padding: 0; }
-.tparts .selbar .cut .ico { width: 14px; height: 14px; }
-.tparts .selbar button:disabled { opacity: 0.5; }
+.tparts .selbar .btn { white-space: nowrap; box-shadow: var(--shadow-raised); }
 .transport-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .transport-row output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-left: var(--space-1); }
 .transport-row .ptracks { font-size: var(--text-sm); color: var(--muted); } /* how many tracks, after the time */
@@ -502,7 +506,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* the tempo, a number to type (BPM, or % for a song with no steady beat); while that tempo is being made its field
    fills up from the left, so nothing beside it moves */
 /* one box like the key's: "BPM" then the number, which is the field */
-.tempo { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: 32px; padding-left: var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md);
+.tempo { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding-left: var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md);
   background-color: var(--surface-2); font-size: var(--text-sm); color: var(--muted); cursor: text; }
 .tempo:hover { background-color: var(--hover-2); }
 .tempo:focus-within { border-color: var(--ink); background-color: var(--surface); }
@@ -529,15 +533,12 @@ input[type="range"]:disabled { opacity: 0.4; }
   .keyctl { flex-wrap: wrap; row-gap: var(--space-1); }
   .knote { flex-basis: 100%; width: auto; height: 20px; line-height: 20px; -webkit-line-clamp: 1; }
 }
-.btn.round { width: 40px; padding: 0; justify-content: center; border-radius: 50%; }
-.btn.icon { width: 32px; padding: 0; justify-content: center; }
-.btn.icon .ico { width: 18px; height: 18px; }
 /* start, −5 s, +5 s, end: one control, its buttons close together; icons and labels in one grey, so the thin icons
    and the bolder text look alike */
 .seek { display: flex; gap: var(--space-1); }
 .seek .btn { color: var(--fg-80); }
 .seek .btn:hover { color: var(--ink); }
-.seek .btn.icon .ico { width: 16px; height: 16px; }
+.seek .btn.icon .ico { width: var(--icon-sm); height: var(--icon-sm); }
 /* Hugeicons line icons: stroke settings live here, the paths in ICONS */
 /* Icons are drawn on a 24 grid at 16–24 px; a stroke that scaled with them came out under a pixel at 16 px, thinner
    than the text beside it. Their lines are 1.4 px at any size instead, about the weight of 13–14 px text. */
@@ -547,7 +548,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .player { --c-btn: 32px; --c-vol: 160px; }
 .mix { margin-left: auto; display: grid; grid-template-columns: var(--c-btn) var(--c-vol) var(--c-btn); gap: var(--space-3); align-items: center; justify-items: center; }
 .mix-ico { display: flex; color: var(--muted); }
-.mix-ico .ico { width: 18px; height: 18px; }
+.mix-ico .ico { width: var(--icon-md); height: var(--icon-md); }
 .mix input { width: 100%; justify-self: start; } /* placed like the track sliders, which start-align */
 /* play ⇄ pause icon, drawn by ppTo(). A stroke in the fill colour with round joins softens the corners
    (and covers the seam where the triangle's two halves meet). */
@@ -561,26 +562,24 @@ input[type="range"]:disabled { opacity: 0.4; }
 .track { row-gap: var(--space-2); }
 .track .twave { display: block; width: 100%; height: 28px; cursor: pointer; } /* as wide as the song's waveform (.twrap spans the row) */
 /* the Vocals row's open/close button, after its name */
-.disclose { display: inline-grid; place-items: center; width: 24px; height: 24px; margin: calc(var(--space-1) * -1) 0 calc(var(--space-1) * -1) var(--space-1); padding: 0; border: 0; border-radius: var(--radius-sm);
-  vertical-align: middle; background: transparent; color: var(--muted); }
-.disclose:hover { background: var(--fill); color: var(--ink); }
-.disclose .ico { width: 16px; height: 16px; transition: transform var(--duration-base) var(--ease); }
+.disclose { margin: calc(var(--space-1) * -1) 0 calc(var(--space-1) * -1) var(--space-1); vertical-align: middle; }
+.btn.disclose > .ico { width: var(--icon-md); height: var(--icon-md); transition: transform var(--duration-base) var(--ease); }
 .disclose[aria-expanded="true"] .ico { transform: rotate(180deg); }
 /* lead and backing, revealed under Vocals: no icon, their names in line with its name, on a shade darker to the card's edges */
 .track.sub { margin: 0 calc(var(--space-4) * -1); padding-left: var(--space-4); padding-right: var(--space-4); background: color-mix(in oklab, var(--bg) 60%, var(--surface)); }
-.track .ico { width: 18px; height: 18px; }
+.track .ico { width: var(--icon-md); height: var(--icon-md); }
 .track .name { font-size: var(--text-md); min-width: 0; }
 .track .name small { display: block; color: var(--faint); font-size: var(--text-xs); }
 .track.off .ico { opacity: 0.35; }
 .track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
-.tog { height: 28px; min-width: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill); font: var(--weight-medium) var(--text-xs) var(--mono); color: var(--muted); }
+.tog { height: var(--control-sm); min-width: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill); font: var(--weight-medium) var(--text-xs) var(--mono); color: var(--muted); }
 .tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
 .tog[aria-pressed="true"].s { background: var(--solo); color: var(--on-solo); }
 .tog:hover { background: var(--fg-8); }
 /* A track's mute and solo: one pair of keys, like a mixer channel's. Off, both sit raised and look the same; on, a key
    is pressed in: a muted track's M sinks back and dims (the track is out of the way), a soloed track's S lights up. */
 .ms { display: flex; justify-self: start; }
-.ms .tog { width: var(--c-btn); height: 28px; border-radius: 0; color: var(--muted);
+.ms .tog { width: var(--c-btn); height: var(--control-sm); border-radius: 0; color: var(--muted);
   background: linear-gradient(oklch(0.31 0 0), oklch(0.27 0 0)); box-shadow: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35); }
 .ms .tog:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
 .ms .tog:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; box-shadow: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35), inset 1px 0 0 rgba(0, 0, 0, 0.45); }
@@ -590,15 +589,11 @@ input[type="range"]:disabled { opacity: 0.4; }
 .ms .tog.s[aria-pressed="true"] { color: var(--solo); text-shadow: 0 0 6px color-mix(in oklab, var(--solo) 60%, transparent); }
 .track input[type="range"] { width: 100%; }
 /* downloads, the song's (what you hear) and each track's: one size, one look; the song's in full ink */
-.dl { height: 32px; width: 32px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--faint); display: inline-flex; align-items: center; justify-content: center; }
-.dl .ico { width: 18px; height: 18px; }
-.dl:hover { background: var(--fill); color: var(--ink); }
-.dl:disabled { opacity: 0.4; pointer-events: none; }
 #pExport { color: var(--ink); }
 /* the click's options sit beside its name, so its slider lines up with the others */
 .name-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); flex-wrap: wrap; min-width: 0; }
 .clickopts { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-xs); color: var(--muted); }
-.clickopts .pick { height: 28px; font-size: var(--text-xs); padding: 0 var(--space-6) 0 var(--space-2); background-position: right 8px center; }
+.clickopts .pick { height: var(--control-sm); font-size: var(--text-xs); padding: 0 var(--space-6) 0 var(--space-2); background-position: right 8px center; }
 .export-state { margin: 0; font-size: var(--text-sm); }
 .export-state:empty { display: none; }
 .back { display: flex; width: fit-content; margin-bottom: var(--space-5); }
@@ -606,7 +601,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 .backbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-5); }
 .backbar .back { margin-bottom: 0; }
 .bb-acts { display: flex; align-items: center; gap: var(--space-2); } /* the song's own: Save, then Practice */
-#pSave:disabled { opacity: 0.4; }
 #pSave:not(:disabled) { background: var(--ink); color: var(--on-ink); }
 #pSave:not(:disabled):hover { background: var(--ink-strong); }
 .lib-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-1); } /* 16 px to the list with the group's 12 */
@@ -630,8 +624,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .add-at.open { z-index: calc(var(--z-veil) + 1); transition: none; }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
 /* the glyph (2 px in from its box each way) 10 px from the field's left, top and bottom, and from the text */
-.search .ico { position: absolute; left: 8px; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
-.search input { width: 100%; height: 32px; padding: 0 var(--space-3) 0 var(--space-8); border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2);
+.search .ico { position: absolute; left: 8px; width: var(--icon-sm); height: var(--icon-sm); color: var(--faint); pointer-events: none; }
+.search input { width: 100%; height: var(--control-md); padding: 0 var(--space-3) 0 var(--space-8); border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2);
   color: inherit; font: var(--text-sm)/20px var(--font); transition: border-color var(--duration-fast), background-color var(--duration-fast); }
 .search input::placeholder { color: var(--placeholder); }
 .search input::-webkit-search-cancel-button { -webkit-appearance: none; }
@@ -690,7 +684,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .add-first .plus { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-sm); border: 1px dashed var(--fg-30);
   color: var(--muted); transition: border-color var(--duration-fast), color var(--duration-fast); }
 #sLib .add-first:hover .plus { border-color: var(--faint); color: var(--ink); }
-#sLib .add-first .plus .ico { width: 20px; height: 20px; }
+#sLib .add-first .plus .ico { width: var(--icon-lg); height: var(--icon-lg); }
 #sLib .add-first small { color: var(--muted); font-size: var(--text-sm); }
 /* one step at a time: with the tools still to install, an empty library waits under their banner */
 #sInstall:not([hidden]) ~ #sLibPage:has(.add-first) { display: none; }
@@ -705,14 +699,14 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .row, #sLib .lib-cols { display: grid; grid-template-columns: 48px minmax(0, 4fr) minmax(56px, 1fr) minmax(104px, 1.5fr) minmax(96px, 1.5fr) 56px 32px;
   column-gap: var(--space-4); align-items: center; }
 #sLib .lib-cols { position: relative; height: 40px; padding: 0 var(--space-3); }
-#sLib .lib-cols .sort { justify-self: start; display: inline-flex; align-items: center; gap: var(--space-1); height: 24px; padding: 0; border: 0; background: none;
+#sLib .lib-cols .sort { justify-self: start; display: inline-flex; align-items: center; gap: var(--space-1); height: var(--control-xs); padding: 0; border: 0; background: none;
   color: var(--faint); font-size: var(--text-xs); cursor: pointer; transition: color var(--duration-fast); }
 #sLib .lib-cols .sort[data-by="title"] { grid-column: 1 / 3; }
 #sLib .lib-cols .sort.end { justify-self: end; flex-direction: row-reverse; } /* the arrow before the label, the label over the numbers */
 #sLib .lib-cols .sort:hover, #sLib .lib-cols .sort.on { color: var(--muted); }
 #sLib .lib-cols .sort:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--radius-xs); }
 #sLib .lib-cols .sort .lab { display: inline-flex; align-items: center; gap: var(--space-1); } /* the length's: a clock, then the word */
-#sLib .lib-cols .sort .ico { width: 14px; height: 14px; }
+#sLib .lib-cols .sort .ico { width: var(--icon-xs); height: var(--icon-xs); }
 #sLib .lib-cols .sort .arrow { opacity: 0; transition: opacity var(--duration-fast); }
 #sLib .lib-cols .sort:hover .arrow, #sLib .lib-cols .sort:focus-visible .arrow, #sLib .lib-cols .sort.on .arrow { opacity: 1; }
 #sLib .num { font-variant-numeric: tabular-nums; }
@@ -770,7 +764,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .menu button { display: flex; align-items: center; gap: var(--space-2); height: 36px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent;
   color: var(--ink); font-size: var(--text-md); text-align: left; }
 .menu button:hover, .menu button:focus-visible { background: var(--fill); outline: none; }
-.menu .ico { width: 16px; height: 16px; color: var(--muted); }
+.menu .ico { width: var(--icon-sm); height: var(--icon-sm); color: var(--muted); }
 .menu .danger, .menu .danger .ico { color: var(--bad); }
 /* Info page */
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); margin: 0; }
@@ -783,7 +777,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .info-lyrics .ly-state { margin: 0; font-size: var(--text-sm); color: var(--muted); }
 .info-lyrics .ly-state.warn { color: var(--warn-ink); }
 .ly-acts, .ly-find { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.ly-find input { flex: 1 1 240px; min-width: 0; height: 32px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2); padding: 0 var(--space-3); font-size: var(--text-md); }
+.ly-find input { flex: 1 1 240px; min-width: 0; height: var(--control-md); border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2); padding: 0 var(--space-3); font-size: var(--text-md); }
 .ly-find input:focus, .ly-paste textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
 .ly-found { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
 .ly-found li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--bg); font-size: var(--text-sm); }
@@ -812,9 +806,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .listen-row { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
 .listen-row .lbl { width: 56px; color: var(--muted); }
 .listen-row b { width: 40px; font-weight: var(--weight-medium); }
-.listen-row .btn .ico { width: 14px; height: 14px; }
-#sLib .song-actions .btn.icon { background: transparent; color: var(--muted); }
-#sLib .song-actions .btn.icon:hover { background: var(--fill); color: var(--ink); }
+.listen-row .btn .ico { width: var(--icon-xs); height: var(--icon-xs); }
 @media (hover: none) { #sLib .song-actions .btn { opacity: 1; } }
 @media (max-width: 760px) {
   .track { grid-template-columns: 24px minmax(70px, 1fr) auto auto; row-gap: var(--space-1); }
@@ -842,32 +834,32 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .ear-row > span { color: var(--muted); }
 .ear-sub { margin-top: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--line); font-weight: var(--weight-medium); } /* the comparison's ears, under a hairline */
 .seg { display: inline-flex; gap: var(--space-half); padding: var(--space-half); border-radius: var(--radius-md); background: var(--fill); }
-.seg button { min-width: 48px; height: 28px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--text-sm); }
+.seg button { min-width: 48px; height: var(--control-sm); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--text-sm); }
 .seg button:hover { color: var(--ink); }
 .seg button[aria-checked="true"] { background: var(--surface-2); color: var(--ink); }
 /* set to anything but both ears for all (and your voice off): a dot on the button, so a quiet ear isn't a mystery */
 #kEars { position: relative; }
 #kEars.set::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--voice); }
-.sb-vol .kfield { height: 32px; }
+.sb-vol .kfield { height: var(--control-md); }
 #songBar .keyctl { flex: 1 1 100%; } /* the key, tempo and click on a line of their own, however wide */
 /* Find lyrics: pressed, it opens out (paintLyrBtn) with a spinner at its left while they're found */
 .lyr { gap: var(--space-2); overflow: hidden; white-space: nowrap; }
 .lyr.busy { color: var(--muted); pointer-events: none; }
-.lyr .ring { width: 14px; height: 14px; flex: none; transform: rotate(-90deg); }
+.lyr .ring { width: var(--icon-xs); height: var(--icon-xs); flex: none; transform: rotate(-90deg); }
 .songbar output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .kfield { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--muted); }
 .kfield input[type="range"] { width: 112px; }
 .kfield .pick { font-size: var(--text-sm); } /* the bar's text size */
 .tog.icon { display: inline-grid; place-items: center; padding: 0; }
-.tog.icon .ico { width: 16px; height: 16px; }
-.songbar .tog.icon { width: 32px; height: 32px; border-radius: var(--radius-md); } /* Loop and the click: as tall as the buttons beside them */
+.tog.icon .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.songbar .tog.icon { width: var(--control-md); height: var(--control-md); border-radius: var(--radius-md); } /* Loop and the click: as tall as the buttons beside them */
 #kClick[aria-pressed="false"] + input[type="range"] { display: none; } /* the click's volume shows only while the click is on */
 /* Phrases: one block per line of the song; click one to jump there, Loop repeats it */
 .phrase-row { flex-basis: 100%; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-3); border-top: 1px solid var(--line); }
 .phrase-row output { min-width: 84px; text-align: center; }
 .phrase-row > .kfield:first-child { margin-right: var(--space-2); } /* the count-in first, a little apart from the phrases' controls */
-.songbar .btn:disabled, .songbar .tog:disabled, #vPractice .bb-acts .btn:disabled { opacity: 0.35; pointer-events: none; }
-.strip { position: relative; flex: 1 1 240px; height: 28px; border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; }
+.tog:disabled { opacity: 0.4; pointer-events: none; }
+.strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; }
 .strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--fg-16); cursor: pointer; }
 .strip button:hover { background: var(--fg-30); }
 .strip button[aria-current="true"] { background: var(--fg-38); }
@@ -882,7 +874,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .rec-split { display: inline-flex; gap: 1px; }
 .rec-split .btn.rec { border-radius: var(--radius-md) 0 0 var(--radius-md); }
 .rec-split .rec-mode { border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: var(--text-sm); }
-.btn.rec .ico { width: 16px; height: 16px; }
+.btn.rec .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .btn.rec[aria-pressed="true"] { background: color-mix(in oklab, var(--bad) 22%, var(--surface-2)); }
 .btn.rec[aria-pressed="true"]:hover { background: color-mix(in oklab, var(--bad) 30%, var(--surface-2)); }
 .btn.rec[aria-pressed="true"] .ico circle { fill: currentColor; }
@@ -939,12 +931,9 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) 32px 32px auto; align-items: center; gap: var(--space-3);
   min-height: 48px; padding: var(--space-2) var(--space-3); }
 .take + .take { border-top: 1px solid var(--line); }
-.tk-play { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--ink); display: grid; place-items: center;
-  transition: background-color var(--duration-fast), filter var(--duration-fast), opacity var(--duration-fast); }
-.tk-play:hover { background: var(--hover-2); }
-.tk-play:disabled { opacity: 0.4; pointer-events: none; }
+.tk-play { transition: background-color var(--duration-fast), filter var(--duration-fast), opacity var(--duration-fast); }
 .tk-play .pp { width: 10.5px; height: 12px; }
-.tk-play .ico { width: 16px; height: 16px; }
+.tk-play > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .take.playing .tk-play { background: var(--ink); color: var(--on-ink); }
 .tk-when { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .tk-part { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; line-height: 20px; }
@@ -958,7 +947,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .take.armed .tk-confirm { max-width: 160px; margin-right: var(--space-2); opacity: 1; }
 .tk-cmp, .tk-dl { transition: filter var(--duration-fast), opacity var(--duration-fast), background-color var(--duration-fast); }
 .take.armed :is(.tk-play, .tk-cmp, .tk-dl) { filter: blur(1.5px); opacity: 0.35; pointer-events: none; }
-.tk-cmp[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); } /* comparing */
+.btn.tk-cmp[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); } /* comparing */
 .take.armed .tk-del { background: color-mix(in oklab, var(--bad) 18%, transparent); color: var(--bad); }
 .take.saving .tk-part b { color: var(--muted); font-weight: var(--weight-regular); }
 /* its waveform (drawTakeWave), under the rest, the card's width: press or drag on it to play from there */
@@ -967,7 +956,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .tk-wave canvas { display: block; width: 100%; height: 100%; }
 .tk-wave:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .tk-empty { display: flex; align-items: center; gap: var(--space-3); margin: 0; padding: var(--space-5); border-radius: var(--radius-2xl); border: 1px dashed var(--track); color: var(--muted); font-size: var(--text-md); }
-.tk-empty .ico { width: 18px; height: 18px; color: var(--bad); }
+.tk-empty .ico { width: var(--icon-md); height: var(--icon-md); color: var(--bad); }
 @media (max-width: 760px) {
   .tk-mix { flex: 1 1 100%; display: grid; gap: var(--space-2); }
   .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
@@ -1004,9 +993,9 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Stem</a>
-    <button class="chipbtn iconchip" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop" hidden></button>
-    <button class="chipbtn mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
-    <button class="chipbtn iconchip" id="micSetBtn" type="button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="micSet"></button>
+    <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop" hidden></button>
+    <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+    <button class="btn sm icon quiet" id="micSetBtn" type="button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="micSet"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
     <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><b>Adding songs</b><div id="jobsList"></div></div>
     <div class="pop" id="micSet" role="dialog" aria-label="Settings" hidden>
@@ -1027,7 +1016,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <div class="pr-main">
     <div class="songbar" id="songBar">
       <div class="sb-main">
-        <button class="btn dark round" id="startBtn" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
+        <button class="btn primary round" id="startBtn" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <div class="seek" role="group" aria-label="Move through the song">
           <button class="btn sm icon" id="kStart" type="button" aria-label="Go to start" title="Go to start (Home)"></button>
           <button class="btn sm" id="kBack" type="button">−5 s</button>
@@ -1085,13 +1074,13 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <div class="intro" id="sIntro">
       <h1 class="title">Practice any song</h1>
     </div>
-    <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)">Save</button><button class="btn sm dark" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
+    <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)">Save</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
     <!-- the tools to add songs, in the library and on Add song while they're missing (an update can add one) -->
     <section class="panel-card" id="sInstall" hidden>
-      <div class="setup-line"><p class="muted">First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.</p><span class="muted" id="sInstallState"></span><button class="btn sm dark" id="sInstallBtn" type="button">Install</button></div>
+      <div class="setup-line"><p class="muted">First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.</p><span class="muted" id="sInstallState"></span><button class="btn sm primary" id="sInstallBtn" type="button">Install</button></div>
       <div class="bar" hidden id="sInstallBar"><i></i></div>
       <pre class="log" id="sInstallLog" hidden></pre>
     </section>
@@ -1102,18 +1091,18 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
-        <span class="add-at" id="sAddAt"><button class="btn sm dark" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button>
+        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button>
         <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
           <div class="add-form" id="sAdd" hidden>
             <b>Add a song</b>
             <form class="yt" id="sYtForm">
               <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
-              <button class="btn sm dark" type="submit">Add</button>
+              <button class="btn sm primary" type="submit">Add</button>
             </form>
             <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
             <div class="gpu-row" id="sGpu" hidden>
               <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
-              <button class="btn sm dark" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
+              <button class="btn sm primary" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
               <div class="bar" hidden id="sGpuBar"><i></i></div>
               <span class="muted" id="sGpuState"></span>
             </div>
@@ -1128,7 +1117,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="ts" id="sTakesStudio" aria-label="Takes Studio" hidden>
       <div class="ts-top"><a class="btn sm back" id="tsBack" href="#stems">Practice</a><b id="tsTitle"></b></div>
       <div class="ts-bar">
-        <button class="btn dark round" id="tsPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
+        <button class="btn primary round" id="tsPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <output id="tsTime">0:00 / 0:00</output>
         <label class="kfield">Your voice <input type="range" id="tsVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
         <label class="kfield">Band <input type="range" id="tsBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
@@ -1142,7 +1131,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="panel-card info" id="sInfo" hidden>
       <div class="player-head">
         <div class="player-title"><b id="iTitle"></b><span class="muted" id="iSub"></span></div>
-        <div class="row-actions" id="iActs" hidden><a class="btn sm" id="iOpen" href="#stems">Studio</a><button class="btn sm dark" id="iSing" type="button"><span class="txt">Practice</span></button></div>
+        <div class="row-actions" id="iActs" hidden><a class="btn sm" id="iOpen" href="#stems">Studio</a><button class="btn sm primary" id="iSing" type="button"><span class="txt">Practice</span></button></div>
       </div>
       <p class="muted" id="iWait">Reading the song…</p>
       <dl class="facts" id="iFacts"></dl>
@@ -1155,7 +1144,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <div class="mix">
           <label class="mix-ico" for="pVol" title="Volume"></label>
           <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
-          <button class="dl" id="pExport" type="button" aria-label="Export what you hear (MP3)" title="Export what you hear (MP3)"></button>
+          <button class="btn sm icon ghost" id="pExport" type="button" aria-label="Export what you hear (MP3)" title="Export what you hear (MP3)"></button>
         </div></div>
         <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span class="knote" id="pKeyNote"></span></span>
           <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button></div></div>
@@ -1163,7 +1152,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
       <div class="transport-row">
-        <button class="btn dark round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
+        <button class="btn primary round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <div class="seek" role="group" aria-label="Move through the song">
           <button class="btn sm icon" id="pStart" type="button" aria-label="Go to start" title="Go to start (Home)"></button>
           <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
@@ -1638,7 +1627,7 @@ function yin(b, sr) {
 // ---------- helpers ----------
 function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 function mkBtn(label, fn, primary) {
-  const b = document.createElement("button"); b.type = "button"; b.className = "btn sm" + (primary ? " dark" : "");
+  const b = document.createElement("button"); b.type = "button"; b.className = "btn sm" + (primary ? " primary" : "");
   b.textContent = label; b.onclick = fn; return b;
 }
 // Double-click a slider to put it back where it started (runs its own oninput, so everything that listens updates)
@@ -1895,7 +1884,7 @@ async function drawLibrary() {
     row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
     const acts = el("div", "song-actions");
     const more = mkBtn("", () => songMenu(more, m));
-    more.classList.add("icon"); more.title = tr("More"); more.setAttribute("aria-label", tr("More for {title}", { title: m.title }));
+    more.classList.add("icon", "ghost"); more.title = tr("More"); more.setAttribute("aria-label", tr("More for {title}", { title: m.title }));
     more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false"); more.append(icon("more"));
     acts.append(more);
     row.append(coverTile(m), info, el("span", "c num wide", m.bpm ? String(Math.round(m.bpm)) : "–"), key,
@@ -2431,7 +2420,7 @@ function paintJobs() {
       row = el("div", "job"); row.id = "job-" + id;
       const top = el("div", "top"); top.append(el("b"), el("span"));
       const bar = el("div", "bar"); bar.append(el("i")); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
-      const x = el("button", "x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
+      const x = el("button", "btn sm icon ghost x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
       row.append(top, bar, x); list.append(row);
     }
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err, at = Math.round((j.progress || 0) * 100);
@@ -2448,7 +2437,7 @@ function paintJobs() {
     // cancel, or clear one that failed; once it's in, open it
     const x = row.querySelector(".x"), kind = j.done ? "goTo" : "close";
     if (x.dataset.icon !== kind) { x.replaceChildren(icon(kind)); x.dataset.icon = kind; }
-    x.classList.toggle("go", !!j.done);
+    x.classList.toggle("ghost", !j.done); x.classList.toggle("primary", !!j.done); // in: the way to it, the panel's one strong button
     say(x, j.done ? "Open song" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping;
   }
 }
@@ -3100,7 +3089,7 @@ function trackRow(name, members, sub, open) {
   const note = group ? "lead and backing" : isClick ? (bpm ? tr("{bpm} BPM · {bpb}/4 · follows the song’s beat", { bpm: Math.round(bpm * P.rate), bpb: t.bpb }) : "no steady beat") : STEM_NOTES[name] || "";
   const nm = el("div", "name"); nm.append(document.createTextNode(tr(title)));
   if (group) { // opens and closes the lead and backing rows
-    const tog = el("button", "disclose"); tog.type = "button"; tog.setAttribute("aria-expanded", String(open));
+    const tog = el("button", "btn xs icon ghost disclose"); tog.type = "button"; tog.setAttribute("aria-expanded", String(open));
     tog.title = tr(open ? "Show the vocals as one track" : "Show lead and backing vocals apart"); tog.setAttribute("aria-label", tog.title);
     tog.append(icon("chevronDown")); tog.onclick = () => { store.set("voicesOpen", !open); renderTracks(); };
     nm.append(tog);
@@ -3131,7 +3120,7 @@ function trackRow(name, members, sub, open) {
     last = el("span"); // only the vocals have a download of their own; the band comes with the song's export
   } else {
     if (name === "vocals" && splitting[P.song.id]) nm.querySelector("small").textContent = tr(...splitting[P.song.id]);
-    last = el("button", "dl"); last.type = "button"; last.title = tr("Download {what} only (MP3)", { what: tr(group ? "the vocals" : TRACK_TITLES[name] || name) }); last.setAttribute("aria-label", last.title);
+    last = el("button", "btn sm icon ghost"); last.type = "button"; last.title = tr("Download {what} only (MP3)", { what: tr(group ? "the vocals" : TRACK_TITLES[name] || name) }); last.setAttribute("aria-label", last.title);
     last.append(icon("download"));
     last.onclick = () => exportMix(members.map((k) => ({ name: k, gain: 1 })), null, last);
   }
@@ -3445,7 +3434,7 @@ function paintKeeps() {
       part.append(x); box.append(part);
     }
     if (P.tsel && P.tsel.name === name) {
-      const bar = el("div", "selbar"), keep = el("button", "keep", tr("Keep playing here")), cut = el("button", "cut"), { a, b } = P.tsel;
+      const bar = el("div", "selbar"), keep = el("button", "btn xs primary", tr("Keep playing here")), cut = el("button", "btn xs icon primary"), { a, b } = P.tsel;
       keep.type = cut.type = "button"; keep.title = tr("This stretch plays even while the track is muted");
       keep.onclick = () => addKeep(name, a, b);
       cut.title = tr("Download {what}, {a}–{b} only (MP3)", { what: tr(name === "voices" ? "the vocals" : TRACK_TITLES[name] || name), a: fmtTime(a), b: fmtTime(b) });
@@ -4381,13 +4370,13 @@ function ppIcon() {
 function takeRow(t) {
   const row = el("div", "take" + (t.saving ? " saving" : t.failed ? " failed" : "")), d = new Date(t.created * 1000), part = takePart(t);
   row.dataset.id = t.id;
-  const play = el("button", "tk-play");
+  const play = el("button", "btn sm round tk-play");
   play.type = "button";
   if (t.failed) { play.append(icon("retry")); play.title = tr("Try saving it again"); play.setAttribute("aria-label", play.title); play.onclick = t.retry; }
   else { play.append(ppIcon()); play.disabled = !!t.saving; play.onclick = () => listenTake(t); }
   const what = el("span", "tk-part");
   what.append(el("b", null, t.saving ? tr("Saving take…") : t.failed ? tr("Couldn’t save this take") : part.what), el("small", null, t.failed ? tr(t.failed) : part.more));
-  const cmp = el("button", "dl tk-cmp"), dl = el("button", "dl"), del = el("button", "dl tk-del");
+  const cmp = el("button", "btn sm icon ghost tk-cmp"), dl = el("button", "btn sm icon ghost tk-dl"), del = el("button", "btn sm icon ghost tk-del");
   cmp.type = dl.type = del.type = "button"; cmp.append(icon("compare")); dl.append(icon("download")); del.append(icon("trash"));
   cmp.disabled = dl.disabled = !!(t.saving || t.failed); del.disabled = !!t.saving;
   cmp.title = tr("Compare: the original in one ear, yours in the other (set under Headphones)"); cmp.setAttribute("aria-label", cmp.title); cmp.setAttribute("aria-pressed", "false");
@@ -4396,7 +4385,6 @@ function takeRow(t) {
   del.title = tr(t.failed ? "Dismiss" : "Delete this take"); del.setAttribute("aria-label", del.title);
   dl.onclick = () => takeWav(t);
   del.onclick = () => takeDelete(t);
-  dl.classList.add("tk-dl");
   const end = el("span", "tk-end"); end.append(el("span", "tk-confirm", tr("Really delete?")), del); // the question right beside Delete
   row.append(play, el("span", "tk-when", d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })), what, cmp, dl, end);
   if (!t.saving && !t.failed) row.append(takeWaveEl(t));
