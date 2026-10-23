@@ -952,20 +952,59 @@ def _whisper(job, share: tuple[float, float]):
         _free_gpu()
 
 
-def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, float]) -> tuple[list, float]:
-    """Lines of lyrics put where they're sung in voice (mono, 16 kHz): lyrics.json's lines, and how well they match."""
+def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, float], whole: np.ndarray | None = None) -> tuple[list, float]:
+    """Lines of lyrics put where they're sung in voice (mono, 16 kHz): lyrics.json's lines, and how well they match.
+    whole: the whole vocal stem, when voice is the lead split from it, for the lines the lead doesn't sing (_reheard)."""
     import lyrics
     _check(job)
     with _creep(job, share, len(voice) / 16000 * (0.05 if device() == "cuda" else 0.5)):
         r = model.align(voice, "\n".join(lines), language=lyrics.language(lines), original_split=True, verbose=None)
     probs = [w.probability for s in r.segments for w in s.words]
-    return lyrics.aligned(r), round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
+    out = lyrics.aligned(r)
+    if whole is not None and len(out) == len(lines):
+        _check(job)
+        out = _reheard(model, whole, lines, out)
+    return out, round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
 
 
-def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tuple[float, float], how: dict | None = None, hint: str = "") -> dict:
+def _unheard(line: dict) -> bool:
+    """A line Whisper couldn't find: half its words or more squeezed to nothing (under 0.1 s)."""
+    w = line["words"]
+    return not w or 2 * sum(b - a < 0.1 for a, b, _ in w) >= len(w)
+
+
+def _reheard(model, whole: np.ndarray, lines: list[str], out: list[dict]) -> list[dict]:
+    """Lines the lead doesn't sing (the backing vocals have them alone: a scat, a call between the lead's lines), which
+    Whisper squeezed into nothing on the lead (_unheard), looked for again on the whole vocal stem: each run of them in
+    the stretch between the lines either side, and kept where they're found there."""
+    import lyrics
+    i, dur = 0, len(whole) / 16000
+    while i < len(out):
+        if not _unheard(out[i]):
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(out) and _unheard(out[j + 1]):
+            j += 1
+        a, b = out[i - 1]["t1"] if i else 0.0, out[j + 1]["t0"] if j + 1 < len(out) else dur
+        if b - a >= 0.5:
+            run = lines[i: j + 1]
+            r = model.align(whole[int(a * 16000): int(b * 16000)], "\n".join(run), language=lyrics.language(run), original_split=True, verbose=None)
+            again = lyrics.aligned(r)
+            for k, line in enumerate(again if len(again) == len(run) else []):
+                if not _unheard(line):
+                    out[i + k] = {"t0": round(line["t0"] + a, 3), "t1": round(line["t1"] + a, 3), "text": line["text"],
+                                  "words": [[round(w0 + a, 3), round(w1 + a, 3), w] for w0, w1, w in line["words"]]}
+        i = j + 1
+    return out
+
+
+def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tuple[float, float], how: dict | None = None, hint: str = "",
+                 whole: np.ndarray | None = None) -> dict:
     """lyrics.json for a song: found on LRCLIB by its title (the first of three likely entries that turns out to be
     sung in it), or how={"id": n}, that LRCLIB entry, or how={"text": …}, lyrics pasted in; those two are kept however
-    well they match. voice: the lead vocal, mono at 16 kHz. Uses the GPU: the caller holds _work_lock."""
+    well they match. voice: the lead vocal, mono at 16 kHz; whole: the vocal stem it was split from (_align). Uses the
+    GPU: the caller holds _work_lock."""
     import lyrics
     lo, hi = share
     mid = lo + 0.5 * (hi - lo)  # the first half for finding them (and the model's download, the first time)
@@ -987,16 +1026,16 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
         step = (hi - mid) / len(found)
         for i, entry in enumerate(found):
             _stage(job, "Lining the lyrics up with the voice", mid + i * step)
-            lines, match = _align(model, voice, entry["lines"], job, (mid + i * step, mid + (i + 1) * step))
+            lines, match = _align(model, voice, entry["lines"], job, (mid + i * step, mid + (i + 1) * step), whole)
             if how or match >= MATCH_MIN:
                 source = {"site": "pasted"} if entry["site"] == "pasted" else {k: entry[k] for k in ("site", "id", "artist", "track")}
                 return {"lines": lines, "match": match, "source": source, "at": time.time()}
     return {"lines": None, "at": time.time()}
 
 
-def _voice16k(folder: str) -> np.ndarray:
-    """The lead vocal (or the whole vocal stem before it's split), mono at 16 kHz, as Whisper hears it."""
-    path = os.path.join(folder, "lead.mp3" if os.path.isfile(os.path.join(folder, "lead.mp3")) else "vocals.mp3")
+def _voice16k(folder: str, whole: bool = False) -> np.ndarray:
+    """The lead vocal (or the whole vocal stem before it's split, or with whole), mono at 16 kHz, as Whisper hears it."""
+    path = os.path.join(folder, "lead.mp3" if not whole and os.path.isfile(os.path.join(folder, "lead.mp3")) else "vocals.mp3")
     if not os.path.isfile(path):
         raise ValueError("This song has no vocal track.")
     raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", path, "-ac", "1", "-ar", "16000", "-f", "f32le", "pipe:1"],
@@ -1048,11 +1087,12 @@ def start_lyrics(song_id: str, how) -> str:
         _looked_up(song_id)  # a song just added: what it is (its artist, its title) is asked of iTunes and Deezer first
         meta = _read_meta(folder)
         voice = _voice16k(folder)
+        whole = _voice16k(folder, whole=True) if os.path.isfile(os.path.join(folder, "lead.mp3")) else None
         mel = None
         with _turn(job):  # one model on the GPU at a time
             # whose song it was found to be (not a cover's: that's named for whoever sings it)
             named = f"{meta['artist']} {meta['title']}" if meta.get("artist") and not covers.is_cover(meta["title"]) else ""
-            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.9), how, named)
+            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.9), how, named, whole)
             if data.get("lines") and _has_split(folder):  # the bars, cut where the new lyrics' syllables start
                 syl = _syllables(folder, data, job, (0.9, 0.96))
                 _stage(job, "Fitting the bars to the lyrics", 0.96)
