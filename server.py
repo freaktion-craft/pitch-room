@@ -340,6 +340,9 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[5] == "delete":
                 stems.delete_take(parts[2], parts[4])
                 return self._json(200, {"ok": True})
+            if parts[5] == "volume":  # {volume}: the take's own, set on its clip in the Takes Studio
+                body = json.loads(self._body(1_000) or b"{}")
+                return self._json(200, stems.set_take_volume(parts[2], parts[4], body.get("volume") if isinstance(body, dict) else None))
             if parts[5] == "wav":
                 body = json.loads(self._body(10_000) or b"{}")
                 data, filename = stems.take_wav(parts[2], parts[4], body if isinstance(body, dict) else {})

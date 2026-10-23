@@ -145,6 +145,10 @@ function recTick(sn) {
 // or that couldn't be, kept until saved or dismissed (so practicing another song meanwhile doesn't lose them).
 const T = { song: null, list: [], loaded: false, voice: new Map(), pitch: new Map(), peaks: new Map(), band: null, play: null, at: null, mix: { voice: 1, band: 1, guide: 0 }, unsaved: [] };
 for (const [k, v] of Object.entries(store.get("takeMix", {}) || {})) if (k in T.mix && Number.isFinite(v)) T.mix[k] = Math.max(0, Math.min(2, v));
+// How loud a take is played under Your voice: its gain (matched to the singer) times its own volume, set on its clip in
+// the Takes Studio (stems.set_take_volume)
+const takeVol = (t) => t.volume ?? 1;
+const takeGain = (t) => (t.gain || 1) * takeVol(t);
 async function loadTakes(m) {
   if (T.song !== m.id) {
     listenStop();
@@ -339,7 +343,7 @@ async function listenTake(t, mode = "take") {
     if (withVoice) { const v = ac.createBufferSource(); v.buffer = voice; v.connect(gains.voice); v.start(when, from, t.duration - from); p.srcs.push(v); }
   };
   const mix = (v, b, gd) => { const g = { voice: ac.createGain(), band: ac.createGain(), guide: ac.createGain() }; g.voice.gain.value = v; g.band.gain.value = b; g.guide.gain.value = gd; return g; };
-  p.gains = mix(T.mix.voice * (t.gain || 1), T.mix.band, T.mix.guide); // yours, as set above (listenGains follows the sliders)
+  p.gains = mix(T.mix.voice * takeGain(t), T.mix.band, T.mix.guide); // yours, as set above (listenGains follows the sliders)
   if (mode === "compare") { // the original and yours together, each to its ear
     p.ears = { orig: earNode("orig", p.bus), yours: earNode("yours", p.bus) };
     pass(at, pos, mix(0, 1, 1), false, p.ears.orig.in);
