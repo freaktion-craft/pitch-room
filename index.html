@@ -106,7 +106,7 @@ body { -webkit-user-select: none; user-select: none; }
 /* Korean lines break between words, as they're read, not inside them (a word too long for its line still breaks) */
 html:lang(ko) body { word-break: keep-all; overflow-wrap: break-word; }
 input, textarea, .song b, #pTitle, #iTitle, #pMeta, #iSub, .facts dd, .server-off, .log, .job .top,
-#sAddMsg, #sInstallState, #sGpuState, #pExportState { -webkit-user-select: text; user-select: text; }
+#sAddMsg, #sInstallState, #sGpuState, #pExportState, #tsState { -webkit-user-select: text; user-select: text; }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
@@ -1129,7 +1129,9 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <label class="kfield">Your voice <input type="range" id="tsVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
         <label class="kfield">Band <input type="range" id="tsBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
         <label class="kfield">Guide vocal <input type="range" id="tsGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
+        <button class="btn sm icon ghost" id="tsExport" type="button" aria-label="Export what you hear (MP3)" title="Export what you hear (MP3)"></button>
       </div>
+      <p class="muted export-state" id="tsState"></p>
       <div class="ts-vers" id="tsVers" hidden></div>
       <div class="ts-tl" id="tsTl"><canvas id="tsWave" aria-label="The song: click to go there"></canvas><div class="ts-lanes" id="tsLanes"></div><i class="ts-line" id="tsLine"></i></div>
       <p class="ts-empty" id="tsEmpty" hidden>No takes yet. Record in Practice and they're laid out here, each where you sang it.</p>
@@ -4783,9 +4785,23 @@ function tsGains() {
   TS.gains.band.gain.setTargetAtTime(T.mix.band, now, 0.015); TS.gains.guide.gain.setTargetAtTime(T.mix.guide, now, 0.015);
   for (const [id, v] of TS.voice) { const t = T.list.find((x) => x.id === id); v.g.gain.setTargetAtTime(T.mix.voice * ((t && t.gain) || 1), now, 0.015); }
 }
+// Export: what the page plays, as an MP3 of the whole song: the band and guide vocal in the takes' version, as the
+// sliders have them, and each take that's on where it was sung (stems.takes_mp3).
+async function tsExport() {
+  const btn = $("#tsExport"), state = $("#tsState"), ids = tsTakes().filter((t) => TS.on.has(t.id)).map((t) => t.id);
+  if (!ids.length) { say(state, "Turn on at least one take to export."); return; }
+  btn.disabled = true; say(state, "Mixing the MP3…");
+  try {
+    const r = await fetch(`/api/library/${TS.id}/takes-mp3`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, mix: T.mix }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
+    say(state, "Saved “{name}” to your downloads.", { name: await saveDownload(r, "takes.mp3") });
+  } catch (e) { say(state, e instanceof TypeError ? "Couldn’t reach the server." : e.message); }
+  btn.disabled = false;
+}
 function initTakesStudio() {
   $("#tsBack").prepend(icon("back"));
   $("#tsPlay").onclick = tsPlay;
+  $("#tsExport").append(icon("download")); $("#tsExport").onclick = tsExport;
   $("#tsTl").onclick = (e) => { const r = $("#tsTl").getBoundingClientRect(); tsSeek(((e.clientX - r.left - 12) / (r.width - 24)) * songDur()); };
   for (const [id, k] of [["#tsVoice", "voice"], ["#tsBand", "band"], ["#tsGuide", "guide"]]) {
     const s = $(id); s.value = T.mix[k];
@@ -5552,6 +5568,7 @@ const KO_SERVER = {
   "Finding the lyrics": "가사 찾는 중", "Lining the lyrics up with the voice": "가사를 목소리에 맞추는 중",
   "Downloading the lyrics model (first time only, ≈1.5 GB)": "가사 모델 내려받는 중 (처음 한 번만, ≈1.5 GB)",
   "Couldn’t reach LRCLIB. Is this computer online?": "LRCLIB에 연결하지 못했어요. 인터넷에 연결돼 있나요?", "LRCLIB answered {code}.": "LRCLIB이 {code} 오류로 답했어요.", "LRCLIB is busy right now. Try again in a minute.": "LRCLIB이 지금 바빠요. 1분 뒤에 다시 해 보세요.",
+  "Those takes were sung in different keys or tempos: export one version at a time.": "서로 다른 키나 템포로 부른 테이크예요. 한 버전씩 내보내세요.",
   "Paste the lyrics, a line of the song to each line.": "가사를 붙여넣어 주세요. 한 줄에 노래 한 줄씩이요.", "That LRCLIB entry has no lyrics.": "그 LRCLIB 항목에는 가사가 없어요.",
   "Send an LRCLIB entry's id or the lyrics' text.": "LRCLIB 항목 번호나 가사를 보내 주세요.", "That's longer than a song's lyrics.": "노래 가사로 보기엔 너무 길어요.",
   "This song's lyrics are being lined up already. Try again in a moment.": "이 곡의 가사를 맞추는 중이에요. 잠시 뒤에 다시 해 주세요.",
@@ -5687,7 +5704,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Download {what} only (MP3)": "{what}만 내려받기 (MP3)", "the vocals": "보컬",
   "waiting to split into lead and backing…": "리드와 백킹으로 나누길 기다리는 중…", "splitting into lead and backing…": "리드와 백킹으로 나누는 중…",
   "splitting into lead and backing… {pct}%": "리드와 백킹으로 나누는 중… {pct}%", "Couldn’t split the vocals: {why}": "보컬을 나누지 못했어요: {why}",
-  "Turn on at least one track.": "트랙을 하나 이상 켜세요.", "Mixing the MP3…": "MP3 믹스하는 중…", "Export failed.": "내보내지 못했어요.",
+  "Turn on at least one track.": "트랙을 하나 이상 켜세요.", "Turn on at least one take to export.": "내보낼 테이크를 하나 이상 켜세요.", "Mixing the MP3…": "MP3 믹스하는 중…", "Export failed.": "내보내지 못했어요.",
   "Saved “{name}” to your downloads.": "“{name}” 파일을 다운로드 폴더에 저장했어요.",
   "Couldn’t save that.": "저장하지 못했어요.", "Couldn’t save the mix.": "믹스를 저장하지 못했어요.",
   "Stop playing {a}–{b} while muted": "음소거 중에는 {a}–{b}도 재생하지 않기", "Keep playing here": "여기는 계속 재생",

@@ -2109,16 +2109,10 @@ def _wav(samples: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
-def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
-    """A take as heard in Practice: your voice (times the take's gain) over the band and, if asked for, the guide
-    vocal, in the key it was sung in. mix: {voice, band, guide}, gains 0…4. The band is every track but the guide vocal
-    (the lead once split, else the vocal stem), as with Practice's Band slider, so backing vocals are in it. Returns
-    (16-bit stereo 44.1 kHz WAV, file name), the take's stretch of the song from its first sample to its last."""
-    folder = _song_dir(song_id)
-    meta, take = _read_meta(folder), _take(song_id, tid)
-    voice, band, guide = _gain(mix, "voice", 1), _gain(mix, "band", 1), _gain(mix, "guide", 0)
-    key, speed = _semitones(take["key"]), _speed(take.get("speed", 1))
-    s0, n = int(round(take["start"] / speed * SR)), int(round(take["duration"] * SR))  # the band at the take's tempo
+def _take_band(song_id: str, folder: str, meta: dict, key: int, speed: float, band: float, guide: float, s0: int, n: int) -> np.ndarray:
+    """The band as takes are heard with it, n samples from s0 (at the tempo they were sung at): every track but the
+    guide vocal (the lead once split, else the vocal stem) times band, as with Practice's Band slider, so backing
+    vocals are in it; the guide vocal times guide; in the key they were sung in."""
     names = _tracks(folder, meta)
     lead = "lead" if "lead" in names else "vocals"
     parts = [(t, g) for t, g in [(t, band) for t in names if t != lead] + [(lead, guide)] if g > 0]
@@ -2133,16 +2127,69 @@ def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
             wav = _decode_stereo(_track_path(folder, t, key, speed))
         seg = wav[:, s0: s0 + n]
         out[:, : seg.shape[1]] += seg * g
+    return out
+
+
+def _take_voice(song_id: str, take: dict, gain: float) -> np.ndarray:
+    """A take's recording, mono at SR, times gain and the take's own gain."""
+    raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", os.path.join(_take_dir(song_id), take["id"] + ".flac"), "-ac", "1",
+                          "-ar", str(SR), "-f", "f32le", "pipe:1"], capture_output=True, check=False).stdout
+    return np.frombuffer(raw, dtype=np.float32) * (gain * float(take.get("gain", 1)))
+
+
+def _version_tags(meta: dict, key: int, speed: float) -> str:
+    """" (+2, 110 BPM)" for a key and tempo other than the song's own, else ""."""
+    tags = [f"{key:+d}" if key else "", (f"{round(meta['bpm'] * speed)} BPM" if meta.get("bpm") else f"{speed:.0%}") if speed != 1 else ""]
+    return f" ({', '.join(t for t in tags if t)})" if any(tags) else ""
+
+
+def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
+    """A take as heard in Practice: your voice (times the take's gain) over the band and, if asked for, the guide
+    vocal (_take_band). mix: {voice, band, guide}, gains 0…4. Returns (16-bit stereo 44.1 kHz WAV, file name), the
+    take's stretch of the song from its first sample to its last."""
+    folder = _song_dir(song_id)
+    meta, take = _read_meta(folder), _take(song_id, tid)
+    voice, band, guide = _gain(mix, "voice", 1), _gain(mix, "band", 1), _gain(mix, "guide", 0)
+    key, speed = _semitones(take["key"]), _speed(take.get("speed", 1))
+    s0, n = int(round(take["start"] / speed * SR)), int(round(take["duration"] * SR))  # the band at the take's tempo
+    out = _take_band(song_id, folder, meta, key, speed, band, guide, s0, n)
     if voice > 0:
-        raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", os.path.join(_take_dir(song_id), tid + ".flac"), "-ac", "1",
-                              "-ar", str(SR), "-f", "f32le", "pipe:1"], capture_output=True, check=False).stdout
-        v = np.frombuffer(raw, dtype=np.float32)[:n] * (voice * float(take.get("gain", 1)))
+        v = _take_voice(song_id, take, voice)[:n]
         out[:, : len(v)] += v
     out = _limit(out)
     for i, k in ((slice(0, int(0.005 * SR)), 1), (slice(max(0, n - int(0.02 * SR)), n), -1)):  # no click at either end
         m = out[:, i].shape[1]
         out[:, i] *= np.linspace(0, 1, m, dtype=np.float32)[::k]
     when = time.strftime("%Y-%m-%d %H-%M", time.localtime(take["created"]))
-    tags = [f"{key:+d}" if key else "", (f"{round(meta['bpm'] * speed)} BPM" if meta.get("bpm") else f"{speed:.0%}") if speed != 1 else ""]
-    return _wav(out), f"{_file_title(meta)} - take {when}" + (f" ({', '.join(t for t in tags if t)})" if any(tags) else "") + ".wav"
+    return _wav(out), f"{_file_title(meta)} - take {when}{_version_tags(meta, key, speed)}.wav"
+
+
+def takes_mp3(song_id: str, ids: list, mix: dict) -> tuple[bytes, str]:
+    """The Takes Studio as heard: the whole song in the takes' version, the band and guide vocal as with take_wav,
+    and each take in ids where it was sung. ids: takes all sung in one key and tempo. mix: {voice, band, guide}.
+    Returns (320 kbps MP3, file name)."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not isinstance(ids, list) or not ids or len(ids) > 500 or not all(isinstance(t, str) for t in ids):
+        raise ValueError("Turn on at least one take to export.")
+    takes = [_take(song_id, t) for t in dict.fromkeys(ids)]
+    vers = {(_semitones(t["key"]), _speed(t.get("speed", 1))) for t in takes}
+    if len(vers) > 1:
+        raise ValueError("Those takes were sung in different keys or tempos: export one version at a time.")
+    (key, speed), = vers
+    voice = _gain(mix, "voice", 1)
+    n = int(round(float(meta["duration"]) / speed * SR))
+    out = _take_band(song_id, folder, meta, key, speed, _gain(mix, "band", 1), _gain(mix, "guide", 0), 0, n)
+    for take in takes if voice > 0 else []:
+        at = int(round(take["start"] / speed * SR))
+        v = _take_voice(song_id, take, voice)[: max(0, n - at)]
+        out[:, at: at + len(v)] += v
+    out = _limit(out)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "out.mp3")
+        _encode_mp3(out, path, "320k")
+        with open(path, "rb") as f:
+            data = f.read()
+    what = "1 take" if len(takes) == 1 else f"{len(takes)} takes"
+    return data, f"{_file_title(meta)} - {what}{_version_tags(meta, key, speed)}.mp3"
 

@@ -310,6 +310,11 @@ class Handler(SimpleHTTPRequestHandler):
                 body = json.loads(self._body(60_000) or b"{}")
                 how = body if isinstance(body, dict) and body else None
                 return self._json(200, {"job": stems.start_lyrics(parts[2], how)})
+            if parts[3] == "takes-mp3":  # the Takes Studio as heard: {ids, mix}
+                body = json.loads(self._body(100_000) or b"{}")
+                body = body if isinstance(body, dict) else {}
+                data, filename = stems.takes_mp3(parts[2], body.get("ids"), body.get("mix") if isinstance(body.get("mix"), dict) else {})
+                return self._attachment(data, "audio/mpeg", filename, "takes.mp3")
             if parts[3] == "takes":  # a take recorded in Practice: the WAV as the body, the rest in the query
                 info = {k: v[0] for k, v in q.items()}
                 return self._json(200, stems.save_take(parts[2], self._body(MAX_SONG), info))
