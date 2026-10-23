@@ -1,6 +1,8 @@
 # Stem
 
-A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
+Open-source personal singing practice software. A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
+
+> **For personal practice only.** Use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service. Songs, lyrics and models stay on your computer and are never part of this repository.
 
 ## Start it
 
@@ -29,7 +31,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 - mute / solo / volume per track, plus the click (accent shift, 2/4–6/4),
 - waveform overview to jump around, Space to play / pause, Home / End to go to the start / the end,
 - **Key** and **tempo** beside the title: move the song up or down by up to 6 semitones, or type a tempo (50–150 % of the song’s) and it plays slower or faster at the same pitch. Each version is made once with Rubber Band (about ten seconds) and kept; Practice, the click, exports and takes follow it,
-- to keep the vocals of some part in even with the lead muted, drag across it on the waveform and press **Keep vocals here** (its vocals move to the backing track); × on a shaded part lets it go,
+- to keep some part of a track playing even while it's muted, drag across it on the track's waveform and press **Keep playing here**; × on a shaded part lets it go. The ↓ beside it exports just that stretch of the track as an MP3,
 - **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that track,
 - **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.
 - **Rename** (⋮ in the library) edits a song’s title right in the list.
@@ -47,8 +49,6 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, yt-dlp, audio-separator, Whisper, the melody's pitch tracker — about 3–4 GB, into `.venv` and `models/`). The first song with Korean or English lyrics adds a model that times their syllables (1.3 GB for Korean, 0.4 GB for English). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.
 
 **GPU:** on Windows and Linux the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
-
-Only use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service.
 
 ## Files
 
@@ -72,3 +72,7 @@ Run the server directly with `.venv/bin/python server.py` (port 5178) if you pre
 - Stems: [Demucs](https://github.com/facebookresearch/demucs) (htdemucs / htdemucs_6s) on PyTorch; lead and backing vocals with [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) and the BS-Roformer karaoke model by frazer & becruily; beats, key and pitch tracking with [librosa](https://librosa.org) ([Praat](https://www.fon.hum.uva.nl/praat/) through parselmouth as a fallback); downloads with [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://deno.com) as its JavaScript runtime; ffmpeg via imageio-ffmpeg.
 - Album art: the [iTunes Search API](https://performance-partners.apple.com/search-api) and the [Deezer API](https://developers.deezer.com/api), or YouTube’s thumbnail.
 - Lyrics: [LRCLIB](https://lrclib.net), lined up with the voice by OpenAI’s [Whisper](https://github.com/openai/whisper) (turbo) through [stable-ts](https://github.com/jianfch/stable-ts).
+
+## License
+
+[MIT](LICENSE). The libraries and models it installs keep their own licenses (Praat through parselmouth is GPL-3.0; it's installed from PyPI, not shipped here).
