@@ -865,10 +865,9 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .strip.looping button[aria-current="true"] { background: var(--ink); }
 .strip button.inspan { background: var(--fg-30); } /* a run of phrases looped together */
 .strip.looping button.inspan:not([aria-current="true"]) { background: var(--muted); }
-/* over the strip, at once: the phrase hovered (its number, where it starts, its words), or the run a drag has reached */
+/* over the strip, at once: the words of the phrase hovered, or reached by a drag */
 .strip-tip { position: fixed; z-index: var(--z-tooltip); transform: translate(-50%, -100%); max-width: min(360px, calc(100vw - 16px)); padding: var(--space-1) var(--space-2);
-  display: grid; gap: var(--space-half); border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); line-height: 16px; pointer-events: none; }
-.strip-tip small { font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; opacity: 0.6; }
+  border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); line-height: 16px; pointer-events: none; }
 /* Developer tools' phrase marks: a split as a line through a phrase, a join as a bar across the gap between two; each
    a hit area wider than it's drawn, a click on it taking it off */
 .strip .pmark { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; cursor: pointer; }
@@ -3774,7 +3773,7 @@ function renderPhrases() {
 }
 // The strip under the pointer: hovering a phrase shows its words in a tip at once (a title would wait a second, and
 // they're how you tell the phrases apart); a drag from one phrase across others picks the run between them to loop, as
-// Shift+click does, shown as it goes, the tip saying where it has reached.
+// Shift+click does, shown as it goes, the tip giving the words where it has reached.
 function initStripDrag() {
   const strip = $("#kStrip"), tip = el("div", "strip-tip");
   tip.hidden = true; tip.setAttribute("aria-hidden", "true"); document.body.append(tip);
@@ -3784,11 +3783,10 @@ function initStripDrag() {
     K.phrases.forEach((p, i) => { const x = Math.max(p.t0 - t, t - p.t1, 0); if (x < d) { d = x; k = i; } });
     return k;
   };
-  const showTip = (i, run) => {
+  const showTip = (i) => { // the words alone: which phrase it is (or the run reached) is beside the strip already
     const b = strip.querySelector(`button[data-i="${i}"]`), p = K.phrases[i];
-    if (!b || !p) { tip.hidden = true; return; }
-    tip.replaceChildren(el("small", null, run ? tr("Phrases {a}–{b}", { a: run.a + 1, b: run.b + 1 }) : tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) })));
-    if (p.text) tip.append(el("span", null, p.text));
+    if (!b || !p || !p.text) { tip.hidden = true; return; }
+    tip.textContent = p.text;
     tip.hidden = false;
     const r = b.getBoundingClientRect(), half = tip.offsetWidth / 2;
     tip.style.left = Math.max(8 + half, Math.min(innerWidth - 8 - half, r.left + r.width / 2)) + "px";
@@ -3811,7 +3809,7 @@ function initStripDrag() {
     }
     if (!drag.moved) return;
     K.span = drag.a === drag.b ? null : { a: Math.min(drag.a, drag.b), b: Math.max(drag.a, drag.b) };
-    paintPhrases(); showTip(i, K.span);
+    paintPhrases(); showTip(i);
   });
   strip.addEventListener("pointerup", () => {
     const d = drag;
