@@ -3685,16 +3685,23 @@ function songPhrases(notes, beats, bpm, dur) {
   const kept = out.filter((s) => s.reduce((n, [t0, t1]) => n + t1 - t0, 0) >= 0.5);
   return phraseTimes(kept.map((s) => ({ t0: s[0][0], t1: s[s.length - 1][1] })), beats, bpm, dur);
 }
-// With lyrics, a phrase is a line of them, from its first word to its last as they're sung (Whisper's times, lyrics.py);
-// a line under LYRIC_MIN s joins the next. A line Whisper started before the one before it ended starts where that ends.
-const LYRIC_MIN = 1.5;
+// With lyrics, a phrase is a line of them, from its first word to its last as they're sung (Whisper's times, lyrics.py).
+// A line Whisper started before the one before it ended starts where that ends. A line under LYRIC_MIN s joins the
+// next, or failing that the one before, if it's within LYRIC_NEAR s of it; with neither that near it stays a phrase of
+// its own (a short line after a long rest is the start of something, not the end of what came before it).
+const LYRIC_MIN = 1.5, LYRIC_NEAR = 2;
 function lyricPhrases(lines, beats, bpm, dur) {
   const spans = [];
   for (const l of lines) {
     const last = spans[spans.length - 1], t0 = last ? Math.max(l.t0, last.t1) : l.t0;
-    if (!l.text || !(l.t1 > t0)) continue; // a line Whisper couldn't place
-    if (last && last.t1 - last.t0 < LYRIC_MIN) { last.t1 = l.t1; last.text += " / " + l.text; }
-    else spans.push({ t0, t1: l.t1, text: l.text });
+    if (l.text && l.t1 > t0) spans.push({ t0, t1: l.t1, text: l.text }); // not a line Whisper couldn't place
+  }
+  for (let i = 0; i < spans.length; ) {
+    const s = spans[i], next = spans[i + 1], prev = spans[i - 1];
+    const a = s.t1 - s.t0 >= LYRIC_MIN ? -1 : next && next.t0 - s.t1 <= LYRIC_NEAR ? i : prev && s.t0 - prev.t1 <= LYRIC_NEAR ? i - 1 : -1;
+    if (a < 0) { i++; continue; }
+    spans.splice(a, 2, { t0: spans[a].t0, t1: spans[a + 1].t1, text: spans[a].text + " / " + spans[a + 1].text });
+    i = a; // joined, it may still be short
   }
   return phraseTimes(spans, beats, bpm, dur);
 }
@@ -3873,7 +3880,7 @@ function marksText() {
   const lines = [
     "Phrase marks from Pitch Room's Practice (Developer tools): where its phrases should have been split, or joined.",
     `Song: ${[m.artist, m.title].filter(Boolean).join(" – ")} · id ${m.id} · ${fmtTime(songDur())} · ${m.bpm} BPM (a beat ${beat.toFixed(3)} s)`,
-    `Phrases now: ${ph.length}, ${K.lyrics ? `the lyrics' lines (lyricPhrases, LYRIC_MIN ${LYRIC_MIN} s)` : `the stretches between breaths (songPhrases, PHRASE ${JSON.stringify(PHRASE)})`}, made in index.html`,
+    `Phrases now: ${ph.length}, ${K.lyrics ? `the lyrics' lines (lyricPhrases, LYRIC_MIN ${LYRIC_MIN} s, LYRIC_NEAR ${LYRIC_NEAR} s)` : `the stretches between breaths (songPhrases, PHRASE ${JSON.stringify(PHRASE)})`}, made in index.html`,
   ];
   K.marks.forEach((mk, n) => {
     lines.push("");
