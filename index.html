@@ -3805,17 +3805,19 @@ function initStripDrag() {
     tip.style.top = strip.getBoundingClientRect().top - 6 + "px";
   };
   let drag = null;
-  strip.addEventListener("pointerdown", (e) => {
-    const b = e.target.closest("button[data-i]");
-    if (!b || e.button !== 0 || e.shiftKey || e.altKey) return;
-    drag = { a: +b.dataset.i, b: +b.dataset.i, moved: false };
+  strip.addEventListener("pointerdown", (e) => { // on a phrase or in a gap (from the phrase nearest it)
+    const i = nearest(tAt(e));
+    if (i < 0 || e.button !== 0 || e.shiftKey || e.altKey || e.target.closest(".pmark")) return;
+    drag = { a: i, b: i, moved: false, x: e.clientX, gap: !e.target.closest("button[data-i]") };
   });
   strip.addEventListener("pointermove", (e) => {
     if (drag && !e.buttons) drag = null; // let go outside the strip before it was held
     if (!drag) { const b = e.target.closest("button[data-i]"); if (b) showTip(+b.dataset.i); else tip.hidden = true; return; }
     const i = nearest(tAt(e));
     if (i < 0) return;
-    if (i !== drag.b) { // held from the first phrase it reaches (not before: a capture would make a click the strip's)
+    // a drag once it reaches another phrase, or from a gap once it moves at all; held from then (not before: a
+    // capture would make a click the strip's)
+    if (i !== drag.b || (drag.gap && Math.abs(e.clientX - drag.x) > 4)) {
       if (!drag.moved) strip.setPointerCapture(e.pointerId);
       drag.b = i; drag.moved = true;
     }
