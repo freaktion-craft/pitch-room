@@ -88,8 +88,10 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-/* Always reserve the scrollbar's space, so short pages (Stems) don't shift sideways when switching tabs */
-html { scrollbar-gutter: stable; }
+/* Always the scrollbar's space, so a short page (the library) and a long one (a song) are laid out at one width and
+   nothing shifts sideways between them: a scrollbar always, its track clear, its thumb only when there's more to see.
+   (scrollbar-gutter: stable is ignored by Chrome on the page once its scrollbars are styled, as they are below.) */
+html { overflow-y: scroll; }
 /* Scrollbars: a thin pill of the ink on nothing (the page's own background shows round it), brighter under the
    pointer and while held; no arrows. Where the standard properties are set (a dropdown's list), those win. */
 ::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
