@@ -54,7 +54,7 @@ Songs are kept in `library/` so they open instantly next time. The first time yo
 
 | | |
 |---|---|
-| `index.html` | The whole app UI (one file) |
+| `index.html` | The whole app UI (one file). Its stylesheet opens with the design tokens on `:root` (colour, type, space, radius, depth, motion, control sizes) and builds everything from them, buttons included: one `.btn` in sizes, tones and shapes |
 | `server.py` | Serves the page and the library API |
 | `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export, takes (jobs run in the background) |
 | `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |
