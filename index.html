@@ -858,13 +858,17 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .phrase-row output { min-width: 84px; text-align: center; }
 .phrase-row > .kfield:first-child { margin-right: var(--space-2); } /* the count-in first, a little apart from the phrases' controls */
 .tog:disabled { opacity: 0.4; pointer-events: none; }
-.strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; }
+.strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; touch-action: pan-y; }
 .strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--fg-16); cursor: pointer; }
 .strip button:hover { background: var(--fg-30); }
 .strip button[aria-current="true"] { background: var(--fg-38); }
 .strip.looping button[aria-current="true"] { background: var(--ink); }
 .strip button.inspan { background: var(--fg-30); } /* a run of phrases looped together */
 .strip.looping button.inspan:not([aria-current="true"]) { background: var(--muted); }
+/* over the strip, at once: the phrase hovered (its number, where it starts, its words), or the run a drag has reached */
+.strip-tip { position: fixed; z-index: var(--z-tooltip); transform: translate(-50%, -100%); max-width: min(360px, calc(100vw - 16px)); padding: var(--space-1) var(--space-2);
+  display: grid; gap: var(--space-half); border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); line-height: 16px; pointer-events: none; }
+.strip-tip small { font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; opacity: 0.6; }
 /* Developer tools' phrase marks: a split as a line through a phrase, a join as a bar across the gap between two; each
    a hit area wider than it's drawn, a click on it taking it off */
 .strip .pmark { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; cursor: pointer; }
@@ -1012,7 +1016,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
       <label>Note names <button class="pick" id="names" type="button"></button></label>
       <div class="pop-sec"><span>Accent colour</span><div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div></div>
-      <div class="pop-sec"><label>Developer tools <input type="checkbox" class="switch" id="devTools"></label><p class="hint muted">In Practice, mark where a phrase should be split or joined, then copy the marks to paste into a chat.</p></div>
+      <div class="pop-sec"><label>Developer tools <input type="checkbox" class="switch" id="devTools"></label><p class="hint muted">In Practice, Alt+click the phrase strip (Option on a Mac), or press M as it plays, to mark where a phrase should be split or joined; the button at its right copies the marks to paste into a chat.</p></div>
     </div>
   </header>
 
@@ -1042,8 +1046,8 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
         <output id="kPh">Phrase –</output>
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
-        <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them"></button>
-        <div class="strip" id="kStrip" role="group" aria-label="Phrases" title="Click a phrase to go to it · Shift+click another to loop the run between them"></div>
+        <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · drag across phrases on the strip to loop a run of them"></button>
+        <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
         <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy phrase marks" title="Copy phrase marks" hidden></button>
       </div>
     </div>
@@ -3752,7 +3756,7 @@ function renderPhrases() {
   K.phrases.forEach((p, i) => {
     const b = el("button"); b.type = "button"; b.tabIndex = -1;
     b.style.left = (p.t0 / dur) * 100 + "%"; b.style.width = ((p.t1 - p.t0) / dur) * 100 + "%";
-    b.title = tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) }) + (p.text ? "\n" + p.text : ""); b.setAttribute("aria-label", b.title);
+    b.setAttribute("aria-label", tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) }) + (p.text ? "\n" + p.text : "")); // shown by the strip's tip
     b.dataset.i = i; strip.append(b);
   });
   if (S.dev) K.marks.forEach((mk, j) => {
@@ -3762,11 +3766,65 @@ function renderPhrases() {
     i.title = tr(mk.kind === "merge" ? "Join here · {t} · click to take it off" : "Split here · {t} · click to take it off", { t: fmtTime(mk.t) });
     i.dataset.j = j; strip.append(i);
   });
-  say(strip, S.dev ? "Click a phrase to go to it · Shift+click another to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined"
-    : "Click a phrase to go to it · Shift+click another to loop the run between them", null, "title");
+  say(strip, S.dev ? "Click a phrase to go to it · drag across phrases (or Shift+click another) to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined"
+    : "Click a phrase to go to it · drag across phrases (or Shift+click another) to loop the run between them", null, "aria-description"); // not a title: the strip's tip says what's under the pointer
   $("#kMarks").hidden = !S.dev; $("#kMarks").disabled = !K.marks.length;
   strip.append(el("i", "head"));
   K.painted = null; paintPhrases();
+}
+// The strip under the pointer: hovering a phrase shows its words in a tip at once (a title would wait a second, and
+// they're how you tell the phrases apart); a drag from one phrase across others picks the run between them to loop, as
+// Shift+click does, shown as it goes, the tip saying where it has reached.
+function initStripDrag() {
+  const strip = $("#kStrip"), tip = el("div", "strip-tip");
+  tip.hidden = true; tip.setAttribute("aria-hidden", "true"); document.body.append(tip);
+  const tAt = (e) => { const r = strip.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * songDur(); };
+  const nearest = (t) => { // the phrase at t, or in a gap the closer of the two beside it
+    let k = -1, d = Infinity;
+    K.phrases.forEach((p, i) => { const x = Math.max(p.t0 - t, t - p.t1, 0); if (x < d) { d = x; k = i; } });
+    return k;
+  };
+  const showTip = (i, run) => {
+    const b = strip.querySelector(`button[data-i="${i}"]`), p = K.phrases[i];
+    if (!b || !p) { tip.hidden = true; return; }
+    tip.replaceChildren(el("small", null, run ? tr("Phrases {a}–{b}", { a: run.a + 1, b: run.b + 1 }) : tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) })));
+    if (p.text) tip.append(el("span", null, p.text));
+    tip.hidden = false;
+    const r = b.getBoundingClientRect(), half = tip.offsetWidth / 2;
+    tip.style.left = Math.max(8 + half, Math.min(innerWidth - 8 - half, r.left + r.width / 2)) + "px";
+    tip.style.top = strip.getBoundingClientRect().top - 6 + "px";
+  };
+  let drag = null;
+  strip.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest("button[data-i]");
+    if (!b || e.button !== 0 || e.shiftKey || e.altKey) return;
+    drag = { a: +b.dataset.i, b: +b.dataset.i, moved: false };
+  });
+  strip.addEventListener("pointermove", (e) => {
+    if (drag && !e.buttons) drag = null; // let go outside the strip before it was held
+    if (!drag) { const b = e.target.closest("button[data-i]"); if (b) showTip(+b.dataset.i); else tip.hidden = true; return; }
+    const i = nearest(tAt(e));
+    if (i < 0) return;
+    if (i !== drag.b) { // held from the first phrase it reaches (not before: a capture would make a click the strip's)
+      if (!drag.moved) strip.setPointerCapture(e.pointerId);
+      drag.b = i; drag.moved = true;
+    }
+    if (!drag.moved) return;
+    K.span = drag.a === drag.b ? null : { a: Math.min(drag.a, drag.b), b: Math.max(drag.a, drag.b) };
+    paintPhrases(); showTip(i, K.span);
+  });
+  strip.addEventListener("pointerup", () => {
+    const d = drag;
+    drag = null;
+    if (!d || !d.moved) return; // a click: the click handler has it
+    strip.dataset.dragged = "1"; setTimeout(() => delete strip.dataset.dragged, 0); // the click this ends in isn't one
+    tip.hidden = true;
+    if (!K.span) return; // back where it started
+    K.loop = true; $("#kLoop").setAttribute("aria-pressed", "true");
+    phraseGo(K.span.a, true);
+  });
+  strip.addEventListener("pointercancel", () => { drag = null; tip.hidden = true; });
+  strip.addEventListener("pointerleave", () => { if (!drag) tip.hidden = true; });
 }
 // Developer tools' phrase marks (stems.py set_phrase_marks): where a phrase should have been split, or two joined, to
 // copy into a chat (marksText) and fix how phrases are made. A mark in a phrase is a split; in the gap between two, a
@@ -4206,7 +4264,9 @@ function initSing() {
   $("#kNext").onclick = () => phraseStep(1);
   $("#kLoop").onclick = () => setLoop(!K.loop);
   $("#kMarks").append(icon("copy")); $("#kMarks").onclick = copyMarks;
+  initStripDrag();
   $("#kStrip").addEventListener("click", (e) => {
+    if (e.currentTarget.dataset.dragged) return; // the end of a drag across phrases (initStripDrag)
     const mk = e.target.closest(".pmark"), r = e.currentTarget.getBoundingClientRect();
     if (mk) { saveMarks(K.marks.filter((_, j) => j !== +mk.dataset.j)); return; }
     if (S.dev && e.altKey) { markPhrase(((e.clientX - r.left) / r.width) * songDur()); return; }
@@ -5722,12 +5782,12 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Bars": "음정 바", "Octave of the note bars": "음정 바의 옥타브", "octave down": "한 옥타브 아래", "as sung": "부른 그대로", "octave up": "한 옥타브 위",
   "Previous phrase": "이전 소절", "Previous phrase (←)": "이전 소절 (←)", "Next phrase": "다음 소절", "Next phrase (→)": "다음 소절 (→)",
   "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)",
-  "Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them": "이 소절 반복 (L) · 소절 막대에서 Shift+클릭하면 여러 소절을 묶어 반복해요",
-  "Click a phrase to go to it · Shift+click another to loop the run between them": "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요",
-  "Click a phrase to go to it · Shift+click another to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined":
-    "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요 · Alt+클릭(Mac은 Option), 또는 재생 중 M으로 소절을 나눌 곳이나 합칠 곳을 표시해요",
+  "Loop this phrase (L) · drag across phrases on the strip to loop a run of them": "이 소절 반복 (L) · 소절 막대에서 여러 소절을 드래그하면 묶어 반복해요",
+  "Click a phrase to go to it · drag across phrases (or Shift+click another) to loop the run between them": "소절을 누르면 그리로 가요 · 여러 소절을 드래그하면(또는 다른 소절을 Shift+클릭) 그 사이를 묶어 반복해요",
+  "Click a phrase to go to it · drag across phrases (or Shift+click another) to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined":
+    "소절을 누르면 그리로 가요 · 여러 소절을 드래그하면(또는 다른 소절을 Shift+클릭) 그 사이를 묶어 반복해요 · Alt+클릭(Mac은 Option), 또는 재생 중 M으로 소절을 나눌 곳이나 합칠 곳을 표시해요",
   "Developer tools": "개발자 도구",
-  "In Practice, mark where a phrase should be split or joined, then copy the marks to paste into a chat.": "연습에서 소절을 나누거나 합쳐야 할 곳을 표시하고, 복사해서 채팅에 붙여 넣어요.",
+  "In Practice, Alt+click the phrase strip (Option on a Mac), or press M as it plays, to mark where a phrase should be split or joined; the button at its right copies the marks to paste into a chat.": "연습에서 소절 막대를 Alt+클릭(Mac은 Option)하거나 재생 중 M을 눌러 소절을 나누거나 합칠 곳을 표시해요. 막대 오른쪽 버튼으로 복사해 채팅에 붙여 넣어요.",
   "Copy phrase marks": "소절 표시 복사", "Copied": "복사했어요", "Couldn’t copy: {why}": "복사하지 못했어요: {why}",
   "Split here · {t} · click to take it off": "여기서 나누기 · {t} · 누르면 지워요", "Join here · {t} · click to take it off": "여기서 합치기 · {t} · 누르면 지워요",
   "Compare: the original in one ear, yours in the other (set under Headphones)": "비교: 한쪽 귀엔 원곡, 다른 쪽엔 내 테이크 (헤드폰에서 설정)",
