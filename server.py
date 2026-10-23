@@ -56,6 +56,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 MAX_SONG = 400 * 1024 * 1024
 HOSTS = ("localhost", "127.0.0.1", "[::1]")
 PAGE_FILES = {"/": "index.html", "/index.html": "index.html", "/favicon.svg": "favicon.svg", "/icons.local.js": "icons.local.js"}
+PAGE_CODE = re.compile(r"/(css/[a-z-]+\.css|js/[a-z-]+\.js)")  # the page's stylesheets and scripts
 SONG_FILE = re.compile(r"/library/[0-9a-f]{12}/[^?#]*[^/]")  # a file in a song's folder, never the folder itself
 
 
@@ -64,6 +65,7 @@ class Handler(SimpleHTTPRequestHandler):
     # sometimes reset the connection before the browser read it (~1 in 7 API calls failed).
     protocol_version = "HTTP/1.1"
     _unread = 0  # request body bytes not read yet
+    _code = False  # the page's own code being sent: asked about again each time (no-cache), so an update is seen
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
@@ -111,13 +113,22 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def _static(self, path) -> bool:
-        """Point self.path at a file the page may load: the page itself and the files in a song's folder. False for
-        anything else (the app's code, its settings, folder listings)."""
+        """Point self.path at a file the page may load: the page itself, its stylesheets and scripts, and the files in a
+        song's folder. False for anything else (the server's code, its settings, folder listings)."""
         path = posixpath.normpath(unquote(path))  # as the file is looked up: %2e%2e/ is ../
         if path in PAGE_FILES:
             self.path = "/" + PAGE_FILES[path]
             return True
+        if PAGE_CODE.fullmatch(path):
+            self.path, self._code = path, True
+            return True
         return bool(SONG_FILE.fullmatch(path))
+
+    def end_headers(self):
+        if self._code:  # one reply's; a keep-alive connection's next request starts without it
+            self.send_header("Cache-Control", "no-cache")
+            self._code = False
+        super().end_headers()
 
     def list_directory(self, path):
         self.send_error(404)
@@ -194,7 +205,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path in ("/", "/index.html"):
             return self._page()
         if path == "/icons.local.js" and not os.path.isfile(os.path.join(ROOT, "icons.local.js")):
-            # optional (see index.html); answer with nothing rather than a 404 in the console
+            # optional (see js/helpers.js); answer with nothing rather than a 404 in the console
             self.send_response(200)
             self.send_header("Content-Type", "text/javascript; charset=utf-8")
             self.send_header("Content-Length", "0")

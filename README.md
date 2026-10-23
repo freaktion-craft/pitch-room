@@ -54,7 +54,9 @@ Songs are kept in `library/` so they open instantly next time. The first time yo
 
 | | |
 |---|---|
-| `index.html` | The whole app UI (one file). Its stylesheet opens with the design tokens on `:root` (colour, type, space, radius, depth, motion, control sizes) and builds everything from them, buttons included: one `.btn` in sizes, tones and shapes |
+| `index.html` | The page's markup; it loads the stylesheets and scripts below. No build step |
+| `css/` | `tokens.css`, the design tokens on `:root` (colour, type, space, radius, depth, motion, control sizes); then, built from them in cascade order, `base.css` (layout, the top bar, controls, one `.btn` in sizes, tones and shapes), `stage.css`, `stems.css`, `practice.css` |
+| `js/` | The app, as plain scripts sharing one scope and run in order (see `index.html`): `core` (settings, language), `ko` (Korean), `audio`, `helpers` (elements, the dropdown, icons), `library`, `info`, `adding`, `studio`, `practice`, `takes`, `takes-studio`, `stage` (the canvas and the main loop), and `app` (routes, opening), which starts it |
 | `server.py` | Serves the page and the library API |
 | `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export, takes (jobs run in the background) |
 | `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |

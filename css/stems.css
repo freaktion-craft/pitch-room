@@ -1,0 +1,423 @@
+/* The library, a song's Studio and Info page, Add song and the songs being added. */
+/* Notices and the drop zone */
+.server-off { margin: 0 0 var(--space-6); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: var(--note-bg); color: var(--note-ink); font-size: var(--text-md); }
+.server-off code { font-family: var(--mono); font-size: var(--text-sm); background: var(--fill); padding: 0 var(--space-1); border-radius: var(--radius-xs); }
+.drop { position: relative; display: flex; align-items: center; justify-content: center; min-height: 72px; padding: var(--space-3); border-radius: var(--radius-lg);
+  border: 1px dashed var(--track); background: var(--bg); color: var(--muted); font-size: var(--text-sm); text-align: center; cursor: pointer; transition: background-color var(--duration-fast), border-color var(--duration-fast); }
+.drop:hover, .drop.over { border-color: var(--ink); color: var(--ink); }
+.drop:has(input:focus-visible) { outline: 2px solid var(--voice); outline-offset: 2px; } /* the file field in it is see-through */
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* Stems page */
+.panel-card { background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); padding: var(--space-4); display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
+.panel-card > b { font-weight: var(--weight-medium); font-size: var(--text-lg); }
+.panel-card p { margin: 0; max-width: 72ch; }
+.panel-card a:not(.btn) { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
+.row-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.inline-field { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); }
+/* the one-time setup: a banner, its line and its button; once it's started, how it's going in the line's place */
+#sInstall { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
+#sInstall .setup-line { display: flex; align-items: center; gap: var(--space-4); }
+#sInstall .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
+#sInstallState:empty, #sInstall .setup-line:has(#sInstallState:not(:empty)) p { display: none; }
+#sInstallState .ico { width: var(--icon-sm); height: var(--icon-sm); margin-right: 6px; vertical-align: -3px; color: var(--good); } /* Installed's tick */
+.gpu-row { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--note-bg); color: var(--note-ink); font-size: var(--text-sm); }
+.gpu-row .btn { justify-self: start; }
+.gpu-row .muted { color: var(--note-ink); opacity: 0.8; }
+.bar { height: 4px; border-radius: var(--radius-pill); background: var(--fill); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width var(--duration-slower) var(--ease); }
+.log { margin: 0; max-height: 120px; overflow: auto; font: var(--text-2xs)/1.5 var(--mono); color: var(--muted); background: var(--bg); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); white-space: pre-wrap; }
+.yt { display: flex; gap: var(--space-2); }
+/* flex-basis auto (not 0) so the field keeps its height when the row stacks on narrow screens */
+/* same height as the app's other fields (selects, small buttons) */
+/* links, a line each: one line tall, growing with them (to five). A long link stays on its line (it scrolls sideways
+   under the caret) rather than wrapping, so the field grows only for another link */
+.yt textarea { flex: 1 1 auto; min-width: 0; height: var(--control-md); max-height: 112px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2);
+  padding: 5px var(--space-3); font: var(--text-md)/20px var(--font); color: inherit; resize: none; white-space: pre; overflow-x: hidden; overflow-y: auto; transition: border-color var(--duration-fast), background-color var(--duration-fast); }
+.yt textarea::placeholder { color: var(--placeholder); }
+.yt textarea:hover { background: var(--hover-2); }
+.yt textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+.yt .btn { align-self: flex-start; }
+.yt .btn { flex: none; }
+/* Songs being added: a ring beside the mic while there are any, as full as they are together; pressed, a panel with
+   each one's name, how it's going (or how many are ahead of it in line), and a button to stop it */
+#jobsBtn .ring { width: var(--icon-sm); height: var(--icon-sm); transform: rotate(-90deg); }
+#jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
+#jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
+#jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */
+#jobsPop > b { font-weight: var(--weight-medium); }
+#jobsList { display: grid; gap: var(--space-4); }
+.job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-2); align-items: center; }
+.job > .top, .job > .bar { grid-column: 1; }
+.job .top { display: grid; min-width: 0; }
+.job .top b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job .top span { color: var(--muted); font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* cancel (or, once it has failed, clear away): beside both rows */
+.job .x { grid-column: 2; grid-row: 1 / span 2; }
+.job .x > .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.job.err .top span { color: var(--bad); white-space: normal; }
+.job.err .bar, .job.done .bar { display: none; }
+.job.err .x, .job.done .x { grid-row: 1; }
+#jobsBtn.ready .ring circle + circle { stroke: var(--ink); } /* all in */
+
+.player { background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); padding: var(--space-4); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
+.player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */
+.player-title { display: grid; gap: var(--space-1); min-width: 0; }
+#sPlayer .player-title { gap: var(--space-2); } /* the title (the song's volume and export at its end), then the key, the facts and the buttons */
+.title-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; min-height: 32px; }
+.title-row b { min-width: 0; }
+.player-title b { font-weight: var(--weight-medium); font-size: var(--text-lg); overflow-wrap: anywhere; }
+.player-title .muted { font-size: var(--text-sm); }
+/* the song's video, muted: the stems carry the sound, the picture is for following lyrics */
+/* the box holds its size while the video loads, so nothing below it jumps */
+.video { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 62vh; border-radius: var(--radius-lg); background: oklch(0 0 0); overflow: hidden; }
+.video video { display: block; width: 100%; height: 100%; object-fit: contain; }
+.video-wait { position: absolute; inset: 0; display: grid; place-items: center; font-size: var(--text-sm); color: var(--muted); animation: blink 1.6s ease-in-out infinite; }
+.video-wait.err { animation: none; }
+.video.ready .video-wait { display: none; }
+#pWave { width: 100%; height: 96px; display: block; border-radius: var(--radius-lg); background: var(--bg); cursor: pointer; touch-action: pan-y; }
+/* the playhead's time while you drag it: a flag at the top of the waveform, the line hanging from it (drawWave) */
+.ph-flag { position: absolute; top: 0; z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 var(--space-2); display: grid; place-items: center;
+  border-radius: var(--radius-xs); background: var(--voice); color: var(--on-voice); font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+.wave-wrap { position: relative; }
+/* the playhead, over the waveform (its rounded corners would clip it at the ends); thicker while you can grab it, hanging
+   from the flag while you drag it */
+.ph-line { position: absolute; left: 0; top: 0; bottom: 0; z-index: 2; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--voice); pointer-events: none; }
+.ph-line.wide { width: 4px; margin-left: -2px; border-radius: var(--radius-pill); }
+.ph-line.hang { top: 20px; }
+/* A track's kept parts, over its waveform (drawn on it by drawTrackWaves): an × in each one's top right corner, shown
+   while you point at the part, and over a stretch being picked, its "Keep playing here" and a download of just that
+   stretch in its middle (paintKeeps) */
+.twrap { position: relative; grid-column: 1 / -1; }
+.tparts { position: absolute; inset: 0; pointer-events: none; }
+.tparts .part { position: absolute; top: 0; bottom: 0; }
+.tparts .x { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--ring); pointer-events: auto; opacity: 0; transition: opacity var(--duration-fast); }
+.tparts .x .ico { width: 10px; height: 10px; }
+.tparts .part.hover .x, .tparts .x:focus-visible { opacity: 1; }
+@media (hover: none) { .tparts .x { opacity: 1; } }
+.tparts .selbar { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; gap: var(--space-1); pointer-events: auto; }
+.tparts .selbar .btn { white-space: nowrap; box-shadow: var(--shadow-raised); }
+.transport-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.transport-row output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-left: var(--space-1); }
+.transport-row .ptracks { font-size: var(--text-sm); color: var(--muted); } /* how many tracks, after the time */
+/* Key change, in the Studio's header and in Practice's bar: a dropdown of the keys, then a note in whatever room is
+   left on the line (that big shifts can sound processed, or why a change failed). The dropdown has a fixed width and
+   the note takes no room of its own, so nothing moves as they change. */
+.keyctl { flex: 1 1 auto; display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--muted); }
+.keypick { width: 200px; flex: none; font-size: var(--text-sm); } /* one width whatever key it says, or how far it's got */
+.keypick .pre { flex: none; margin-right: var(--space-2); color: var(--muted); } /* "Key", inside the box */
+/* the tempo, a number to type (BPM, or % for a song with no steady beat); while that tempo is being made its field
+   fills up from the left, so nothing beside it moves */
+/* one box like the key's: "BPM" then the number, which is the field */
+.tempo { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding-left: var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md);
+  background-color: var(--surface-2); font-size: var(--text-sm); color: var(--muted); cursor: text; }
+.tempo:hover { background-color: var(--hover-2); }
+.tempo:focus-within { border-color: var(--ink); background-color: var(--surface); }
+.tempo input { width: 44px; height: 30px; padding: 0 var(--space-3) 0 0; border: 0; background: transparent; text-align: left; font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--ink); font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
+.tempo input:hover { background: transparent; }
+.tempo input::-webkit-inner-spin-button, .tempo input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.tempo input:focus { outline: none; }
+.tempo.changed input { color: var(--voice); } /* not the song's own tempo */
+/* up to two lines (32 px) where the line is short: within the height of the row's 40 px play button. With less room
+   than its min-width for it, the control moves to the next line. */
+.knote { flex: 1 1 0; width: 0; min-width: 140px; font-size: var(--text-xs); line-height: 16px; max-height: 32px; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.knote.warn { color: var(--warn-ink); }
+.knote.err { color: var(--bad); }
+/* In the Studio the control sits under the title, then the tempo, length and tracks, then its note, and the song's
+   buttons at the end of that line; on a narrow screen the buttons go to a line of their own */
+.song-facts { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; }
+.song-facts .keyctl { flex: none; }
+.meta-line { display: flex; flex: 1 1 120px; min-width: 0; white-space: nowrap; }
+#pKeyNote { flex: 1 1 0; width: auto; min-width: 0; height: auto; max-height: none; display: block; overflow: hidden; text-overflow: ellipsis; font-size: inherit; line-height: inherit; }
+#pKeyNote:not(:empty)::before { content: " · "; color: var(--muted); white-space: pre; }
+@media (max-width: 760px) { /* too little room beside the key: the note gets a line of its own, there even when empty */
+  .keyctl { flex-wrap: wrap; row-gap: var(--space-1); }
+  .knote { flex-basis: 100%; width: auto; height: 20px; line-height: 20px; -webkit-line-clamp: 1; }
+}
+/* start, −5 s, +5 s, end: one control, its buttons close together; icons and labels in one grey, so the thin icons
+   and the bolder text look alike */
+.seek { display: flex; gap: var(--space-1); }
+.seek .btn { color: var(--fg-80); }
+.seek .btn:hover { color: var(--ink); }
+.seek .btn.icon .ico { width: var(--icon-sm); height: var(--icon-sm); }
+/* Hugeicons line icons: stroke settings live here, the paths in ICONS */
+/* Icons are drawn on a 24 grid at 16–24 px; a stroke that scaled with them came out under a pixel at 16 px, thinner
+   than the text beside it. Their lines are 1.4 px at any size instead, about the weight of 13–14 px text. */
+.ico { fill: none; stroke: currentColor; stroke-width: 1.4px; flex: none; }
+.ico > * { vector-effect: non-scaling-stroke; }
+/* the song's volume and export sit in the same columns as each track's solo button, slider and download */
+.player { --c-btn: 32px; --c-vol: 160px; }
+.mix { margin-left: auto; display: grid; grid-template-columns: var(--c-btn) var(--c-vol) var(--c-btn); gap: var(--space-3); align-items: center; justify-items: center; }
+.mix-ico { display: flex; color: var(--muted); }
+.mix-ico .ico { width: var(--icon-md); height: var(--icon-md); }
+.mix input { width: 100%; justify-self: start; } /* placed like the track sliders, which start-align */
+/* play ⇄ pause icon, drawn by ppTo(). A stroke in the fill colour with round joins softens the corners
+   (and covers the seam where the triangle's two halves meet). */
+.pp { width: 14px; height: 16px; flex: none; fill: currentColor; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
+/* the tracks are a short, fixed list: rows on the card itself, hairlines between them, no box around them; their
+   buttons line up with the transport row's above */
+.tracks { display: grid; }
+/* the icon gets room on both sides (wider first column, more left padding); the right side lines up with .mix above */
+.track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) calc(var(--c-btn) * 2) var(--c-vol) var(--c-btn); align-items: center; gap: var(--space-3); padding: var(--space-2) 0; min-height: 48px; }
+.track + .track { border-top: 1px solid var(--line); }
+.track { row-gap: var(--space-2); }
+.track .twave { display: block; width: 100%; height: 28px; cursor: pointer; } /* as wide as the song's waveform (.twrap spans the row) */
+/* the Vocals row's open/close button, after its name */
+.disclose { margin: calc(var(--space-1) * -1) 0 calc(var(--space-1) * -1) var(--space-1); vertical-align: middle; }
+.btn.disclose > .ico { width: var(--icon-md); height: var(--icon-md); transition: transform var(--duration-base) var(--ease); }
+.disclose[aria-expanded="true"] .ico { transform: rotate(180deg); }
+/* lead and backing, revealed under Vocals: no icon, their names in line with its name, on a shade darker to the card's edges */
+.track.sub { margin: 0 calc(var(--space-4) * -1); padding-left: var(--space-4); padding-right: var(--space-4); background: color-mix(in oklab, var(--bg) 60%, var(--surface)); }
+.track .ico { width: var(--icon-md); height: var(--icon-md); }
+.track .name { font-size: var(--text-md); min-width: 0; }
+.track .name small { display: block; color: var(--faint); font-size: var(--text-xs); }
+.track.off .ico { opacity: 0.35; }
+.track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
+.tog { height: var(--control-sm); min-width: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill); font: var(--weight-medium) var(--text-xs) var(--mono); color: var(--muted); }
+.tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
+.tog[aria-pressed="true"].s { background: var(--solo); color: var(--on-solo); }
+.tog:hover { background: var(--fg-8); }
+/* A track's mute and solo: one pair of keys, like a mixer channel's. Off, both sit raised and look the same; on, a key
+   is pressed in: a muted track's M sinks back and dims (the track is out of the way), a soloed track's S lights up. */
+.ms { display: flex; justify-self: start; }
+.ms .tog { width: var(--c-btn); height: var(--control-sm); border-radius: 0; color: var(--muted);
+  background: linear-gradient(oklch(0.31 0 0), oklch(0.27 0 0)); box-shadow: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35); }
+.ms .tog:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.ms .tog:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; box-shadow: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35), inset 1px 0 0 rgba(0, 0, 0, 0.45); }
+.ms .tog:hover { background: linear-gradient(oklch(0.34 0 0), oklch(0.3 0 0)); color: var(--fg-80); }
+.ms .tog[aria-pressed="true"] { background: oklch(0.2 0 0); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6); }
+.ms .tog.m[aria-pressed="true"] { color: var(--dim); }
+.ms .tog.s[aria-pressed="true"] { color: var(--solo); text-shadow: 0 0 6px color-mix(in oklab, var(--solo) 60%, transparent); }
+.track input[type="range"] { width: 100%; }
+/* downloads, the song's (what you hear) and each track's: one size, one look; the song's in full ink */
+#pExport { color: var(--ink); }
+/* the click's options sit beside its name, so its slider lines up with the others */
+.name-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); flex-wrap: wrap; min-width: 0; }
+.clickopts { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-xs); color: var(--muted); }
+.clickopts .pick { height: var(--control-sm); font-size: var(--text-xs); padding: 0 var(--space-6) 0 var(--space-2); background-position: right 8px center; }
+.export-state { margin: 0; font-size: var(--text-sm); }
+.export-state:empty { display: none; }
+.back { display: flex; width: fit-content; margin-bottom: var(--space-5); }
+/* back to the library, and in the Studio the song's Save at the other end of the line */
+.backbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-5); }
+.backbar .back { margin-bottom: 0; }
+.bb-acts { display: flex; align-items: center; gap: var(--space-2); } /* the song's own: Save, then Practice */
+#pSave:not(:disabled) { background: var(--ink); color: var(--on-ink); }
+#pSave:not(:disabled):hover { background: var(--ink-strong); }
+.lib-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-1); } /* 16 px to the list with the group's 12 */
+/* Search, heading the list in place of a "Library" that said nothing: the songs whose title or artist has every word
+   typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
+   to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. Add song
+   stays at the right, with the search there or not. */
+/* Add song: a panel under its button (links, files, the options), not a page of its own */
+.add-at { position: relative; display: inline-flex; margin-left: auto; }
+.add-at .pop { width: min(520px, calc(100vw - 32px)); font-size: var(--text-md); }
+.add-form { display: grid; gap: var(--space-3); }
+.add-form > b { font-weight: var(--weight-medium); font-size: var(--text-lg); }
+.add-form p, #sAddSetup { margin: 0; }
+.add-form .drop { justify-content: center; } /* not the panel's label rows */
+/* while it's up the page behind blurs back, so the panel (and its button) have your attention; a click on it closes */
+#addVeil { position: fixed; inset: 0; z-index: var(--z-veil); background: var(--scrim); backdrop-filter: blur(8px);
+  opacity: 0; pointer-events: none; transition: opacity var(--duration-base) ease; }
+#addVeil.on { opacity: 1; pointer-events: auto; }
+/* above it at once when it opens; and still above it while it fades away, so the button never blurs in passing */
+.add-at { z-index: 0; transition: z-index 0s linear var(--duration-base); }
+.add-at.open { z-index: calc(var(--z-veil) + 1); transition: none; }
+.search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
+/* the glyph (2 px in from its box each way) 10 px from the field's left, top and bottom, and from the text */
+.search .ico { position: absolute; left: 8px; width: var(--icon-sm); height: var(--icon-sm); color: var(--faint); pointer-events: none; }
+.search input { width: 100%; height: var(--control-md); padding: 0 var(--space-3) 0 var(--space-8); border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2);
+  color: inherit; font: var(--text-sm)/20px var(--font); transition: border-color var(--duration-fast), background-color var(--duration-fast); }
+.search input::placeholder { color: var(--placeholder); }
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.search input:hover { background: var(--hover-2); }
+.search input:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+.search .keys { position: absolute; top: 6px; right: 6px; height: 20px; display: flex; gap: var(--space-1); pointer-events: none; transition: opacity var(--duration-fast); }
+.search kbd { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-xs); background: var(--fill);
+  box-shadow: inset 0 0 0 1px var(--fg-8); color: var(--faint); font: var(--weight-medium) var(--text-2xs)/1 var(--font); }
+.search input:focus ~ .keys, .search input:not(:placeholder-shown) ~ .keys { opacity: 0; }
+@media (hover: none) { .search .keys { display: none; } }
+#sLib .lib-none { margin: 0; padding: var(--space-6) var(--space-3); color: var(--faint); font-size: var(--text-md); }
+/* A long list: the page's foot fades into the background while there's more below, and clears at the end. Lower down,
+   what's under it is hidden more and blurred more: six blurs (0.5 px doubling to 16 px), each in its own band of the
+   fade, overlapping the next, under the background coming in on an eased curve. Each layer fades itself in and out
+   (an opacity on the box would cut the blurs off from what's behind it). */
+#listFade, #listFadeTop { position: fixed; left: 0; right: 0; z-index: 5; height: 0; pointer-events: none; --dir: to bottom; } /* height: paintFade */
+#listFade { bottom: 0; }
+/* and the same under the library's pinned top, the other way up, while rows have gone under it */
+#listFadeTop { top: var(--mast, 0px); z-index: 3; --dir: to top; }
+:is(#listFade, #listFadeTop) > * { position: absolute; inset: 0; opacity: 0; transition: opacity var(--duration-base); }
+:is(#listFade, #listFadeTop).on > * { opacity: 1; }
+:is(#listFade, #listFadeTop).now > * { transition: none; }
+/* The library's top (the app's bar, the intro, search and Add song, the column heads) stays put while the list scrolls
+   under it: each part sticks right where it stands (--top-*, measured by pinLibTop) over a band of the page's colour as
+   tall as all of it (#libMast), so the rows pass under the gaps between them too. The bar's panels stay over the rest. */
+#libMast { display: none; position: fixed; left: 0; right: 0; top: 0; height: var(--mast, 0px); z-index: 3; background: var(--bg); pointer-events: none; }
+html.lib-top #libMast { display: block; }
+html.lib-top { scroll-padding-top: var(--mast); } /* a row reached with Tab isn't left under it */
+html.lib-top #app > header { position: sticky; top: var(--top-header); z-index: 6; }
+html.lib-top #sIntro { position: sticky; top: var(--top-intro); z-index: 4; }
+html.lib-top #sLibPage .lib-head { position: sticky; top: var(--top-head); z-index: 4; transition: z-index 0s linear var(--duration-base); }
+html.lib-top #sLibPage .lib-head:has(.add-at.open) { z-index: calc(var(--z-veil) + 1); transition: none; } /* the Add song panel over its blur */
+html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 4; }
+:is(#listFade, #listFadeTop) > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(var(--dir), transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
+:is(#listFade, #listFadeTop) > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(var(--dir), transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }
+:is(#listFade, #listFadeTop) > i:nth-child(3) { backdrop-filter: blur(2px); mask: linear-gradient(var(--dir), transparent 33.3%, #000 50%, #000 66.7%, transparent 83.3%); }
+:is(#listFade, #listFadeTop) > i:nth-child(4) { backdrop-filter: blur(4px); mask: linear-gradient(var(--dir), transparent 50%, #000 66.7%, #000 83.3%, transparent 100%); }
+:is(#listFade, #listFadeTop) > i:nth-child(5) { backdrop-filter: blur(8px); mask: linear-gradient(var(--dir), transparent 66.7%, #000 83.3%); }
+:is(#listFade, #listFadeTop) > i:nth-child(6) { backdrop-filter: blur(16px); mask: linear-gradient(var(--dir), transparent 83.3%, #000 100%); }
+:is(#listFade, #listFadeTop) > b { background: linear-gradient(var(--dir), color-mix(in oklab, var(--bg) 0%, transparent) 0%, color-mix(in oklab, var(--bg) 3%, transparent) 14%,
+  color-mix(in oklab, var(--bg) 10%, transparent) 27%, color-mix(in oklab, var(--bg) 22%, transparent) 40%, color-mix(in oklab, var(--bg) 38%, transparent) 52%,
+  color-mix(in oklab, var(--bg) 56%, transparent) 64%, color-mix(in oklab, var(--bg) 74%, transparent) 76%, color-mix(in oklab, var(--bg) 89%, transparent) 88%, var(--bg) 100%); }
+/* The list: flat, nothing behind it, a hairline between songs. It reaches 12 px past the page's edges, so a song's
+   hover fill has room round it, while the lines and what's in the rows keep to the edges; the lines either side of
+   the song pointed at give way to its fill. */
+#sLib { margin-inline: calc(var(--space-3) * -1); background: none; box-shadow: none; border-radius: 0; }
+#sLib .row { position: relative; padding: var(--space-4) var(--space-3); border-radius: var(--radius-md); cursor: pointer; transition: background-color var(--duration-fast); }
+#sLib .row + .row { border-top: 0; }
+#sLib .row + .row::before { content: ""; position: absolute; left: 12px; right: 12px; height: 1px; background: var(--line); transition: opacity var(--duration-fast); }
+#sLib .row + .row::before { top: 0; }
+#sLib .row:hover { background: var(--fill); }
+#sLib .row:hover::before, #sLib .row:hover + .row::before { opacity: 0; }
+#sLib:empty { display: none; } /* until the list has loaded */
+/* an empty library: a row in the list that opens Add song, a dashed square with a plus where a cover would be */
+#sLib .add-first { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
+#sLib .add-first .plus { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--radius-sm); border: 1px dashed var(--fg-30);
+  color: var(--muted); transition: border-color var(--duration-fast), color var(--duration-fast); }
+#sLib .add-first:hover .plus { border-color: var(--faint); color: var(--ink); }
+#sLib .add-first .plus .ico { width: var(--icon-lg); height: var(--icon-lg); }
+#sLib .add-first small { color: var(--muted); font-size: var(--text-sm); }
+/* one step at a time: with the tools still to install, an empty library waits under their banner */
+#sInstall:not([hidden]) ~ #sLibPage:has(.add-first) { display: none; }
+/* the album art (covers.py), as tall as the title and its details beside it: a square the row has from the start, so
+   nothing moves when the picture comes in (fading); a quiet tile until then, or for good when there's none. A hairline
+   inside, for a white cover on the white list. */
+/* The list is a table: the cover, the title over the artist, tempo, key, the day added, length, ⋮. The columns share
+   the width, the title half of it; the length is at the end, against the ⋮. Under 640 px wide only the length stays
+   beside the title. A header sorts by its column (lib-cols .sort): its arrow shows which way, and the others' show on
+   hover, in room kept for them so no label moves. */
+#sLib { container-type: inline-size; }
+#sLib .row, #sLib .lib-cols { display: grid; grid-template-columns: 48px minmax(0, 4fr) minmax(56px, 1fr) minmax(104px, 1.5fr) minmax(96px, 1.5fr) 56px 32px;
+  column-gap: var(--space-4); align-items: center; }
+#sLib .lib-cols { position: relative; height: 40px; padding: 0 var(--space-3); }
+#sLib .lib-cols .sort { justify-self: start; display: inline-flex; align-items: center; gap: var(--space-1); height: var(--control-xs); padding: 0; border: 0; background: none;
+  color: var(--faint); font-size: var(--text-xs); cursor: pointer; transition: color var(--duration-fast); }
+#sLib .lib-cols .sort[data-by="title"] { grid-column: 1 / 3; }
+#sLib .lib-cols .sort.end { justify-self: end; flex-direction: row-reverse; } /* the arrow before the label, the label over the numbers */
+#sLib .lib-cols .sort:hover, #sLib .lib-cols .sort.on { color: var(--muted); }
+#sLib .lib-cols .sort:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--radius-xs); }
+#sLib .lib-cols .sort .lab { display: inline-flex; align-items: center; gap: var(--space-1); } /* the length's: a clock, then the word */
+#sLib .lib-cols .sort .ico { width: var(--icon-xs); height: var(--icon-xs); }
+#sLib .lib-cols .sort .arrow { opacity: 0; transition: opacity var(--duration-fast); }
+#sLib .lib-cols .sort:hover .arrow, #sLib .lib-cols .sort:focus-visible .arrow, #sLib .lib-cols .sort.on .arrow { opacity: 1; }
+#sLib .num { font-variant-numeric: tabular-nums; }
+#sLib .end { text-align: right; }
+#sLib .row > .c { color: var(--muted); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sLib .song a, #sLib .song b { display: block; min-width: 0; }
+#sLib .song { gap: var(--space-half); } #sLib .song b { line-height: 20px; } #sLib .song small { line-height: 18px; } /* the artist right under the title */
+#sLib .song b, #sLib .song small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sLib .song small:empty { display: none; } /* no artist known: the title alone, in the middle */
+@container (max-width: 640px) {
+  #sLib .row, #sLib .lib-cols { grid-template-columns: 48px minmax(0, 1fr) 56px 32px; }
+  #sLib .wide { display: none; }
+}
+#sLib .cover { position: relative; width: 48px; height: 48px; border-radius: var(--radius-sm); overflow: hidden; background: var(--fill); }
+#sLib .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--fg-8); }
+#sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-slow); }
+#sLib .cover img.in { opacity: 1; }
+#sLib .cover img.now { transition: none; }
+#sLib .cover[role="button"] { cursor: pointer; }
+#sLib .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* A cover, pressed: it flies up from the list to the middle of the page (.cv-fly) and faces you there. As the pointer
+   comes near it leans a little (.cv-card), pressed where the pointer is, like a card held in the hand; a light from
+   the upper left gleams off it where the tilt puts the light's reflection, and a sheen slides across as it turns. A
+   click, a tap or Esc puts it back. */
+#coverView { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; perspective: 1200px; cursor: pointer; outline: none; }
+/* the backdrop on its own, so it alone fades: the cover stays solid all the way to its tile, with no flash as it lands */
+#coverView .cv-back { position: fixed; inset: 0; background: var(--scrim-strong); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+#coverView[hidden] { display: none; }
+.cv-fly { width: min(72vmin, 480px); aspect-ratio: 1; transform-origin: 50% 50%; }
+.cv-card { position: relative; width: 100%; height: 100%; border-radius: var(--radius-xl); overflow: hidden; touch-action: none;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06); will-change: transform; }
+.cv-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cv-card i { position: absolute; inset: 0; pointer-events: none; opacity: var(--glow, 0.5); }
+.cv-card .cv-light { background: radial-gradient(circle at var(--lx, 38%) var(--ly, 30%), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.15) 30%, rgba(255, 255, 255, 0) 60%); mix-blend-mode: overlay; }
+.cv-card .cv-sheen { background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.3) 48%, rgba(255, 255, 255, 0.08) 54%, transparent 65%) var(--sx, 50%) 0 / 300% 100% no-repeat;
+  mix-blend-mode: overlay; }
+.song { display: grid; gap: var(--space-1); min-width: 0; }
+.song b { font-weight: var(--weight-medium); font-size: var(--text-md); overflow-wrap: anywhere; }
+.song small { color: var(--faint); font-size: var(--text-xs); }
+/* Rename: a field over the title, in its font, size and line breaks (24 px lines: its link's 15 px × 1.6). The title
+   stays underneath, unseen, showing what's typed, so the row keeps the size the title would have and nothing moves.
+   The field's fill and ring are box-shadows, which take no room: 32 px tall, like the other fields. */
+.song:has(> .rename) > a { grid-area: 1 / 1; visibility: hidden; }
+.song:has(> .rename) b { white-space: pre-wrap; }
+.song .rename { grid-area: 1 / 1; width: 0; min-width: 100%; height: 0; min-height: 100%; margin: 0; padding: 0; border: 0; border-radius: var(--radius-xs);
+  resize: none; overflow: hidden; font: var(--weight-medium) var(--text-md)/24px var(--font); color: inherit; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--surface); box-shadow: 0 0 0 4px var(--surface), 0 0 0 5px var(--ink); outline: none; }
+.song-actions { display: flex; gap: var(--space-2); }
+/* the ⋮ button stays faint until you point at the song (always shown in full where there's no hover) */
+#sLib .song-actions .btn { opacity: 0.3; transition: opacity var(--duration-fast), background-color var(--duration-fast), color var(--duration-fast); }
+#sLib .row:hover .song-actions .btn, #sLib .song-actions .btn:focus-visible, #sLib .song-actions .btn.open { opacity: 1; }
+#sLib .song-actions .btn.open { background: var(--fill); color: var(--ink); }
+.menu { position: fixed; z-index: var(--z-popover); min-width: 168px; padding: var(--space-1); border-radius: var(--radius-lg); background: var(--surface); display: grid;
+  box-shadow: var(--shadow-float); }
+.menu button { display: flex; align-items: center; gap: var(--space-2); height: 36px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--ink); font-size: var(--text-md); text-align: left; }
+.menu button:hover, .menu button:focus-visible { background: var(--fill); outline: none; }
+.menu .ico { width: var(--icon-sm); height: var(--icon-sm); color: var(--muted); }
+.menu .danger, .menu .danger .ico { color: var(--bad); }
+/* Info page */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); margin: 0; }
+.facts div { display: grid; align-content: start; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: var(--bg); }
+.facts dt { font-size: var(--text-xs); color: var(--muted); }
+.facts dd { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-medium); }
+.facts dd small { display: block; margin-top: var(--space-1); font-size: var(--text-xs); font-weight: var(--weight-regular); color: var(--faint); }
+/* Info: the lyrics, where they're from, what to do about them, and each line where it's sung (a click plays it) */
+.info-lyrics { display: grid; gap: var(--space-3); }
+.info-lyrics .ly-state { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.info-lyrics .ly-state.warn { color: var(--warn-ink); }
+.ly-acts, .ly-find { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ly-find input { flex: 1 1 240px; min-width: 0; height: var(--control-md); border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2); padding: 0 var(--space-3); font-size: var(--text-md); }
+.ly-find input:focus, .ly-paste textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+.ly-found { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.ly-found li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--bg); font-size: var(--text-sm); }
+.ly-found li span { flex: 1; min-width: 0; }
+.ly-found li small { display: block; color: var(--faint); font-size: var(--text-xs); }
+.ly-paste { display: grid; gap: var(--space-2); justify-items: start; }
+.ly-paste textarea { width: 100%; min-height: 160px; resize: vertical; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-2); padding: var(--space-2) var(--space-3);
+  font: var(--text-md)/20px var(--font); color: inherit; }
+.ly-lines { margin: 0; padding: var(--space-1); list-style: none; display: grid; gap: var(--space-half); max-height: 320px; overflow-y: auto; border-radius: var(--radius-lg); background: var(--bg); }
+.ly-lines button { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--space-3); width: 100%; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: none;
+  text-align: left; font-size: var(--text-sm); line-height: 20px; }
+.ly-lines button:hover { background: var(--fill); }
+.ly-lines button span { color: var(--faint); font-variant-numeric: tabular-nums; }
+.info-range { display: grid; gap: var(--space-3); }
+.info-range:empty { display: none; }
+.rbars { display: grid; gap: var(--space-3); }
+.rbar { display: grid; grid-template-columns: 48px minmax(0, 1fr) 96px; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
+.rbar .lane { position: relative; height: 8px; border-radius: var(--radius-pill); background: var(--fill); }
+.rbar .lane i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-pill); }
+.rbar .full { background: color-mix(in oklch, var(--stem-lead) 35%, transparent); }
+.rbar .core { background: var(--stem-lead); }
+.rbar output { font: var(--text-xs) var(--mono); color: var(--muted); text-align: right; }
+.rbar.axis .lane { height: 16px; background: none; }
+.rbar.axis .lane span { position: absolute; transform: translateX(-50%); font: var(--text-2xs) var(--mono); color: var(--faint); }
+.listen { display: grid; gap: var(--space-2); }
+.listen-row { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
+.listen-row .lbl { width: 56px; color: var(--muted); }
+.listen-row b { width: 40px; font-weight: var(--weight-medium); }
+.listen-row .btn .ico { width: var(--icon-xs); height: var(--icon-xs); }
+@media (hover: none) { #sLib .song-actions .btn { opacity: 1; } }
+@media (max-width: 760px) {
+  .track { grid-template-columns: 24px minmax(70px, 1fr) auto auto; row-gap: var(--space-1); }
+  .track > :nth-child(5) { grid-row: 1; grid-column: 4; } /* the download button */
+  .track input[type="range"] { grid-row: 2; grid-column: 2 / -1; }
+  .track .twrap { grid-row: 3; }
+  .yt { flex-direction: column; }
+  .yt input, .yt .btn { width: 100%; justify-content: center; }
+  .mix { margin-right: 0; }
+}

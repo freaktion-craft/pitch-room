@@ -1865,7 +1865,7 @@ def _click_track(beats: list[float], dur: float, offset: int, beats_per_bar: int
     return np.vstack([out, out])
 
 
-# The limiter the page plays through (index.html LIMIT), for exports and take WAVs, so they peak where the song did as
+# The limiter the page plays through (js/audio.js LIMIT), for exports and take WAVs, so they peak where the song did as
 # you heard it, rather than being turned down as a whole. Per sample: R, how far down the louder channel must go to stay
 # under LIMIT_CEILING, held and falling back over LIMIT_RELEASE s; its largest over the last LIMIT_LOOK samples; that
 # averaged over LIMIT_LOOK samples, eased in ahead of each peak.

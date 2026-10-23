@@ -1,0 +1,89 @@
+/* Practice's stage: the bars, the lyrics over them, the count-in; the keyboard under it. */
+/* Sing view */
+/* The stage: a line on top (what Practice is doing, and whose line is whose) over the bars, so no bar is ever under a
+   box; on the bars only your note, at the top right */
+.stage { position: relative; display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline);
+  overflow: hidden; height: clamp(320px, 62vh, 640px); }
+.stage-head { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-4); padding: 10px var(--space-4);
+  box-shadow: inset 0 -1px 0 var(--line); font-size: var(--text-sm); line-height: 20px; color: var(--muted); }
+.stage-head .legend { display: flex; gap: var(--space-4); }
+.stage-head .legend span { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.stage-head .legend i { width: 16px; height: 2px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--muted) 45%, var(--surface)); } /* as drawn */
+.stage-head .legend i.you { height: 3px; border-radius: var(--radius-pill); background: var(--voice); }
+/* the head's left: what Practice is doing, then (while there are no lyrics) what finding them says */
+.sh-left { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.sh-left .rep { flex: none; }
+.ly-note { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--faint); }
+.ly-note:empty { display: none; }
+.ly-note a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
+.plot { position: relative; flex: 1; min-height: 0; }
+.plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* the lyrics in the stretch already sung (left of the playhead), as Apple Music shows them: the phrase being sung in
+   the middle, filled in as it's sung, the next ones under it, the one before over it; a line up at a time */
+.lycol { position: absolute; top: 0; bottom: 0; overflow: hidden; pointer-events: none;
+  -webkit-mask: linear-gradient(transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(transparent, #000 12%, #000 88%, transparent); }
+.lycol[hidden], .lyblur[hidden] { display: none; }
+/* the bars under the lyrics, more out of focus the further back from the playhead: layers of blur, each taking over
+   further left (stacked, they add up) */
+.lyblur { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.lyblur i { position: absolute; inset: 0; -webkit-backdrop-filter: blur(var(--b)); backdrop-filter: blur(var(--b));
+  -webkit-mask: linear-gradient(to left, transparent var(--s), #000 calc(var(--s) + 20%)); mask: linear-gradient(to left, transparent var(--s), #000 calc(var(--s) + 20%)); }
+.lylist { padding: 0 var(--space-4) 0 var(--space-5); transition: transform var(--duration-slowest) var(--ease); }
+.lylist p { margin: 0 0 var(--space-3); font-size: var(--text-lg); line-height: 24px; font-weight: var(--weight-semibold); word-break: keep-all; color: var(--ink); opacity: 0;
+  transition: opacity var(--duration-slower); }
+.lylist p.now { opacity: 1; }
+.lylist p.now span { background: linear-gradient(90deg, var(--voice) var(--p, 0%), var(--ink) var(--p, 0%)); -webkit-background-clip: text;
+  background-clip: text; color: transparent; }
+.lylist p.n1 { opacity: 0.4; }
+.lylist p.n2, .lylist p.b1 { opacity: 0.2; }
+/* Practice: the count-in before the voice comes back after an intro or a break */
+/* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
+   drawn there during an intro or break, while the coming bars arrive from the right */
+/* The label over a row of dots, one per count: all bright to start, each count dims the next one, so the bright ones
+   left are the counts to go. No width of its own, so the label and the dots centre on one fixed line whatever the label
+   says; fixed heights, so nothing moves between counts. Dots 20 px, down to 10 where the stretch is narrow. */
+.countin { --dot: 20px; position: absolute; left: var(--mid); top: 50%; width: 0; transform: translateY(-50%); display: flex; flex-direction: column;
+  align-items: center; gap: var(--space-2); pointer-events: none; text-align: center; }
+/* with lyrics, a line of them (renderLyrics): smaller, at their left edge, over the line it counts into; once counted,
+   it goes up and out with the lines sung */
+.lylist .countin { position: static; width: auto; transform: none; align-items: flex-start; text-align: left; margin: 0 0 var(--space-3);
+  transition: opacity var(--duration-slower); }
+.lylist .countin .dots { --dot: 10px; }
+.lylist .countin.past { opacity: 0; }
+.countin .lbl:empty { display: none; }
+.countin span { font-size: var(--text-sm); line-height: 20px; color: var(--muted); white-space: nowrap; }
+.countin .dots { display: flex; gap: calc(var(--dot) * 0.6); height: var(--dot); }
+.countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--ink); transition: opacity var(--duration-fast); }
+.countin .dots i.gone { opacity: 0.25; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(380px, calc(100% - 32px));
+  background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-float);
+  padding: var(--space-5); display: grid; gap: var(--space-4); text-align: center; }
+.overlay h2 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-medium); }
+.overlay p { margin: 0; color: var(--muted); font-size: var(--text-md); }
+
+/* Keyboard */
+.keys-wrap { overflow-x: auto; margin-top: var(--space-2); background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); padding: var(--space-3); }
+.keys { position: relative; height: 84px; display: flex; width: max-content; }
+.key { border: 0; padding: 0; }
+/* Keys have a light face on the dark app, so their edges and labels use fixed dark tints; the labels are 9 px, the
+   most a 26 px key holds */
+.key.w { width: 26px; height: 84px; background: var(--key-w); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); border-radius: 0 0 var(--radius-xs) var(--radius-xs); margin-right: -1px;
+  display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.62); padding-bottom: var(--space-1); }
+.key.b { position: absolute; top: 0; width: 16px; height: 52px; background: var(--key-b); border-radius: 0 0 var(--radius-xs) var(--radius-xs); z-index: 1; }
+.key.guide.w { background: var(--key-w-on); }
+.key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }
+.key.live { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 -5px 0 var(--voice); }
+.key.b.live { box-shadow: inset 0 -5px 0 var(--voice); }
+/* keys you point at and play: a tint of your colour, then the colour itself while held (the label goes dark on it) */
+@media (hover: hover) {
+  .key.w:hover { background: color-mix(in oklab, var(--voice) 30%, var(--key-w)); }
+  .key.b:hover { background: color-mix(in oklab, var(--voice) 45%, var(--key-b)); }
+}
+.key.w.down, .key.b.down { background: var(--voice); }
+.key.w.down { color: var(--on-voice); }
+
+@media (max-width: 760px) {
+  header { margin-bottom: var(--space-10); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

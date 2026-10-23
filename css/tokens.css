@@ -1,0 +1,68 @@
+/* Stem's design system: its tokens. The other stylesheets build from them (in this order: base, stage, stems,
+   practice; they're split where the page's parts are, the cascade as it was). A literal value left in a rule is either
+   drawing (a waveform's line, the piano's keys, the M/S keys' bevel) or an optical correction, and says so.
+   Layout: one column, settings as hairline-separated rows. Colours are OKLCH, dark only. */
+:root {
+  /* ---- colour: surfaces and ink ---- */
+  --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.275 0 0); --hover-2: oklch(0.315 0 0); /* buttons and fields stand clear of the card */
+  --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0); --knob: oklch(0.87 0 0); --knob-hot: oklch(0.66 0 0);
+  /* the ink's tints: white at n % (--fg-n), the steps every translucent fill, line and text below is drawn from */
+  --fg: 255, 255, 255;
+  --fg-2: rgba(var(--fg), 0.02); --fg-6: rgba(var(--fg), 0.06); --fg-8: rgba(var(--fg), 0.08); --fg-12: rgba(var(--fg), 0.12);
+  --fg-16: rgba(var(--fg), 0.16); --fg-30: rgba(var(--fg), 0.3); --fg-38: rgba(var(--fg), 0.38); --fg-46: rgba(var(--fg), 0.46);
+  --fg-55: rgba(var(--fg), 0.55); --fg-80: rgba(var(--fg), 0.8);
+  /* their roles. Text: muted for what's beside the main text, faint for what's quieter still; both at least 4.5:1 on
+     the page and the card (6.1 and 4.7), so they're read without effort. dim is for marks that aren't text (meters, a
+     pressed M); placeholder for a field's hint, which steps back once there's text. */
+  --muted: var(--fg-55); --faint: var(--fg-46); --placeholder: var(--fg-38); --dim: var(--fg-30);
+  --fill: var(--fg-6); --line: var(--fg-6); --ring: var(--fg-12); --track: var(--fg-16);
+  --scrim: rgba(0, 0, 0, 0.3); --scrim-strong: rgba(0, 0, 0, 0.55); /* behind a panel, behind a cover held up */
+  /* --voice, your colour (your pitch, the playhead, focus rings): one of these, picked in the header and set on <html>
+     before first paint. Matched for the dark surface: L 0.68–0.77 (blue and violet lowest, as they look brighter),
+     C 0.15–0.17 (teal 0.12, the most sRGB has at that lightness); all ≥ 6:1 on the surface. Text on it is dark.
+     Pink is the pale azalea asked for (hsl(337 92% 91%), oklch(0.9 0.054 353)), a touch deeper so it doesn't pass
+     for the white ink. */
+  --voice-blue: oklch(0.68 0.17 262); --voice-violet: oklch(0.7 0.16 295); --voice-pink: oklch(0.86 0.08 353); --voice-coral: oklch(0.72 0.16 32);
+  --voice-orange: oklch(0.75 0.15 58); --voice-amber: oklch(0.77 0.15 82); --voice-green: oklch(0.73 0.16 150); --voice-teal: oklch(0.74 0.12 195);
+  --voice: var(--voice-blue); --on-voice: oklch(0.165 0 0);
+  --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --bad: oklch(0.66 0.2 25);
+  --solo: oklch(0.84 0.14 85); --on-solo: oklch(0.3 0.06 85); /* a soloed track's S, lit */
+  --note-bg: oklch(0.27 0.03 75); --note-ink: oklch(0.86 0.09 80); --warn-ink: oklch(0.8 0.13 80);
+  --key-w: oklch(0.87 0 0); --key-b: oklch(0.22 0 0); --key-w-on: oklch(0.72 0 0); --key-b-on: oklch(0 0 0);
+  /* tracks: the voices in your accent colour (the lead as it is, the backing vocals a quieter shade of it), the band
+     all in one muted white; each track is named beside its icon and waveform, so colour isn't what tells them apart */
+  --stem-lead: var(--voice); --stem-backing: color-mix(in oklab, var(--voice) 55%, oklch(0.5 0 0)); /* oklab keeps the hue */
+  --stem-band: oklch(0.74 0 0);
+  --stem-drums: var(--stem-band); --stem-bass: var(--stem-band); --stem-guitar: var(--stem-band); --stem-piano: var(--stem-band); --stem-other: var(--stem-band);
+  --stem-vocals: var(--stem-lead); --stem-click: var(--ink);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+  /* ---- type: Pretendard throughout; what was set in a monospace (times, levels, M/S) keeps its digits in line with
+     tabular-nums ---- */
+  --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --mono: var(--font);
+  --text-2xs: 11px; --text-xs: 12px; --text-sm: 13px; --text-md: 14px; --text-lg: 15px; --text-xl: 18px;
+  --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600;
+
+  /* ---- space and shape: a 4 px grid (--space-n is n × 4 px) ---- */
+  --space-half: 2px; --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+  --space-8: 32px; --space-10: 40px; --space-16: 64px; --space-18: 72px;
+  /* a box inside another one, with padding p between them, takes the outer radius less p, so their curves run together */
+  /* controls: buttons and fields stand on these heights, their icons on these sizes */
+  --control-xs: 24px; --control-sm: 28px; --control-md: 32px; --control-lg: 40px;
+  --icon-xs: 14px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px;
+  --radius-xs: 4px; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px; --radius-xl: 12px; --radius-2xl: 14px; --radius-pill: 999px;
+
+  /* ---- depth ---- */
+  --shadow-hairline: 0 0 0 1px var(--line); /* a card's edge */
+  --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2); /* a switch's knob */
+  --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.25); /* a control over a waveform */
+  --shadow-float: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.4); /* a panel, menu or list over the page */
+  --gap-float: var(--space-2); /* …and how far it stands off the button that opened it (floatGap() for those placed by script) */
+  --z-veil: 15; --z-popover: 20; --z-dropdown: 30; --z-tooltip: 40; --z-modal: 50; --z-boot: 60;
+
+  /* ---- motion ---- */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 0.15s; --duration-base: 0.2s; --duration-slow: 0.3s; --duration-slower: 0.4s; --duration-slowest: 0.6s;
+  color-scheme: dark;
+}

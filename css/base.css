@@ -1,0 +1,224 @@
+/* The page and its parts: the layout, the top bar and its panels, the controls (dropdowns, sliders, switches, the
+   one .btn). Built from tokens.css. */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+/* Always the scrollbar's space, so a short page (the library) and a long one (a song) are laid out at one width and
+   nothing shifts sideways between them: a scrollbar always, its track clear, its thumb only when there's more to see.
+   (scrollbar-gutter: stable is ignored by Chrome on the page once its scrollbars are styled, as they are below.) */
+html { overflow-y: scroll; }
+/* Scrollbars: a thin pill of the ink on nothing (the page's own background shows round it), brighter under the
+   pointer and while held; no arrows. Where the standard properties are set (a dropdown's list), those win. */
+::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+::-webkit-scrollbar-thumb { min-height: 40px; border: 3px solid transparent; border-radius: var(--radius-sm); background: var(--fg-16) padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--fg-30); }
+::-webkit-scrollbar-thumb:active { background-color: var(--fg-38); }
+::-webkit-scrollbar-corner, ::-webkit-scrollbar-track { background: transparent; }
+@supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: var(--fg-16) transparent; } }
+body { background: var(--bg); color: var(--ink); font: var(--text-lg)/1.6 var(--font); -webkit-font-smoothing: antialiased; }
+[hidden] { display: none !important; }
+/* Interface text can't be selected (a stray drag highlights nothing); what someone might copy can: song titles and
+   facts, messages and errors, the install log, the server notice (it has the address), and fields */
+body { -webkit-user-select: none; user-select: none; }
+/* Korean lines break between words, as they're read, not inside them (a word too long for its line still breaks) */
+html:lang(ko) body { word-break: keep-all; overflow-wrap: break-word; }
+input, textarea, .song b, #pTitle, #iTitle, #pMeta, #iSub, .facts dd, .server-off, .log, .job .top,
+#sAddMsg, #sInstallState, #sGpuState, #pExportState, #tsState { -webkit-user-select: text; user-select: text; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--voice); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+/* Practice's aurora (drawAurora): behind the page along the bottom of the window, the cards in front of it. Drawn
+   tiny and stretched, then blurred, so it's all glow; it spills past the window's edges so the blur doesn't fade them. */
+#aurora { position: fixed; left: -48px; right: -48px; bottom: -48px; width: calc(100% + 96px); height: calc(40vh + 48px); z-index: 0;
+  pointer-events: none; opacity: 0; filter: blur(28px); transition: opacity 0.8s; }
+#aurora.on { opacity: 0.4; } /* there, not looked at */
+#app { position: relative; z-index: 1; }
+/* One width for every page, so the header and column edges don't jump when switching views */
+.app { max-width: 1440px; margin: 0 auto; padding-block: var(--space-6) var(--space-16);
+  padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+
+/* Top bar: app name, then its chips (quiet small buttons): songs being added, the mic, settings */
+header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-18); } /* the chips 8 px apart, as buttons side by side are elsewhere */
+.brand { margin-right: auto; font-size: var(--text-lg); font-weight: var(--weight-medium); }
+/* The mic chip: a square with the mic struck through while it's off; turned on, it slides open to show the spectrum.
+   Both icons share one cell. */
+.btn.quiet.mic { padding: 0 var(--space-2); transition: background-color var(--duration-fast), color var(--duration-fast); }
+/* off: a light red tint, so a mic that isn't listening gets noticed */
+.btn.quiet.mic:not(.on) { background: color-mix(in oklab, var(--bad) 14%, transparent); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
+.btn.quiet.mic:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, transparent); }
+.mic-ico { display: inline-grid; }
+.mic-ico > .ico { grid-area: 1 / 1; width: var(--icon-sm); height: var(--icon-sm); }
+.mic.on .mic-ico { color: var(--ink); }
+.mic.on .if-off { visibility: hidden; }
+/* turned off: a beat after the chip starts to close, the slash draws across the whole mic, top left to bottom right;
+   as it finishes the mic melts into its cut one (the off icon's body, cut where the slash crosses). Turned on, it's
+   back at once. */
+.mic:not(.on) .if-on { opacity: 0; transition: opacity 0.18s ease 0.28s; }
+.mic.on .if-off path:not(.slash) { opacity: 0; }
+.mic:not(.on) .if-off path:not(.slash) { transition: opacity 0.18s ease 0.28s; }
+.mic-ico .slash { stroke-dasharray: 1 2; stroke-dashoffset: 0; }
+.mic.on .mic-ico .slash { stroke-dashoffset: 1.1; } /* drawn back past its start, so its round cap doesn't show */
+.mic:not(.on) .mic-ico .slash { transition: stroke-dashoffset 0.22s cubic-bezier(0.4, 0, 0.2, 1) 0.12s; }
+/* the mic's spectrum: one bar per band of the voice range, as tall as that band is loud */
+.spec { display: inline-flex; align-items: center; gap: var(--space-half); height: 16px; overflow: hidden; width: 0; margin-left: calc(var(--space-2) * -1); opacity: 0;
+  transition: width var(--duration-slow) var(--ease), margin-left var(--duration-slow) var(--ease), opacity var(--duration-base); }
+.mic.on .spec { width: 33px; margin-left: 0; opacity: 1; } /* 7 bars of 3 px, 2 px apart */
+.spec i { flex: none; }
+.spec i { width: 3px; height: 16px; border-radius: var(--radius-pill); background: var(--dim); transform: scaleY(0.15); }
+.mic.on .spec i { background: var(--ink); }
+/* settings (the mic's, note names, colour), under the gear */
+header { position: relative; }
+.pop { position: absolute; right: 0; top: calc(100% + var(--gap-float)); z-index: var(--z-popover); width: min(340px, calc(100vw - 32px)); padding: var(--space-4); border-radius: var(--radius-xl);
+  background: var(--surface); box-shadow: var(--shadow-float); display: grid; gap: var(--space-3); font-size: var(--text-sm); }
+.pop label { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.pop input[type="range"] { width: 140px; }
+.pop .hint { margin: 0; }
+#micNote { gap: var(--space-1); } /* why the mic didn't start, outside Practice */
+#micNote p { margin: 0; color: var(--muted); }
+/* the input menu keeps one width whatever the inputs are called (a long name ends in …) */
+#micDev { flex: 0 1 200px; }
+/* Mic sensitivity, as in Discord: what the mic hears, live, on a bar (louder to the right), and the threshold as a line
+   on it to drag. Past the line the bar is in your colour: that sound counts as singing; short of it, it's grey. The bar
+   lines up with the rows above; the slider reaches half its handle past each end, so the line sits exactly where the
+   bar reaches when a sound is just loud enough. */
+.gate-sec { display: grid; gap: var(--space-2); }
+.gate-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.gate-acts { display: flex; gap: var(--space-2); }
+#hearMe { min-width: 112px; justify-content: center; } /* one width, whichever it says */
+#hearMe[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+/* the mic, on and off, as the header's chip: tinted red while it's off */
+#micBtn2:not(.on) { background: color-mix(in oklab, var(--bad) 14%, var(--surface-2)); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
+#micBtn2:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, var(--surface-2)); }
+.gate { position: relative; height: 20px; }
+.gate-meter { position: absolute; left: 0; right: 0; top: 6px; height: 8px; border-radius: var(--radius-pill); background: var(--fg-8); overflow: hidden; }
+.gate-meter i { display: block; height: 100%; width: 0; background: var(--fg-30); }
+.gate-meter i.on { background: var(--voice); }
+.pop .gate input[type="range"] { position: absolute; top: 0; left: -6px; width: calc(100% + 12px); height: 20px; margin: 0; }
+/* the track as tall as the handle, so the handle's line stands over the bar, its middle on the bar's */
+#gate::-webkit-slider-runnable-track { height: 20px; background: transparent; }
+#gate::-moz-range-track, #gate::-moz-range-progress { height: 20px; background: transparent; }
+#gate::-webkit-slider-thumb { width: 12px; height: 20px; margin-top: 0; border-radius: var(--radius-xs); background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
+#gate::-moz-range-thumb { width: 12px; height: 20px; border-radius: var(--radius-xs); background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
+#gate.hot::-webkit-slider-thumb { background: linear-gradient(90deg, transparent 4px, var(--knob-hot) 4px 8px, transparent 8px); transform: none; }
+/* the accent colour: a row of swatches in the settings, under a hairline, spread across the panel */
+.pop-sec { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--line); line-height: 20px; }
+.swatches { display: flex; justify-content: space-between; margin: 0 calc(var(--space-1) * -1); } /* the dots, not their rings, line up with the rows above */
+.swatch { width: 32px; height: 32px; padding: var(--space-1); border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow var(--duration-fast); }
+/* the picked one: a quiet ring in its own colour, not a bright one that outshines the colours */
+.swatch:hover { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c) 25%, transparent); }
+.swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c) 50%, transparent); }
+
+.title { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-medium); }
+.muted { color: var(--muted); }
+
+/* Opening the page: the bar of a job in progress, in the middle, its white part sweeping from side to side while the
+   library loads; the page meanwhile hidden, so nothing shows half-made. Then boot() brings the page in. */
+#boot { position: fixed; inset: 0; z-index: var(--z-boot); display: none; place-items: center; pointer-events: none; }
+html.booting #boot { display: grid; }
+html.booting #app { visibility: hidden; }
+#boot .bar { width: 160px; }
+#boot .bar i { width: 40%; transition: none; animation: boot-sweep 0.8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
+@keyframes boot-sweep { to { transform: translateX(150%); } }
+/* Page intro: the title, set apart from what follows */
+.intro { display: grid; gap: var(--space-half); margin-bottom: var(--space-4); }
+.group { display: grid; gap: var(--space-3); }
+/* Section titles: they head the content, so they read stronger than it */
+.group-label { font-size: var(--text-lg); font-weight: var(--weight-medium); color: var(--ink); }
+.group-label.minor { font-size: var(--text-md); color: var(--muted); }
+.rows { background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 52px; padding: var(--space-2) var(--space-4); flex-wrap: wrap; }
+.row + .row { border-top: 1px solid var(--line); }
+.row > span:first-child { font-size: var(--text-md); }
+.row em { font-style: normal; color: var(--faint); font-size: var(--text-xs); margin-left: var(--space-2); }
+select, .pick, input[type="number"] { height: var(--control-md); border: 0; border-radius: var(--radius-md); background-color: var(--surface-2); padding: 0 var(--space-3); font-size: var(--text-md); max-width: 100%; }
+select:hover, .pick:hover, input[type="number"]:hover { background-color: var(--hover-2); }
+/* Our own chevron instead of the OS one: same 1.5px stroke and grey as the rest of the UI, centred, with room on the right */
+select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(--space-8); cursor: pointer;
+  background-image: var(--chevron);
+  background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px; }
+/* A dropdown in the app's own style (the browser's list of a <select> can't be styled): a button like a select, and a
+   list like the ⋮ menu under it, the chosen one ticked at the row's end, choices under group headings when they have
+   them, and a footnote when it has one */
+.pick { display: inline-flex; align-items: center; min-width: 0; color: var(--ink); text-align: left; }
+.pick > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-list { position: fixed; z-index: var(--z-dropdown); padding: var(--space-1); border-radius: var(--radius-lg); background: var(--surface); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--ring) transparent;
+  box-shadow: var(--shadow-float); }
+.pick-list .grp { padding: var(--space-3) var(--space-3) var(--space-1); font-size: var(--text-xs); line-height: 16px; color: var(--faint); } /* lined up with the names */
+.pick-list .grp:first-child { padding-top: var(--space-1); }
+.pick-list .foot { margin: var(--space-1) 0 0; padding: var(--space-2) var(--space-3) var(--space-1); border-top: 1px solid var(--line); font-size: var(--text-xs); line-height: 16px; color: var(--muted); }
+.pick-list [role="option"] { display: flex; align-items: center; gap: var(--space-3); width: 100%; height: var(--control-md); padding: 0 var(--space-2) 0 var(--space-3); border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--ink); font-size: var(--text-md); text-align: left; }
+.pick-list [role="option"]:hover, .pick-list [role="option"]:focus-visible { background: var(--fill); outline: none; }
+.pick-list [role="option"] span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-list [role="option"] .ico { width: var(--icon-sm); height: var(--icon-sm); flex: none; margin-left: auto; visibility: hidden; }
+.pick-list [role="option"] .side { margin-left: auto; padding-left: var(--space-4); min-width: 56px; text-align: right; font: var(--text-xs) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pick-list [role="option"] .side + .ico, .pick-list [role="option"] .side + .ring { margin-left: 0; } /* 12 px after the note, as after a name */
+.pick-list [role="option"] .side.accent { color: var(--muted); } /* the natural-sounding ones: as the notes are; the far ones fainter */
+.pick-list [role="option"] .side.faint, .pick-list .foot b { color: var(--faint); }
+.pick-list .foot b { font: var(--text-xs) var(--mono); }
+/* how far a choice that takes a while has got, where its tick will be: a ring filling up (spinning until it knows) */
+.pick-list .ring { width: var(--icon-sm); height: var(--icon-sm); flex: none; margin-left: auto; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 2; }
+.ring circle:first-child { stroke: var(--ring); }
+.ring circle + circle { stroke: var(--muted); stroke-linecap: round; }
+.ring.spin { animation: ring-spin 0.9s linear infinite; }
+@keyframes ring-spin { to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) { .ring.spin { animation: none; } }
+.pick-list [aria-selected="true"] .ico { visibility: visible; }
+/* Sliders: a thin line, filled up to the handle (--p, which sliderTips keeps in step: Chrome has no style for that part),
+   and a small round handle that turns a muted grey under the pointer or while it's held */
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; max-width: 100%; height: 20px; margin: 0; background: transparent; --p: 0%; }
+input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: var(--radius-pill); background: linear-gradient(to right, var(--ink) var(--p), var(--track) var(--p)); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: calc(var(--space-1) * -1); border: 0; border-radius: 50%; background: var(--ink);
+  transition: background-color var(--duration-fast), transform var(--duration-fast) var(--ease); }
+input[type="range"].hot::-webkit-slider-thumb { background: var(--knob-hot); transform: scale(1.17); }
+input[type="range"]::-moz-range-track { height: 4px; border-radius: var(--radius-pill); background: var(--track); }
+input[type="range"]::-moz-range-progress { height: 4px; border-radius: var(--radius-pill); background: var(--ink); }
+input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--ink); }
+input[type="range"].hot::-moz-range-thumb { background: var(--knob-hot); }
+input[type="range"]:disabled { opacity: 0.4; }
+/* a slider's level over its handle while you move it (sliderTips) */
+.slider-tip { position: fixed; z-index: var(--z-tooltip); transform: translate(-50%, -100%); height: 20px; padding: 0 var(--space-2); display: grid; place-items: center;
+  border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; pointer-events: none; }
+.switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: var(--radius-pill); background: var(--ring); position: relative;
+  margin: 0; cursor: pointer; transition: background-color var(--duration-base) var(--ease); flex: none; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--knob);
+  box-shadow: var(--shadow-knob); transition: transform var(--duration-base) var(--ease); }
+.switch:checked { background: var(--ink); }
+.switch:checked::after { transform: translateX(16px); background: var(--on-ink); }
+.hint { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
+.credit { margin: var(--space-3) 0 0; color: var(--faint); font-size: var(--text-xs); }
+.credit a { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
+
+/* Buttons: one component, .btn, set on three axes.
+   size:  40 px by default, .sm 32, .xs 24 (--btn-h); padding, text and icon follow it
+   tone:  surface-2 by default; .primary, the ink, for the one strong action in a group; .quiet, a faint fill (the
+          header's chips); .ghost, nothing until pointed at (an icon action in a row or a list)
+   shape: .icon, a square, and .round, a circle: an icon alone
+   An icon before a label gets less padding on its side, so icon and label read as centred together, and 6 px between
+   them (the icon's own margin adds a little), so they read as one. Disabled, it fades and takes no clicks. */
+.btn { --btn-h: var(--control-lg); height: var(--btn-h); padding: 0 var(--space-4); border: 0; border-radius: var(--radius-md); background: var(--surface-2); color: var(--ink);
+  font-size: var(--text-md); display: inline-flex; align-items: center; gap: var(--space-2);
+  transition: transform var(--duration-base) var(--ease), background-color var(--duration-fast); }
+.btn:hover { background: var(--hover-2); }
+.btn:active { transform: scale(0.985); }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+.btn.sm { --btn-h: var(--control-md); padding: 0 var(--space-3); font-size: var(--text-sm); }
+.btn.xs { --btn-h: var(--control-xs); padding: 0 var(--space-2); border-radius: var(--radius-sm); font-size: var(--text-xs); }
+.btn > .ico { width: var(--icon-md); height: var(--icon-md); }
+.btn.sm > .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.btn:not(.icon, .round):has(> .ico:first-child) { padding-left: var(--space-3); gap: 6px; }
+.btn.sm:not(.icon, .round):has(> .ico:first-child) { padding-left: var(--space-2); }
+.btn.icon, .btn.round { width: var(--btn-h); padding: 0; justify-content: center; }
+.btn.icon .ico { width: var(--icon-md); height: var(--icon-md); }
+.btn.xs > .ico { width: var(--icon-xs); height: var(--icon-xs); }
+.btn.round { border-radius: 50%; }
+.btn.primary { background: var(--ink); color: var(--on-ink); }
+.btn.primary:hover { background: var(--ink-strong); }
+.btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
+.btn.quiet:hover { background: var(--fg-8); }
+.btn.quiet > .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.btn.ghost { background: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--fill); color: var(--ink); }

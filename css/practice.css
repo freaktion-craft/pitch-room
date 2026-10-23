@@ -1,0 +1,171 @@
+/* Practice's bars and panels, its phrases, Record; the takes and the Takes Studio. */
+/* Practice */
+.songbar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; margin: calc(var(--space-1) * -1) 0 var(--space-3); padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-hairline); font-size: var(--text-sm); }
+/* the controls, wrapping as the width needs: play, seek and the time, then the guide vocal's and the band's volumes at
+   the right end of that line; the key, tempo and click on the next. Find lyrics and Record are in the bar above, at its
+   right, as Save and Practice are on the Studio's. */
+.sb-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; }
+.sb-vol { display: flex; align-items: center; gap: var(--space-2) var(--space-4); margin-left: auto; }
+/* Headphones: a panel under its button, a row for each part with the ears it can play in */
+.ears-at { position: relative; display: inline-flex; }
+.ears-at .pop { width: min(360px, calc(100vw - 32px)); }
+.ears-at .pop > b { font-weight: var(--weight-medium); }
+#earRows { display: grid; gap: var(--space-2); }
+.ear-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 32px; }
+.ear-row > span { color: var(--muted); }
+.ear-sub { margin-top: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--line); font-weight: var(--weight-medium); } /* the comparison's ears, under a hairline */
+.seg { display: inline-flex; gap: var(--space-half); padding: var(--space-half); border-radius: var(--radius-md); background: var(--fill); }
+.seg button { min-width: 48px; height: var(--control-sm); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--text-sm); }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-checked="true"] { background: var(--surface-2); color: var(--ink); }
+/* set to anything but both ears for all (and your voice off): a dot on the button, so a quiet ear isn't a mystery */
+#kEars { position: relative; }
+#kEars.set::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--voice); }
+.sb-vol .kfield { height: var(--control-md); }
+#songBar .keyctl { flex: 1 1 100%; } /* the key, tempo and click on a line of their own, however wide */
+/* Find lyrics: pressed, it opens out (paintLyrBtn) with a spinner at its left while they're found */
+.lyr { gap: var(--space-2); overflow: hidden; white-space: nowrap; }
+.lyr.busy { color: var(--muted); pointer-events: none; }
+.lyr .ring { width: var(--icon-xs); height: var(--icon-xs); flex: none; transform: rotate(-90deg); }
+.songbar output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.kfield { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--muted); }
+.kfield input[type="range"] { width: 112px; }
+.kfield .pick { font-size: var(--text-sm); } /* the bar's text size */
+.tog.icon { display: inline-grid; place-items: center; padding: 0; }
+.tog.icon .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.songbar .tog.icon { width: var(--control-md); height: var(--control-md); border-radius: var(--radius-md); } /* Loop and the click: as tall as the buttons beside them */
+#kClick[aria-pressed="false"] + input[type="range"] { display: none; } /* the click's volume shows only while the click is on */
+/* Phrases: one block per line of the song; click one to jump there, Loop repeats it */
+.phrase-row { flex-basis: 100%; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.phrase-row > .kfield:first-child { margin-right: var(--space-2); } /* the count-in first, a little apart from the phrases' controls */
+.tog:disabled { opacity: 0.4; pointer-events: none; }
+.strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; touch-action: pan-y; }
+.strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--fg-16); cursor: pointer; }
+.strip button:hover { background: var(--fg-30); }
+.strip button[aria-current="true"] { background: var(--fg-38); }
+.strip.looping button[aria-current="true"] { background: var(--ink); }
+.strip button.inspan { background: var(--fg-30); } /* a run of phrases looped together */
+.strip.looping button.inspan:not([aria-current="true"]) { background: var(--muted); }
+/* over the strip, at once: the words of the phrase hovered, or reached by a drag */
+.strip-tip { position: fixed; z-index: var(--z-tooltip); transform: translate(-50%, -100%); max-width: min(360px, calc(100vw - 16px)); padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); line-height: 16px; pointer-events: none; }
+/* Developer tools' phrase marks: a split as a line through a phrase, a join as a bar across the gap between two; each
+   a hit area wider than it's drawn, a click on it taking it off */
+.strip .pmark { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; cursor: pointer; }
+.strip .pmark.merge { min-width: 12px; margin-left: 0; }
+.strip .pmark::before { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; border-radius: var(--radius-pill); background: var(--warn); }
+.strip .pmark.merge::before { left: 0; right: 0; top: 50%; bottom: auto; width: auto; height: 2px; margin-top: -1px; }
+.strip .pmark:hover::before { box-shadow: 0 0 0 2px color-mix(in oklab, var(--warn) 35%, transparent); }
+.strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
+/* Record, beside Play: a dot in the red. Armed, the button takes a tint of the red and the dot fills in; while a take
+   is being recorded the dot pulses, and the stage says "Recording" with the take's length. */
+.btn.rec { color: var(--bad); }
+/* Record, split: the icon records, the label beside it (with its chevron) picks how; one control, a hairline apart */
+.rec-split { display: inline-flex; gap: 1px; }
+.rec-split .btn.rec { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.rec-split .rec-mode { border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: var(--text-sm); }
+.btn.rec .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.btn.rec[aria-pressed="true"] { background: color-mix(in oklab, var(--bad) 22%, var(--surface-2)); }
+.btn.rec[aria-pressed="true"]:hover { background: color-mix(in oklab, var(--bad) 30%, var(--surface-2)); }
+.btn.rec[aria-pressed="true"] .ico circle { fill: currentColor; }
+.btn.rec.on .ico { animation: rec-pulse 1.2s ease-in-out infinite; }
+@keyframes rec-pulse { 50% { opacity: 0.3; } }
+.stage-head .rep.rec { color: var(--ink); }
+.stage-head .rep.rec::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: var(--space-2); border-radius: 50%; background: var(--bad); vertical-align: 1px; }
+@media (prefers-reduced-motion: reduce) { .btn.rec.on .ico { animation: none; } }
+
+/* Practice: the song's bar, stage and piano; beside them (under them on a narrow screen) the takes, once there's
+   something for them: Record on, or takes of the song */
+.pr-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.pr-main { min-width: 0; }
+/* Takes: what you recorded in Practice, by day, newest first, like notes to self. The sliders in the head set how a
+   take sounds, played here and downloaded. */
+.takes { display: grid; gap: var(--space-4); margin-top: var(--space-10); }
+.tk-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); flex-wrap: wrap; min-height: 32px; }
+.tk-head h2 { margin: 0; }
+.tk-title { display: flex; align-items: center; gap: var(--space-3); }
+/* Takes Studio (#stems/<song>/takes): the song's takes laid out on its timeline, each where it was sung, to hear any of
+   them with the band, in time. The band's waveform on top; under it the takes, a lane each where they overlap; a take
+   pressed is on (in your colour) and plays where it falls; a click anywhere else on the timeline goes there; the
+   playhead runs across it all. Takes sung in another key or tempo play with the band in theirs: one version at a time. */
+.ts { display: grid; gap: var(--space-4); }
+.ts-top { display: flex; align-items: center; gap: var(--space-4); }
+.ts-top .back { margin-bottom: 0; }
+#tsTitle { font-weight: var(--weight-medium); font-size: var(--text-lg); }
+.ts-bar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface);
+  box-shadow: var(--shadow-hairline); font-size: var(--text-sm); }
+.ts-bar output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
+.ts-vers { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted); }
+.ts-vers .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.ts-tl { position: relative; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-hairline); cursor: pointer; }
+#tsWave { display: block; width: 100%; height: 64px; }
+.ts-lanes { display: grid; gap: var(--space-1); margin-top: var(--space-2); }
+.ts-lane { position: relative; height: 48px; border-radius: var(--radius-sm); background: var(--fg-2); }
+.ts-clip { position: absolute; top: 0; bottom: 0; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; text-align: left;
+  background: var(--fill); box-shadow: inset 0 0 0 1px var(--ring); color: var(--muted); transition: background-color var(--duration-fast), box-shadow var(--duration-fast); }
+.ts-clip:hover { background: var(--fg-12); }
+.ts-clip[aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 20%, transparent); box-shadow: inset 0 0 0 1px var(--voice); color: var(--ink); }
+.ts-clip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ts-clip canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ts-clip span { position: relative; display: block; padding: var(--space-1) 6px; font-size: var(--text-2xs); line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-line { position: absolute; top: 8px; bottom: 8px; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--ink); pointer-events: none; }
+.ts-empty { margin: 0; color: var(--muted); font-size: var(--text-md); }
+.tk-mix { display: flex; align-items: center; gap: var(--space-3) var(--space-5); flex-wrap: wrap; font-size: var(--text-sm); }
+.tk-mix input[type="range"] { width: 112px; }
+.tk-days { display: grid; gap: var(--space-5); }
+.tk-day { display: grid; gap: var(--space-2); }
+.tk-day h3 { margin: 0; }
+.tk-rows { overflow: hidden; } /* a take's hover fill keeps to the card's round corners */
+/* columns: play, time of day, the part sung (its times beside it), compare, download, delete ("Really delete?" right
+   beside it while asked) */
+.take { position: relative; display: grid; grid-template-columns: 32px 44px minmax(0, 1fr) 32px 32px auto; align-items: center; gap: var(--space-3);
+  min-height: 48px; padding: var(--space-2) var(--space-3); }
+.take + .take { border-top: 1px solid var(--line); }
+.tk-play { transition: background-color var(--duration-fast), filter var(--duration-fast), opacity var(--duration-fast); }
+.tk-play .pp { width: 10.5px; height: 12px; }
+.tk-play > .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.take.playing .tk-play { background: var(--ink); color: var(--on-ink); }
+.tk-when { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tk-part { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; line-height: 20px; }
+.tk-part b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--text-md); }
+.tk-part small { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-xs); color: var(--faint); } /* gives way first */
+.tk-part small.err, .take.failed .tk-part b { color: var(--bad); }
+/* Delete, asked: the question opens out right beside it, the play, compare and download buttons blurred back */
+.tk-end { display: flex; align-items: center; justify-self: end; }
+.tk-confirm { max-width: 0; margin-right: 0; overflow: hidden; white-space: nowrap; font-size: var(--text-sm); color: var(--bad); opacity: 0;
+  transition: max-width var(--duration-base) var(--ease), margin-right var(--duration-base) var(--ease), opacity var(--duration-fast); }
+.take.armed .tk-confirm { max-width: 160px; margin-right: var(--space-2); opacity: 1; }
+.tk-cmp, .tk-dl { transition: filter var(--duration-fast), opacity var(--duration-fast), background-color var(--duration-fast); }
+.take.armed :is(.tk-play, .tk-cmp, .tk-dl) { filter: blur(1.5px); opacity: 0.35; pointer-events: none; }
+.btn.tk-cmp[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); } /* comparing */
+.take.armed .tk-del { background: color-mix(in oklab, var(--bad) 18%, transparent); color: var(--bad); }
+.take.saving .tk-part b { color: var(--muted); font-weight: var(--weight-regular); }
+/* its waveform (drawTakeWave), under the rest, the card's width: press or drag on it to play from there */
+.take { row-gap: var(--space-1); }
+.tk-wave { grid-column: 1 / -1; height: 28px; border-radius: var(--radius-xs); cursor: pointer; touch-action: none; }
+.tk-wave canvas { display: block; width: 100%; height: 100%; }
+.tk-wave:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.tk-empty { display: flex; align-items: center; gap: var(--space-3); margin: 0; padding: var(--space-5); border-radius: var(--radius-2xl); border: 1px dashed var(--track); color: var(--muted); font-size: var(--text-md); }
+.tk-empty .ico { width: var(--icon-md); height: var(--icon-md); color: var(--bad); }
+@media (max-width: 760px) {
+  .tk-mix { flex: 1 1 100%; display: grid; gap: var(--space-2); }
+  .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
+  .tk-mix input[type="range"] { width: 100%; }
+  .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px auto; gap: var(--space-2); }
+  .tk-when { display: none; }
+  .tk-part { grid-area: 1 / 2; }
+}
+/* beside Practice, where there's room: a column as wide as the takes' rows need, the sliders one under another, a
+   take's words over its phrase and times. It opens out into the page's right margin (--out of it, set by
+   paintTakesShown), so the stage keeps its width; where the margin is narrower the stage gives up the rest. */
+@media (min-width: 1080px) {
+  .pr-cols.with-takes { grid-template-columns: minmax(0, 1fr) 360px; margin-right: calc(-1 * var(--out, 0px)); }
+  .pr-cols.with-takes .takes { margin-top: calc(var(--space-1) * -1); } /* level with the bar, which sits 4 px up */
+  .pr-cols.with-takes .tk-mix { flex: 1 1 100%; display: grid; gap: var(--space-2); }
+  .pr-cols.with-takes .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
+  .pr-cols.with-takes .tk-mix input[type="range"] { width: 100%; }
+  .pr-cols.with-takes .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px auto; gap: var(--space-2); }
+  .pr-cols.with-takes .tk-when { display: none; }
+  .pr-cols.with-takes .tk-part { grid-area: 1 / 2; flex-direction: column; align-items: stretch; gap: 0; }
+  .pr-cols.with-takes .tk-empty { padding: var(--space-4); font-size: var(--text-sm); }
+}
