@@ -58,6 +58,8 @@ const KO_SERVER = {
   "Send the take as a WAV file.": "테이크를 WAV 파일로 보내 주세요.", "Send the take as 16-bit PCM.": "테이크를 16비트 PCM으로 보내 주세요.",
   "Takes under {n} seconds aren’t kept.": "{n}초보다 짧은 테이크는 남기지 않아요.", "Saving the take failed: {why}": "테이크를 저장하지 못했어요: {why}",
   "Each volume is a number.": "볼륨은 숫자여야 해요.", "Each volume is between 0 and 4.": "볼륨은 0에서 4 사이여야 해요.",
+  "The volume is a number.": "볼륨은 숫자여야 해요.", "The volume is between 0 and 2.": "볼륨은 0에서 2 사이여야 해요.",
+  "Couldn’t save the take’s volume.": "테이크 볼륨을 저장하지 못했어요.", "Volume {n}% · drag the line, or ↑ ↓": "볼륨 {n}% · 선을 위아래로 끌거나 ↑ ↓",
   "4 stems": "스템 4개", "6 stems": "스템 6개", "6 stems (+ guitar, piano)": "스템 6개 (+ 기타, 피아노)",
 };
 const KO_TEXT = Object.assign(Object.create(null), {

@@ -2088,6 +2088,7 @@ def _file_title(meta: dict) -> str:
 # rewrite (or lock) a file that others are in.
 TAKE_MIN = 2.0  # s: anything shorter was a Play pressed by mistake
 TAKE_GAIN = (0.25, 16.0)  # how far a take is turned down or up to match the singer (-12 dB … +24 dB)
+TAKE_VOLUME = 2.0  # the most a take's own volume goes, set on its clip in the Takes Studio (1: as matched to the singer)
 
 
 def _take_dir(song_id: str) -> str:
@@ -2226,6 +2227,21 @@ def take_pitch(song_id: str, tid: str) -> list:
     return out
 
 
+def set_take_volume(song_id: str, tid: str, volume) -> dict:
+    """A take's own volume, 0…TAKE_VOLUME, as set on its clip in the Takes Studio: on top of its gain (which stays what
+    matches it to the singer) wherever it's heard or exported. Returns the take's json with it."""
+    take = _take(song_id, tid)
+    try:
+        v = float(volume)
+    except (TypeError, ValueError):
+        raise ValueError("The volume is a number.") from None
+    if not math.isfinite(v) or not 0 <= v <= TAKE_VOLUME:
+        raise ValueError(f"The volume is between 0 and {TAKE_VOLUME:g}.")
+    take["volume"] = round(v, 3)
+    _write_json(os.path.join(_take_dir(song_id), tid + ".json"), take)
+    return take
+
+
 def delete_take(song_id: str, tid: str):
     _take(song_id, tid)
     d = _take_dir(song_id)
@@ -2277,10 +2293,10 @@ def _take_band(song_id: str, folder: str, meta: dict, key: int, speed: float, ba
 
 
 def _take_voice(song_id: str, take: dict, gain: float) -> np.ndarray:
-    """A take's recording, mono at SR, times gain and the take's own gain."""
+    """A take's recording, mono at SR, times gain, the take's own gain and its volume (set_take_volume)."""
     raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", os.path.join(_take_dir(song_id), take["id"] + ".flac"), "-ac", "1",
                           "-ar", str(SR), "-f", "f32le", "pipe:1"], capture_output=True, check=False).stdout
-    return np.frombuffer(raw, dtype=np.float32) * (gain * float(take.get("gain", 1)))
+    return np.frombuffer(raw, dtype=np.float32) * (gain * float(take.get("gain", 1)) * float(take.get("volume", 1)))
 
 
 def _version_tags(meta: dict, key: int, speed: float) -> str:
@@ -2290,7 +2306,7 @@ def _version_tags(meta: dict, key: int, speed: float) -> str:
 
 
 def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
-    """A take as heard in Practice: your voice (times the take's gain) over the band and, if asked for, the guide
+    """A take as heard in Practice: your voice (times the take's gain and volume) over the band and, if asked for, the guide
     vocal (_take_band). mix: {voice, band, guide}, gains 0…4. Returns (16-bit stereo 44.1 kHz WAV, file name), the
     take's stretch of the song from its first sample to its last."""
     folder = _song_dir(song_id)

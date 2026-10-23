@@ -61,15 +61,86 @@ function tsRender() {
       c.type = "button"; c.dataset.id = t.id;
       c.style.left = (t.start / dur) * 100 + "%"; c.style.width = ((t.duration * sp) / dur) * 100 + "%";
       c.setAttribute("aria-pressed", String(TS.on.has(t.id)));
-      c.title = `${part.what} · ${part.more} · ${new Date(t.created * 1000).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" })}`;
-      c.append(el("canvas"), el("span", null, part.what));
-      c.onclick = (e) => { e.stopPropagation(); tsToggle(t); };
+      c.dataset.about = `${part.what} · ${part.more} · ${new Date(t.created * 1000).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" })}`;
+      c.append(el("canvas"), el("span", null, part.what), el("i", "ts-vol"));
       row.append(c);
+      tsClipVol(c, t);
       tsVoice(t).then(() => tsClipWave(c, t)).catch(() => {});
     }
     return row;
   }));
   tsWave(); tsPaint();
+}
+// A take's own volume, on its clip: a line across it as high as the volume (the bottom silent, halfway 100%, the top
+// TS_VOL), dragged up or down, or moved with ↑ ↓ while the clip has focus; a double-click on it puts it back to 100%.
+// Heard at once, and saved with the take once let go (tsVolSave). A press on the line doesn't switch the take.
+const TS_VOL = 2, tsVolSnap = (v) => Math.max(0, Math.min(TS_VOL, Math.round(v * 20) / 20)); // in steps of 5
+let tsVolTip = null;
+function tsClipVol(c, t) {
+  const lineY = (r) => r.bottom - (takeVol(t) / TS_VOL) * r.height;
+  const near = (e) => Math.abs(e.clientY - lineY(c.getBoundingClientRect())) <= (e.pointerType === "touch" ? 12 : 6);
+  const tip = (e) => { // the volume over the line, where the pointer is along it
+    if (!tsVolTip) { tsVolTip = el("output", "slider-tip"); tsVolTip.setAttribute("aria-hidden", "true"); document.body.append(tsVolTip); }
+    tsVolTip.hidden = !e;
+    if (!e) return;
+    const r = c.getBoundingClientRect();
+    tsVolTip.textContent = String(Math.round(takeVol(t) * 100));
+    tsVolTip.style.left = Math.max(r.left, Math.min(r.right, e.clientX)) + "px"; tsVolTip.style.top = lineY(r) - 4 + "px";
+  };
+  let drag = false, pressed = false;
+  tsVolPaint(t, c);
+  c.onpointerdown = (e) => {
+    if (e.button !== 0 || !near(e)) return;
+    e.preventDefault(); c.setPointerCapture(e.pointerId); drag = pressed = true; c.classList.add("vol-drag"); tip(e);
+  };
+  c.onpointermove = (e) => {
+    if (!drag) { c.classList.toggle("vol-hot", near(e)); return; }
+    const r = c.getBoundingClientRect();
+    tsVolSet(t, tsVolSnap(((r.bottom - e.clientY) / r.height) * TS_VOL)); tip(e);
+  };
+  c.onpointerup = c.onpointercancel = () => {
+    if (!drag) return;
+    drag = false; c.classList.remove("vol-drag"); tip(null); tsVolSave(t);
+    setTimeout(() => { pressed = false; }); // after the click that ends the press
+  };
+  c.onpointerleave = () => { if (!drag) c.classList.remove("vol-hot"); };
+  c.ondblclick = (e) => { if (near(e)) { tsVolSet(t, 1); tsVolSave(t); } };
+  c.onkeydown = (e) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    tsVolSet(t, tsVolSnap(takeVol(t) + (e.key === "ArrowUp" ? 0.05 : -0.05))); tsVolSave(t, 600);
+  };
+  c.onclick = (e) => { e.stopPropagation(); if (!pressed) tsToggle(t); };
+}
+// The line at the take's volume, and the volume in the clip's tip
+function tsVolPaint(t, c = document.querySelector(`#tsLanes .ts-clip[data-id="${t.id}"]`)) {
+  if (!c) return;
+  c.style.setProperty("--v", takeVol(t) / TS_VOL);
+  c.title = `${c.dataset.about} · ${tr("Volume {n}% · drag the line, or ↑ ↓", { n: Math.round(takeVol(t) * 100) })}`;
+}
+// A take's volume as set: heard at once, here and in Practice's Takes; what was saved kept (tsVolWas) until it's saved
+// again, to go back to if it can't be.
+const tsVolWas = new Map(), tsVolTimers = new Map();
+function tsVolSet(t, v) {
+  if (!tsVolWas.has(t.id)) tsVolWas.set(t.id, takeVol(t));
+  t.volume = v; tsVolPaint(t); tsGains(); listenGains();
+}
+function tsVolSave(t, wait = 0) {
+  clearTimeout(tsVolTimers.get(t.id));
+  tsVolTimers.set(t.id, setTimeout(async () => {
+    tsVolTimers.delete(t.id);
+    if (!tsVolWas.has(t.id)) return;
+    const was = tsVolWas.get(t.id), v = takeVol(t), song = TS.id;
+    if (v === was) { tsVolWas.delete(t.id); return; }
+    try {
+      const r = await fetch(`/api/library/${song}/takes/${t.id}/volume`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ volume: v }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Couldn’t save the take’s volume.");
+      if (takeVol(t) === v) tsVolWas.delete(t.id); else tsVolWas.set(t.id, v); // moved again meanwhile: saved once let go
+    } catch (e) {
+      if (takeVol(t) === v) { tsVolWas.delete(t.id); t.volume = was; tsVolPaint(t); tsGains(); listenGains(); }
+      if (TS.id === song) say($("#tsState"), e instanceof TypeError ? "Couldn’t reach the server." : e.message);
+    }
+  }, wait));
 }
 // A take as recorded, decoded once for the page; its peaks for its clip.
 function tsVoice(t) {
@@ -145,7 +216,7 @@ async function tsVoiceOn(t, at = ac.currentTime + 0.03) {
   if (!TS.playing || !TS.on.has(t.id) || TS.voice.has(t.id)) return;
   const V = (TS.pos + Math.max(0, at - TS.at) * sp) / sp, vs = t.start / sp;
   if (V >= vs + t.duration) return;
-  const from = Math.max(0, V - vs), g = ac.createGain(), src = ac.createBufferSource(), vol = T.mix.voice * (t.gain || 1);
+  const from = Math.max(0, V - vs), g = ac.createGain(), src = ac.createBufferSource(), vol = T.mix.voice * takeGain(t);
   g.gain.value = vol; g.connect(TS.bus); src.buffer = buf; src.connect(g);
   if (from > 0) { g.gain.value = 0; fadeIn(g.gain, at, vol); } // switched on partway through: in over FADE
   src.start(at + Math.max(0, vs - V), from, t.duration - from);
@@ -184,7 +255,7 @@ function tsGains() {
   if (!TS.gains) return;
   const now = ac.currentTime;
   TS.gains.band.gain.setTargetAtTime(T.mix.band, now, 0.015); TS.gains.guide.gain.setTargetAtTime(T.mix.guide, now, 0.015);
-  for (const [id, v] of TS.voice) { const t = T.list.find((x) => x.id === id); v.g.gain.setTargetAtTime(T.mix.voice * ((t && t.gain) || 1), now, 0.015); }
+  for (const [id, v] of TS.voice) { const t = T.list.find((x) => x.id === id); v.g.gain.setTargetAtTime(T.mix.voice * (t ? takeGain(t) : 1), now, 0.015); }
 }
 // Export: what the page plays, as an MP3 of the whole song: the band and guide vocal in the takes' version, as the
 // sliders have them, and each take that's on where it was sung (stems.takes_mp3).
@@ -229,7 +300,7 @@ function listenGains() {
   const p = T.play;
   if (!p || !p.gains) return;
   const now = ac.currentTime;
-  p.gains.voice.gain.setTargetAtTime(T.mix.voice * (p.take.gain || 1), now, 0.015);
+  p.gains.voice.gain.setTargetAtTime(T.mix.voice * takeGain(p.take), now, 0.015);
   p.gains.band.gain.setTargetAtTime(T.mix.band, now, 0.015);
   p.gains.guide.gain.setTargetAtTime(T.mix.guide, now, 0.015);
 }

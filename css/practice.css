@@ -108,6 +108,10 @@
 .ts-clip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ts-clip canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ts-clip span { position: relative; display: block; padding: var(--space-1) 6px; font-size: var(--text-2xs); line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-vol { position: absolute; left: 0; right: 0; bottom: calc(var(--v, 0.5) * (100% - 2px)); border-top: 1px solid var(--fg-30); pointer-events: none; }
+.ts-clip[aria-pressed="true"] .ts-vol { border-top-color: var(--voice); }
+.ts-clip.vol-hot, .ts-clip.vol-drag { cursor: ns-resize; }
+.ts-clip.vol-hot .ts-vol, .ts-clip.vol-drag .ts-vol { border-top-width: 2px; border-top-color: var(--ink); }
 .ts-line { position: absolute; top: 8px; bottom: 8px; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--ink); pointer-events: none; }
 .ts-empty { margin: 0; color: var(--muted); font-size: var(--text-md); }
 .tk-mix { display: flex; align-items: center; gap: var(--space-3) var(--space-5); flex-wrap: wrap; font-size: var(--text-sm); }
