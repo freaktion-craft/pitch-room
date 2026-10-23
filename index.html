@@ -1901,7 +1901,7 @@ async function drawLibrary() {
   });
   arrangeRows();
   pinLibTop(); paintFade(); // the column heads are new: pinned where they stand
-  awaitCovers(lib);
+  awaitLookups(lib);
 }
 // The list's order: by a column, either way, kept (store "libSort"); newest first until another is chosen. desc: the
 // way a column sorts first (the newest, otherwise A to Z and low to high). Songs a column has nothing for (no steady
@@ -2099,23 +2099,34 @@ function initCoverView() {
     else if (e.key === "Tab") e.preventDefault(); // nothing else to go to while it's up
   }, true);
 }
-// Covers still being looked for (a song just added, or ones from before there were covers): the list asks again in a
-// few seconds, a minute at most, and puts each in as it's found.
-let coverTimer = 0;
-function awaitCovers(lib, tries = 0) {
-  clearTimeout(coverTimer);
-  if (tries >= 20 || !lib.some((m) => !("cover" in m))) return;
-  coverTimer = setTimeout(async () => {
+// What songs are, still being looked up (a song just added, or ones from before there were covers): its title and
+// artist as found (stems.py _look_up; "artist" is absent until then) and its cover. The list asks again every few
+// seconds, a minute at most, and puts each in as it's found, in its row, where the video's own title was meanwhile.
+let lookupTimer = 0;
+function awaitLookups(lib, tries = 0) {
+  clearTimeout(lookupTimer);
+  if (tries >= 20 || !lib.some((m) => !("cover" in m) || !("artist" in m))) return;
+  lookupTimer = setTimeout(async () => {
     if (!(view === "stems" && stemsPage === "lib")) return; // the list asks again when it's shown again
     let now;
     try { now = await (await fetch("/api/library", { cache: "no-store" })).json(); } catch (e) { return; }
     if (!Array.isArray(now)) return;
+    let renamed = false;
     for (const m of now) {
-      const known = libCache.get(m.id), tile = libRows.get(m.id)?.querySelector(".cover");
-      if (known && "cover" in m) known.cover = m.cover;
-      if (tile) paintCover(tile, m);
+      const known = libCache.get(m.id), row = libRows.get(m.id);
+      if (!known || !row) continue;
+      if ("cover" in m) known.cover = m.cover;
+      paintCover(row.querySelector(".cover"), m);
+      if ((known.title !== m.title || known.artist !== m.artist) && !row.querySelector(".rename")) { // not while it's being renamed
+        known.title = m.title; known.artist = m.artist; renamed = true;
+        const link = row.querySelector(".song a");
+        link.title = m.title; link.querySelector("b").textContent = m.title; link.setAttribute("aria-label", libLine(known));
+        row.querySelector(".song small").textContent = m.artist || "";
+        row.querySelector(".song-actions .btn").setAttribute("aria-label", tr("More for {title}", { title: m.title }));
+      }
     }
-    awaitCovers(now, tries + 1);
+    if (renamed && SORTS[libSort.by]?.text) arrangeRows(); // sorted by name: it may belong elsewhere now
+    awaitLookups(now, tries + 1);
   }, 3000);
 }
 // Key names spelled the usual way for each key (D♭ major, C♯ minor).
