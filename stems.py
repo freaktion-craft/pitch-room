@@ -1206,8 +1206,8 @@ def song_info(song_id: str) -> dict:
         data = get_melody(song_id)
         ends = _extremes(data["notes"])
         if ends:
-            (lo, lo_at), (hi, hi_at) = ends
-            info["vocals"] = {"lo": lo, "hi": hi, "mostly": data.get("range"), "loAt": lo_at, "hiAt": hi_at}
+            (lo, lo_at), (hi, hi_at), mostly = ends
+            info["vocals"] = {"lo": lo, "hi": hi, "mostly": mostly, "loAt": lo_at, "hiAt": hi_at}
         else:
             info["vocals"] = None
     return info
@@ -1218,11 +1218,13 @@ PHRASE_GAP, SLIP = 1.0, 7  # s to the nearest note for it to be in a phrase; sem
 
 
 def _extremes(notes: list) -> tuple | None:
-    """The melody's lowest and highest notes that were really sung, each with the longest stretch to hear it:
-    ((midi, [t0, t1]), (midi, [t0, t1])). Left out: notes shorter than HELD (breaths, consonants), notes with no
-    other note within PHRASE_GAP (a stray sound in a rest), and notes more than SLIP semitones from every neighbour
-    (the pitch tracker jumping an octave). A pitch then needs ENOUGH time in all, and one more than LEAP semitones
-    beyond the rest at either end goes too. None when nothing is left."""
+    """The melody's lowest and highest notes that were really sung, each with the longest stretch to hear it, and
+    where it mostly sits: ((midi, [t0, t1]), (midi, [t0, t1]), [lo, hi]). Left out: notes shorter than HELD (breaths,
+    consonants), notes with no other note within PHRASE_GAP (a stray sound in a rest), and notes more than SLIP
+    semitones from every neighbour (the pitch tracker jumping an octave). A pitch then needs ENOUGH time in all, and
+    one more than LEAP semitones beyond the rest at either end goes too. Where it mostly sits is the 3rd to 97th
+    percentile of the notes kept, so it's never outside the lowest and highest (melody.json's "range", of every note,
+    can be). None when nothing is left."""
     def sung_note(i):
         a, b, m = notes[i]
         near = [notes[j][2] for j in (i - 1, i + 1) if 0 <= j < len(notes)
@@ -1240,7 +1242,8 @@ def _extremes(notes: list) -> tuple | None:
     if not sung:
         return None
     at = lambda m: max((n for n in held if n[2] == m), key=lambda n: n[1] - n[0])[:2]  # noqa: E731
-    return (sung[0], at(sung[0])), (sung[-1], at(sung[-1]))
+    mids = [m for _, _, m in held if sung[0] <= m <= sung[-1]]
+    return (sung[0], at(sung[0])), (sung[-1], at(sung[-1])), [int(np.percentile(mids, 3)), int(np.percentile(mids, 97))]
 
 
 # ---------- lead vocal ----------
