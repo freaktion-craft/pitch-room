@@ -858,7 +858,6 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #kClick[aria-pressed="false"] + input[type="range"] { display: none; } /* the click's volume shows only while the click is on */
 /* Phrases: one block per line of the song; click one to jump there, Loop repeats it */
 .phrase-row { flex-basis: 100%; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-3); border-top: 1px solid var(--line); }
-.phrase-row output { min-width: 84px; text-align: center; }
 .phrase-row > .kfield:first-child { margin-right: var(--space-2); } /* the count-in first, a little apart from the phrases' controls */
 .tog:disabled { opacity: 0.4; pointer-events: none; }
 .strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; touch-action: pan-y; }
@@ -1046,7 +1045,6 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <div class="phrase-row">
         <label class="kfield">Count-in <button class="pick" id="kCount" type="button"></button></label>
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
-        <output id="kPh">Phrase –</output>
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
         <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · drag across phrases on the strip to loop a run of them"></button>
         <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
@@ -3795,7 +3793,7 @@ function initStripDrag() {
     K.phrases.forEach((p, i) => { const x = Math.max(p.t0 - t, t - p.t1, 0); if (x < d) { d = x; k = i; } });
     return k;
   };
-  const showTip = (i) => { // the words alone: which phrase it is (or the run reached) is beside the strip already
+  const showTip = (i) => { // the words alone: they're what tells one phrase from another, not its number
     const b = strip.querySelector(`button[data-i="${i}"]`), p = K.phrases[i];
     if (!b || !p || !p.text) { tip.hidden = true; return; }
     tip.textContent = p.text;
@@ -3926,9 +3924,6 @@ async function copyMarks() {
 }
 function paintPhrases() {
   const n = K.phrases.length, sp = K.span, key = `${K.ph}|${K.loop}|${sp ? sp.a + "-" + sp.b : ""}`;
-  const w = Math.max(2, String(n).length), pad = (i) => String(i + 1).padStart(w, "0"); // 01 / 31: zero-padded, so the strip beside it doesn't shift
-  setText("kPh", !n ? tr("No phrases") : sp ? tr("Phrases {a}–{b}", { a: pad(sp.a), b: pad(sp.b) }) // about as wide as "Phrase 03 / 31"
-    : tr("Phrase {n} / {total}", { n: K.ph == null ? "–".repeat(w) : pad(K.ph), total: n }));
   $("#kPrev").disabled = !n || K.ph === 0; $("#kNext").disabled = !n || K.ph == null || K.ph === n - 1;
   $("#kLoop").disabled = !n;
   if (K.painted === key) return;
@@ -5805,8 +5800,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Comparing a take": "테이크 비교", "Left ear": "왼쪽 귀", "Right ear": "오른쪽 귀", "Original": "원곡", "Your take": "내 테이크", "Playing a take": "테이크 듣는 중",
   "Comparing with the original": "원곡과 비교 중",
   "Headphones": "헤드폰", "Headphones: which ear each part plays in": "헤드폰: 소리마다 어느 쪽 귀로 들을지", "Left": "왼쪽", "Both": "양쪽", "Right": "오른쪽",
-  "Count-in": "카운트인", "Off": "없음", "1 beat": "1박", "{n} beats": "{n}박", "From {t}": "{t}부터", "Phrases": "소절", "Phrase –": "소절 –",
-  "Phrase {n} / {total}": "소절 {n} / {total}", "No phrases": "소절 없음", "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
+  "Count-in": "카운트인", "Off": "없음", "1 beat": "1박", "{n} beats": "{n}박", "From {t}": "{t}부터", "Phrases": "소절",
+  "Phrase {n} · {t}": "소절 {n} · {t}", "Phrase {n}": "소절 {n}", "Phrases {a}–{b}": "소절 {a}–{b}",
   "Intro": "전주", "Break": "간주", "{kind} · vocals in {s} s": "{kind} · {s}초 뒤 보컬",
   "Pitch display": "음정 화면",
   "Recording {t}": "녹음 중 {t}", "bars as sung": "음정 바: 부른 그대로", "bars an octave up": "음정 바: 한 옥타브 위", "bars an octave down": "음정 바: 한 옥타브 아래",
