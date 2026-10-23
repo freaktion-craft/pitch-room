@@ -410,8 +410,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 .panel-card a:not(.btn) { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .row-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .inline-field { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); }
-/* Add song's lyrics switch: its words on the left, the switch at the panel's right edge, under the Separate button */
-.add-opt { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); color: var(--muted); cursor: pointer; }
 /* the one-time setup: a banner, its line and its button; once it's started, how it's going in the line's place */
 #sInstall { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
 #sInstall .setup-line { display: flex; align-items: center; gap: var(--space-4); }
@@ -867,6 +865,13 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .strip.looping button[aria-current="true"] { background: var(--ink); }
 .strip button.inspan { background: var(--fg-30); } /* a run of phrases looped together */
 .strip.looping button.inspan:not([aria-current="true"]) { background: var(--muted); }
+/* Developer tools' phrase marks: a split as a line through a phrase, a join as a bar across the gap between two; each
+   a hit area wider than it's drawn, a click on it taking it off */
+.strip .pmark { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; cursor: pointer; }
+.strip .pmark.merge { min-width: 12px; margin-left: 0; }
+.strip .pmark::before { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; border-radius: var(--radius-pill); background: var(--warn); }
+.strip .pmark.merge::before { left: 0; right: 0; top: 50%; bottom: auto; width: auto; height: 2px; margin-top: -1px; }
+.strip .pmark:hover::before { box-shadow: 0 0 0 2px color-mix(in oklab, var(--warn) 35%, transparent); }
 .strip .head { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--ink); box-shadow: 0 0 0 1px var(--surface); pointer-events: none; }
 /* Record, beside Play: a dot in the red. Armed, the button takes a tint of the red and the dot fills in; while a take
    is being recorded the dot pulses, and the stage says "Recording" with the take's length. */
@@ -1007,6 +1012,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
       <label>Note names <button class="pick" id="names" type="button"></button></label>
       <div class="pop-sec"><span>Accent colour</span><div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div></div>
+      <div class="pop-sec"><label>Developer tools <input type="checkbox" class="switch" id="devTools"></label><p class="hint muted">In Practice, mark where a phrase should be split or joined, then copy the marks to paste into a chat.</p></div>
     </div>
   </header>
 
@@ -1038,6 +1044,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
         <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them"></button>
         <div class="strip" id="kStrip" role="group" aria-label="Phrases" title="Click a phrase to go to it · Shift+click another to loop the run between them"></div>
+        <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy phrase marks" title="Copy phrase marks" hidden></button>
       </div>
     </div>
 
@@ -1107,7 +1114,6 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
               <div class="bar" hidden id="sGpuBar"><i></i></div>
               <span class="muted" id="sGpuState"></span>
             </div>
-            <label class="add-opt">Find the lyrics too <input type="checkbox" class="switch" id="sAddLyr"></label>
             <p class="muted" id="sAddMsg" hidden></p>
           </div>
           <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
@@ -1229,8 +1235,8 @@ const store = (() => {
 })();
 // names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
 // treated as silent; vol: the keyboard's piano; mic: the input's deviceId ("" = the system default); countIn: the beats
-// Practice counts in before a phrase, a loop or a play after a pause (0: none)
-const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4, ears: null };
+// Practice counts in before a phrase, a loop or a play after a pause (0: none); dev: Developer tools (phrase marks)
+const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4, ears: null, dev: false };
 for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
 // ears: which ear each part plays in, in Practice (EARS)
 const EAR_DEFAULT = { band: "both", guide: "both", click: "both", left: "orig", right: "yours" };
@@ -1728,6 +1734,7 @@ Object.assign(ICONS, {
   close: '<path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085"/>', // Cancel01
   plus: '<path d="M12 4V20M20 12H4"/>', // PlusSign
   tick: '<path d="M5 14L8.5 17.5L19 6.5"/>', // Tick02
+  copy: '<path d="M9 15C9 12.1716 9 10.7574 9.87868 9.87868C10.7574 9 12.1716 9 15 9H16C18.8284 9 20.2426 9 21.1213 9.87868C22 10.7574 22 12.1716 22 15V16C22 18.8284 22 20.2426 21.1213 21.1213C20.2426 22 18.8284 22 16 22H15C12.1716 22 10.7574 22 9.87868 21.1213C9 20.2426 9 18.8284 9 16V15Z"/><path d="M17 9C16.9975 6.04291 16.9528 4.51121 16.092 3.46243C15.9258 3.25989 15.7401 3.07418 15.5376 2.90796C14.4312 2 12.7875 2 9.5 2C6.21252 2 4.56878 2 3.46243 2.90796C3.25989 3.07417 3.07418 3.25989 2.90796 3.46243C2 4.56878 2 6.21252 2 9.5C2 12.7875 2 14.4312 2.90796 15.5376C3.07417 15.7401 3.25989 15.9258 3.46243 16.092C4.51121 16.9528 6.04291 16.9975 9 17"/>', // Copy01
   save: '<path d="M8 22V19C8 17.1144 8 16.1716 8.58579 15.5858C9.17157 15 10.1144 15 12 15C13.8856 15 14.8284 15 15.4142 15.5858C16 16.1716 16 17.1144 16 19V22"/><path d="M10 7H14"/><path d="M3 11.8584C3 7.28199 3 4.99376 4.38674 3.54394C4.43797 3.49038 4.49038 3.43797 4.54394 3.38674C5.99376 2 8.28199 2 12.8584 2C13.943 2 14.4655 2.00376 14.9628 2.18936C15.4417 2.3681 15.8429 2.70239 16.6452 3.37099L18.8411 5.20092C19.9027 6.08561 20.4335 6.52795 20.7168 7.13266C21 7.73737 21 8.42833 21 9.81025V13C21 16.7497 21 18.6246 20.0451 19.9389C19.7367 20.3634 19.3634 20.7367 18.9389 21.0451C17.6246 22 15.7497 22 12 22C8.25027 22 6.3754 22 5.06107 21.0451C4.6366 20.7367 4.26331 20.3634 3.95491 19.9389C3 18.6246 3 16.7497 3 13V11.8584Z"/>', // FloppyDisk
   chevronDown: '<path d="M18 9.00005C18 9.00005 13.5811 15 12 15C10.4188 15 6 9 6 9"/>', // ArrowDown01
   mic: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C15.8824 18 18.7174 15.3914 19 12M12 22H15M12 22H9"/><path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6V11C16 13.2091 14.2091 15 12 15C9.79086 15 8 13.2091 8 11V6Z"/>', // Mic02
@@ -2580,8 +2587,6 @@ async function postJob(url, body, headers) {
 }
 // 4 stems: vocals, drums, bass and the rest (the 6-stem model's piano track bleeds, so it isn't offered)
 const stemModel = () => "htdemucs";
-// Find the lyrics too (the switch, kept as last set): the server finds them once the song is in the library
-const addLyrics = () => $("#sAddLyr").checked;
 // Several at once: links a line each (or spaces between), files several at a time. Each is sent in the order given;
 // the server takes them in that order, one at a time, the rest waiting with how many are ahead of them. Once one is
 // in, the library shows their progress; one that couldn't start says why here, the others going on.
@@ -2593,7 +2598,7 @@ async function submitYoutube(e) {
   let sent = 0;
   for (const url of urls) {
     try {
-      const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel(), lyrics: addLyrics() }), { "Content-Type": "application/json" });
+      const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" });
       if (!sent++) holdRing();
       jobStarted(id, url);
     } catch (err) { failed.push(url); addMsg(urls.length > 1 ? tr("{url}: {why}", { url, why: () => tr(err.message) }) : err.message, true); }
@@ -2608,7 +2613,7 @@ async function submitFiles(files) {
   for (const [i, file] of files.entries()) {
     addMsg(files.length > 1 ? tr("Uploading {i} of {n}…", { i: i + 1, n: files.length }) : "Uploading…");
     try {
-      const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}&lyrics=${addLyrics() ? 1 : 0}`, file);
+      const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}`, file);
       if (!ok++) holdRing();
       jobStarted(id, file.name.replace(/\.[^.]+$/, ""));
     }
@@ -3517,8 +3522,6 @@ function initStems() {
   $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { say($("#sInstallState"), e.message); $("#sInstallBtn").disabled = false; } };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { say($("#sGpuState"), e.message); $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
-  $("#sAddLyr").checked = store.get("addLyrics", false);
-  $("#sAddLyr").onchange = (e) => store.set("addLyrics", e.target.checked);
   // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it
   const addPop = $("#addPop");
   $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
@@ -3575,7 +3578,7 @@ function initStems() {
 // phrases: the song's lines (songPhrases); ph: the one you're on (fixed while loop is on); cue: the phrase whose
 // count-in is showing after a jump to it
 const K = { on: false, song: null, notes: [], evs: [], contour: [], entries: [], phrases: [], ph: null, cue: null, loop: false, painted: null, hist: [], guideVol: 0.5, bandVol: 1, studio: null, span: null, resume: null,
-  lyrics: null, lyricMsg: null, lyricKey: null }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place
+  lyrics: null, lyricMsg: null, lyricKey: null, marks: [] }; // lyrics: the song's lines (lyrics.json); lyricMsg: what's said in their place; marks: phraseMarks
 function songEvs() {
   const sh = P.key; // the bars move with the key the song plays in
   K.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
@@ -3739,8 +3742,104 @@ function renderPhrases() {
     b.title = tr("Phrase {n} · {t}", { n: i + 1, t: fmtTime(p.t0) }) + (p.text ? "\n" + p.text : ""); b.setAttribute("aria-label", b.title);
     b.dataset.i = i; strip.append(b);
   });
+  if (S.dev) K.marks.forEach((mk, j) => {
+    const g = mk.kind === "merge" ? gapAt(mk.t) : null, i = el("i", "pmark " + mk.kind);
+    i.style.left = ((g ? K.phrases[g].t1 : mk.t) / dur) * 100 + "%";
+    if (g) i.style.width = ((K.phrases[g + 1].t0 - K.phrases[g].t1) / dur) * 100 + "%";
+    i.title = tr(mk.kind === "merge" ? "Join here · {t} · click to take it off" : "Split here · {t} · click to take it off", { t: fmtTime(mk.t) });
+    i.dataset.j = j; strip.append(i);
+  });
+  say(strip, S.dev ? "Click a phrase to go to it · Shift+click another to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined"
+    : "Click a phrase to go to it · Shift+click another to loop the run between them", null, "title");
+  $("#kMarks").hidden = !S.dev; $("#kMarks").disabled = !K.marks.length;
   strip.append(el("i", "head"));
   K.painted = null; paintPhrases();
+}
+// Developer tools' phrase marks (stems.py set_phrase_marks): where a phrase should have been split, or two joined, to
+// copy into a chat (marksText) and fix how phrases are made. A mark in a phrase is a split; in the gap between two, a
+// join (at the gap's middle). Marking where there's one already takes it off.
+const gapAt = (t) => { const k = K.phrases.findIndex((p, i) => K.phrases[i + 1] && p.t1 <= t && t <= K.phrases[i + 1].t0); return k < 0 ? null : k; };
+function markPhrase(t) {
+  const inside = K.phrases.some((p) => p.t0 <= t && t <= p.t1), g = inside ? null : gapAt(t);
+  if (!inside && g == null) return; // before the first phrase or after the last
+  if (g != null) t = (K.phrases[g].t1 + K.phrases[g + 1].t0) / 2;
+  const kind = g != null ? "merge" : "split", there = K.marks.findIndex((m) => m.kind === kind && Math.abs(m.t - t) < 0.3);
+  saveMarks(there >= 0 ? K.marks.filter((_, j) => j !== there)
+    : [...K.marks, { t: r2(t), kind, by: K.lyrics ? "lyrics" : "breaths" }].sort((a, b) => a.t - b.t));
+}
+async function saveMarks(next) {
+  const m = K.song, was = K.marks;
+  K.marks = next; renderPhrases(); // shown at once; the server sorts and saves them
+  try {
+    const r = await fetch(`/api/library/${m.id}/marks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ marks: next }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Couldn’t save that.");
+    m.phraseMarks = j.marks;
+    if (K.song === m) { K.marks = j.marks; renderPhrases(); }
+  } catch (e) {
+    if (K.song === m) { K.marks = was; renderPhrases(); } // not saved: it comes off again
+    console.warn("Phrase marks:", e.message);
+  }
+}
+// The marks as text for a chat: the song, how its phrases are made now, then each mark with what's around it (the
+// phrase it's in or the two it would join, their words with where they're sung, and the gaps between the notes).
+function marksText() {
+  const m = K.song, ph = K.phrases, beat = 60 / (m.bpm || 120), by = K.lyrics ? "lyrics" : "breaths";
+  const tc = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, "0")}`;
+  const span = (p) => `${tc(p.t0)}–${tc(p.t1)}, ${(p.t1 - p.t0).toFixed(2)} s, ${((p.t1 - p.t0) / beat).toFixed(1)} beats`;
+  const words = (p, at) => {
+    const ws = (K.lyrics || []).flatMap((l) => l.words || []).filter(([a, b]) => a >= p.t0 - 0.05 && b <= p.t1 + 0.05);
+    if (!ws.length) return null;
+    const out = ws.map(([a, , w]) => `${tc(a)} ${w.trim()}`), k = at == null ? -1 : ws.findIndex(([a]) => a > at);
+    if (k > 0) out.splice(k, 0, "|");
+    return out.join(" · ");
+  };
+  const gaps = (p, at) => {
+    const ns = K.notes.filter(([a, b]) => b > p.t0 && a < p.t1), gs = [];
+    for (let i = 1; i < ns.length; i++) if (ns[i][0] - ns[i - 1][1] >= 0.05) gs.push([ns[i - 1][1], ns[i][0] - ns[i - 1][1]]);
+    if (!gs.length) return null;
+    const near = at == null ? -1 : gs.reduce((k, g, i) => (Math.abs(g[0] - at) < Math.abs(gs[k][0] - at) ? i : k), 0);
+    return gs.map(([t, d], i) => `${tc(t)} (${d.toFixed(2)} s)${i === near ? " ← nearest" : ""}`).join(" · ");
+  };
+  const lines = [
+    "Phrase marks from Pitch Room's Practice (Developer tools): where its phrases should have been split, or joined.",
+    `Song: ${[m.artist, m.title].filter(Boolean).join(" – ")} · id ${m.id} · ${fmtTime(songDur())} · ${m.bpm} BPM (a beat ${beat.toFixed(3)} s)`,
+    `Phrases now: ${ph.length}, ${K.lyrics ? `the lyrics' lines (lyricPhrases, LYRIC_MIN ${LYRIC_MIN} s)` : `the stretches between breaths (songPhrases, PHRASE ${JSON.stringify(PHRASE)})`}, made in index.html`,
+  ];
+  K.marks.forEach((mk, n) => {
+    lines.push("");
+    const was = mk.by !== by ? ` (marked when the phrases were the ${mk.by === "lyrics" ? "lyrics' lines" : "stretches between breaths"})` : "";
+    if (mk.kind === "split") {
+      const i = ph.findIndex((p) => p.t0 <= mk.t && mk.t <= p.t1), p = ph[i];
+      if (!p) { lines.push(`${n + 1}. Split at ${tc(mk.t)}${was}: no phrase there now`); return; }
+      lines.push(`${n + 1}. Split at ${tc(mk.t)}${was}, in phrase ${i + 1} (${span(p)})${p.text ? `: "${p.text}"` : ""}`);
+      const w = words(p, mk.t), g = gaps(p, mk.t);
+      if (w) lines.push(`   words: ${w}`);
+      if (g) lines.push(`   gaps between notes: ${g}`);
+    } else {
+      const k = gapAt(mk.t);
+      if (k == null) { lines.push(`${n + 1}. Join at ${tc(mk.t)}${was}: one phrase there now`); return; }
+      const a = ph[k], b = ph[k + 1], gap = b.t0 - a.t1;
+      lines.push(`${n + 1}. Join phrases ${k + 1} and ${k + 2}${was}, across ${tc(a.t1)}–${tc(b.t0)} (${gap.toFixed(2)} s, ${(gap / beat).toFixed(1)} beats)`);
+      for (const [j, p] of [[k, a], [k + 1, b]]) lines.push(`   ${j + 1}: ${span(p)}${p.text ? `: "${p.text}"` : ""}`);
+    }
+  });
+  return lines.join("\n");
+}
+// Copied with the Clipboard API, or where that's not allowed (an embedded browser, a page not focused), the old way: from
+// a field off to the side, selected
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); } catch (e) {
+    const f = el("textarea"); f.value = text; f.style.cssText = "position: fixed; left: -9999px"; document.body.append(f); f.select();
+    const ok = document.execCommand("copy"); f.remove();
+    if (!ok) throw e;
+  }
+}
+async function copyMarks() {
+  const b = $("#kMarks");
+  try { await copyText(marksText()); } catch (e) { say(b, "Couldn’t copy: {why}", { why: e.message }, "title"); return; }
+  b.replaceChildren(icon("tick")); say(b, "Copied", null, "title");
+  clearTimeout(b.done); b.done = setTimeout(() => { b.replaceChildren(icon("copy")); say(b, "Copy phrase marks", null, "title"); }, 1500);
 }
 function paintPhrases() {
   const n = K.phrases.length, sp = K.span, key = `${K.ph}|${K.loop}|${sp ? sp.a + "-" + sp.b : ""}`;
@@ -3944,7 +4043,7 @@ async function singSong(m, btn) {
   show(was);
   K.song = m; K.notes = mel.notes; K.contour = mel.contour; K.hist = []; K.on = true; A4 = mel.a4 || 440;
   K.entries = songEntries(K.notes, m.beats, m.bpm);
-  K.song = m; lyricsFor(m, lyr); setPhrases();
+  K.song = m; K.marks = Array.isArray(m.phraseMarks) ? m.phraseMarks : []; lyricsFor(m, lyr); setPhrases();
   songEvs(); songView(true);
   // Practice sets the tracks its own way (Guide vocal, Band); the Studio's mix is put back on the way out (route)
   practiceMix();
@@ -4093,7 +4192,11 @@ function initSing() {
   $("#kPrev").onclick = () => phraseStep(-1);
   $("#kNext").onclick = () => phraseStep(1);
   $("#kLoop").onclick = () => setLoop(!K.loop);
+  $("#kMarks").append(icon("copy")); $("#kMarks").onclick = copyMarks;
   $("#kStrip").addEventListener("click", (e) => {
+    const mk = e.target.closest(".pmark"), r = e.currentTarget.getBoundingClientRect();
+    if (mk) { saveMarks(K.marks.filter((_, j) => j !== +mk.dataset.j)); return; }
+    if (S.dev && e.altKey) { markPhrase(((e.clientX - r.left) / r.width) * songDur()); return; }
     const b = e.target.closest("button");
     if (b && e.shiftKey) { // a run to loop: from the phrase you're on (or the run's start) to this one
       const i = +b.dataset.i, from = K.span ? K.span.a : K.ph ?? i;
@@ -4102,7 +4205,6 @@ function initSing() {
       phraseGo(K.span ? K.span.a : i, true); return;
     }
     if (b) { phraseGo(+b.dataset.i); return; }
-    const r = e.currentTarget.getBoundingClientRect();
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
   });
   $("#kLeave").prepend(icon("back"));
@@ -4126,6 +4228,8 @@ function initSing() {
   $("#gate").oninput = (e) => { S.gate = 10 ** (+e.target.value / 20); save(); };
   resetOnDblClick($("#gate"), -40);
   $("#hearMe").onclick = () => hearMe(!monitorOn);
+  $("#devTools").checked = S.dev;
+  $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); };
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
   micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); });
   micPick.set([{ v: "", t: "System default" }], "");
@@ -5361,7 +5465,7 @@ document.addEventListener("keydown", (e) => {
   if (view === "practice" && K.on) {
     if (e.repeat && e.code === "Space") { e.preventDefault(); return; }
     const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
-      Home: songStart, End: songEnd }[e.code];
+      Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null }[e.code];
     if (act) { e.preventDefault(); act(); }
   }
 });
@@ -5436,7 +5540,7 @@ const KO_SERVER = {
   "Installing Demucs, librosa, yt-dlp and Whisper…": "Demucs, librosa, yt-dlp, Whisper 설치하는 중…",
   "Finding the lyrics": "가사 찾는 중", "Lining the lyrics up with the voice": "가사를 목소리에 맞추는 중",
   "Downloading the lyrics model (first time only, ≈1.5 GB)": "가사 모델 내려받는 중 (처음 한 번만, ≈1.5 GB)",
-  "Couldn’t reach LRCLIB. Is this computer online?": "LRCLIB에 연결하지 못했어요. 인터넷에 연결돼 있나요?", "LRCLIB answered {code}.": "LRCLIB이 {code} 오류로 답했어요.",
+  "Couldn’t reach LRCLIB. Is this computer online?": "LRCLIB에 연결하지 못했어요. 인터넷에 연결돼 있나요?", "LRCLIB answered {code}.": "LRCLIB이 {code} 오류로 답했어요.", "LRCLIB is busy right now. Try again in a minute.": "LRCLIB이 지금 바빠요. 1분 뒤에 다시 해 보세요.",
   "Paste the lyrics, a line of the song to each line.": "가사를 붙여넣어 주세요. 한 줄에 노래 한 줄씩이요.", "That LRCLIB entry has no lyrics.": "그 LRCLIB 항목에는 가사가 없어요.",
   "Send an LRCLIB entry's id or the lyrics' text.": "LRCLIB 항목 번호나 가사를 보내 주세요.", "That's longer than a song's lyrics.": "노래 가사로 보기엔 너무 길어요.",
   "This song's lyrics are being lined up already. Try again in a moment.": "이 곡의 가사를 맞추는 중이에요. 잠시 뒤에 다시 해 주세요.",
@@ -5516,7 +5620,6 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Runs on your Apple GPU — about 30 s for a 4-minute song.": "Apple GPU에서 돌아가요. 4분짜리 곡에 30초쯤 걸려요.",
   "Runs on your NVIDIA GPU{name} — usually under a minute.": "NVIDIA GPU{name}에서 돌아가요. 보통 1분이 안 걸려요.",
   "Runs on the CPU — a 4-minute song can take several minutes.": "CPU에서 돌아가요. 4분짜리 곡이면 몇 분 걸릴 수 있어요.",
-  "Find the lyrics too": "가사도 가져오기",
   "Songs being added": "추가 중인 곡", "Adding songs": "곡 추가 중", "Adding {n} songs · {pct}%": "{n}곡 추가 중 · {pct}%",
   "Adding a song · {pct}%": "곡 추가 중 · {pct}%", "Couldn’t add a song": "곡을 추가하지 못했어요", "Added": "추가됨", "A song": "곡",
   "{n} songs added": "{n}곡 추가됨", "Song added": "곡 추가됨", "Open song": "곡 열기", "Songs added": "추가된 곡",
@@ -5593,6 +5696,12 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Loop this phrase": "이 소절 반복", "Loop this phrase (L)": "이 소절 반복 (L)",
   "Loop this phrase (L) · Shift+click phrases on the strip to loop a run of them": "이 소절 반복 (L) · 소절 막대에서 Shift+클릭하면 여러 소절을 묶어 반복해요",
   "Click a phrase to go to it · Shift+click another to loop the run between them": "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요",
+  "Click a phrase to go to it · Shift+click another to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined":
+    "소절을 누르면 그리로 가요 · 다른 소절을 Shift+클릭하면 그 사이를 묶어 반복해요 · Alt+클릭(Mac은 Option), 또는 재생 중 M으로 소절을 나눌 곳이나 합칠 곳을 표시해요",
+  "Developer tools": "개발자 도구",
+  "In Practice, mark where a phrase should be split or joined, then copy the marks to paste into a chat.": "연습에서 소절을 나누거나 합쳐야 할 곳을 표시하고, 복사해서 채팅에 붙여 넣어요.",
+  "Copy phrase marks": "소절 표시 복사", "Copied": "복사했어요", "Couldn’t copy: {why}": "복사하지 못했어요: {why}",
+  "Split here · {t} · click to take it off": "여기서 나누기 · {t} · 누르면 지워요", "Join here · {t} · click to take it off": "여기서 합치기 · {t} · 누르면 지워요",
   "Compare: the original in one ear, yours in the other (set under Headphones)": "비교: 한쪽 귀엔 원곡, 다른 쪽엔 내 테이크 (헤드폰에서 설정)",
   "Comparing a take": "테이크 비교", "Left ear": "왼쪽 귀", "Right ear": "오른쪽 귀", "Original": "원곡", "Your take": "내 테이크", "Playing a take": "테이크 듣는 중",
   "Comparing with the original": "원곡과 비교 중",

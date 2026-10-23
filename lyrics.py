@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 import unicodedata
 import urllib.error
@@ -20,22 +21,37 @@ AGENT = "Stem (a local singing-practice app)"  # LRCLIB asks apps to name themse
 WHISPER_MODEL, WHISPER_FILE = "turbo", "large-v3-turbo.pt"  # ≈1.5 GB, in models/
 
 
-def _get(path: str, params: dict | None = None, tries: int = 4):
-    """LRCLIB's json for path, tried again after a moment when it's busy (it answers 503 now and then). None for 404."""
+_pace = threading.Lock()
+_last = 0.0  # when LRCLIB was last asked: a song's lookup is a handful of searches, sent no faster than GAP apart
+GAP = 0.4
+
+
+def _get(path: str, params: dict | None = None, tries: int = 6):
+    """LRCLIB's json for path, None for 404. When it's busy it answers 503 (or 429), with a Retry-After at times: that
+    long, or 1, 2, 4, 8 then 16 s, is waited before asking again, half a minute in all before giving up."""
+    global _last
     url = f"{API}/{path}" + ("?" + urllib.parse.urlencode(params) if params else "")
     for i in range(tries):
+        with _pace:
+            time.sleep(max(0.0, _last + GAP - time.monotonic()))
+            _last = time.monotonic()
+        wait = min(2 ** i, 16)
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": AGENT}), timeout=15) as r:
                 return json.load(r)
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return None
-            if e.code < 500 or i == tries - 1:
-                raise RuntimeError(f"LRCLIB answered {e.code}.") from None
+            if (e.code < 500 and e.code != 429) or i == tries - 1:
+                raise RuntimeError("LRCLIB is busy right now. Try again in a minute." if e.code in (429, 503)
+                                   else f"LRCLIB answered {e.code}.") from None
+            after = e.headers.get("Retry-After", "")
+            if after.strip().isdigit():
+                wait = min(int(after), 30)
         except (urllib.error.URLError, TimeoutError, OSError):
             if i == tries - 1:
                 raise RuntimeError("Couldn’t reach LRCLIB. Is this computer online?") from None
-        time.sleep(1 + i)
+        time.sleep(wait)
     return None
 
 
@@ -115,7 +131,18 @@ def candidates(title: str, duration: float, most: int = 3, hint: str = "") -> li
     if not found and failed:
         raise failed  # not "none found": that's only said once LRCLIB has answered
     found.sort(key=lambda r: (-len(tw & _words(f"{r['artist']} {r['track']}")), not r["synced"], abs(r["duration"] - duration)))
-    return [e for r in found[:most] if (e := get(r["id"])) and e["lines"]]
+    out = []
+    for r in found[:most]:
+        try:
+            e = get(r["id"])
+        except RuntimeError as err:  # the others may still come
+            failed = err
+            continue
+        if e and e["lines"]:
+            out.append(e)
+    if not out and failed:
+        raise failed
+    return out
 
 
 def get(entry_id: int) -> dict | None:

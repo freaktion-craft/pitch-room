@@ -271,11 +271,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1")})
         if url.path == "/api/stems/upload":
             name = (q.get("name") or ["upload"])[0]
-            lyr = (q.get("lyrics") or ["0"])[0] == "1"
-            return self._json(200, {"job": stems.start_upload(self._body(MAX_SONG), name, model, lyr)})
+            return self._json(200, {"job": stems.start_upload(self._body(MAX_SONG), name, model)})
         if url.path == "/api/stems/youtube":
             body = json.loads(self._body(10_000) or b"{}")
-            return self._json(200, {"job": stems.start_youtube(body.get("url", "").strip(), body.get("model", model), body.get("lyrics") is True)})
+            return self._json(200, {"job": stems.start_youtube(body.get("url", "").strip(), body.get("model", model))})
         parts = url.path.strip("/").split("/")  # api/library/<id>/<action>, api/jobs/<id>/cancel
         if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "cancel":
             return self._json(200, {"status": stems.cancel_job(parts[2])})
@@ -296,6 +295,9 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == "keep":
                 body = json.loads(self._body(100_000) or b"{}")
                 return self._json(200, {"keep": stems.set_keep(parts[2], body.get("keep") if isinstance(body, dict) else None)})
+            if parts[3] == "marks":
+                body = json.loads(self._body(100_000) or b"{}")
+                return self._json(200, {"marks": stems.set_phrase_marks(parts[2], body.get("marks") if isinstance(body, dict) else None)})
             if parts[3] == "key":
                 body = json.loads(self._body(1000) or b"{}")
                 return self._json(200, stems.start_key(parts[2], body.get("n"), body.get("speed", 1)))
