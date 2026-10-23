@@ -34,7 +34,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 
 ## Update it
 
-Close Stem, then double-click the updater for your system in the `update` folder: `update-windows.bat`, `update-mac.command` or `update-linux.sh`. A git clone is pulled; a downloaded copy gets the latest version's files, written over the ones that changed. Your songs, takes, settings and downloaded models stay as they are. Start Stem as usual afterwards.
+Close Stem, then double-click the updater for your system in the `update` folder: `update-windows.bat`, `update-mac.command` or `update-linux.sh`. A git clone is pulled; a downloaded copy gets the latest version's files, written over the ones that changed. Your songs, takes, settings and downloaded models stay as they are. Start Stem as usual afterwards. When a new version lines lyrics up, times their syllables or reads melodies better, the songs you have are brought up to date in the background once it starts, one at a time: the one being done shows a ring over its cover in the library.
 
 ## What's inside
 

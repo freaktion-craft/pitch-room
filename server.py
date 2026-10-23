@@ -368,7 +368,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def serve(port: int) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    stems.start_upgrades()  # songs made by an older version, brought up to date in the background
+    return httpd
 
 
 if __name__ == "__main__":

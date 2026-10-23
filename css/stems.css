@@ -328,6 +328,11 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--fg-8); }
 #sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-slow); }
 #sLib .cover img.in { opacity: 1; }
+/* being brought up to date (paintUpgrade): the picture dimmed, a ring of how far it's got over its middle */
+#sLib .cover.upgrading img.in { opacity: 0.5; }
+#sLib .cover .ring { position: absolute; inset: 0; width: var(--icon-lg); height: var(--icon-lg); margin: auto; transform: rotate(-90deg); }
+#sLib .cover .ring circle:first-child { stroke: var(--fg-30); }
+#sLib .cover .ring circle + circle { stroke: var(--ink); transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #sLib .cover img.now { transition: none; }
 #sLib .cover[role="button"] { cursor: pointer; }
 #sLib .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

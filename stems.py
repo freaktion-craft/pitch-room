@@ -416,6 +416,9 @@ def library() -> list[dict]:
                 print(f"Skipped library/{d}: its meta.json can't be read ({e})", file=sys.stderr)
                 continue
             meta["split"] = _has_split(folder)
+            if _upgrading["id"] == d:  # being brought up to date (start_upgrades): how far it's got
+                up = get_job(_upgrading["job"]) or {}
+                meta["upgrade"] = 1.0 if up.get("status") not in ("queued", "running") else round(up.get("progress") or 0, 3)
             if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
                 _backfilled.add(d)
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
@@ -841,6 +844,9 @@ def _pipeline(job, src: dict, model_name: str):
 # share of the words Whisper is fairly sure it hears where they've been put (probability over 0.5). The song's own
 # lyrics score about 0.75 and another song's 0 to 0.05, so an entry under MATCH_MIN is taken for another song.
 MATCH_MIN = 0.3
+# lyrics.json's "v": how its lines were lined up. 2: lines the lead doesn't sing looked for on the whole vocal
+# (_reheard); 1 (no "v"), on the lead alone. Bump it when that changes: songs' lyrics are lined up again (start_upgrades).
+LYRICS_VERSION = 2
 
 
 def _whisper_bar(job, share: tuple[float, float]):
@@ -1008,7 +1014,9 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
     import lyrics
     lo, hi = share
     mid = lo + 0.5 * (hi - lo)  # the first half for finding them (and the model's download, the first time)
-    if how and how.get("text") is not None:
+    if how and how.get("lines") is not None:  # the lines the song has, lined up again (start_lyrics again=True)
+        found = [(how.get("source") or {"site": "pasted"}) | {"lines": how["lines"]}]
+    elif how and how.get("text") is not None:
         found = [{"site": "pasted", "lines": lyrics.lines_of(how["text"])}]
         if not found[0]["lines"]:
             raise ValueError("Paste the lyrics, a line of the song to each line.")
@@ -1028,8 +1036,8 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
             _stage(job, "Lining the lyrics up with the voice", mid + i * step)
             lines, match = _align(model, voice, entry["lines"], job, (mid + i * step, mid + (i + 1) * step), whole)
             if how or match >= MATCH_MIN:
-                source = {"site": "pasted"} if entry["site"] == "pasted" else {k: entry[k] for k in ("site", "id", "artist", "track")}
-                return {"lines": lines, "match": match, "source": source, "at": time.time()}
+                source = {"site": "pasted"} if entry["site"] == "pasted" else {k: entry.get(k) for k in ("site", "id", "artist", "track")}
+                return {"lines": lines, "match": match, "source": source, "at": time.time(), "v": LYRICS_VERSION}
     return {"lines": None, "at": time.time()}
 
 
@@ -1059,16 +1067,17 @@ def get_lyrics(song_id: str) -> dict:
     return {"lyrics": data, "job": running["id"] if running and running["status"] in ("queued", "running") else None}
 
 
-def start_lyrics(song_id: str, how) -> str:
+def start_lyrics(song_id: str, how, again: bool = False) -> str:
     """Find a song's lyrics and line them up with its voice, in the background (half a minute at most on a GPU; the
     first time, Whisper's model is downloaded too). how: None to look on LRCLIB by the title, {"id": n} for an entry
-    picked from search_lyrics, {"text": …} for lyrics pasted in. Returns the job's id; one already running for the song
+    picked from search_lyrics, {"text": …} for lyrics pasted in. again: the lines the song has, lined up again as the
+    app does now (start_upgrades; nothing downloaded for it). Returns the job's id; one already running for the song
     is returned rather than a second started, unless this one asks for something in particular."""
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
     if not installed():
         raise ValueError("Lyrics need Whisper: install the stem tools on the Library page first.")
-    if how is not None:
+    if how is not None and not again:
         if not isinstance(how, dict) or not (isinstance(how.get("text"), str) or isinstance(how.get("id"), int)):
             raise ValueError("Send an LRCLIB entry's id or the lyrics' text.")
         if len(how.get("text") or "") > 50_000:
@@ -1083,18 +1092,24 @@ def start_lyrics(song_id: str, how) -> str:
 
     def work(job):
         import covers
-        _set(job, status="running", stage="Finding the lyrics", progress=0.02)
+        _set(job, status="running", stage="Lining the lyrics up with the voice" if again else "Finding the lyrics", progress=0.02)
         _looked_up(song_id)  # a song just added: what it is (its artist, its title) is asked of iTunes and Deezer first
         meta = _read_meta(folder)
+        ask = how
+        if again:
+            old = _lyrics_data(folder)
+            if not old:
+                return
+            ask = {"lines": [line["text"] for line in old["lines"]], "source": old.get("source")}
         voice = _voice16k(folder)
         whole = _voice16k(folder, whole=True) if os.path.isfile(os.path.join(folder, "lead.mp3")) else None
         mel = None
         with _turn(job):  # one model on the GPU at a time
             # whose song it was found to be (not a cover's: that's named for whoever sings it)
             named = f"{meta['artist']} {meta['title']}" if meta.get("artist") and not covers.is_cover(meta["title"]) else ""
-            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.9), how, named, whole)
+            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.9), ask, named, whole)
             if data.get("lines") and _has_split(folder):  # the bars, cut where the new lyrics' syllables start
-                syl = _syllables(folder, data, job, (0.9, 0.96))
+                syl = _syllables(folder, data, job, (0.9, 0.96), fetch=not again)
                 _stage(job, "Fitting the bars to the lyrics", 0.96)
                 mel = _melody_of(folder, True, syl)
         if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
@@ -1105,6 +1120,7 @@ def start_lyrics(song_id: str, how) -> str:
 
     job = _new_job("lyrics")
     job["songId"] = song_id
+    job["upgrade"] = again
     _lyrics_jobs[song_id] = _run(job, work)
     return _lyrics_jobs[song_id]
 
@@ -1532,9 +1548,9 @@ def _syllables(folder: str, lyr: dict | None, job=None, share: tuple[float, floa
         old = _load_json(path) if os.path.isfile(path) else None
     except ValueError:
         old = None
-    if old and old.get("at") == lyr.get("at"):
-        return old
     import syllables
+    if old and old.get("at") == lyr.get("at") and old.get("v") == syllables.VERSION:
+        return old
     try:
         if fetch:
             _fetch_syllable_models(syllables.languages(lyr["lines"]), job, share)
@@ -1543,10 +1559,27 @@ def _syllables(folder: str, lyr: dict | None, job=None, share: tuple[float, floa
         al = syllables.align_lyrics(_decode_stereo(os.path.join(folder, "lead.mp3")).mean(0), lyr["lines"], dev=device)
     except Exception as e:  # noqa: BLE001
         print(f"No syllables for library/{os.path.basename(folder)}: {e}", file=sys.stderr)
-        return {"at": lyr.get("at"), "onsets": [], "failed": str(e)[:200]}
-    data = {"at": lyr.get("at"), "onsets": [[round(t, 3), s] for t, s in al["onsets"]], "skipped": al.get("skipped")}
+        return {"at": lyr.get("at"), "onsets": [], "failed": str(e)[:200], "v": syllables.VERSION}
+    data = {"at": lyr.get("at"), "onsets": [[round(t, 3), s] for t, s in al["onsets"]], "skipped": al.get("skipped"), "v": syllables.VERSION}
     _write_json(path, data)
     return data
+
+
+def _melody_outdated(folder: str, data: dict) -> bool:
+    """melody.json (data) is to be read again: the extraction changed (melody.VERSION), it came from the whole vocal
+    stem and the lead model is installed now, the lyrics changed or their syllables were worked out differently, or it
+    was read without a model that's there now (_stale)."""
+    import melody
+    import syllables
+    lyr = _lyrics_data(folder) if data.get("lead") else None
+    if data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available()) or data.get("lyricsAt") != (lyr or {}).get("at"):
+        return True
+    path = os.path.join(folder, "syllables.json")
+    try:
+        syl = _load_json(path) if lyr and os.path.isfile(path) else None
+    except ValueError:
+        syl = None
+    return bool(syl and syl.get("v") != syllables.VERSION) or _stale(data, lyr)
 
 
 def _stale(data: dict, lyr: dict | None) -> bool:
@@ -1596,9 +1629,7 @@ def get_melody(song_id: str) -> dict:
                 data = _load_json(path)
             except ValueError:
                 data = {}  # damaged: built again below
-            lyr = _lyrics_data(folder) if data.get("lead") else None
-            if (data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available())
-                    or data.get("lyricsAt") != (lyr or {}).get("at") or _stale(data, lyr)):
+            if _melody_outdated(folder, data):
                 data = None
         vocals = os.path.join(folder, "vocals.mp3")
         if data is None:
@@ -1622,6 +1653,48 @@ def get_melody(song_id: str) -> dict:
             data["full"] = {"notes": full["notes"], "contour": full["contour"]}
             _write_json(path, data, separators=(",", ":"))
         return _splice(data, ranges)
+
+
+# Songs made by older logic, brought up to date in the background once the server starts, one at a time, newest
+# first: their lyrics lined up again when LYRICS_VERSION has moved on (their syllables and bars follow), else their
+# bars read again when melody.VERSION or syllables.VERSION has. The library shows the one being done (its cover
+# dimmed under a ring, library()'s "upgrade"); Practice opened on it meanwhile has what it had, then the new. Nothing
+# is downloaded for it: a song that would need a model that isn't here is left as it is.
+_upgrading = {"id": None, "job": None}  # the song being brought up to date and its job; held till the next one's
+
+
+def _lyrics_outdated(folder: str) -> bool:
+    import lyrics
+    data = _lyrics_data(folder)
+    return bool(data) and data.get("v", 1) < LYRICS_VERSION and os.path.isfile(os.path.join(MODEL_DIR, lyrics.WHISPER_FILE))
+
+
+def _melody_job(job, song_id: str):
+    _set(job, status="running", stage="Reading the melody again", progress=0)
+    get_melody(song_id)
+
+
+def start_upgrades():
+    def run():
+        for meta in library() if installed() else []:
+            song_id, folder = meta["id"], _song_dir(meta["id"])
+            try:
+                if _lyrics_outdated(folder):
+                    job_id = start_lyrics(song_id, None, again=True)
+                elif os.path.isfile(os.path.join(folder, "melody.json")) and _melody_outdated(folder, _load_json(os.path.join(folder, "melody.json"))):
+                    job = _new_job("melody")
+                    job["songId"] = song_id
+                    job_id = _run(job, _melody_job, song_id)
+                else:
+                    continue
+            except Exception as e:  # noqa: BLE001  (it's brought up to date when it's next opened)
+                print(f"Couldn't bring library/{song_id} up to date: {e}", file=sys.stderr)
+                continue
+            _upgrading.update(id=song_id, job=job_id)  # (the last one's, done, until now: the list sees no gap between)
+            while (get_job(job_id) or {}).get("status") in ("queued", "running"):
+                time.sleep(0.5)
+        _upgrading.update(id=None, job=None)
+    threading.Thread(target=run, daemon=True).start()
 
 
 # ---------- key and tempo ----------

@@ -29,7 +29,7 @@ import numpy as np
 
 SR = 44100
 STEP = 0.01  # 10 ms frames
-VERSION = 8  # bump when the output changes so cached melody.json files are rebuilt
+VERSION = 8  # bump when the output changes so cached melody.json files are rebuilt (stems.start_upgrades)
 
 # 1. RMVPE (Wei et al. 2023): note F1 0.615 with pYIN and v6's segmenter, 0.733 with RMVPE and the segmenter below.
 _HERE = os.path.dirname(os.path.abspath(__file__))

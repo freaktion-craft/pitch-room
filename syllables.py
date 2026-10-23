@@ -37,6 +37,7 @@ import unicodedata
 import numpy as np
 
 SR = 44100
+VERSION = 1  # bump when the onsets change: songs' syllables.json are worked out again (stems.start_upgrades)
 FRAME = 0.02  # wav2vec2 frame hop (320 samples at 16 kHz)
 FRAME_CENTER = 0.0125  # frame k covers samples [320k, 320k + 400): centre 12.5 ms after k * 20 ms
 _HERE = os.path.dirname(os.path.abspath(__file__))

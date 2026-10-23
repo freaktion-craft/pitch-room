@@ -179,8 +179,20 @@ function arrangeRows() {
 function coverTile(m) {
   const tile = el("span", "cover");
   tile.setAttribute("aria-hidden", "true");
-  paintCover(tile, m);
+  paintCover(tile, m); paintUpgrade(tile, m);
   return tile;
+}
+// A song being brought up to date after an update of the app (stems.start_upgrades: its lyrics lined up again, its
+// bars read again): its cover dimmed under a ring of how far it's got, spinning until it's started
+function paintUpgrade(tile, m) {
+  const on = m.upgrade != null;
+  let ring = tile.querySelector(".ring");
+  tile.classList.toggle("upgrading", on);
+  if (!on) { ring?.remove(); tile.removeAttribute("title"); return; }
+  if (!ring) tile.append((ring = progRing(0)));
+  ring.classList.toggle("spin", !m.upgrade);
+  ring.lastChild.setAttribute("stroke-dasharray", `${Math.max(6, m.upgrade * 100)} 100`);
+  tile.title = tr("Updating for the new version…");
 }
 function paintCover(tile, m) {
   if (!m.cover || tile.querySelector("img")) return;
@@ -329,10 +341,12 @@ function initCoverView() {
 // What songs are, still being looked up (a song just added, or ones from before there were covers): its title and
 // artist as found (stems.py _look_up; "artist" is absent until then) and its cover. The list asks again every few
 // seconds, a minute at most, and puts each in as it's found, in its row, where the video's own title was meanwhile.
+// While a song is being brought up to date (paintUpgrade), every second, for as long as that takes.
 let lookupTimer = 0;
 function awaitLookups(lib, tries = 0) {
   clearTimeout(lookupTimer);
-  if (tries >= 20 || !lib.some((m) => !("cover" in m) || !("artist" in m))) return;
+  const looking = tries < 20 && lib.some((m) => !("cover" in m) || !("artist" in m)), upgrading = lib.some((m) => m.upgrade != null);
+  if (!looking && !upgrading) return;
   lookupTimer = setTimeout(async () => {
     if (!(view === "stems" && stemsPage === "lib")) return; // the list asks again when it's shown again
     let now;
@@ -343,7 +357,8 @@ function awaitLookups(lib, tries = 0) {
       const known = libCache.get(m.id), row = libRows.get(m.id);
       if (!known || !row) continue;
       if ("cover" in m) known.cover = m.cover;
-      paintCover(row.querySelector(".cover"), m);
+      known.upgrade = m.upgrade;
+      paintCover(row.querySelector(".cover"), m); paintUpgrade(row.querySelector(".cover"), m);
       if ((known.title !== m.title || known.artist !== m.artist) && !row.querySelector(".rename")) { // not while it's being renamed
         known.title = m.title; known.artist = m.artist; renamed = true;
         const link = row.querySelector(".song a");
@@ -354,7 +369,7 @@ function awaitLookups(lib, tries = 0) {
     }
     if (renamed && SORTS[libSort.by]?.text) arrangeRows(); // sorted by name: it may belong elsewhere now
     awaitLookups(now, tries + 1);
-  }, 3000);
+  }, upgrading ? 1000 : 3000);
 }
 // Key names spelled the usual way for each key (D♭ major, C♯ minor).
 const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
