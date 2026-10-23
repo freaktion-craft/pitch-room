@@ -42,7 +42,8 @@ function drawInfo() {
   fact("Length", fmtTime(s.duration));
   const v = s.vocals && { ...s.vocals, lo: s.vocals.lo + n, hi: s.vocals.hi + n, mostly: s.vocals.mostly && s.vocals.mostly.map((x) => x + n) };
   s.vocals = v; s.shift = n;
-  if (v) fact("Vocal range", `${absName(v.lo)}–${absName(v.hi)}`, tr("{n} semitones", { n: v.hi - v.lo }) + (v.mostly ? tr(" · mostly {lo}–{hi}", { lo: absName(v.mostly[0]), hi: absName(v.mostly[1]) }) : ""));
+  const key = keyAfter(s.key, n); // the notes named as the key they're shown in has them (absName)
+  if (v) fact("Vocal range", `${absName(v.lo, key)}–${absName(v.hi, key)}`, tr("{n} semitones", { n: v.hi - v.lo }) + (v.mostly ? tr(" · mostly {lo}–{hi}", { lo: absName(v.mostly[0], key), hi: absName(v.mostly[1], key) }) : ""));
   fact("Tracks", String(trackNames(s).length), trackNames(s).map((k) => tr(k)).join(", "));
   if (v) renderInfoRange(s);
   renderInfoLyrics(id);
@@ -151,7 +152,7 @@ async function hearAt(s, t0, t1, btn) {
 function stopHear() { if (infoSrc) { try { infoSrc.stop(); } catch (e) {} infoSrc = null; } }
 // The melody's range: lighter for all of it, solid for where it mostly sits.
 function renderInfoRange(s) {
-  const v = s.vocals, box = $("#iRange"), lo = v.lo - 2, hi = v.hi + 2;
+  const v = s.vocals, box = $("#iRange"), lo = v.lo - 2, hi = v.hi + 2, key = keyAfter(s.key, s.shift || 0);
   const at = (x) => `${((x - lo) / (hi - lo)) * 100}%`;
   const bar = (name, text, spans) => {
     const row = el("div", "rbar"), lane = el("div", "lane");
@@ -159,17 +160,17 @@ function renderInfoRange(s) {
     row.append(el("span", null, name), lane, el("output", null, text)); return row;
   };
   const axis = el("div", "rbar axis"), ticks = el("div", "lane");
-  for (let x = Math.ceil(lo); x <= hi; x++) if (x % 12 === 0) { const t = el("span", null, absName(x)); t.style.left = at(x); ticks.append(t); }
+  for (let x = Math.ceil(lo); x <= hi; x++) if (x % 12 === 0) { const t = el("span", null, absName(x, key)); t.style.left = at(x); ticks.append(t); }
   axis.append(el("span"), ticks, el("output"));
   box.append(el("div", "group-label minor", tr("Where the melody sits")));
   const bars = el("div", "rbars");
-  bars.append(bar(tr("Song"), `${absName(v.lo)}–${absName(v.hi)}`, [[v.lo, v.hi, "full"], ...(v.mostly ? [[v.mostly[0], v.mostly[1], "core"]] : [])]));
+  bars.append(bar(tr("Song"), `${absName(v.lo, key)}–${absName(v.hi, key)}`, [[v.lo, v.hi, "full"], ...(v.mostly ? [[v.mostly[0], v.mostly[1], "core"]] : [])]));
   bars.append(axis); box.append(bars);
   // hear the extremes: the vocal track at that moment, or the bare note on the piano
   const listen = el("div", "listen");
   for (const [name, m, at] of [["Lowest", v.lo, v.loAt], ["Highest", v.hi, v.hiAt]]) {
     const row = el("div", "listen-row");
-    row.append(el("span", "lbl", tr(name)), el("b", null, absName(m)));
+    row.append(el("span", "lbl", tr(name)), el("b", null, absName(m, key)));
     if (at) {
       const hear = mkBtn("", () => hearAt(s, at[0], at[1], hear));
       hear.title = tr("Play that moment of the vocal track"); hear.append(icon("play"), tr("In the song · {t}", { t: fmtTime(at[0]) }));

@@ -372,7 +372,7 @@ function awaitLookups(lib, tries = 0) {
   }, upgrading ? 1000 : 3000);
 }
 // Key names spelled the usual way for each key (D♭ major, C♯ minor).
-const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
+const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]; // G♭ (6 flats, as its notes are spelt) for F♯
 const KEY_MINOR = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"];
 const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${tr(k.mode)}` : ""); // G♯ minor, G♯ 단조
 const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : tr("no steady beat"), keyName(m.key)].filter(Boolean);

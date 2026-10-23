@@ -62,6 +62,7 @@ const HIT = 0.24; // where the playhead line is, as a share of the width right o
 // now: song time at the hit line; cur: your pitch; hist: your recent pitch; evs: the bars; guide: the original singer's
 // pitch line ({pts, shift})
 function draw(now, cur, hist, evs, guide) {
+  const key = playedKey(guide.shift); // the note names' spelling
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = C.surface; g.fillRect(0, 0, W, H);
   const hitX = Math.round(GUT + (W - GUT) * HIT), pps = (W - hitX) / 4.4;
@@ -77,7 +78,7 @@ function draw(now, cur, hist, evs, guide) {
       if (p === 0) { g.globalAlpha = a; g.fillStyle = C.line; g.fillRect(GUT, Math.round(y + ppS / 2), W - GUT, 1); }
       if (a === 1 && !BLACK.has(p) && (ppS >= 13 || p === 0)) {
         g.fillStyle = p === 0 ? C.ink : C.muted; g.font = `${p === 0 ? 600 : 400} 11px Pretendard, system-ui, sans-serif`;
-        g.textBaseline = "middle"; g.fillText(absName(m), 16, y);
+        g.textBaseline = "middle"; g.fillText(absName(m, key), 16, y);
       }
     }
     g.globalAlpha = 0.35 * a; g.fillStyle = C["surface-2"]; g.fillRect(GUT + 1, 0, hitX - GUT - 1, H);
@@ -103,7 +104,7 @@ function draw(now, cur, hist, evs, guide) {
     g.stroke();
     if (w > 26 && bh >= 12) {
       g.fillStyle = C.ink; g.font = "500 11px Pretendard, \"Apple SD Gothic Neo\", system-ui, sans-serif"; g.textBaseline = "middle";
-      g.fillText(absName(e.midi), x0 + 7, y + bh / 2 + 0.5);
+      g.fillText(absName(e.midi, key), x0 + 7, y + bh / 2 + 0.5);
     }
   }
   // original singer's pitch, faint, behind your own line

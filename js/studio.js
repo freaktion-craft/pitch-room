@@ -15,7 +15,7 @@ const trackNames = (m) => (m.split ? m.stems.flatMap((n) => (n === "vocals" ? ["
 async function openSong(m) {
   closeSong();
   ensureCtx();
-  P.song = m; P.offset = 0; P.ph = null;
+  P.song = m; P.offset = 0; P.ph = null; labelKeys();
   $("#pSing").hidden = !m.stems.includes("vocals");
   $("#pTitle").textContent = m.title;
   paintMeta(); keyOf(m).then(() => { if (P.song === m) { paintMeta(); paintKey(); } });
@@ -534,6 +534,8 @@ function saveRate(id, s) { const r = rateMap(); if (s !== 1) r[id] = s; else del
 const KEYS = 6, KEY_WARN = 4; // from KEY_WARN semitones on, the processing can be heard
 const keySign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n); // +2, −3, 0
 const keyAfter = (k, n) => k && { pc: (((k.pc + n) % 12) + 12) % 12, mode: k.mode };
+// the open song's key as it plays: its own, moved n semitones (P.key, or a take's), for the note names (absName)
+const playedKey = (n = P.key) => (P.song ? keyAfter(P.song.key, n) : null);
 const keyMap = () => { const k = store.get("keys", {}); return k && typeof k === "object" ? k : {}; }; // song id -> n
 const savedKey = (id) => Math.max(-KEYS, Math.min(KEYS, Math.round(+keyMap()[id] || 0)));
 function saveKey(id, n) { const k = keyMap(); if (n) k[id] = n; else delete k[id]; store.set("keys", k); }
@@ -602,6 +604,7 @@ function applyKey(n, s) {
   P.buffers = Object.fromEntries(Object.entries(P.orig).map(([k, b]) => [k, bufs[k] || b]));
   if (P.playing) swapSources(was);
   if (K.on && K.song === P.song) songEvs();
+  labelKeys(); // the keyboard's names, as the key now has them
   if (s !== was) renderTracks(); // the metronome's tempo, as played now
   paintKey();
 }

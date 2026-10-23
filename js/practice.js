@@ -765,7 +765,7 @@ function initSing() {
   micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); });
   micPick.set([{ v: "", t: "System default" }], "");
   if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
-  namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m))); });
+  namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); labelKeys(); });
   namesPick.set([{ v: "en", t: "C D E (C4)" }, { v: "ko", t: "Do Re Mi" }], S.names);
   // kept once picked; until then the browser's language decides (initLang)
   langPick = makePick($("#lang"), "Language", (v) => { store.set("lang", v); setLang(v); });

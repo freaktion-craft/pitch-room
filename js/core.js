@@ -5,6 +5,8 @@
 const $ = (s) => document.querySelector(s);
 const EN = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
 const KO = ["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Ti"]; // solfège (fixed do)
+const EN_FLAT = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+const KO_FLAT = ["Do","Re♭","Re","Mi♭","Mi","Fa","Sol♭","Sol","La♭","La","Ti♭","Ti"];
 const BLACK = new Set([1,3,6,8,10]);
 
 // ---------- settings ----------
@@ -59,7 +61,12 @@ let A4 = 440; // the reference the song's bars are numbered against (melody.json
 const mf = (m) => A4 * Math.pow(2, (m - 69) / 12);
 const pc = (m) => ((Math.round(m) % 12) + 12) % 12;
 const oct = (m) => Math.floor(Math.round(m) / 12) - 1;
-const absName = (m) => (S.names === "ko" ? KO : EN)[pc(m)] + oct(m);
+// Note names are spelt as the key is written: with flats in F, B♭, E♭, A♭, D♭ and G♭ major and their relative minors
+// (D, G, C, F, B♭ and E♭ minor), with sharps in the rest. key: the key the notes are in ({pc, mode}), by default the
+// open song's as it plays (playedKey: its own, or moved up or down); with none known, sharps.
+const FLAT_MAJORS = new Set([5, 10, 3, 8, 1, 6]);
+const flatKey = (k) => !!k && FLAT_MAJORS.has(k.mode === "major" ? k.pc : (k.pc + 3) % 12);
+const absName = (m, key = playedKey()) => (flatKey(key) ? (S.names === "ko" ? KO_FLAT : EN_FLAT) : (S.names === "ko" ? KO : EN))[pc(m)] + oct(m);
 const clock = () => performance.now() / 1000;
 // --gap-float, for menus and lists placed by script
 const floatGap = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gap-float")) || 8;

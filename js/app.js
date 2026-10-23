@@ -52,13 +52,13 @@ function notice(msg) {
 // keyboard
 const KEY_LO = 36, KEY_HI = 84, KW = 26;
 const keyEls = new Map();
+const labelKeys = () => keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m)));
 (function buildKeys() {
   const box = $("#keys"); let wi = 0;
   for (let m = KEY_LO; m <= KEY_HI; m++) {
     const b = document.createElement("button"); b.type = "button";
     const black = BLACK.has(pc(m));
     b.className = "key " + (black ? "b" : "w");
-    b.setAttribute("aria-label", absName(m));
     if (black) b.style.left = (wi * (KW - 1) - 8) + "px";
     else { if (pc(m) === 0) b.textContent = "C" + oct(m); wi++; }
     // held down: a class rather than :active, so Enter and Space show it too and it ends when the pointer slides off
@@ -68,6 +68,7 @@ const keyEls = new Map();
     b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); b.classList.add("down"); playKey(m); } });
     box.append(b); keyEls.set(m, b);
   }
+  labelKeys();
 })();
 let kGuide = null, kLive = null;
 function renderKeys(tm, m) {
