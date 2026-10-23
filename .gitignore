@@ -9,3 +9,4 @@ models/
 .ffmpeg/
 icons.local.js
 settings.json
+.update-files

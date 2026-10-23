@@ -4,6 +4,14 @@ Open-source personal singing practice software. A local app for learning songs b
 
 > **For personal practice only.** Use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service. Songs, lyrics and models stay on your computer and are never part of this repository.
 
+## Get it
+
+No GitHub account needed. Either download it — **Code → Download ZIP** on this page, then unzip it anywhere — or, with git:
+
+```bash
+git clone https://github.com/freaktion-craft/pitch-room.git
+```
+
 ## Start it
 
 Double-click the launcher for your system:
@@ -23,6 +31,10 @@ The first run creates a private Python environment in `.venv` and installs the b
 Use earphones while practicing so the song doesn't leak into the mic, or turn on **Filter out speaker sound** in Practice's mic settings. The mic settings also choose which **Input** to sing into, if you have more than one.
 
 The page is in English or Korean (한국어): **Language** in the settings (the gear). It starts in Korean when the browser is set to Korean.
+
+## Update it
+
+Close Stem, then double-click the updater for your system in the `update` folder: `update-windows.bat`, `update-mac.command` or `update-linux.sh`. A git clone is pulled; a downloaded copy gets the latest version's files, written over the ones that changed. Your songs, takes, settings and downloaded models stay as they are. Start Stem as usual afterwards.
 
 ## What's inside
 
@@ -62,6 +74,7 @@ Songs are kept in `library/` so they open instantly next time. The first time yo
 | `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |
 | `syllables.py` | The lyrics' syllables timed on the lead vocal, where the melody's notes may start |
 | `launch.py` | Installs packages, finds a free port, starts the server, opens Chrome |
+| `update.py`, `update/` | Brings a copy up to date: `git pull` in a clone, else the latest ZIP's changed files (your library and settings kept); `update/` has a launcher per OS |
 | `start-*` | One-click launchers per OS |
 
 Run the server directly with `.venv/bin/python server.py` (port 5178) if you prefer.
