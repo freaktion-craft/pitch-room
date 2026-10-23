@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 import shutil
 import subprocess
 import sys
@@ -26,11 +27,19 @@ MANIFEST = os.path.join(ROOT, ".update-files")  # {commit, files}: what the last
 KEEP = ("library/", "models/", ".venv/", ".tools/", ".ffmpeg/", ".git/", "settings.json", "icons.local.js", ".update-files")
 
 
+def step(n: int, text: str):
+    print(f"[{n}/4] {text}", flush=True)
+
+
 def running() -> str:
-    """The address of a Stem that's running on this computer, or ""."""
+    """The address of a Stem that's running on this computer, or "". The ports are asked all at once: one at a time,
+    Windows takes a second or two on each closed one, and the window sat blank for most of a minute."""
     sys.path.insert(0, ROOT)
     from launch import is_ours
-    return next((f"http://localhost:{p}" for p in range(5178, 5198) if is_ours(p)), "")
+    ports = range(5178, 5198)
+    with ThreadPoolExecutor(len(ports)) as pool:
+        ours = list(pool.map(is_ours, ports))
+    return next((f"http://localhost:{p}" for p, yes in zip(ports, ours) if yes), "")
 
 
 def requirements() -> str:
@@ -43,7 +52,8 @@ def from_git() -> bool:
     if not git:
         sys.exit("This copy is a git clone, but git isn't installed here. Install git, or download Stem again as a ZIP.")
     before = subprocess.run([git, "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    if subprocess.run([git, "pull", "--ff-only", "-q"], cwd=ROOT).returncode != 0:
+    print("      git pull (this copy is a git clone)…", flush=True)
+    if subprocess.run([git, "pull", "--ff-only", "--progress"], cwd=ROOT).returncode != 0:
         sys.exit("git couldn't update this copy (see above): files changed here, most likely. Commit or undo them first.")
     return subprocess.run([git, "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip() != before
 
@@ -53,13 +63,17 @@ def from_zip() -> bool:
         old = json.load(open(MANIFEST, encoding="utf-8"))
     except (OSError, ValueError):
         old = {"commit": "", "files": []}
-    print("Downloading the latest version…", flush=True)
+    print("      Downloading the latest version from GitHub…", flush=True)
     try:
         with urllib.request.urlopen(ZIP, timeout=60) as r:
-            data = r.read()
+            data = bytearray()
+            while chunk := r.read(1 << 16):
+                data += chunk
+                print(f"\r      {len(data) / 1e6:.1f} MB", end="", flush=True)
+            print(flush=True)
     except OSError as e:
         sys.exit(f"Couldn't download it ({e}). Check the internet connection and try again.")
-    with zipfile.ZipFile(io.BytesIO(data)) as z:
+    with zipfile.ZipFile(io.BytesIO(bytes(data))) as z:
         commit = z.comment.decode(errors="ignore").strip()  # GitHub puts the commit's id there
         if commit and commit == old["commit"]:
             return False
@@ -93,25 +107,50 @@ def from_zip() -> bool:
             gone += 1
     with open(MANIFEST, "w", encoding="utf-8") as f:
         json.dump({"commit": commit, "files": sorted(files)}, f, indent=1)
-    print(f"{wrote} file{'s' * (wrote != 1)} updated" + (f", {gone} removed" if gone else "") + ".")
+    print(f"      {wrote} file{'s' * (wrote != 1)} updated" + (f", {gone} removed" if gone else "") + ".")
     return wrote > 0 or gone > 0
 
 
 def main():
+    print("Stem updater\n", flush=True)
+    step(1, "Checking that Stem is closed…")
     at = running()
     if at:
         sys.exit(f"Stem is running ({at}). Close its window first, then run this again.")
     req = requirements()
+    step(2, "Getting the latest version…")
     changed = from_git() if os.path.isdir(os.path.join(ROOT, ".git")) else from_zip()
     if not changed:
-        print("Already up to date.")
+        step(3, "Nothing new: already up to date.")
         return
     if req != requirements() and os.path.isfile(os.path.join(ROOT, ".venv", "pyvenv.cfg")):
-        print("Installing the base tools this version needs…", flush=True)
+        step(3, "Installing the base tools this version needs (can take a minute)…")
         venv = os.path.join(ROOT, ".venv", *(("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")))
-        subprocess.check_call([venv, "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", os.path.join(ROOT, "requirements.txt")])
-    print("Updated. Start Stem as usual.")
+        subprocess.check_call([venv, "-m", "pip", "install", "--disable-pip-version-check", "-r", os.path.join(ROOT, "requirements.txt")])
+    else:
+        step(3, "Base tools: nothing new to install.")
+    step(4, "Updated. Start Stem as usual.")
+
+
+def run():
+    """main, with how it ended spelled out last, so a glance at the window says whether it worked."""
+    try:
+        main()
+    except SystemExit as e:
+        if e.code not in (None, 0):
+            print(f"\n{e.code}" if isinstance(e.code, str) else "", file=sys.stderr, flush=True)
+            print("\nUPDATE FAILED. Nothing above was lost: fix what it says and run the updater again.", flush=True)
+            sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nUPDATE STOPPED.", flush=True)
+        sys.exit(1)
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        traceback.print_exc()
+        print(f"\nUPDATE FAILED ({type(e).__name__}: {e}).", flush=True)
+        sys.exit(1)
+    print("\nDONE.", flush=True)
 
 
 if __name__ == "__main__":
-    main()
+    run()
