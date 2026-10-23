@@ -725,11 +725,58 @@ def _separate(job, wav: np.ndarray, model_name: str):
     return list(model.sources), out
 
 
+SLOW = 70  # BPM: a beat found slower than this may be every other one of a slow groove (_double_time)
+BEATS_VERSION = 2  # meta's "beatsV": 2, half-time beats doubled (songs added before are checked once: _tempo_upgrade)
+
+
+def _pulse(drums: np.ndarray, mix: np.ndarray) -> np.ndarray:
+    """What the beat is read from, mono at 22.05 kHz: the drums, which carry the pulse best, or the full mix if the drum
+    stem is nearly silent."""
+    import librosa
+    y = drums if np.sqrt((drums ** 2).mean()) > 0.15 * np.sqrt((mix ** 2).mean()) else mix
+    return librosa.resample(y.astype(np.float32), orig_sr=SR, target_sr=22050)
+
+
+def _double_time(y: np.ndarray, period: float) -> bool:
+    """Whether beats period s apart are every other beat of y (_pulse): under SLOW BPM, when the tempo of y's onsets is
+    twice theirs. librosa's beat tracker hears the kick and snare above all, so a slow groove's half-time backbeat can
+    pull it to half the tempo (ALL: 49 BPM for its 99); its tempo estimate from every band's onsets, leaning toward 120
+    BPM, isn't pulled that way."""
+    import librosa
+    if 60 / period >= SLOW:
+        return False
+    est = float(librosa.feature.tempo(onset_envelope=librosa.onset.onset_strength(y=y, sr=22050), sr=22050)[0])
+    return abs(est * period / 120 - 1) < 0.04
+
+
+def _halved(beats: list) -> list:
+    """A beat grid with a beat put halfway between each two."""
+    out = []
+    for a, b in zip(beats[:-1], beats[1:]):
+        out += [a, (a + b) / 2]
+    return out + list(beats[-1:])
+
+
+def _tempo_upgrade(folder: str):
+    """A song added before BEATS_VERSION 2, its beat under SLOW BPM, checked once (a few seconds) for being every other
+    beat (_double_time): if it is, the beats between are put in and its tempo doubled. Then marked checked ("beatsV")."""
+    meta = _read_meta(folder)
+    beats = meta.get("beats") or []
+    if meta.get("beatsV", 1) >= BEATS_VERSION or not meta.get("bpm") or meta["bpm"] >= SLOW or len(beats) < 2:
+        return
+    wavs = {t: _decode_stereo(os.path.join(folder, t + ".mp3")).mean(0) for t in meta.get("stems", []) if os.path.isfile(os.path.join(folder, t + ".mp3"))}
+    if wavs:
+        n = min(len(w) for w in wavs.values())
+        mix = sum(w[:n] for w in wavs.values())  # the stems together, for the song as it came
+        if _double_time(_pulse(wavs["drums"][:n] if "drums" in wavs else mix, mix), 60 / meta["bpm"]):
+            _update_meta(folder, bpm=round(meta["bpm"] * 2, 1), beats=[round(b, 3) for b in _halved(beats)], beatsV=BEATS_VERSION)
+            return
+    _update_meta(folder, beatsV=BEATS_VERSION)
+
+
 def _beats(drums: np.ndarray, mix: np.ndarray, dur: float) -> tuple[float | None, list[float]]:
     import librosa
-    # drums carry the pulse best; fall back to the full mix if the drum stem is nearly silent
-    y = drums if np.sqrt((drums ** 2).mean()) > 0.15 * np.sqrt((mix ** 2).mean()) else mix
-    y = librosa.resample(y.astype(np.float32), orig_sr=SR, target_sr=22050)
+    y = _pulse(drums, mix)
     _, beats = librosa.beat.beat_track(y=y, sr=22050, units="time")
     beats = np.asarray(beats, dtype=float)
     if len(beats) < 4:
@@ -739,6 +786,8 @@ def _beats(drums: np.ndarray, mix: np.ndarray, dur: float) -> tuple[float | None
     # average period. Keep it only when it agrees with the median (i.e. the tempo is steady).
     slope = float(np.polyfit(np.arange(len(beats)), beats, 1)[0])
     period = slope if abs(slope - med) / med < 0.03 else med
+    if _double_time(y, period):  # the beats found are on every other one: the ones between put in
+        beats, period = np.asarray(_halved(list(beats))), period / 2
     # Fill the grid so the metronome also runs through drum-less intros, breaks and outros.
     grid = list(np.arange(beats[0] - period, -1e-6, -period)[::-1])
     for a, b in zip(beats[:-1], beats[1:]):
@@ -823,7 +872,7 @@ def _pipeline(job, src: dict, model_name: str):
                 _set(job, progress=0.9 + 0.09 * (i + 1) / len(order))
             _check(job)  # the last chance: once meta.json is written the song is in the library
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
-                    "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
+                    "beatsV": BEATS_VERSION, "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
             if channel:
                 meta["channel"] = channel  # who put the video up: a cover's singer, often
             _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
@@ -1711,6 +1760,10 @@ def start_upgrades():
     def run():
         for meta in library() if installed() else []:
             song_id, folder = meta["id"], _song_dir(meta["id"])
+            try:
+                _tempo_upgrade(folder)
+            except Exception as e:  # noqa: BLE001  (its beat stays as it was)
+                print(f"Couldn't check library/{song_id}'s tempo: {e}", file=sys.stderr)
             try:
                 if _lyrics_outdated(folder):
                     job_id = start_lyrics(song_id, None, again=True)
