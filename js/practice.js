@@ -98,24 +98,47 @@ function songPhrases(notes, beats, bpm, dur) {
   return phraseTimes(kept.map((s) => ({ t0: s[0][0], t1: s[s.length - 1][1] })), beats, bpm, dur);
 }
 // With lyrics, a phrase is a line of them, from its first word to its last as they're sung (Whisper's times, lyrics.py).
-// A line Whisper started before the one before it ended starts where that ends. A line under LYRIC_MIN s joins the
-// next, or failing that the one before, if it's within LYRIC_NEAR s of it; with neither that near it stays a phrase of
-// its own (a short line after a long rest is the start of something, not the end of what came before it).
+// A line Whisper started before the one before it ended starts where that ends; one it put inside that one altogether
+// isn't a phrase, its words go with that one's. A line is cut where its notes rest over LYRIC_NEAR s with words sung on
+// both sides (splitLine). A line under LYRIC_MIN s joins the next, or failing that the one before, if it's within
+// LYRIC_NEAR s of it; with neither that near it stays a phrase of its own (a short line after a long rest is the start of
+// something, not the end of what came before it). Each phrase keeps its words, for the stage (renderLyrics).
 const LYRIC_MIN = 1.5, LYRIC_NEAR = 2;
-function lyricPhrases(lines, beats, bpm, dur) {
+function lyricPhrases(lines, notes, beats, bpm, dur) {
   const spans = [];
   for (const l of lines) {
-    const last = spans[spans.length - 1], t0 = last ? Math.max(l.t0, last.t1) : l.t0;
-    if (l.text && l.t1 > t0) spans.push({ t0, t1: l.t1, text: l.text }); // not a line Whisper couldn't place
+    const last = spans[spans.length - 1], t0 = last ? Math.max(l.t0, last.t1) : l.t0, words = l.words || [];
+    if (l.text && l.t1 > t0) spans.push(...splitLine({ t0, t1: l.t1, text: l.text, words }, notes)); // not a line Whisper couldn't place
+    else if (last) last.words = last.words.concat(words);
   }
   for (let i = 0; i < spans.length; ) {
     const s = spans[i], next = spans[i + 1], prev = spans[i - 1];
     const a = s.t1 - s.t0 >= LYRIC_MIN ? -1 : next && next.t0 - s.t1 <= LYRIC_NEAR ? i : prev && s.t0 - prev.t1 <= LYRIC_NEAR ? i - 1 : -1;
     if (a < 0) { i++; continue; }
-    spans.splice(a, 2, { t0: spans[a].t0, t1: spans[a + 1].t1, text: spans[a].text + " / " + spans[a + 1].text });
+    spans.splice(a, 2, { t0: spans[a].t0, t1: spans[a + 1].t1, text: spans[a].text + " / " + spans[a + 1].text, words: spans[a].words.concat(spans[a + 1].words) });
     i = a; // joined, it may still be short
   }
   return phraseTimes(spans, beats, bpm, dur);
+}
+// A line in two at its longest rest between notes of over LYRIC_NEAR s (two lines that far apart aren't joined either),
+// each half then cut again the same way. Only a rest no word lies inside (words without notes: rapped, not a rest), its
+// words going to the side of its middle they're nearer (Whisper's word edges run a little into a rest), with words
+// heard on both sides: not a line Whisper stretched over a rest with its last words squeezed in at the far end (half
+// of them or more under 0.1 s, as stems.py's _unheard), as those were sung before the rest, it just couldn't tell where.
+const heard = (ws) => ws.length > 0 && 2 * ws.filter(([a, b]) => b - a < 0.1).length < ws.length;
+function splitLine(s, notes) {
+  const ns = notes.filter(([a, b]) => b > s.t0 && a < s.t1), mid = ([a, b]) => (a + b) / 2;
+  let cut = null;
+  for (let i = 1; i < ns.length; i++) {
+    const a = ns[i - 1][1], b = ns[i][0];
+    if (b - a <= LYRIC_NEAR || (cut && b - a <= cut.b - cut.a) || s.words.some(([w0, w1]) => w0 > a && w1 < b)) continue;
+    const before = s.words.filter((w) => mid(w) < (a + b) / 2), after = s.words.filter((w) => mid(w) >= (a + b) / 2);
+    if (heard(before) && heard(after)) cut = { a, b, before, after };
+  }
+  if (!cut) return [s];
+  const text = (ws) => ws.map((w) => w[2]).join("").trim(); // Whisper's words come with the space before them
+  return [...splitLine({ t0: s.t0, t1: cut.a, text: text(cut.before), words: cut.before }, notes),
+    ...splitLine({ t0: cut.b, t1: s.t1, text: text(cut.after), words: cut.after }, notes)];
 }
 // Each phrase's count-in (the four beats before it), and where it plays from (the count-in) and to (just before the next).
 function phraseTimes(spans, beats, bpm, dur) {
@@ -131,7 +154,7 @@ function phraseTimes(spans, beats, bpm, dur) {
 // where it has one (Whisper can start a line a little early), else from where the line starts.
 function setPhrases() {
   const m = K.song;
-  K.phrases = K.lyrics ? lyricPhrases(K.lyrics, m.beats, m.bpm, songDur()) : songPhrases(K.notes, m.beats, m.bpm, songDur());
+  K.phrases = K.lyrics ? lyricPhrases(K.lyrics, K.notes, m.beats, m.bpm, songDur()) : songPhrases(K.notes, m.beats, m.bpm, songDur());
   K.entries = songEntries(K.lyrics ? K.phrases.map((p) => [K.notes.find(([a]) => a >= p.t0 - 0.3 && a < p.t1)?.[0] ?? p.t0, p.t1])
     : K.notes, m.beats, m.bpm);
   K.entryFor = new Map(K.entries.map((e) => [K.phrases.findIndex((p) => e.t < p.to), e])); // phrase -> the count-in before it
@@ -455,9 +478,7 @@ function renderLyrics(now) {
   if (K.lyFor !== K.phrases) {
     K.lyFor = K.phrases; K.lyAt = null; K.lyCountAt = null;
     K.lyLines = K.phrases.map((ph) => {
-      const p = el("p"), mid = (l) => (l.t0 + l.t1) / 2;
-      const ws = K.lyrics.filter((l) => mid(l) >= ph.t0 - 0.05 && mid(l) <= ph.t1 + 0.05).flatMap((l) => l.words || [])
-        .map(([a, b, w]) => ({ a, b, s: el("span", null, w) }));
+      const p = el("p"), ws = ph.words.map(([a, b, w]) => ({ a, b, s: el("span", null, w) }));
       if (ws.length) p.append(...ws.flatMap((x, k) => (k ? [" ", x.s] : [x.s]))); else p.textContent = ph.text;
       return { p, ws };
     });
