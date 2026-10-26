@@ -163,7 +163,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <div class="ts-bar">
         <button class="btn primary round" id="tsPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <output id="tsTime">0:00 / 0:00</output>
-        <label class="tempo ts-sync" id="tsSync" title="Moves the takes that are on against the band: below 0 earlier, above 0 later. ↑ ↓ by 5 ms; ← → on a take moves it alone"><span>Sync</span><input type="number" step="5" min="-1000" max="1000" aria-label="Sync of the takes that are on (ms)"><span>ms</span></label>
+        <label class="kfield ts-sync" title="How far the takes that are on are moved against the band, left earlier: the delay the browser reports (the mark) plus what you add. Double-click to go back to the mark; ← → on a take moves it alone">Sync <span class="ts-sync-at"><i class="ts-sync-auto" id="tsSyncAuto" hidden></i><input type="range" id="tsSync" min="-400" max="100" step="5" value="0" data-tip="ms" aria-label="Sync of the takes that are on (ms)"></span><span class="ts-sync-val" id="tsSyncVal" aria-hidden="true">—</span></label>
         <label class="kfield">Your voice <input type="range" id="tsVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
         <label class="kfield">Band <input type="range" id="tsBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
         <label class="kfield">Guide vocal <input type="range" id="tsGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>

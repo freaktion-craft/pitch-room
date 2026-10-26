@@ -15,7 +15,7 @@ function resetOnDblClick(input, def) {
 }
 // Every slider: only its handle can be grabbed (a press elsewhere on it doesn't jump the level there), and while it's
 // held, or moved with the keys, a tip over the handle says the level: a volume out of 100 for full (up to 150), others
-// (data-tip="pos") as how far along they are, out of 100. It also keeps each slider's filled part (--p) in step.
+// (data-tip="pos") as how far along they are, out of 100, and data-tip="ms" its value in ms, signed. It also keeps each slider's filled part (--p) in step.
 (function sliderTips() {
   const THUMB = 12, tip = el("output", "slider-tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
   document.body.append(tip);
@@ -34,7 +34,8 @@ function resetOnDblClick(input, def) {
   const thumbX = (s) => { const r = s.getBoundingClientRect(); return r.left + THUMB / 2 + frac(s) * (r.width - THUMB); };
   function show(s) {
     if (!s) { tip.hidden = true; return; }
-    tip.textContent = s.dataset.tip === "db" ? `${s.value} dB` : String(Math.round((s.dataset.tip === "pos" ? frac(s) : +s.value) * 100));
+    tip.textContent = s.dataset.tip === "db" ? `${s.value} dB` : s.dataset.tip === "ms" ? `${+s.value > 0 ? "+" : +s.value < 0 ? "−" : ""}${Math.abs(+s.value)} ms`
+      : String(Math.round((s.dataset.tip === "pos" ? frac(s) : +s.value) * 100));
     tip.hidden = false;
     tip.style.left = thumbX(s) + "px"; tip.style.top = s.getBoundingClientRect().top - 2 + "px";
   }

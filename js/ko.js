@@ -61,7 +61,8 @@ const KO_SERVER = {
   "The volume is a number.": "볼륨은 숫자여야 해요.", "The volume is between 0 and 2.": "볼륨은 0에서 2 사이여야 해요.",
   "Couldn’t save the take’s volume.": "테이크 볼륨을 저장하지 못했어요.", "Volume {n}% · drag the line, or ↑ ↓": "볼륨 {n}% · 선을 위아래로 끌거나 ↑ ↓",
   "The sync is a number.": "싱크는 숫자여야 해요.", "The sync is between -1000 and 1000 ms.": "싱크는 -1000에서 1000 ms 사이여야 해요.",
-  "Couldn’t save the take’s sync.": "테이크 싱크를 저장하지 못했어요.", "Sync {n} ms · ← →": "싱크 {n} ms · ← →",
+  "Couldn’t save the take’s sync.": "테이크 싱크를 저장하지 못했어요.", "Sync {n} ms (automatic {a} ms) · ← →": "싱크 {n} ms (자동 {a} ms) · ← →",
+  "automatic {a} ms": "자동 {a} ms",
   "4 stems": "스템 4개", "6 stems": "스템 6개", "6 stems (+ guitar, piano)": "스템 6개 (+ 기타, 피아노)",
 };
 const KO_TEXT = Object.assign(Object.create(null), {
@@ -171,7 +172,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Play / pause (Space)": "재생 / 일시정지 (Space)", "Record takes": "테이크 녹음", "How to record": "녹음 방식", "Each play": "재생마다", "Full song": "곡 전체", "Takes Studio": "테이크 스튜디오", "Studio": "스튜디오", "Sung in": "부른 버전",
   "As the song is": "원곡 그대로", "Key {n}": "키 {n}",
   "Sync": "싱크", "Sync of the takes that are on (ms)": "켜진 테이크의 싱크 (ms)",
-  "Moves the takes that are on against the band: below 0 earlier, above 0 later. ↑ ↓ by 5 ms; ← → on a take moves it alone": "켜진 테이크를 반주에 맞춰 옮겨요: 0보다 작으면 앞으로, 크면 뒤로. ↑ ↓는 5 ms씩, 테이크에서 ← →는 그 테이크만 옮겨요",
+  "How far the takes that are on are moved against the band, left earlier: the delay the browser reports (the mark) plus what you add. Double-click to go back to the mark; ← → on a take moves it alone": "켜진 테이크를 반주에 맞춰 옮긴 양이에요 (왼쪽이 앞): 브라우저가 알려 준 지연(표시된 곳)에 직접 더한 만큼. 더블클릭하면 표시된 곳으로 돌아가고, 테이크에서 ← →는 그 테이크만 옮겨요",
   "No takes yet. Record in Practice and they're laid out here, each where you sang it.": "아직 테이크가 없어요. 연습에서 녹음하면 부른 자리에 맞춰 여기에 놓여요.",
   "The song: click to go there": "곡 전체: 누르면 그 자리로 가요", "Guide vocal": "가이드 보컬", "Guide vocal volume": "가이드 보컬 볼륨",
   "Band": "반주", "Band volume": "반주 볼륨", "Click on/off (follows the beat)": "메트로놈 켜기/끄기 (박자를 따라가요)", "Click volume": "메트로놈 볼륨",
