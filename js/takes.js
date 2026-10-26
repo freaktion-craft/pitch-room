@@ -7,7 +7,8 @@
 // recorded on the song's own audio clock, by an AudioWorklet that tags each block with the frame it came in on, so a
 // take knows to the sample which moment of the song it goes with. What you sing to a moment of the song reaches the
 // recorder later by the round trip: the page's buffering on the way out (baseLatency), the sound system's
-// (outputLatency) and the mic's (its track's latency, where the browser reports one). The take starts that much after
+// (outputLatency) and the mic's (its track's latency, where the browser reports one), and once it's been measured (Sync
+// settings, in the Library) whatever else lies on the way that the browser can't see. The take starts that much after
 // the song does, so played back it lines up with the band.
 const REC_WORKLET = `registerProcessor("stem-rec", class extends AudioWorkletProcessor {
   constructor() { super(); this.on = false; this.buf = new Float32Array(8192); this.n = 0; this.at = 0;
@@ -55,10 +56,12 @@ function recOff() {
   if (ac) recEnd(ac.currentTime);
   paintRec();
 }
-function recLatency() {
-  const tk = micStream && micStream.getAudioTracks()[0], s = (tk && tk.getSettings && tk.getSettings()) || {};
-  return Math.min(1, Math.max(0, (ac.baseLatency || 0) + (ac.outputLatency || 0) + (+s.latency || 0) + limitDelay));
+// The delay the browser reports for a mic's track: the page's buffering, the sound system's, the mic's, and the limiter's
+function browserLatency(tk) {
+  const s = (tk && tk.getSettings && tk.getSettings()) || {};
+  return (ac.baseLatency || 0) + (ac.outputLatency || 0) + (+s.latency || 0) + limitDelay;
 }
+function recLatency() { return Math.min(1, Math.max(0, browserLatency(micStream && micStream.getAudioTracks()[0]) + syncExtra())); }
 // A take starts with the song (at: a context time the song has started by)…
 function recBegin(at) {
   if (!R.armed || !R.node || !micOn || !K.on || view !== "practice" || !K.song || !P.song || K.song.id !== P.song.id) return;
@@ -139,6 +142,126 @@ function recTick(sn) {
   if (R.sec && R.cap && P.playing && sn >= R.sec.end - 0.05) { R.sec = null; pauseSong(); recOff(); }
 }
 
+// ---------- the delay, measured (Sync settings, in the Library) ----------
+// recLatency knows only the delays the browser reports. Whatever else lies between the band and a take (a DAW's
+// buffers, a loopback driver, the air from headphones to the mic) is measured here: CLICKS played as the band is (into
+// master, so through the limiter too), heard by the mic and recorded as a take is. How late they come back, less the
+// browser's part, is the rest: kept for the input they came in on (syncExtra: {input: {s, label, at}}, in the settings)
+// and added to every take recorded from it after. Takes already made keep the delay they were made with.
+const CLICKS = [0, 0.43, 0.79, 1.31, 1.62, 2.17, 2.51, 3.08]; // s: unevenly apart, so only the true lag lines them all up
+const CLICK_WAIT = 1; // s: the longest a click may take to come back (as recLatency's)
+let syncExtras = store.get("syncExtra", {}) || {}, syncBusy = false;
+const syncKey = () => S.mic || "default";
+const syncExtra = () => +(syncExtras[syncKey()]?.s) || 0;
+// A click: 3 ms of 2 and 5 kHz together, at full from its first sample (which it's timed from), dying away
+function clickBuf() {
+  const sr = ac.sampleRate, n = Math.round(sr * 0.003), b = ac.createBuffer(1, n, sr), d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = 0.5 * (Math.cos((2 * Math.PI * 2000 * i) / sr) + Math.cos((2 * Math.PI * 5000 * i) / sr)) * Math.exp(-i / (n / 4));
+  return b;
+}
+// One measurement, from the chosen input opened again with nothing filtered out (an echo filter would take the clicks
+// away). Returns {s: how late the clicks came back, browser: the browser's part of it, label: the input}; an Error,
+// in English, to show.
+async function measureDelay() {
+  ensureCtx(); await ac.resume();
+  try { await recInit(); } catch (e) { throw new Error("This browser can’t record takes. A current Chrome, Edge or Firefox can."); }
+  let stream;
+  try { stream = await openMic(false); }
+  catch (e) {
+    throw new Error(e && e.name === "NotAllowedError" ? "Microphone access is blocked. Allow it from the mic icon in the address bar, then try again."
+      : "No microphone found. Check it’s connected, then try again.");
+  }
+  const tk = stream.getAudioTracks()[0], src = ac.createMediaStreamSource(stream), rec = new AudioWorkletNode(ac, "stem-rec", { numberOfOutputs: 0 });
+  const chunks = [], out = ac.createGain(), click = clickBuf(), t0 = ac.currentTime + 0.4; // a moment of the room first
+  rec.port.onmessage = (e) => chunks.push(e.data);
+  src.connect(rec); rec.port.postMessage(true);
+  out.gain.value = 0.8; out.connect(master);
+  for (const c of CLICKS) { const b = ac.createBufferSource(); b.buffer = click; b.connect(out); b.start(t0 + c); }
+  try {
+    await new Promise((r) => setTimeout(r, (t0 + CLICKS[CLICKS.length - 1] + CLICK_WAIT + 0.1 - ac.currentTime) * 1000));
+    rec.port.postMessage(false);
+    await new Promise((r) => setTimeout(r, 150)); // its last block, on its way
+    return { s: findClicks(chunks, Math.round(t0 * ac.sampleRate), ac.sampleRate, click.getChannelData(0)), browser: browserLatency(tk), label: splitInput(tk.label || "")[0] };
+  } finally { src.disconnect(); out.disconnect(); rec.port.onmessage = null; stream.getTracks().forEach((t) => t.stop()); }
+}
+// How late the clicks came back, s, from the recording (chunks of {at: its first frame, x}; from: the frame the first
+// click was played at; click: its samples). The recording matched against the click (how much each moment sounds like
+// one starting there), where a click stands out of the room's noise and a hum doesn't; on that, the lag (up to
+// CLICK_WAIT) that lines the most clicks up with something loud, then each click's best match there. The middle of
+// those, and those near it, averaged. Too few clicks clearly over the room's noise, or too far apart, is an Error.
+function findClicks(chunks, from, sr, click) {
+  const start = chunks.length ? chunks[0].at : 0, n = chunks.reduce((m, c) => Math.max(m, c.at + c.x.length - start), 0);
+  const x = new Float32Array(n), y = new Float32Array(n);
+  for (const c of chunks) x.set(c.x, c.at - start);
+  for (let i = 0, m = click.length; i + m <= n; i++) { let s = 0; for (let j = 0; j < m; j++) s += x[i + j] * click[j]; y[i] = Math.abs(s); }
+  const hop = Math.max(1, Math.round(sr / 2000)), H = Math.floor(n / hop), env = new Float32Array(H); // every 0.5 ms, its loudest
+  for (let k = 0; k < H; k++) { let m = 0; for (let i = k * hop; i < (k + 1) * hop; i++) if (y[i] > m) m = y[i]; env[k] = m; }
+  const noise = Math.max(1e-6, Float32Array.from(env).sort()[H >> 1]); // the room: the clicks are a sliver of the whole
+  const played = CLICKS.map((c) => from - start + Math.round(c * sr));
+  let best = 0, lag = -1; // in hops
+  for (let L = 0; L <= CLICK_WAIT * 2000; L++) {
+    let s = 0;
+    for (const p of played) { const k = Math.floor(p / hop) + L; if (k >= 0 && k + 2 < H) s += Math.log1p(Math.max(env[k], env[k + 1], env[k + 2]) / noise); }
+    if (s > best) { best = s; lag = L; }
+  }
+  const found = [];
+  for (const p of played) {
+    const lo = Math.max(0, (Math.floor(p / hop) + lag - 2) * hop), hi = Math.min(n, (Math.floor(p / hop) + lag + 8) * hop);
+    let peak = 0, at = lo; for (let i = lo; i < hi; i++) if (y[i] > peak) { peak = y[i]; at = i; }
+    if (lag < 0 || peak < 6 * noise) continue; // not clearly over the room
+    found.push((at - p) / sr);
+  }
+  if (found.length < 5) throw new Error("Couldn’t hear the clicks. Hold the headphones closer and try again.");
+  found.sort((a, b) => a - b);
+  const mid = found[found.length >> 1], near = found.filter((d) => Math.abs(d - mid) <= 0.003);
+  if (near.length < 5) throw new Error("The clicks came back unevenly. Keep quiet and try again.");
+  return near.reduce((a, b) => a + b, 0) / near.length;
+}
+// The panel: what new takes allow for, from the input chosen (the browser's part as it reports it now, and the part
+// measured, when and on what), Measure, and Forget. msg: a word under it (English, with vars; "" for none, undefined to
+// leave it as it is).
+function paintSync(msg, err, vars) {
+  if (!ac) return;
+  const m = syncExtras[syncKey()], b = inMs(browserLatency(micStream && micStream.getAudioTracks()[0]));
+  const now = $("#syncNow");
+  if (m) say(now, "Now: {t} ms (browser {b} + measured {e})", { t: Math.max(0, Math.min(1000, b + inMs(m.s))), b, e: keySign(inMs(m.s)) });
+  else say(now, "Now: {b} ms (browser only)", { b });
+  now.title = m ? `${m.label || tr("System default")} · ${longDate(new Date(m.at))}` : ""; // where and when it was measured
+  const go = $("#syncGo");
+  go.disabled = syncBusy; say(go, syncBusy ? "Measuring…" : m ? "Measure again" : "Measure");
+  $("#syncForget").hidden = !m || syncBusy;
+  if (msg !== undefined) { const p = $("#syncMsg"); p.hidden = !msg; say(p, msg, vars); p.classList.toggle("err", !!err); }
+}
+async function runSync() {
+  if (syncBusy) return;
+  syncBusy = true; paintSync("Listening…");
+  pauseSong(); listenStop(); tsStop(); // nothing else playing while it listens
+  try {
+    const r = await measureDelay();
+    syncExtras = { ...syncExtras, [syncKey()]: { s: Math.round(Math.max(-1, Math.min(1, r.s - r.browser)) * 1e4) / 1e4, label: r.label, at: Date.now() } };
+    store.set("syncExtra", syncExtras);
+    syncBusy = false; paintSync("Measured {t} ms. New takes use it.", false, { t: inMs(r.s) });
+  } catch (e) { syncBusy = false; paintSync(e.message, true); }
+}
+function showSync(on) {
+  const pop = $("#syncPop");
+  if (on) {
+    showAdd(false); showMicSet(false); showJobs(false); ensureCtx(); paintSync(syncBusy ? undefined : "");
+    setTimeout(() => { if (!pop.hidden) paintSync(); }, 500); // the sound system's delay, which the browser knows once its audio runs
+  }
+  pop.hidden = !on; $("#syncBtn").setAttribute("aria-expanded", String(on)); pop.parentElement.classList.toggle("open", on);
+}
+function initSync() {
+  const btn = $("#syncBtn"), pop = $("#syncPop");
+  btn.prepend(icon("timer"));
+  btn.onclick = (e) => { e.stopPropagation(); showSync(pop.hidden); };
+  pop.onclick = (e) => e.stopPropagation(); // its buttons don't count as a click outside
+  document.addEventListener("click", () => { if (!pop.hidden) showSync(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showSync(false); btn.focus(); } });
+  $("#syncGo").onclick = runSync;
+  $("#syncForget").onclick = () => { const { [syncKey()]: gone, ...rest } = syncExtras; syncExtras = rest; store.set("syncExtra", syncExtras); paintSync(""); };
+}
+
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
 // (play) or paused (at: {id, pos}). mix: how takes sound, played here and downloaded; Your voice works on top of the
 // take's own gain, which brings it to about the loudness of the song's singer. unsaved: takes of any song being saved,
@@ -152,6 +275,7 @@ const takeGain = (t) => (t.gain || 1) * takeVol(t);
 // How far a take's voice is moved against the band, set in the Takes Studio (stems.set_take_sync): s as heard, below 0
 // earlier; for a delay the page couldn't allow for when it was recorded (a DAW's own buffers, say)
 const takeSync = (t) => t.sync ?? 0;
+const inMs = (s) => Math.round(s * 1000);
 // A take's voice from `from` s into the take (as heard with the band) for len s, starting at when: moved by its sync,
 // so it comes in that much later, or that far into the recording; what falls outside the take isn't heard.
 function voiceStart(src, when, from, len, sync) {

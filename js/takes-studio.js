@@ -162,7 +162,6 @@ function tsOwnSave(t, what, wait = 0) {
 // earlier) that sets each of them to it, in steps of TS_SYNC_STEP, the automatic amount marked on it; a double-click
 // puts them back to that. ← → on a clip move that take alone. Heard as it's moved (tsResync), saved once let go.
 const TS_SYNC_MIN = -0.4, TS_SYNC_MAX = 0.1, TS_SYNC_STEP = 0.005;
-const inMs = (s) => Math.round(s * 1000);
 const takeAuto = (t) => -(t.latency || 0); // earlier by the delay allowed for when it was recorded
 const takeShift = (t) => takeAuto(t) + takeSync(t);
 // the sync that moves a take to `shift` in all, within the slider's reach and the server's (stems.TAKE_SYNC)
