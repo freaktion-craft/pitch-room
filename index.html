@@ -136,6 +136,14 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
+        <span class="sync-at"><button class="btn sm" id="syncBtn" type="button" aria-expanded="false" aria-controls="syncPop" title="Measure how late your voice reaches the app">Sync settings</button>
+        <div class="pop" id="syncPop" role="dialog" aria-label="Sync settings" hidden>
+          <b>Sync settings</b>
+          <p class="hint" id="syncNow"></p>
+          <p class="hint">Hold your headphones close to the mic and press Measure.</p>
+          <div class="sync-acts"><button class="btn sm primary" id="syncGo" type="button">Measure</button><button class="btn sm ghost" id="syncForget" type="button" hidden>Forget it</button></div>
+          <p class="sync-msg" id="syncMsg" aria-live="polite" hidden></p>
+        </div></span>
         <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button>
         <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
           <div class="add-form" id="sAdd" hidden>

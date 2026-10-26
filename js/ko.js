@@ -63,6 +63,13 @@ const KO_SERVER = {
   "The sync is a number.": "싱크는 숫자여야 해요.", "The sync is between -1000 and 1000 ms.": "싱크는 -1000에서 1000 ms 사이여야 해요.",
   "Couldn’t save the take’s sync.": "테이크 싱크를 저장하지 못했어요.", "Sync {n} ms (automatic {a} ms) · ← →": "싱크 {n} ms (자동 {a} ms) · ← →",
   "automatic {a} ms": "자동 {a} ms",
+  "Sync settings": "싱크 설정", "Measure how late your voice reaches the app": "내 목소리가 앱에 얼마나 늦게 들어오는지 재기",
+  "Hold your headphones close to the mic and press Measure.": "헤드폰을 마이크에 가까이 대고 측정을 누르세요.",
+  "Measure": "측정", "Measure again": "다시 측정", "Measuring…": "측정하는 중…", "Forget it": "측정값 지우기", "Listening…": "듣는 중…",
+  "Now: {b} ms (browser only)": "지금 보정: {b} ms (브라우저 값만)", "Now: {t} ms (browser {b} + measured {e})": "지금 보정: {t} ms (브라우저 {b} + 측정 {e})",
+  "Measured {t} ms. New takes use it.": "{t} ms로 측정됐어요. 새 테이크부터 적용돼요.",
+  "Couldn’t hear the clicks. Hold the headphones closer and try again.": "클릭이 잘 안 들렸어요. 헤드폰을 더 가까이 대고 다시 해 보세요.",
+  "The clicks came back unevenly. Keep quiet and try again.": "클릭이 고르지 않게 들어왔어요. 조용히 하고 다시 해 보세요.",
   "4 stems": "스템 4개", "6 stems": "스템 6개", "6 stems (+ guitar, piano)": "스템 6개 (+ 기타, 피아노)",
 };
 const KO_TEXT = Object.assign(Object.create(null), {

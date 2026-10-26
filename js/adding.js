@@ -266,7 +266,7 @@ function jobStarted(id, name) { addingJob(id, { name, status: "queued", progress
 let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
 function showAdd(on) {
   const pop = $("#addPop"), btn = $("#sAddBtn");
-  if (on) { showMicSet(false); showJobs(false); }
+  if (on) { showMicSet(false); showJobs(false); showSync(false); }
   const was = !pop.hidden;
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
   $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // the page behind blurs back

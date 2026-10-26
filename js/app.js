@@ -124,7 +124,7 @@ function route() {
     K.studio = null;
   }
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems";
-  showMicSet(false); showEars(false);
+  showMicSet(false); showEars(false); showSync(false);
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } // takes are recorded and played in Practice only
   if (view === "stems") stemsRoute(sub, extra);

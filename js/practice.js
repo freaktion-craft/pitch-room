@@ -763,7 +763,7 @@ function initSing() {
   });
   $("#kLeave").prepend(icon("back"));
   $("#kLeave").onclick = () => { leaveSong(); go(P.song ? "stems/" + P.song.id : "stems"); };
-  initTakes(); initEars();
+  initTakes(); initEars(); initSync();
   // settings: a panel under the gear beside the mic chip; a click elsewhere or Escape closes it
   const setBtn = $("#micSetBtn"), pop = $("#micSet");
   setBtn.append(icon("settings"));

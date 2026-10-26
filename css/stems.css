@@ -214,6 +214,13 @@
    stays at the right, with the search there or not. */
 /* Add song: a panel under its button (links, files, the options), not a page of its own */
 .add-at { position: relative; display: inline-flex; margin-left: auto; }
+/* Sync settings: just before it, a panel under its button like the headphones' (the page behind doesn't blur) */
+.sync-at { position: relative; display: inline-flex; margin-left: auto; }
+.sync-at + .add-at { margin-left: 0; }
+.sync-at .pop > b { font-weight: var(--weight-medium); }
+.sync-acts { display: flex; gap: var(--space-2); }
+.sync-msg { margin: 0; color: var(--muted); }
+.sync-msg.err { color: var(--bad); }
 .add-at .pop { width: min(520px, calc(100vw - 32px)); font-size: var(--text-md); }
 .add-form { display: grid; gap: var(--space-3); }
 .add-form > b { font-weight: var(--weight-medium); font-size: var(--text-lg); }
@@ -262,6 +269,7 @@ html.lib-top #app > header { position: sticky; top: var(--top-header); z-index: 
 html.lib-top #sIntro { position: sticky; top: var(--top-intro); z-index: 4; }
 html.lib-top #sLibPage .lib-head { position: sticky; top: var(--top-head); z-index: 4; transition: z-index 0s linear var(--duration-base); }
 html.lib-top #sLibPage .lib-head:has(.add-at.open) { z-index: calc(var(--z-veil) + 1); transition: none; } /* the Add song panel over its blur */
+html.lib-top #sLibPage .lib-head:has(.sync-at.open) { z-index: var(--z-popover); transition: none; } /* Sync settings' over the list's sticky headings */
 html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 4; }
 :is(#listFade, #listFadeTop) > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(var(--dir), transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
 :is(#listFade, #listFadeTop) > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(var(--dir), transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }

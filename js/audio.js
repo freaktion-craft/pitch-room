@@ -155,9 +155,10 @@ async function startMic() {
   micNode = ac.createMediaStreamSource(micStream); micNode.connect(micBus); onMicEnd(micStream);
   micOn = true; renderMic(); listMics(); return true;
 }
-// The chosen input if it's still there, else the system default: an unplugged mic is no error.
-async function openMic() {
-  const audio = { echoCancellation: S.echo, noiseSuppression: false, autoGainControl: false };
+// The chosen input if it's still there, else the system default: an unplugged mic is no error. echo: the browser's echo
+// filter (Filter out speaker sound), as set unless asked otherwise.
+async function openMic(echo = S.echo) {
+  const audio = { echoCancellation: echo, noiseSuppression: false, autoGainControl: false };
   if (S.mic) {
     try { return await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: S.mic } } }); }
     catch (e) { if (e && e.name === "NotAllowedError") throw e; }
