@@ -15,7 +15,7 @@ const KO_SERVER = {
   "Downloading and installing (≈3–4 GB, a few minutes)…": "내려받아 설치하는 중 (≈3–4 GB, 몇 분 걸려요)…",
   "No CUDA build of PyTorch matched this system. Separation will keep using the CPU.": "이 시스템에 맞는 CUDA용 PyTorch가 없어요. 분리는 계속 CPU로 해요.",
   "Installing Demucs, librosa, yt-dlp and Whisper…": "Demucs, librosa, yt-dlp, Whisper 설치하는 중…",
-  "Finding the lyrics": "가사 찾는 중", "Lining the lyrics up with the voice": "가사를 목소리에 맞추는 중",
+  "Finding the lyrics": "가사 찾는 중", "Listening to the song": "곡을 듣는 중", "Lining the lyrics up with the voice": "가사를 목소리에 맞추는 중",
   "Downloading the lyrics model (first time only, ≈1.5 GB)": "가사 모델 내려받는 중 (처음 한 번만, ≈1.5 GB)",
   "Couldn’t reach LRCLIB. Is this computer online?": "LRCLIB에 연결하지 못했어요. 인터넷에 연결돼 있나요?", "LRCLIB answered {code}.": "LRCLIB이 {code} 오류로 답했어요.", "LRCLIB is busy right now. Try again in a minute.": "LRCLIB이 지금 바빠요. 1분 뒤에 다시 해 보세요.",
   "Those takes were sung in different keys or tempos: export one version at a time.": "서로 다른 키나 템포로 부른 테이크예요. 한 버전씩 내보내세요.",
