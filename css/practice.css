@@ -95,25 +95,44 @@
 .ts-bar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface);
   box-shadow: var(--shadow-hairline); font-size: var(--text-sm); }
 .ts-bar output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
-/* Sync, a box like the tempo's: "Sync", the number (ms), "ms"; in your colour when the takes are moved */
-.ts-sync { padding-right: var(--space-3); }
-.ts-sync input { width: 40px; padding: 0; text-align: right; }
-.ts-sync input:disabled { color: var(--muted); }
-.ts-sync.changed input { color: var(--voice); }
+/* Sync, a slider filled from 0 (--z along it) to the handle, left earlier, right later, with a mark across it where the
+   delay the browser reports puts the takes (--a); then its ms, grey there and in your colour when moved from it, as
+   wide as its widest so nothing beside it moves */
+.ts-sync input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--track) min(var(--z), var(--p)), var(--ink) min(var(--z), var(--p)) max(var(--z), var(--p)), var(--track) max(var(--z), var(--p))); }
+.ts-sync input[type="range"]::-moz-range-track { background: linear-gradient(to right, var(--track) min(var(--z), var(--p)), var(--ink) min(var(--z), var(--p)) max(var(--z), var(--p)), var(--track) max(var(--z), var(--p))); }
+.ts-sync-at { position: relative; display: inline-flex; }
+.ts-sync-at input { position: relative; } /* over the mark, which shows above and below its track */
+.ts-sync-auto { position: absolute; top: 3px; bottom: 3px; left: calc(6px + var(--a, 0) * (100% - 12px)); width: 2px; margin-left: -1px; border-radius: var(--radius-pill);
+  background: var(--muted); pointer-events: none; } /* 6px: half the handle, whose middle is at the value */
+.ts-sync input[type="range"]::-moz-range-progress { background: transparent; }
+.ts-sync input[type="range"] { width: 80px; } /* narrower than the volumes', so the bar stays on one line */
+.ts-sync-val { min-width: 7ch; font: var(--text-sm) var(--mono); font-variant-numeric: tabular-nums; }
+.ts-sync.changed .ts-sync-val { color: var(--voice); }
 .ts-vers { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted); }
 .ts-vers .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
 .ts-tl { position: relative; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-hairline); cursor: pointer; }
 #tsWave { display: block; width: 100%; height: 64px; }
 .ts-lanes { display: grid; gap: var(--space-1); margin-top: var(--space-2); }
 .ts-lane { position: relative; height: 48px; border-radius: var(--radius-sm); background: var(--fg-2); }
-.ts-clip { position: absolute; top: 0; bottom: 0; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; text-align: left;
+/* a take: its clip, and over its top right corner the clip's ↓, shown with its volume line while the pointer's on the
+   take (or it has focus); without a pointer that hovers, always */
+.ts-take { position: absolute; top: 0; bottom: 0; min-width: 4px; container-type: inline-size; }
+.ts-take:hover, .ts-take:focus-within { z-index: 1; } /* its ↓ over the next take, where it's narrower than the ↓ */
+.ts-clip { position: absolute; inset: 0; padding: 0; border: 0; border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; text-align: left;
   background: var(--fill); box-shadow: inset 0 0 0 1px var(--ring); color: var(--muted); transition: background-color var(--duration-fast), box-shadow var(--duration-fast); }
 .ts-clip:hover { background: var(--fg-12); }
 .ts-clip[aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 20%, transparent); box-shadow: inset 0 0 0 1px var(--voice); color: var(--ink); }
 .ts-clip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ts-clip canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ts-clip span { position: relative; display: block; padding: var(--space-1) 6px; font-size: var(--text-2xs); line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ts-vol { position: absolute; left: 0; right: 0; bottom: calc(var(--v, 0.5) * (100% - 2px)); border-top: 1px solid var(--fg-30); pointer-events: none; }
+.ts-vol { position: absolute; left: 0; right: 0; bottom: calc(var(--v, 0.5) * (100% - 2px)); border-top: 1px solid var(--fg-30); pointer-events: none;
+  opacity: 0; transition: opacity var(--duration-fast); }
+.ts-dl { position: absolute; top: 2px; right: 2px; background: var(--surface); box-shadow: var(--shadow-raised); opacity: 0; pointer-events: none;
+  transition: opacity var(--duration-fast); } /* not there to press until it shows */
+.ts-take:hover .ts-vol, .ts-take:focus-within .ts-vol, .ts-clip.vol-drag .ts-vol { opacity: 1; }
+.ts-take:hover .ts-dl, .ts-take:focus-within .ts-dl { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .ts-vol { opacity: 1; } .ts-dl { opacity: 1; pointer-events: auto; } }
+@container (max-width: 56px) { .ts-dl { right: auto; left: calc(100% + 2px); } } /* a clip too narrow for it: just past its right edge */
 .ts-clip[aria-pressed="true"] .ts-vol { border-top-color: var(--voice); }
 .ts-clip.vol-hot, .ts-clip.vol-drag { cursor: ns-resize; }
 .ts-clip.vol-hot .ts-vol, .ts-clip.vol-drag .ts-vol { border-top-width: 2px; border-top-color: var(--ink); }
