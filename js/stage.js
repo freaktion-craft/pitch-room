@@ -263,7 +263,7 @@ function takeFrame(tp) {
   if (!tp.evs) tp.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const hist = [];
   const a4sh = 12 * Math.log2(A4 / 440); // a take's line is read against A440, the bars against the song's a4
-  if (tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + t * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m: m == null ? m : m - a4sh }); }
+  if (tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + (t + takeSync(tk)) * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m: m == null ? m : m - a4sh }); }
   const last = hist[hist.length - 1], cur = last && now - last.t < 0.1 ? last.m : null;
   songView();
   draw(now, cur, hist, tp.evs, { pts: K.contour, shift: sh });

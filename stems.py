@@ -2138,10 +2138,12 @@ def _file_title(meta: dict) -> str:
 # time "start", and the page has already allowed for the delay of the speakers and the mic, so sample 0 of the take
 # goes with the band at "start". takes/<id>.flac holds the mic as recorded (mono, 16-bit, at the browser's rate);
 # takes/<id>.json says when, which stretch, which key and how it went. One json per take, so saving one never has to
-# rewrite (or lock) a file that others are in.
+# rewrite (or lock) a file that others are in. Where the page's guess at the delay was off (a DAW's own buffers, which
+# the browser can't see), the take's "sync" moves its voice against the band: seconds as heard, below 0 earlier.
 TAKE_MIN = 2.0  # s: anything shorter was a Play pressed by mistake
 TAKE_GAIN = (0.25, 16.0)  # how far a take is turned down or up to match the singer (-12 dB … +24 dB)
 TAKE_VOLUME = 2.0  # the most a take's own volume goes, set on its clip in the Takes Studio (1: as matched to the singer)
+TAKE_SYNC = 1.0  # s: the most a take's voice is moved earlier or later against the band, set in the Takes Studio
 
 
 def _take_dir(song_id: str) -> str:
@@ -2295,6 +2297,21 @@ def set_take_volume(song_id: str, tid: str, volume) -> dict:
     return take
 
 
+def set_take_sync(song_id: str, tid: str, sync) -> dict:
+    """A take's sync, -TAKE_SYNC…TAKE_SYNC s, as set in the Takes Studio: how far its voice is moved against the band
+    (below 0 earlier), in seconds as heard at the take's tempo, wherever it's heard or exported. Returns the take's json with it."""
+    take = _take(song_id, tid)
+    try:
+        v = float(sync)
+    except (TypeError, ValueError):
+        raise ValueError("The sync is a number.") from None
+    if not math.isfinite(v) or not -TAKE_SYNC <= v <= TAKE_SYNC:
+        raise ValueError(f"The sync is between -{TAKE_SYNC * 1000:g} and {TAKE_SYNC * 1000:g} ms.")
+    take["sync"] = round(v, 4)
+    _write_json(os.path.join(_take_dir(song_id), tid + ".json"), take)
+    return take
+
+
 def delete_take(song_id: str, tid: str):
     _take(song_id, tid)
     d = _take_dir(song_id)
@@ -2352,6 +2369,14 @@ def _take_voice(song_id: str, take: dict, gain: float) -> np.ndarray:
     return np.frombuffer(raw, dtype=np.float32) * (gain * float(take.get("gain", 1)) * float(take.get("volume", 1)))
 
 
+def _lay(out: np.ndarray, v: np.ndarray, at: int):
+    """Mono v added into both channels of out from sample at; what falls before 0 or past the end is left out."""
+    v = v[max(0, -at):]
+    at = max(0, at)
+    v = v[: max(0, out.shape[1] - at)]
+    out[:, at: at + len(v)] += v
+
+
 def _version_tags(meta: dict, key: int, speed: float) -> str:
     """" (+2, 110 BPM)" for a key and tempo other than the song's own, else ""."""
     tags = [f"{key:+d}" if key else "", (f"{round(meta['bpm'] * speed)} BPM" if meta.get("bpm") else f"{speed:.0%}") if speed != 1 else ""]
@@ -2361,7 +2386,7 @@ def _version_tags(meta: dict, key: int, speed: float) -> str:
 def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
     """A take as heard in Practice: your voice (times the take's gain and volume) over the band and, if asked for, the guide
     vocal (_take_band). mix: {voice, band, guide}, gains 0…4. Returns (16-bit stereo 44.1 kHz WAV, file name), the
-    take's stretch of the song from its first sample to its last."""
+    take's stretch of the song from its first sample to its last, the voice moved by its sync (set_take_sync)."""
     folder = _song_dir(song_id)
     meta, take = _read_meta(folder), _take(song_id, tid)
     voice, band, guide = _gain(mix, "voice", 1), _gain(mix, "band", 1), _gain(mix, "guide", 0)
@@ -2369,8 +2394,7 @@ def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
     s0, n = int(round(take["start"] / speed * SR)), int(round(take["duration"] * SR))  # the band at the take's tempo
     out = _take_band(song_id, folder, meta, key, speed, band, guide, s0, n)
     if voice > 0:
-        v = _take_voice(song_id, take, voice)[:n]
-        out[:, : len(v)] += v
+        _lay(out, _take_voice(song_id, take, voice), int(round(float(take.get("sync", 0)) * SR)))
     out = _limit(out)
     for i, k in ((slice(0, int(0.005 * SR)), 1), (slice(max(0, n - int(0.02 * SR)), n), -1)):  # no click at either end
         m = out[:, i].shape[1]
@@ -2381,7 +2405,7 @@ def take_wav(song_id: str, tid: str, mix: dict) -> tuple[bytes, str]:
 
 def takes_mp3(song_id: str, ids: list, mix: dict) -> tuple[bytes, str]:
     """The Takes Studio as heard: the whole song in the takes' version, the band and guide vocal as with take_wav,
-    and each take in ids where it was sung. ids: takes all sung in one key and tempo. mix: {voice, band, guide}.
+    and each take in ids where it was sung (moved by its sync). ids: takes all sung in one key and tempo. mix: {voice, band, guide}.
     Returns (320 kbps MP3, file name)."""
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
@@ -2396,9 +2420,7 @@ def takes_mp3(song_id: str, ids: list, mix: dict) -> tuple[bytes, str]:
     n = int(round(float(meta["duration"]) / speed * SR))
     out = _take_band(song_id, folder, meta, key, speed, _gain(mix, "band", 1), _gain(mix, "guide", 0), 0, n)
     for take in takes if voice > 0 else []:
-        at = int(round(take["start"] / speed * SR))
-        v = _take_voice(song_id, take, voice)[: max(0, n - at)]
-        out[:, at: at + len(v)] += v
+        _lay(out, _take_voice(song_id, take, voice), int(round((take["start"] / speed + float(take.get("sync", 0))) * SR)))
     out = _limit(out)
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "out.mp3")
