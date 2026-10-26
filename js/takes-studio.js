@@ -62,18 +62,20 @@ function tsRender() {
       c.style.left = (t.start / dur) * 100 + "%"; c.style.width = ((t.duration * sp) / dur) * 100 + "%";
       c.setAttribute("aria-pressed", String(TS.on.has(t.id)));
       c.dataset.about = `${part.what} · ${part.more} · ${new Date(t.created * 1000).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" })}`;
-      c.append(el("canvas"), el("span", null, part.what), el("i", "ts-vol"));
+      c.append(el("canvas"), el("span"), el("i", "ts-vol"));
+      c.dataset.what = part.what;
       row.append(c);
       tsClipVol(c, t);
       tsVoice(t).then(() => tsClipWave(c, t)).catch(() => {});
     }
     return row;
   }));
-  tsWave(); tsPaint();
+  tsWave(); tsPaint(); tsSyncPaint();
 }
 // A take's own volume, on its clip: a line across it as high as the volume (the bottom silent, halfway 100%, the top
 // TS_VOL), dragged up or down, or moved with ↑ ↓ while the clip has focus; a double-click on it puts it back to 100%.
-// Heard at once, and saved with the take once let go (tsVolSave). A press on the line doesn't switch the take.
+// Heard at once, and saved with the take once let go (tsOwnSave). A press on the line doesn't switch the take. ← → move
+// the take's sync (tsSyncBy), the take alone.
 const TS_VOL = 2, tsVolSnap = (v) => Math.max(0, Math.min(TS_VOL, Math.round(v * 20) / 20)); // in steps of 5
 let tsVolTip = null;
 function tsClipVol(c, t) {
@@ -88,7 +90,7 @@ function tsClipVol(c, t) {
     tsVolTip.style.left = Math.max(r.left, Math.min(r.right, e.clientX)) + "px"; tsVolTip.style.top = lineY(r) - 4 + "px";
   };
   let drag = false, pressed = false;
-  tsVolPaint(t, c);
+  tsClipPaint(t, c);
   c.onpointerdown = (e) => {
     if (e.button !== 0 || !near(e)) return;
     e.preventDefault(); c.setPointerCapture(e.pointerId); drag = pressed = true; c.classList.add("vol-drag"); tip(e);
@@ -96,51 +98,82 @@ function tsClipVol(c, t) {
   c.onpointermove = (e) => {
     if (!drag) { c.classList.toggle("vol-hot", near(e)); return; }
     const r = c.getBoundingClientRect();
-    tsVolSet(t, tsVolSnap(((r.bottom - e.clientY) / r.height) * TS_VOL)); tip(e);
+    tsOwnSet(t, "volume", tsVolSnap(((r.bottom - e.clientY) / r.height) * TS_VOL)); tip(e);
   };
   c.onpointerup = c.onpointercancel = () => {
     if (!drag) return;
-    drag = false; c.classList.remove("vol-drag"); tip(null); tsVolSave(t);
+    drag = false; c.classList.remove("vol-drag"); tip(null); tsOwnSave(t, "volume");
     setTimeout(() => { pressed = false; }); // after the click that ends the press
   };
   c.onpointerleave = () => { if (!drag) c.classList.remove("vol-hot"); };
-  c.ondblclick = (e) => { if (near(e)) { tsVolSet(t, 1); tsVolSave(t); } };
+  c.ondblclick = (e) => { if (near(e)) { tsOwnSet(t, "volume", 1); tsOwnSave(t, "volume"); } };
   c.onkeydown = (e) => {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); tsSyncBy([t], e.key === "ArrowRight" ? TS_SYNC_STEP : -TS_SYNC_STEP); return; }
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
     e.preventDefault();
-    tsVolSet(t, tsVolSnap(takeVol(t) + (e.key === "ArrowUp" ? 0.05 : -0.05))); tsVolSave(t, 600);
+    tsOwnSet(t, "volume", tsVolSnap(takeVol(t) + (e.key === "ArrowUp" ? 0.05 : -0.05))); tsOwnSave(t, "volume", 600);
   };
   c.onclick = (e) => { e.stopPropagation(); if (!pressed) tsToggle(t); };
 }
-// The line at the take's volume, and the volume in the clip's tip
-function tsVolPaint(t, c = document.querySelector(`#tsLanes .ts-clip[data-id="${t.id}"]`)) {
+// The line at the take's volume, its sync after its name where it's moved, and both in the clip's tip
+function tsClipPaint(t, c = document.querySelector(`#tsLanes .ts-clip[data-id="${t.id}"]`)) {
   if (!c) return;
+  const sync = keySign(inMs(takeSync(t)));
   c.style.setProperty("--v", takeVol(t) / TS_VOL);
-  c.title = `${c.dataset.about} · ${tr("Volume {n}% · drag the line, or ↑ ↓", { n: Math.round(takeVol(t) * 100) })}`;
+  c.querySelector("span").textContent = c.dataset.what + (takeSync(t) ? ` · ${sync} ms` : "");
+  c.title = `${c.dataset.about} · ${tr("Volume {n}% · drag the line, or ↑ ↓", { n: Math.round(takeVol(t) * 100) })} · ${tr("Sync {n} ms · ← →", { n: sync })}`;
 }
-// A take's volume as set: heard at once, here and in Practice's Takes; what was saved kept (tsVolWas) until it's saved
-// again, to go back to if it can't be.
-const tsVolWas = new Map(), tsVolTimers = new Map();
-function tsVolSet(t, v) {
-  if (!tsVolWas.has(t.id)) tsVolWas.set(t.id, takeVol(t));
-  t.volume = v; tsVolPaint(t); tsGains(); listenGains();
+// A take's own volume or sync, as set: heard at once, here and in Practice's Takes; what was saved kept (tsWas, by
+// "<take>/<what>") until it's saved again, to go back to if it can't be.
+const TS_OWN = {
+  volume: { get: takeVol, heard: (t) => { tsClipPaint(t); tsGains(); listenGains(); }, err: "Couldn’t save the take’s volume." },
+  sync: { get: takeSync, heard: (t) => { tsClipPaint(t); tsSyncPaint(true); tsResync(t); }, err: "Couldn’t save the take’s sync." },
+};
+const tsWas = new Map(), tsTimers = new Map();
+function tsOwnSet(t, what, v) {
+  const k = `${t.id}/${what}`;
+  if (!tsWas.has(k)) tsWas.set(k, TS_OWN[what].get(t));
+  t[what] = v; TS_OWN[what].heard(t);
 }
-function tsVolSave(t, wait = 0) {
-  clearTimeout(tsVolTimers.get(t.id));
-  tsVolTimers.set(t.id, setTimeout(async () => {
-    tsVolTimers.delete(t.id);
-    if (!tsVolWas.has(t.id)) return;
-    const was = tsVolWas.get(t.id), v = takeVol(t), song = TS.id;
-    if (v === was) { tsVolWas.delete(t.id); return; }
+function tsOwnSave(t, what, wait = 0) {
+  const k = `${t.id}/${what}`, own = TS_OWN[what];
+  clearTimeout(tsTimers.get(k));
+  tsTimers.set(k, setTimeout(async () => {
+    tsTimers.delete(k);
+    if (!tsWas.has(k)) return;
+    const was = tsWas.get(k), v = own.get(t), song = TS.id;
+    if (v === was) { tsWas.delete(k); return; }
     try {
-      const r = await fetch(`/api/library/${song}/takes/${t.id}/volume`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ volume: v }) });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Couldn’t save the take’s volume.");
-      if (takeVol(t) === v) tsVolWas.delete(t.id); else tsVolWas.set(t.id, v); // moved again meanwhile: saved once let go
+      const r = await fetch(`/api/library/${song}/takes/${t.id}/${what}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [what]: v }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || own.err);
+      if (own.get(t) === v) tsWas.delete(k); else tsWas.set(k, v); // moved again meanwhile: saved once let go
     } catch (e) {
-      if (takeVol(t) === v) { tsVolWas.delete(t.id); t.volume = was; tsVolPaint(t); tsGains(); listenGains(); }
+      if (own.get(t) === v) { tsWas.delete(k); t[what] = was; own.heard(t); }
       if (TS.id === song) say($("#tsState"), e instanceof TypeError ? "Couldn’t reach the server." : e.message);
     }
   }, wait));
+}
+// Sync: how far the takes that are on are moved against the band, in ms (below 0 earlier), for a voice that comes out
+// late or early: the page's guess at the delay of the speakers and the mic can be off (a DAW's own buffers, which the
+// browser can't see). A number typed in sets each of them to it; ↑ ↓ move each by TS_SYNC_STEP from where it is, as ← →
+// on a clip move that take alone. Heard at once (tsResync), saved once let go.
+const TS_SYNC = 1, TS_SYNC_STEP = 0.005;
+const inMs = (s) => Math.round(s * 1000);
+const tsSyncSnap = (v) => Math.max(-TS_SYNC, Math.min(TS_SYNC, Math.round(v * 1000) / 1000)); // in whole ms
+const tsOnTakes = () => tsTakes().filter((t) => TS.on.has(t.id));
+function tsSyncBy(ts, d) { for (const t of ts) { tsOwnSet(t, "sync", tsSyncSnap(takeSync(t) + d)); tsOwnSave(t, "sync", 600); } }
+// The field: the takes that are on, their sync when they share one (else empty, "…"); edit: also while it's being typed in
+function tsSyncPaint(edit) {
+  const box = $("#tsSync"), f = box.querySelector("input"), on = tsOnTakes(), vals = [...new Set(on.map((t) => inMs(takeSync(t))))];
+  f.disabled = !on.length;
+  if (edit || document.activeElement !== f) f.value = vals.length === 1 ? vals[0] : "";
+  f.placeholder = vals.length > 1 ? "…" : "0";
+  box.classList.toggle("changed", vals.some((v) => v !== 0));
+}
+// A take that's playing, moved: its voice again from where the song is, at its new place
+function tsResync(t) {
+  if (!TS.playing || !TS.voice.has(t.id)) return;
+  tsVoiceOff(t.id); tsVoiceOn(t);
 }
 // A take as recorded, decoded once for the page; its peaks for its clip.
 function tsVoice(t) {
@@ -214,7 +247,7 @@ async function tsPlay() {
 async function tsVoiceOn(t, at = ac.currentTime + 0.03) {
   const buf = await tsVoice(t), sp = tsSpeed();
   if (!TS.playing || !TS.on.has(t.id) || TS.voice.has(t.id)) return;
-  const V = (TS.pos + Math.max(0, at - TS.at) * sp) / sp, vs = t.start / sp;
+  const V = (TS.pos + Math.max(0, at - TS.at) * sp) / sp, vs = t.start / sp + takeSync(t);
   if (V >= vs + t.duration) return;
   const from = Math.max(0, V - vs), g = ac.createGain(), src = ac.createBufferSource(), vol = T.mix.voice * takeGain(t);
   g.gain.value = vol; g.connect(TS.bus); src.buffer = buf; src.connect(g);
@@ -244,6 +277,7 @@ function tsToggle(t) {
   if (on) TS.on.add(t.id); else TS.on.delete(t.id);
   document.querySelector(`#tsLanes .ts-clip[data-id="${t.id}"]`)?.setAttribute("aria-pressed", String(on));
   if (TS.playing) { if (on) tsVoiceOn(t); else tsVoiceOff(t.id); }
+  tsSyncPaint();
 }
 function tsSeek(pos) {
   const was = TS.playing;
@@ -275,6 +309,18 @@ function initTakesStudio() {
   $("#tsPlay").onclick = tsPlay;
   $("#tsExport").append(icon("download")); $("#tsExport").onclick = tsExport;
   $("#tsTl").onclick = (e) => { const r = $("#tsTl").getBoundingClientRect(); tsSeek(((e.clientX - r.left - 12) / (r.width - 24)) * songDur()); };
+  const sf = $("#tsSync input");
+  sf.addEventListener("change", () => {
+    const v = Math.round(+sf.value);
+    if (!sf.value.trim() || !Number.isFinite(v)) { tsSyncPaint(true); return; }
+    for (const t of tsOnTakes()) { tsOwnSet(t, "sync", tsSyncSnap(v / 1000)); tsOwnSave(t, "sync"); }
+    tsSyncPaint(true);
+  });
+  sf.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); tsSyncBy(tsOnTakes(), e.key === "ArrowUp" ? TS_SYNC_STEP : -TS_SYNC_STEP); }
+    else if (e.key === "Enter") { e.preventDefault(); sf.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); sf.value = ""; sf.blur(); tsSyncPaint(true); }
+  });
   for (const [id, k] of [["#tsVoice", "voice"], ["#tsBand", "band"], ["#tsGuide", "guide"]]) {
     const s = $(id); s.value = T.mix[k];
     s.addEventListener("input", () => { T.mix[k] = +s.value; store.set("takeMix", T.mix); tsGains(); listenGains(); const o = $({ voice: "#tkVoice", band: "#tkBand", guide: "#tkGuide" }[k]); if (o) o.value = s.value; });

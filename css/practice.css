@@ -95,6 +95,11 @@
 .ts-bar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface);
   box-shadow: var(--shadow-hairline); font-size: var(--text-sm); }
 .ts-bar output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
+/* Sync, a box like the tempo's: "Sync", the number (ms), "ms"; in your colour when the takes are moved */
+.ts-sync { padding-right: var(--space-3); }
+.ts-sync input { width: 40px; padding: 0; text-align: right; }
+.ts-sync input:disabled { color: var(--muted); }
+.ts-sync.changed input { color: var(--voice); }
 .ts-vers { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted); }
 .ts-vers .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
 .ts-tl { position: relative; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-hairline); cursor: pointer; }

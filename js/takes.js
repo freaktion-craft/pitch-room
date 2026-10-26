@@ -149,6 +149,15 @@ for (const [k, v] of Object.entries(store.get("takeMix", {}) || {})) if (k in T.
 // the Takes Studio (stems.set_take_volume)
 const takeVol = (t) => t.volume ?? 1;
 const takeGain = (t) => (t.gain || 1) * takeVol(t);
+// How far a take's voice is moved against the band, set in the Takes Studio (stems.set_take_sync): s as heard, below 0
+// earlier; for a delay the page couldn't allow for when it was recorded (a DAW's own buffers, say)
+const takeSync = (t) => t.sync ?? 0;
+// A take's voice from `from` s into the take (as heard with the band) for len s, starting at when: moved by its sync,
+// so it comes in that much later, or that far into the recording; what falls outside the take isn't heard.
+function voiceStart(src, when, from, len, sync) {
+  const late = Math.max(0, sync - from), off = Math.max(0, from - sync);
+  if (len - late > 0.005) src.start(when + late, off, len - late);
+}
 async function loadTakes(m) {
   if (T.song !== m.id) {
     listenStop();
@@ -340,7 +349,7 @@ async function listenTake(t, mode = "take") {
     for (const [name, buf] of Object.entries(bufs)) {
       const s = ac.createBufferSource(); s.buffer = buf; s.connect(name === guide ? gains.guide : gains.band); s.start(when, t.start / sp + from, t.duration - from); p.srcs.push(s);
     }
-    if (withVoice) { const v = ac.createBufferSource(); v.buffer = voice; v.connect(gains.voice); v.start(when, from, t.duration - from); p.srcs.push(v); }
+    if (withVoice) { const v = ac.createBufferSource(); v.buffer = voice; v.connect(gains.voice); voiceStart(v, when, from, t.duration - from, takeSync(t)); p.srcs.push(v); }
   };
   const mix = (v, b, gd) => { const g = { voice: ac.createGain(), band: ac.createGain(), guide: ac.createGain() }; g.voice.gain.value = v; g.band.gain.value = b; g.guide.gain.value = gd; return g; };
   p.gains = mix(T.mix.voice * takeGain(t), T.mix.band, T.mix.guide); // yours, as set above (listenGains follows the sliders)
