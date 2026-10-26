@@ -894,6 +894,11 @@ def _pipeline(job, src: dict, model_name: str):
 # share of the words Whisper is fairly sure it hears where they've been put (probability over 0.5). The song's own
 # lyrics score about 0.75 and another song's 0 to 0.05, so an entry under MATCH_MIN is taken for another song.
 MATCH_MIN = 0.3
+# Before lining up entries found by searching (each a pass of Whisper over the whole song), the 30 s where the lead
+# sings most is heard once (_heard), and an entry with under SCREEN_MIN of it (lyrics.heard_share) is passed over: a
+# song's own lyrics have 0.45 or more of it, other songs' up to 0.35, the same name's in another language under 0.25.
+# Of the rest, the likeliest are tried first, at most TRIES, and lyrics already tried under another entry aren't again.
+SCREEN_MIN, TRIES = 0.25, 3
 # lyrics.json's "v": how its lines were lined up. 4: lines also looked for again where LRCLIB's timing puts them
 # (_placed), or pulled apart over a long pause; a line still not found spread over where it should be (_spread), not
 # heaped on one moment; 3: lines put where the lead is silent looked for again, on the lead, then on the whole vocal
@@ -1212,10 +1217,21 @@ def _reheard(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str
     return out
 
 
+def _heard(model, voice: np.ndarray, span: float = 30.0) -> str:
+    """What Whisper hears in the span s of voice (mono, 16 kHz) where it sings most, as text ("" if it hardly sings)."""
+    loud = _loudness(voice)
+    sung = (loud > float(np.percentile(loud, 90)) - 35).astype(float)
+    w = int(span / 0.05)
+    if sung.sum() < 0.2 * w:
+        return ""
+    a = int(np.argmax(np.convolve(sung, np.ones(w), "valid"))) * 800 if len(sung) > w else 0
+    return model.transcribe(voice[a: a + w * 800], verbose=None, condition_on_previous_text=False).text
+
+
 def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tuple[float, float], how: dict | None = None, hint: str = "",
                  whole: np.ndarray | None = None) -> dict:
-    """lyrics.json for a song: found on LRCLIB by its title (the first of three likely entries that turns out to be
-    sung in it), or how={"id": n}, that LRCLIB entry, or how={"text": …}, lyrics pasted in; those two are kept however
+    """lyrics.json for a song: found on LRCLIB by its title (the first of the likely entries that turns out to be sung
+    in it, screened first: SCREEN_MIN), or how={"id": n}, that LRCLIB entry, or how={"text": …}, lyrics pasted in; those two are kept however
     well they match. voice: the lead vocal, mono at 16 kHz; whole: the vocal stem it was split from (_align). Uses the
     GPU: the caller holds _work_lock."""
     import lyrics
@@ -1234,11 +1250,24 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
         found = [entry | {"site": "lrclib"}]
     else:
         _stage(job, "Finding the lyrics", lo)
-        found = [e | {"site": "lrclib"} for e in lyrics.candidates(title, duration, hint=hint)]
+        found = [e | {"site": "lrclib"} for e in lyrics.candidates(title, duration, most=2 * TRIES, hint=hint)]
         if not found:
             return {"lines": None, "at": time.time()}
     with _whisper(job, (lo, mid)) as model:
-        step = (hi - mid) / len(found)
+        if not how:
+            _stage(job, "Listening to the song", mid)
+            _check(job)
+            heard = _heard(model, voice)
+            if heard.strip():  # (hardly sung, or heard as nothing: every entry lined up as before)
+                scored = sorted(((lyrics.heard_share(heard, e["lines"]), -k, e) for k, e in enumerate(found)), reverse=True)
+                found = [e for s, _, e in scored if s >= SCREEN_MIN]
+        tried, kept = set(), []
+        for e in found:  # the same lyrics under another entry: tried once
+            if tuple(e["lines"]) not in tried:
+                tried.add(tuple(e["lines"]))
+                kept.append(e)
+        found = kept[:TRIES]
+        step = (hi - mid) / max(1, len(found))
         for i, entry in enumerate(found):
             _stage(job, "Lining the lyrics up with the voice", mid + i * step)
             lrc = entry.get("lrc") or ({"times": entry["times"], "duration": entry.get("duration")} if entry.get("times") else None)
@@ -1316,6 +1345,7 @@ def start_lyrics(song_id: str, how, again: bool = False) -> str:
 
     def work(job):
         import covers
+        import lyrics
         _set(job, status="running", stage="Lining the lyrics up with the voice" if again else "Finding the lyrics", progress=0.02)
         _looked_up(song_id)  # a song just added: what it is (its artist, its title) is asked of iTunes and Deezer first
         meta = _read_meta(folder)
@@ -1331,6 +1361,8 @@ def start_lyrics(song_id: str, how, again: bool = False) -> str:
         with _turn(job):  # one model on the GPU at a time
             # whose song it was found to be (not a cover's: that's named for whoever sings it)
             named = f"{meta['artist']} {meta['title']}" if meta.get("artist") and not covers.is_cover(meta["title"]) else ""
+            if not named and meta.get("channel") and not covers.is_cover(meta["title"]):  # not known yet: its channel's may be the artist's
+                named = f"{lyrics._clean(meta['channel'])} {meta['title']}"
             data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.9), ask, named, whole)
             if data.get("lines") and _has_split(folder):  # the bars, cut where the new lyrics' syllables start
                 syl = _syllables(folder, data, job, (0.9, 0.96), fetch=not again)

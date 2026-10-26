@@ -99,12 +99,15 @@ def queries(title: str) -> list[str]:
     return list(dict.fromkeys(q.strip() for q in out if q.strip()))
 
 
+def _found(q: str) -> list[dict]:
+    """LRCLIB's records for a search (each with its lyrics), the ones with words only."""
+    return [r for r in _get("search", {"q": q}) or [] if not r.get("instrumental") and (r.get("syncedLyrics") or r.get("plainLyrics"))]
+
+
 def search(q: str) -> list[dict]:
     """LRCLIB's entries for a search, as {id, artist, track, album, duration, synced}, the ones with words only."""
-    found = _get("search", {"q": q}) or []
     return [{"id": r["id"], "artist": r.get("artistName") or "", "track": r.get("trackName") or "", "album": r.get("albumName") or "",
-             "duration": r.get("duration"), "synced": bool(r.get("syncedLyrics"))}
-            for r in found if not r.get("instrumental") and (r.get("syncedLyrics") or r.get("plainLyrics"))]
+             "duration": r.get("duration"), "synced": bool(r.get("syncedLyrics"))} for r in _found(q)]
 
 
 def _words(s: str) -> set[str]:
@@ -119,38 +122,31 @@ def candidates(title: str, duration: float, most: int = 3, hint: str = "") -> li
     seen, found, tw, failed = set(), [], _words(f"{title} {hint}"), None
     for q in dict.fromkeys(([hint] if hint else []) + queries(title)):
         try:
-            results = search(q)
+            results = _found(q)
         except RuntimeError as e:  # LRCLIB busy or out of reach: the other searches may still get through
             failed = e
             continue
         for r in results:
-            if r["id"] not in seen and r["duration"] and abs(r["duration"] - duration) <= max(10.0, 0.08 * duration):
+            if r["id"] not in seen and r.get("duration") and abs(r["duration"] - duration) <= max(10.0, 0.08 * duration):
                 seen.add(r["id"])
                 found.append(r)
         if len(found) >= most:
             break
     if not found and failed:
         raise failed  # not "none found": that's only said once LRCLIB has answered
-    found.sort(key=lambda r: (-len(tw & _words(f"{r['artist']} {r['track']}")), not r["synced"], abs(r["duration"] - duration)))
-    out = []
-    for r in found[:most]:
-        try:
-            e = get(r["id"])
-        except RuntimeError as err:  # the others may still come
-            failed = err
-            continue
-        if e and e["lines"]:
-            out.append(e)
-    if not out and failed:
-        raise failed
-    return out
+    found.sort(key=lambda r: (-len(tw & _words(f"{r.get('artistName') or ''} {r.get('trackName') or ''}")), not r.get("syncedLyrics"),
+                              abs(r["duration"] - duration)))
+    return [e for e in map(_entry, found[:most]) if e["lines"]]  # the lyrics came with the search: none fetched again
 
 
 def get(entry_id: int) -> dict | None:
     """One LRCLIB entry: {id, artist, track, album, duration, lines}, lines its lyrics' lines of words."""
     r = _get(f"get/{int(entry_id)}")
-    if not r:
-        return None
+    return _entry(r) if r else None
+
+
+def _entry(r: dict) -> dict:
+    """An LRCLIB record as {id, artist, track, album, duration, lines, times} (timed_lines)."""
     lines, times = timed_lines(r.get("syncedLyrics") or r.get("plainLyrics") or "")
     return {"id": r["id"], "artist": r.get("artistName") or "", "track": r.get("trackName") or "", "album": r.get("albumName") or "",
             "duration": r.get("duration"), "lines": lines, "times": times if any(t is not None for t in times) else None}
@@ -177,6 +173,19 @@ def timed_lines(text: str) -> tuple[list[str], list[float | None]]:
 
 def lines_of(text: str) -> list[str]:
     return timed_lines(text)[0]
+
+
+def _grams(s: str) -> set[str]:
+    s = re.sub(r"[\W_]+", "", unicodedata.normalize("NFKC", s).casefold())
+    return {s[i:i + 3] for i in range(len(s) - 2)}
+
+
+def heard_share(heard: str, lines: list[str]) -> float:
+    """How much of what Whisper heard in a stretch of the song is in these lyrics: the share of its runs of three
+    letters (spaces and marks left out) found in them. A song's own lyrics have 0.45 to 0.95 of it, another song's 0.01
+    to 0.35 (in English, common words alone get that far)."""
+    h = _grams(heard)
+    return len(h & _grams(" ".join(lines))) / len(h) if h else 0.0
 
 
 def language(lines: list[str]) -> str:
