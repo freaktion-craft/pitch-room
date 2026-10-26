@@ -2,8 +2,9 @@
 
 Found on LRCLIB (lrclib.net, a free and open database of song lyrics, most of them time-synced) by the song's title,
 picked there by hand, or pasted in; then lined up with the song's lead vocal word by word by Whisper (OpenAI's speech
-model, in its "turbo" size), through stable-ts's alignment. LRCLIB's own times aren't used: people type them (half a
-second out is common), for the album version, which a video can be longer or shorter than.
+model, in its "turbo" size), through stable-ts's alignment. LRCLIB's own times aren't used for the words: people type
+them (half a second out is common), for the album version, which a video can be longer or shorter than. They do say
+roughly where each line goes, though, so a line Whisper puts far from there is looked for again near it (stems.py).
 """
 from __future__ import annotations
 
@@ -150,19 +151,32 @@ def get(entry_id: int) -> dict | None:
     r = _get(f"get/{int(entry_id)}")
     if not r:
         return None
-    text = r.get("syncedLyrics") or r.get("plainLyrics") or ""
+    lines, times = timed_lines(r.get("syncedLyrics") or r.get("plainLyrics") or "")
     return {"id": r["id"], "artist": r.get("artistName") or "", "track": r.get("trackName") or "", "album": r.get("albumName") or "",
-            "duration": r.get("duration"), "lines": lines_of(re.sub(r"(?m)^\[\d+:\d+(?:\.\d+)?\]", "", text))}
+            "duration": r.get("duration"), "lines": lines, "times": times if any(t is not None for t in times) else None}
+
+
+STAMP = re.compile(r"^\s*\[(\d+):(\d+(?:\.\d+)?)\]")
+
+
+def timed_lines(text: str) -> tuple[list[str], list[float | None]]:
+    """Lines of words from lyrics as written: no blank lines, no section heads like [Chorus] or (Verse 2); and for synced
+    lyrics, when each starts in LRCLIB's recording (its first [mm:ss.xx]; None for a line without one)."""
+    lines, times = [], []
+    for line in str(text).splitlines():
+        t = None
+        while m := STAMP.match(line):  # a line sung more than once can have a stamp for each time
+            t = int(m.group(1)) * 60 + float(m.group(2)) if t is None else t
+            line = line[m.end():]
+        line = " ".join(line.split())
+        if line and not re.fullmatch(r"\[[^\]]*\]|\([^)]*\)", line):
+            lines.append(line)
+            times.append(t)
+    return lines, times
 
 
 def lines_of(text: str) -> list[str]:
-    """Lines of words from lyrics as written: no blank lines, no section heads like [Chorus] or (Verse 2)."""
-    out = []
-    for line in str(text).splitlines():
-        line = " ".join(line.split())
-        if line and not re.fullmatch(r"\[[^\]]*\]|\([^)]*\)", line):
-            out.append(line)
-    return out
+    return timed_lines(text)[0]
 
 
 def language(lines: list[str]) -> str:

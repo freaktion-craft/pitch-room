@@ -889,14 +889,19 @@ def _pipeline(job, src: dict, model_name: str):
 
 # ---------- lyrics ----------
 # lyrics.json: {"lines": [{t0, t1, text, words}], "match", "source": {site: "lrclib", id, artist, track} or {site:
-# "pasted"}, "at"}, or {"lines": null} when none were found (so Practice doesn't look each time it opens). match: the
+# "pasted"}, "at", "lrc"}, or {"lines": null} when none were found (so Practice doesn't look each time it opens). lrc:
+# LRCLIB's own timing of the lines, {times, duration} (its recording's length), where it has one (_anchors). match: the
 # share of the words Whisper is fairly sure it hears where they've been put (probability over 0.5). The song's own
 # lyrics score about 0.75 and another song's 0 to 0.05, so an entry under MATCH_MIN is taken for another song.
 MATCH_MIN = 0.3
-# lyrics.json's "v": how its lines were lined up. 3: lines put where the lead is silent looked for again, on the lead,
-# then on the whole vocal (_reheard); 2: only lines squeezed into nothing, on the whole vocal; 1 (no "v"), on the lead
-# alone. Bump it when that changes: songs' lyrics are lined up again (start_upgrades).
-LYRICS_VERSION = 3
+# lyrics.json's "v": how its lines were lined up. 4: lines also looked for again where LRCLIB's timing puts them
+# (_placed), or pulled apart over a long pause; a line still not found spread over where it should be (_spread), not
+# heaped on one moment; 3: lines put where the lead is silent looked for again, on the lead, then on the whole vocal
+# (_reheard); 2: only lines squeezed into nothing, on the whole vocal; 1 (no "v"), on the lead alone. Bump it when that
+# changes: songs' lyrics are lined up again (start_upgrades).
+LYRICS_VERSION = 4
+GAP_MAX = 6.0  # s: a pause this long between two words of a line means Whisper dragged one off elsewhere
+OFF_MAX = 3.0  # s: a line starting this far from where LRCLIB's timing puts it was put in the wrong place
 
 
 def _whisper_bar(job, share: tuple[float, float]):
@@ -1008,9 +1013,11 @@ def _whisper(job, share: tuple[float, float]):
         _free_gpu()
 
 
-def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, float], whole: np.ndarray | None = None) -> tuple[list, float]:
+def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, float], whole: np.ndarray | None = None,
+           lrc: dict | None = None) -> tuple[list, float]:
     """Lines of lyrics put where they're sung in voice (mono, 16 kHz): lyrics.json's lines, and how well they match.
-    whole: the whole vocal stem, when voice is the lead split from it, for the lines the lead doesn't sing (_reheard)."""
+    whole: the whole vocal stem, when voice is the lead split from it, for the lines the lead doesn't sing (_reheard).
+    lrc: LRCLIB's timing of the lines, where it has one (_anchors)."""
     import lyrics
     _check(job)
     with _creep(job, share, len(voice) / 16000 * (0.05 if device() == "cuda" else 0.5)):
@@ -1019,8 +1026,19 @@ def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, 
     out = lyrics.aligned(r)
     if len(out) == len(lines):
         _check(job)
-        out = _reheard(model, voice, whole, lines, out)
-    return out, round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
+        out = _reheard(model, voice, whole, lines, out, lrc)
+    return _tidy(out), round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
+
+
+def _tidy(out: list[dict]) -> list[dict]:
+    """Lines one after another: one that runs on past where the next starts (by a breath, as Whisper or a line looked
+    for again can leave it) ends there, its words too."""
+    for prev, line in zip(out, out[1:]):
+        if line["t0"] < prev["t1"]:
+            end = max(prev["t0"], line["t0"])
+            prev["t1"] = end
+            prev["words"] = [[min(a, end), min(b, end), w] for a, b, w in prev["words"]]
+    return out
 
 
 def _unheard(line: dict) -> bool:
@@ -1035,11 +1053,17 @@ def _loudness(voice: np.ndarray) -> np.ndarray:
     return 20 * np.log10(np.sqrt((voice[: n * 800].reshape(n, 800) ** 2).mean(1)) + 1e-9)
 
 
+def _apart(line: dict) -> bool:
+    """A line pulled apart: a pause of over GAP_MAX between two of its words, one dragged off to another part of the song."""
+    w = line["words"]
+    return any(w[k + 1][0] - w[k][1] > GAP_MAX for k in range(len(w) - 1))
+
+
 def _misplaced(line: dict, loud: np.ndarray, quiet: float) -> bool:
-    """A line Whisper put where it isn't sung: squeezed into nothing (_unheard), or with a word where the voice (loud)
-    is silent all through it and 0.1 s either side (under quiet): pushed into the rest before the line, or a line the
-    lead doesn't sing at all."""
-    if _unheard(line):
+    """A line Whisper put where it isn't sung: squeezed into nothing (_unheard), pulled apart (_apart), or with a word
+    where the voice (loud) is silent all through it and 0.1 s either side (under quiet): pushed into the rest before the
+    line, or a line the lead doesn't sing at all."""
+    if _unheard(line) or _apart(line):
         return True
     for a, b, _ in line["words"]:
         span = loud[max(0, int((a - 0.1) / 0.05)): int((b + 0.1) / 0.05) + 1]
@@ -1048,16 +1072,118 @@ def _misplaced(line: dict, loud: np.ndarray, quiet: float) -> bool:
     return False
 
 
-def _reheard(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str], out: list[dict]) -> list[dict]:
-    """Lines Whisper put where they aren't sung (_misplaced), looked for again, each run of them in the stretch between
-    the lines either side of it: on the lead (voice) first, then, for those the lead doesn't sing (the backing vocals
-    have them alone: a scat, a call between the lead's lines), on the whole vocal stem (whole, when the lead was split
-    from it). A line is kept where it's found if it's sung there; else it stays as it was."""
+def _shifted(line: dict, a: float) -> dict:
+    """A line lined up on a stretch of the voice starting a s in, in the song's time."""
+    return {"t0": round(line["t0"] + a, 3), "t1": round(line["t1"] + a, 3), "text": line["text"],
+            "words": [[round(w0 + a, 3), round(w1 + a, 3), w] for w0, w1, w in line["words"]]}
+
+
+def _spread(texts: list[str], a: float, b: float, loud: np.ndarray, quiet: float) -> list[dict]:
+    """Lines Whisper couldn't find, laid over a to b where the voice (loud) sings in it (all of it, if it hardly does):
+    their words one after another, each its letters' share of the time. Roughly where they're sung, and in order,
+    rather than heaped on one moment."""
+    frames = np.arange(int(a / 0.05), max(int(a / 0.05) + 1, int(np.ceil(b / 0.05))))
+    sung = frames[(frames < len(loud)) & (loud[np.minimum(frames, len(loud) - 1)] > quiet)]
+    if len(sung) * 0.05 < 0.3 * (b - a):
+        sung = frames  # (hardly sung there: the lines are someone else's, or the voice is too quiet to tell)
+    starts = np.maximum(sung * 0.05, a)
+    lens = np.minimum(starts + 0.05, b) - starts  # each sung frame's share of a to b
+    at = np.concatenate([[0.0], np.cumsum(lens)])
+    when = lambda x: float(np.interp(x, at, np.concatenate([starts, [starts[-1] + lens[-1]]])))  # noqa: E731  sung time to song time
+    words = [[k, w] for k, t in enumerate(texts) for w in t.split()]
+    weight = np.cumsum([0] + [len(w) + 1 for _, w in words])
+    out = [{"t0": 0.0, "t1": 0.0, "text": t, "words": []} for t in texts]
+    for (k, w), w0, w1 in zip(words, weight[:-1], weight[1:]):
+        out[k]["words"].append([round(when(at[-1] * w0 / weight[-1]), 3), round(when(at[-1] * w1 / weight[-1]), 3), " " + w])
+    for line in out:
+        if line["words"]:
+            line["t0"], line["t1"] = line["words"][0][0], line["words"][-1][1]
+        else:
+            line["t0"] = line["t1"] = round(a, 3)
+    return out
+
+
+def _anchors(out: list[dict], lrc: dict | None, dur: float, bad) -> list | None:
+    """Where LRCLIB's timing puts each line in this recording (None for a line it has no time for): its times moved by
+    how far this recording runs from LRCLIB's, the middle of that over the lines Whisper put well. None without a
+    timing, for another edit of the song (more than 10 s or 8 % longer or shorter: one offset wouldn't hold), or when
+    too few of those lines agree on it (within a second)."""
+    times = (lrc or {}).get("times")
+    if not times or len(times) != len(out) or not lrc.get("duration") or abs(lrc["duration"] - dur) > max(10.0, 0.08 * dur):
+        return None
+    gaps = [line["t0"] - t for line, t in zip(out, times) if t is not None and not bad(line)]
+    if len(gaps) < 5:
+        return None
+    off = float(np.median(gaps))
+    if sum(abs(g - off) < 1 for g in gaps) < 0.6 * len(gaps):
+        return None
+    return [None if t is None else t + off for t in times]
+
+
+def _placed(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str], out: list[dict], exp: list, loud: np.ndarray,
+            quiet: float) -> list[dict]:
+    """Lines lined up again by LRCLIB's timing (exp, _anchors), in order: one put where it isn't sung (_misplaced),
+    starting more than OFF_MAX from where it should, or running past where the next one should start, is looked for
+    again alone between its own start and the next's, on the lead, then (a line the lead doesn't sing) on the whole
+    vocal; not found there either, its words are spread over that stretch (_spread). A line squeezed to nothing between
+    its neighbours after all that is placed again with the one crowding it (running on into its time, or starting early
+    into it), each in its own, taking back the time the one before ran on into (_tidy ends that one there)."""
+    import lyrics
+    dur = len(voice) / 16000
+    nxt = lambda i: next((exp[k] for k in range(i + 1, len(exp)) if exp[k] is not None), None)  # noqa: E731
+
+    def wrong(i: int, line: dict, lead: bool = True) -> bool:  # lead: heard on the lead (on the whole vocal, it may sing where the lead doesn't)
+        if _misplaced(line, loud, quiet) if lead else _unheard(line) or _apart(line):
+            return True
+        if exp[i] is None:
+            return False
+        n = nxt(i)
+        return abs(line["t0"] - exp[i]) > OFF_MAX or (n is not None and line["t1"] > n + 1.5)
+
+    def place(i: int, reclaim: bool = False):  # reclaim: from inside the line before, not after it
+        n = nxt(i)
+        end = n if n is not None else exp[i] + max(4.0, 0.6 * len(lines[i].split()))
+        a, b = max(0.0, exp[i] - 1.5, (out[i - 1]["t0"] + 0.3 if reclaim else out[i - 1]["t1"] - 0.2) if i else 0.0), min(dur, end + 1.0)
+        found = None
+        for src, lead in ((voice, True), (whole, False)):
+            if src is None or b - a < 0.5:
+                continue
+            r = model.align(src[int(a * 16000): int(b * 16000)], lines[i], language=lyrics.language([lines[i]]), original_split=True, verbose=None)
+            again = [_shifted(line, a) for line in lyrics.aligned(r)]
+            if len(again) == 1 and not wrong(i, again[0], lead):
+                found = again[0]
+                break
+        out[i] = found or _spread([lines[i]], max(a, exp[i] - 0.2), max(max(a, exp[i] - 0.2) + 0.3, min(b, end)), loud, quiet)[0]
+
+    for i in range(len(out)):
+        if exp[i] is not None and wrong(i, out[i]):
+            place(i)
+    _tidy(out)
+    for i in range(len(out)):
+        if exp[i] is None or not _unheard(out[i]):
+            continue
+        crowd = [k for k in (i - 1, i + 1) if 0 <= k < len(out) and exp[k] is not None
+                 and (out[k]["t1"] > exp[i] + 0.3 if k < i else out[k]["t0"] < exp[k] - 0.5)]
+        for k in sorted([i] + crowd):
+            place(k, k == i and i - 1 in crowd)
+        _tidy(out)
+    return out
+
+
+def _reheard(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str], out: list[dict], lrc: dict | None = None) -> list[dict]:
+    """Lines Whisper put where they aren't sung (_misplaced), looked for again. With LRCLIB's timing (lrc), each where
+    that puts it (_placed). Without, each run of them in the stretch between the lines either side of it: on the lead
+    (voice) first, then, for those the lead doesn't sing (the backing vocals have them alone: a scat, a call between the
+    lead's lines), on the whole vocal stem (whole, when the lead was split from it). A line is kept where it's found if
+    it's sung there; a run still not found is spread over its stretch (_spread)."""
     import lyrics
     loud = _loudness(voice)
     quiet = float(np.percentile(loud, 90)) - 35  # silence, by the voice's own loudness when it sings
     bad = lambda line: _misplaced(line, loud, quiet)  # noqa: E731
     i, dur = 0, len(voice) / 16000
+    exp = _anchors(out, lrc, dur, bad)
+    if exp:
+        return _placed(model, voice, whole, lines, out, exp, loud, quiet)
     while i < len(out):
         if not bad(out[i]):
             i += 1
@@ -1073,13 +1199,15 @@ def _reheard(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str
             if src is None or b - a < 0.5 or not any(bad(out[k]) for k in range(i, j + 1)):
                 continue
             r = model.align(src[int(a * 16000): int(b * 16000)], "\n".join(run), language=lyrics.language(run), original_split=True, verbose=None)
-            again = [{"t0": round(line["t0"] + a, 3), "t1": round(line["t1"] + a, 3), "text": line["text"],
-                      "words": [[round(w0 + a, 3), round(w1 + a, 3), w] for w0, w1, w in line["words"]]} for line in lyrics.aligned(r)]
+            again = [_shifted(line, a) for line in lyrics.aligned(r)]
             if len(again) != len(run) or (lead and any(bad(line) for line in again)):
                 continue
             for k, line in enumerate(again):
                 if bad(out[i + k]) and not _unheard(line):
                     out[i + k] = line
+        left = [k for k in range(i, j + 1) if _unheard(out[k]) or bad(out[k]) and not (a <= out[k]["t0"] and out[k]["t1"] <= b)]
+        if left:  # still heaped up, or out of its stretch: the run spread over it, in order
+            out[i: j + 1] = _spread(run, a, max(b, a + 0.3), loud, quiet)
         i = j + 1
     return out
 
@@ -1094,7 +1222,7 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
     lo, hi = share
     mid = lo + 0.5 * (hi - lo)  # the first half for finding them (and the model's download, the first time)
     if how and how.get("lines") is not None:  # the lines the song has, lined up again (start_lyrics again=True)
-        found = [(how.get("source") or {"site": "pasted"}) | {"lines": how["lines"]}]
+        found = [(how.get("source") or {"site": "pasted"}) | {"lines": how["lines"], "lrc": how.get("lrc")}]
     elif how and how.get("text") is not None:
         found = [{"site": "pasted", "lines": lyrics.lines_of(how["text"])}]
         if not found[0]["lines"]:
@@ -1113,10 +1241,11 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
         step = (hi - mid) / len(found)
         for i, entry in enumerate(found):
             _stage(job, "Lining the lyrics up with the voice", mid + i * step)
-            lines, match = _align(model, voice, entry["lines"], job, (mid + i * step, mid + (i + 1) * step), whole)
+            lrc = entry.get("lrc") or ({"times": entry["times"], "duration": entry.get("duration")} if entry.get("times") else None)
+            lines, match = _align(model, voice, entry["lines"], job, (mid + i * step, mid + (i + 1) * step), whole, lrc)
             if how or match >= MATCH_MIN:
                 source = {"site": "pasted"} if entry["site"] == "pasted" else {k: entry.get(k) for k in ("site", "id", "artist", "track")}
-                return {"lines": lines, "match": match, "source": source, "at": time.time(), "v": LYRICS_VERSION}
+                return {"lines": lines, "match": match, "source": source, "at": time.time(), "v": LYRICS_VERSION, "lrc": lrc}
     return {"lines": None, "at": time.time()}
 
 
@@ -1128,6 +1257,22 @@ def _voice16k(folder: str, whole: bool = False) -> np.ndarray:
     raw = subprocess.run([ffmpeg_exe(), "-v", "error", "-i", path, "-ac", "1", "-ar", "16000", "-f", "f32le", "pipe:1"],
                          capture_output=True, check=True).stdout
     return np.frombuffer(raw, dtype=np.float32).copy()
+
+
+def _lrc_of(old: dict) -> dict | None:
+    """LRCLIB's timing for lyrics lined up before it was kept (LYRICS_VERSION 3 and older), asked of LRCLIB again, if
+    its lines are still the ones the song has; None if it has none, or can't be reached."""
+    import lyrics
+    src = old.get("source") or {}
+    if src.get("site") != "lrclib" or not isinstance(src.get("id"), int):
+        return None
+    try:
+        e = lyrics.get(src["id"])
+    except Exception:  # noqa: BLE001  (lined up again without it)
+        return None
+    if not e or not e.get("times") or e["lines"] != [line["text"] for line in old["lines"]]:
+        return None
+    return {"times": e["times"], "duration": e.get("duration")}
 
 
 _lyrics_jobs: dict[str, str] = {}  # song id -> its lyrics job, so Practice opened twice doesn't start two
@@ -1179,7 +1324,7 @@ def start_lyrics(song_id: str, how, again: bool = False) -> str:
             old = _lyrics_data(folder)
             if not old:
                 return
-            ask = {"lines": [line["text"] for line in old["lines"]], "source": old.get("source")}
+            ask = {"lines": [line["text"] for line in old["lines"]], "source": old.get("source"), "lrc": old.get("lrc") or _lrc_of(old)}
         voice = _voice16k(folder)
         whole = _voice16k(folder, whole=True) if os.path.isfile(os.path.join(folder, "lead.mp3")) else None
         mel = None
