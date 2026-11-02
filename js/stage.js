@@ -212,7 +212,7 @@ function drawAurora() {
 // down, as a note starts or fades), and drawn that's a sudden plunge. So a note starts, and a leap past a fourth counts,
 // only once its readings agree for 50 ms; until then the line holds where it was.
 const LEAP = 5, HOLD = 50;
-let med = [], cur = null, miss = 0, level = 0, leap = null;
+let med = [], cur = null, miss = 0, level = 0, leap = null, micQ = null; // micQ: how periodic the last reading was (YIN's 1 − dip), for Chest & head voice
 const middle = (a) => [...a].sort((x, y) => x - y)[a.length >> 1];
 function reading(m) {
   if (m == null) { if (++miss > 3) { med = []; cur = null; leap = null; } return; }
@@ -237,7 +237,8 @@ function loop() {
     analyser.getFloatTimeDomainData(tbuf);
     let s = 0; for (let i = 0; i < tbuf.length; i++) s += tbuf[i] * tbuf[i];
     level = Math.sqrt(s / tbuf.length);
-    if (level > S.gate) { const r = yin(tbuf, ac.sampleRate); if (r && r.f > 60 && r.f < 1500) m = 69 + 12 * Math.log2(r.f / A4); }
+    micQ = null;
+    if (level > S.gate) { const r = yin(tbuf, ac.sampleRate); if (r && r.f > 60 && r.f < 1500) { m = 69 + 12 * Math.log2(r.f / A4); micQ = r.q; } }
   } else level = 0;
   reading(m);
   if (view === "voice") voiceFrame();
