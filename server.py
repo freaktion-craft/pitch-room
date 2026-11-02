@@ -229,7 +229,8 @@ class Handler(SimpleHTTPRequestHandler):
             html = f.read()
         js = lambda v: json.dumps(v, ensure_ascii=False).replace("</", "<\\/")  # noqa: E731
         body = html.replace("/*SETTINGS*/null", js(stems.get_settings()), 1)
-        body = body.replace("/*LIBRARY*/null", js({"lib": stems.library(), "jobs": stems.active_jobs()}), 1).encode()
+        body = body.replace("/*LIBRARY*/null", js({"lib": stems.library(), "jobs": stems.active_jobs()}), 1)
+        body = body.replace("/*UPDATE*/null", js(stems.update_offer()), 1).encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -252,10 +253,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, stems.library())
         if path == "/api/settings":
             return self._json(200, stems.get_settings())
-        if path.startswith("/api/library/") and path.endswith(("/info", "/takes", "/lyrics")):
+        if path == "/api/upgrades":  # the library's Update button: songs waiting to be timed again (stems.update_state)
+            return self._json(200, stems.update_state())
+        if path.startswith("/api/library/") and path.endswith(("/info", "/takes", "/lyrics", "/truth", "/notes")):
             try:
                 song = path.split("/")[3]
-                read = stems.song_info if path.endswith("/info") else stems.list_takes if path.endswith("/takes") else stems.get_lyrics
+                read = (stems.song_info if path.endswith("/info") else stems.list_takes if path.endswith("/takes") else stems.get_truth if path.endswith("/truth")
+                        else stems.get_notes if path.endswith("/notes") else stems.get_lyrics)
                 return self._json(200, read(song))
             except ValueError as e:
                 return self._json(422, {"error": str(e)})
@@ -276,6 +280,12 @@ class Handler(SimpleHTTPRequestHandler):
     def _stems_post(self, url):
         q = parse_qs(url.query)
         model = (q.get("model") or ["htdemucs"])[0]
+        if url.path == "/api/jobs/singing":  # the page, every 5 s while a song plays
+            stems.singing()
+            return self._json(200, {"ok": True})
+        if url.path == "/api/upgrades":  # {now}: the answer to the page's question at launch (stems.update_offer)
+            body = json.loads(self._body(1000) or b"{}")
+            return self._json(200, {"running": stems.answer_update(bool(isinstance(body, dict) and body.get("now")))})
         if url.path == "/api/settings":
             return self._json(200, stems.set_settings(json.loads(self._body(600_000) or b"{}")))
         if url.path == "/api/stems/install":
@@ -306,6 +316,12 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == "keep":
                 body = json.loads(self._body(100_000) or b"{}")
                 return self._json(200, {"keep": stems.set_keep(parts[2], body.get("keep") if isinstance(body, dict) else None)})
+            if parts[3] == "truth":  # {marks: [{line, text, t, rate}]}: line starts tapped in Practice
+                body = json.loads(self._body(600_000) or b"{}")
+                return self._json(200, {"marks": stems.set_truth(parts[2], body.get("marks") if isinstance(body, dict) else None)})
+            if parts[3] == "notes":  # {notes: [{t, text, line}]}: dropped on Practice's timeline
+                body = json.loads(self._body(1_200_000) or b"{}")
+                return self._json(200, {"notes": stems.set_notes(parts[2], body.get("notes") if isinstance(body, dict) else None)})
             if parts[3] == "marks":
                 body = json.loads(self._body(100_000) or b"{}")
                 return self._json(200, {"marks": stems.set_phrase_marks(parts[2], body.get("marks") if isinstance(body, dict) else None)})
@@ -336,6 +352,12 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[4] == "delete":
                 stems.drop_lyrics(parts[2])
                 return self._json(200, {"ok": True})
+            if parts[4] == "nudge":  # {all, lines}: the lyrics moved by hand in Practice
+                return self._json(200, stems.set_lyric_nudge(parts[2], json.loads(self._body(600_000) or b"{}")))
+            if parts[4] == "lines":  # {op, line, from, to}: a run of a line's words split off or made backing vocals, in Practice's Edit
+                return self._json(200, stems.change_lyric_lines(parts[2], json.loads(self._body(10_000) or b"{}")))
+            if parts[4] == "edits":  # {lines}: the lyrics set word by word in Practice's Edit
+                return self._json(200, stems.set_lyric_edits(parts[2], json.loads(self._body(4_000_000) or b"{}")))
         if len(parts) == 6 and parts[1] == "library" and parts[3] == "takes":  # api/library/<id>/takes/<take>/<action>
             if parts[5] == "delete":
                 stems.delete_take(parts[2], parts[4])
@@ -357,7 +379,7 @@ class Handler(SimpleHTTPRequestHandler):
         self._unread = int(self.headers.get("Content-Length") or 0)
         if not self._ours():
             return self._refuse()
-        if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")) or url.path == "/api/settings":
+        if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")) or url.path in ("/api/settings", "/api/upgrades"):
             try:
                 return self._stems_post(url)
             except ValueError as e:
@@ -369,13 +391,14 @@ class Handler(SimpleHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         # only log API calls; static files (and send_error's HTTPStatus args) stay quiet
-        if args and isinstance(args[0], str) and "/api/" in args[0]:
+        if args and isinstance(args[0], str) and "/api/" in args[0] and "/api/jobs/singing" not in args[0]:
             super().log_message(fmt, *args)
 
 
 def serve(port: int) -> ThreadingHTTPServer:
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    stems.start_upgrades()  # songs made by an older version, brought up to date in the background
+    if not stems.update_offer():  # (with songs to time again, the page asks first: stems.answer_update)
+        stems.start_upgrades()  # songs made by an older version, brought up to date in the background
     return httpd
 
 

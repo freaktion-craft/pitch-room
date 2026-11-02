@@ -9,7 +9,8 @@ Songs live in ./library/<id>/ :
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model), backing.mp3
                     checked for leakage, cut where the lyrics' syllables start once there are lyrics (melody.py)
     lyrics.json     the lyrics, each line timed to the voice (Practice's phrases), or none found; once asked for (lyrics.py)
-    syllables.json  the onset of every sung syllable of lyrics.json on lead.mp3, for the bars (syllables.py)
+    syllables.json  every sung syllable of lyrics.json on lead.mp3: the bars' onsets, and the lines as they're sung (syllables.py)
+    truth.json      line starts tapped by hand in Practice (Developer tools), to score alignments against; no alignment writes it
     cover.jpg       the album art, as the library shows it (covers.py)
     meta.json       title, duration, bpm, beat times, key, stems, model, keep (parts of tracks that play while muted)
     keys/<n>/       the pitched tracks n semitones up or down (keys/+2/bass.mp3), made the first time a key is chosen
@@ -417,7 +418,7 @@ def library() -> list[dict]:
                 continue
             meta["split"] = _has_split(folder)
             if _upgrading["id"] == d:  # being brought up to date (start_upgrades): how far it's got
-                up = get_job(_upgrading["job"]) or {}
+                up = get_job(_upgrading["job"]) or {"status": "queued"}  # (no job yet: it's next, giving way)
                 meta["upgrade"] = 1.0 if up.get("status") not in ("queued", "running") else round(up.get("progress") or 0, 3)
             if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
                 _backfilled.add(d)
@@ -898,12 +899,15 @@ MATCH_MIN = 0.3
 # sings most is heard once (_heard), and an entry with under SCREEN_MIN of it (lyrics.heard_share) is passed over: a
 # song's own lyrics have 0.45 or more of it, other songs' up to 0.35, the same name's in another language under 0.25.
 # Of the rest, the likeliest are tried first, at most TRIES, and lyrics already tried under another entry aren't again.
+# None left: the best still gets a try (those 30 s can be a verse it has another version of, or words Whisper made up), and MATCH_MIN decides.
 SCREEN_MIN, TRIES = 0.25, 3
 # lyrics.json's "v": how its lines were lined up. 4: lines also looked for again where LRCLIB's timing puts them
 # (_placed), or pulled apart over a long pause; a line still not found spread over where it should be (_spread), not
 # heaped on one moment; 3: lines put where the lead is silent looked for again, on the lead, then on the whole vocal
 # (_reheard); 2: only lines squeezed into nothing, on the whole vocal; 1 (no "v"), on the lead alone. Bump it when that
-# changes: songs' lyrics are lined up again (start_upgrades).
+# changes: songs' lyrics are lined up again (start_upgrades). (What's sung is timed again from the text by syllables.py
+# whichever these are, in Korean and English (other lines keep Whisper's words from these, brackets and all), so leaving
+# brackets out of them, lyrics.lead_text, and stamps under lyrics.STAMP_MIN out of _anchors, didn't need it.)
 LYRICS_VERSION = 4
 GAP_MAX = 6.0  # s: a pause this long between two words of a line means Whisper dragged one off elsewhere
 OFF_MAX = 3.0  # s: a line starting this far from where LRCLIB's timing puts it was put in the wrong place
@@ -1025,13 +1029,14 @@ def _align(model, voice: np.ndarray, lines: list[str], job, share: tuple[float, 
     lrc: LRCLIB's timing of the lines, where it has one (_anchors)."""
     import lyrics
     _check(job)
+    sung = [lyrics.lead_text(x) for x in lines]
     with _creep(job, share, len(voice) / 16000 * (0.05 if device() == "cuda" else 0.5)):
-        r = model.align(voice, "\n".join(lines), language=lyrics.language(lines), original_split=True, verbose=None)
+        r = model.align(voice, "\n".join(sung), language=lyrics.language(sung), original_split=True, verbose=None)
     probs = [w.probability for s in r.segments for w in s.words]
     out = lyrics.aligned(r)
     if len(out) == len(lines):
         _check(job)
-        out = _reheard(model, voice, whole, lines, out, lrc)
+        out = [lyrics.with_brackets(line, text) for line, text in zip(_tidy(_reheard(model, voice, whole, sung, out, lrc)), lines)]
     return _tidy(out), round(sum(p > 0.5 for p in probs) / max(1, len(probs)), 3)
 
 
@@ -1112,15 +1117,20 @@ def _anchors(out: list[dict], lrc: dict | None, dur: float, bad) -> list | None:
     """Where LRCLIB's timing puts each line in this recording (None for a line it has no time for): its times moved by
     how far this recording runs from LRCLIB's, the middle of that over the lines Whisper put well. None without a
     timing, for another edit of the song (more than 10 s or 8 % longer or shorter: one offset wouldn't hold), or when
-    too few of those lines agree on it (within a second)."""
+    too few of those lines agree on it (within a second), or, the lengths apart, the first or last five agree on another (a cut or an
+    insert: moved by this one, the lines past it would leave right times for wrong ones)."""
+    import lyrics
     times = (lrc or {}).get("times")
     if not times or len(times) != len(out) or not lrc.get("duration") or abs(lrc["duration"] - dur) > max(10.0, 0.08 * dur):
         return None
+    times = [None if t is None or t < lyrics.STAMP_MIN else t for t in times]
     gaps = [line["t0"] - t for line, t in zip(out, times) if t is not None and not bad(line)]
     if len(gaps) < 5:
         return None
     off = float(np.median(gaps))
     if sum(abs(g - off) < 1 for g in gaps) < 0.6 * len(gaps):
+        return None
+    if abs(lrc["duration"] - dur) > OFF_MAX and any(abs(np.median(r) - off) > OFF_MAX and sum(abs(g - np.median(r)) < 1 for g in r) >= 4 for r in (gaps[:5], gaps[-5:])):
         return None
     return [None if t is None else t + off for t in times]
 
@@ -1183,7 +1193,7 @@ def _reheard(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str
     it's sung there; a run still not found is spread over its stretch (_spread)."""
     import lyrics
     loud = _loudness(voice)
-    quiet = float(np.percentile(loud, 90)) - 35  # silence, by the voice's own loudness when it sings
+    quiet = max(float(np.percentile(loud, 90)) - 35, -70.0)  # silence, by the voice's own loudness when it sings (-70 dB at least: a voice in under a tenth of the song leaves that percentile in the hiss)
     bad = lambda line: _misplaced(line, loud, quiet)  # noqa: E731
     i, dur = 0, len(voice) / 16000
     exp = _anchors(out, lrc, dur, bad)
@@ -1220,7 +1230,7 @@ def _reheard(model, voice: np.ndarray, whole: np.ndarray | None, lines: list[str
 def _heard(model, voice: np.ndarray, span: float = 30.0) -> str:
     """What Whisper hears in the span s of voice (mono, 16 kHz) where it sings most, as text ("" if it hardly sings)."""
     loud = _loudness(voice)
-    sung = (loud > float(np.percentile(loud, 90)) - 35).astype(float)
+    sung = (loud > max(float(np.percentile(loud, 90)) - 35, -70.0)).astype(float)
     w = int(span / 0.05)
     if sung.sum() < 0.2 * w:
         return ""
@@ -1260,7 +1270,7 @@ def _song_lyrics(job, title: str, duration: float, voice: np.ndarray, share: tup
             heard = _heard(model, voice)
             if heard.strip():  # (hardly sung, or heard as nothing: every entry lined up as before)
                 scored = sorted(((lyrics.heard_share(heard, e["lines"]), -k, e) for k, e in enumerate(found)), reverse=True)
-                found = [e for s, _, e in scored if s >= SCREEN_MIN]
+                found = [e for s, _, e in scored if s >= SCREEN_MIN] or [scored[0][2]]
         tried, kept = set(), []
         for e in found:  # the same lyrics under another entry: tried once
             if tuple(e["lines"]) not in tried:
@@ -1307,8 +1317,23 @@ def _lrc_of(old: dict) -> dict | None:
 _lyrics_jobs: dict[str, str] = {}  # song id -> its lyrics job, so Practice opened twice doesn't start two
 
 
+def _sung(folder: str, data: dict) -> list | None:
+    """The lines of lyrics.json (data) as they're sung, once their syllables are timed (_syllables), else None."""
+    import syllables
+    path = os.path.join(folder, "syllables.json")
+    try:
+        syl = _load_json(path) if data.get("lines") and os.path.isfile(path) else None
+    except ValueError:
+        return None
+    if not syl or syl.get("at") != data.get("at") or syl.get("v") != syllables.VERSION or len(syl.get("lines") or []) != len(data["lines"]):
+        return None
+    data["offLines"] = syl.get("offLines")  # (_off_lines: the page's note, with the syllables it came from)
+    return syl["lines"]
+
+
 def get_lyrics(song_id: str) -> dict:
-    """{lyrics: lyrics.json or None (never looked for), job: the id of the job finding them, if one is running}."""
+    """{lyrics: lyrics.json (its lines as they're sung, once that's known), or None (never looked for), job: the id of the
+    job finding them, if one is running}."""
     folder = _song_dir(song_id)
     _read_meta(folder)
     path = os.path.join(folder, "lyrics.json")
@@ -1316,6 +1341,8 @@ def get_lyrics(song_id: str) -> dict:
         data = _load_json(path) if os.path.isfile(path) else None
     except ValueError:
         data = None  # damaged: as if never looked for
+    if data and (sung := _sung(folder, data)):
+        data = data | {"lines": sung}
     running = get_job(_lyrics_jobs.get(song_id, ""))
     return {"lyrics": data, "job": running["id"] if running and running["status"] in ("queued", "running") else None}
 
@@ -1363,12 +1390,12 @@ def start_lyrics(song_id: str, how, again: bool = False) -> str:
             named = f"{meta['artist']} {meta['title']}" if meta.get("artist") and not covers.is_cover(meta["title"]) else ""
             if not named and meta.get("channel") and not covers.is_cover(meta["title"]):  # not known yet: its channel's may be the artist's
                 named = f"{lyrics._clean(meta['channel'])} {meta['title']}"
-            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.9), ask, named, whole)
+            data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.6), ask, named, whole)
             if data.get("lines") and _has_split(folder):  # the bars, cut where the new lyrics' syllables start
-                syl = _syllables(folder, data, job, (0.9, 0.96), fetch=not again)
-                _stage(job, "Fitting the bars to the lyrics", 0.96)
+                syl = _syllables(folder, data, job, (0.6, 0.85), fetch=not again)
+                _stage(job, "Fitting the bars to the lyrics", 0.85)
                 mel = _melody_of(folder, True, syl)
-        if os.path.isfile(os.path.join(folder, "meta.json")):  # not deleted meanwhile
+        if os.path.isfile(os.path.join(folder, "meta.json")) and (not again or _lyrics_data(folder)):  # not deleted meanwhile, nor an upgrade's over lyrics dropped meanwhile
             _write_json(os.path.join(folder, "lyrics.json"), data, ensure_ascii=False)
             if mel is not None:
                 with _melody_lock:
@@ -1387,6 +1414,117 @@ def search_lyrics(q) -> list[dict]:
     if not isinstance(q, str) or not q.strip():
         raise ValueError("Type a title or an artist to look for.")
     return lyrics.search(q.strip()[:200])
+
+
+def set_lyric_nudge(song_id: str, nudge) -> dict:
+    """Save a song's lyrics as moved by hand in Practice (meta "lyricNudge": {all: s, lines: {index: {at, head, text}}}). Returns
+    what was saved."""
+    folder = _song_dir(song_id)
+    _read_meta(folder)
+    try:
+        lines = nudge.get("lines") or {}
+        out = {"all": max(-10.0, min(10.0, round(float(nudge.get("all") or 0), 3))),
+               "lines": {str(int(i)): ({"at": max(0.0, round(float(x["at"]), 3)), **({"head": 1} if x.get("head") else {})} if "at" in x else {"s": max(-10.0, min(10.0, round(float(x["s"]), 3)))}) | {"text": str(x["text"])[:2000]} for i, x in list(lines.items())[:2000]}}
+    except (AttributeError, TypeError, ValueError, KeyError):
+        raise ValueError("Send it as {all, lines: {index: {at, text}}}.") from None
+    _update_meta(folder, lyricNudge=out)
+    return out
+
+
+def set_lyric_edits(song_id: str, edits) -> dict:
+    """Save a song's lines as set word by word in Practice's Edit (meta "lyricEdits": {lines: {index: {text, words: [[t0, t1] or
+    None, ...]}}}, times less the whole song's nudge). They're also where the singing really is, for measuring the aligner. Returns
+    what was saved."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    top = float(meta.get("duration") or 0) + 10
+    try:
+        out = {}
+        for i, x in list((edits.get("lines") or {}).items())[:2000]:
+            ws = []
+            for w in list(x["words"])[:400]:
+                if w is None:
+                    ws.append(None)
+                    continue
+                a, b = float(w[0]), float(w[1])
+                if not (-10 <= a <= b <= top):
+                    raise ValueError
+                ws.append([round(a, 3), round(b, 3)])
+            out[str(int(i))] = {"text": str(x["text"])[:2000], "words": ws}
+    except (AttributeError, TypeError, ValueError, KeyError, IndexError):
+        raise ValueError("Send it as {lines: {index: {text, words: [[t0, t1], ...]}}}.") from None
+    _update_meta(folder, lyricEdits={"lines": out})
+    return {"lines": out}
+
+
+def change_lyric_lines(song_id: str, op) -> dict:
+    """Practice's Edit, on a run of one line's words (op {line, from, to}: word indices, words as the line's text splits on spaces):
+    "split" puts the run on a line of its own (what's before and after it stay lines of their own too); "backing" puts it in
+    brackets, backing vocals, or with {on: false} takes the brackets off it. lyrics.json is changed in place (Whisper's words go
+    with the line they fall in), the hand edits and nudges go with their lines, and the song is timed again (a melody job).
+    Returns {job, lyricEdits, lyricNudge}."""
+    import unicodedata
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    data = _lyrics_data(folder)
+    try:
+        kind, i, a, b = op["op"], int(op["line"]), int(op["from"]), int(op["to"])
+        line = data["lines"][i]
+        words = re.findall(r"\S+", unicodedata.normalize("NFC", line["text"] or ""))
+        if kind not in ("split", "backing") or not 0 <= a <= b < len(words):
+            raise ValueError
+    except (TypeError, ValueError, KeyError, IndexError):
+        raise ValueError("Send {op: split or backing, line, from, to}.") from None
+    edits = dict((meta.get("lyricEdits") or {}).get("lines") or {})
+    nudge = dict(meta.get("lyricNudge") or {"all": 0, "lines": {}})
+    nudge["lines"] = dict(nudge.get("lines") or {})
+    if kind == "backing":
+        if op.get("on", True):
+            words[a], words[b] = "(" + words[a], words[b] + ")"
+        else:
+            words[a: b + 1] = [w.replace("(", "").replace(")", "").replace("[", "").replace("]", "") or w for w in words[a: b + 1]]
+        text = " ".join(words)
+        line["text"] = text
+        for d in (edits, nudge["lines"]):
+            if str(i) in d:
+                d[str(i)] = {**d[str(i)], "text": text}
+        shift, new = 0, [line]
+    else:
+        parts = [(x, y) for x, y in ((0, a - 1), (a, b), (b + 1, len(words) - 1)) if x <= y]
+        if len(parts) < 2:
+            raise ValueError("That's the whole line already.")
+        try:  # where each part starts as sung (else as Whisper has its words, by count)
+            sung = (_load_json(os.path.join(folder, "syllables.json")).get("lines") or [])[i]["words"]
+            at = [float(sung[x][0]) for x, _ in parts] + [float(sung[-1][1])]
+        except (OSError, ValueError, KeyError, IndexError, TypeError):
+            ww = line.get("words") or []
+            at = [float(ww[min(x, len(ww) - 1)][0]) if ww else float(line["t0"]) + x for x, _ in parts] + [float(line["t1"])]
+        new = []
+        for k, (x, y) in enumerate(parts):
+            t0, t1 = at[k], max(at[k + 1], at[k] + 0.05)
+            ww = [w for w in (line.get("words") or []) if (k == 0 or float(w[0]) >= t0 - 0.05) and (k == len(parts) - 1 or float(w[0]) < t1 - 0.05)]
+            new.append({**line, "t0": round(t0, 3), "t1": round(t1, 3), "text": " ".join(words[x: y + 1]), "words": ww})
+        shift = len(new) - 1
+        e = edits.pop(str(i), None)
+        nudge["lines"].pop(str(i), None)
+        if e and len(e.get("words") or []) == len(words):
+            for (x, y), ln in zip(parts, new):
+                edits[f"_{i}_{x}"] = {"text": ln["text"], "words": e["words"][x: y + 1]}
+    data["lines"][i: i + 1] = new
+    if data.get("lrc") and isinstance(data["lrc"].get("times"), list) and shift:
+        t = data["lrc"]["times"]
+        t[i + 1: i + 1] = [None] * shift
+    moved = lambda d: {(str(int(k) + shift) if not k.startswith("_") and int(k) > i else k): v for k, v in d.items()}  # noqa: E731
+    edits, nudge["lines"] = moved(edits), moved(nudge["lines"])
+    for k in [k for k in edits if k.startswith("_")]:  # the parts of the line split, at their new places
+        _, li, x = k.split("_")
+        edits[str(int(li) + next(n for n, (p, _) in enumerate(parts) if p == int(x)))] = edits.pop(k)
+    data["at"] = time.time()  # the lines changed: their syllables are worked out again
+    _write_json(os.path.join(folder, "lyrics.json"), data, ensure_ascii=False)
+    _update_meta(folder, lyricEdits={"lines": edits}, lyricNudge=nudge)
+    job = _new_job("melody")
+    job["songId"] = song_id
+    return {"job": _run(job, _melody_job, song_id), "lyricEdits": {"lines": edits}, "lyricNudge": nudge}
 
 
 def drop_lyrics(song_id: str):
@@ -1694,6 +1832,68 @@ def set_phrase_marks(song_id: str, marks) -> list:
     return out
 
 
+# Truth marks (truth.json, tapped in Practice with Developer tools on): {marks: [{line, text, t, rate}]}, a lyric line by its
+# place, its text then (changed lyrics don't score against old marks), where it was heard to start, and the speed it played at.
+def get_truth(song_id: str) -> dict:
+    """truth.json, or no marks yet. A damaged file raises, so nothing saves over it."""
+    folder = _song_dir(song_id)
+    _read_meta(folder)
+    path = os.path.join(folder, "truth.json")
+    return _load_json(path) if os.path.isfile(path) else {"marks": []}
+
+
+def set_truth(song_id: str, marks) -> list:
+    """Save a song's truth marks, one a line, by line, 2000 at most. Returns what was saved."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not isinstance(marks, list) or len(marks) > 2000:
+        raise ValueError("Send the marks as [{line, text, t, rate}, …], 2000 at most.")
+    out = {}
+    try:
+        for m in marks:
+            line, t, rate = int(m["line"]), float(m["t"]), float(m["rate"])
+            if line >= 0 and 0 <= t <= float(meta["duration"]) and rate > 0:
+                out[line] = {"line": line, "text": str(m["text"])[:2000], "t": round(t, 3), "rate": round(rate, 3)}
+    except (TypeError, ValueError, KeyError):
+        raise ValueError("Each mark is {line, text, t, rate}.") from None
+    saved = [out[k] for k in sorted(out)]
+    _write_json(os.path.join(folder, "truth.json"), {"marks": saved}, ensure_ascii=False)
+    return saved
+
+
+# Notes (notes.json, dropped on Practice's timeline with T): {notes: [{t, text, line}]}: where in the song, what was said
+# about it, and the lyric line showing then (so whoever reads them knows where to look).
+def get_notes(song_id: str) -> dict:
+    """notes.json, or no notes yet."""
+    folder = _song_dir(song_id)
+    _read_meta(folder)
+    path = os.path.join(folder, "notes.json")
+    return _load_json(path) if os.path.isfile(path) else {"notes": []}
+
+
+def set_notes(song_id: str, notes) -> list:
+    """Save a song's notes, in time order, 500 at most. Returns what was saved."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not isinstance(notes, list) or len(notes) > 500:
+        raise ValueError("Send the notes as [{t, text, line}, …], 500 at most.")
+    out = []
+    try:
+        for n in notes:
+            t = float(n["t"])
+            if 0 <= t <= float(meta["duration"]):
+                out.append({"t": round(t, 3), "text": str(n.get("text") or "")[:2000], "line": str(n.get("line") or "")[:500]})
+    except (TypeError, ValueError, KeyError):
+        raise ValueError("Each note is {t, text, line}.") from None
+    out.sort(key=lambda n: n["t"])
+    path = os.path.join(folder, "notes.json")
+    if not out and os.path.isfile(path) and (_load_json(path).get("notes") or []):  # cleared for a new round: the old round is kept beside it
+        os.replace(path, os.path.join(folder, time.strftime("notes-%Y%m%d-%H%M%S.json")))
+        return out
+    _write_json(path, {"notes": out}, ensure_ascii=False)
+    return out
+
+
 def set_mix(song_id: str, mix) -> dict:
     """Save a song's mix as set in the Studio: {tracks: {name: {vol, mute, solo}}, click: {mute, solo, vol, bpb,
     offset}}, for its own tracks; volumes 0…1.5. Returns what was saved."""
@@ -1760,14 +1960,14 @@ def _save_melody(folder: str, vocals_mono: np.ndarray, drums_mono: np.ndarray | 
     return data
 
 
-def _melody_data(vocals_mono, drums_mono=None, lead=False, backing_mono=None, syl=None, device=None) -> dict:
+def _melody_data(vocals_mono, drums_mono=None, lead=False, backing_mono=None, syl=None, device=None, st=None) -> dict:
     import melody
     try:
         _fetch_rmvpe()
     except Exception as e:  # noqa: BLE001  (offline: read with pYIN now, and again once the model is there)
         print(f"Couldn't get the melody model: {e}", file=sys.stderr)
     data = melody.extract(vocals_mono, drums=drums_mono, backing=backing_mono,
-                          syllables=syl["onsets"] if syl else None, device=device)
+                          syllables=syl["onsets"] if syl else None, device=device, st=st)
     data["lead"] = lead  # built from the lead vocal alone
     data["lyricsAt"] = syl["at"] if syl else None  # the lyrics.json whose syllables cut the bars
     data["sylFailed"] = bool(syl and syl.get("failed"))  # its syllables couldn't be had (a model missing, offline)
@@ -1776,12 +1976,15 @@ def _melody_data(vocals_mono, drums_mono=None, lead=False, backing_mono=None, sy
 
 def _melody_of(folder: str, split: bool, syl: dict | None = None, device: str | None = None) -> dict:
     """_melody_data from the song's files: lead.mp3 and backing.mp3 once split, else vocals.mp3."""
+    st = (syl or {}).pop("st", None)
+    if st and st["rm"]:  # _syllables has just read both stems (with pYIN, for want of rmvpe.pt: read again, _melody_data fetches it)
+        return _melody_data(None, lead=True, syl=syl, device=device, st=st)
     if split:
         lead = _decode_stereo(os.path.join(folder, "lead.mp3")).mean(0)
         back = _decode_stereo(os.path.join(folder, "backing.mp3")).mean(0)
     else:
         lead, back = _decode_stereo(os.path.join(folder, "vocals.mp3")).mean(0), None
-    return _melody_data(lead, _drums_mono(folder), split, back, syl, device)
+    return _melody_data(lead, lambda: _drums_mono(folder), split, back, syl, device)
 
 
 def _lyrics_data(folder: str) -> dict | None:
@@ -1794,12 +1997,29 @@ def _lyrics_data(folder: str) -> dict | None:
     return data if data and data.get("lines") else None
 
 
+OFF_RUN, OFF_REGRET, OFF_SHARE, OFF_MATCH = 8, -12.0, 0.2, 0.6  # _off_lines: lines in a row, their mean regret, share of the song's lines, lyrics.json's match
+
+
+def _off_lines(lines: list, match: float | None) -> int:
+    """How many of syllables.align_lyrics' lines look unsung in this recording (another edit's verse), if a good share do, else 0: lines dropped over silence
+    (_unsung), and any OFF_RUN lines in a row the chain fits badly (one line alone says nothing: right and wrong ones overlap). Only with a low match too: a verse
+    nobody sings takes that much off it. For a note on the page; it moves nothing."""
+    if match is None or match >= OFF_MATCH:
+        return 0
+    fit, off = [x for x in lines if x.get("regret") is not None], {x["i"] for x in lines if x.get("dropped")}
+    for k in range(len(fit) - OFF_RUN + 1):
+        if sum(x["regret"] for x in fit[k: k + OFF_RUN]) < OFF_REGRET * OFF_RUN:
+            off |= {x["i"] for x in fit[k: k + OFF_RUN]}
+    return len(off) if len(off) >= max(4, OFF_SHARE * len(lines)) else 0
+
+
 def _syllables(folder: str, lyr: dict | None, job=None, share: tuple[float, float] = (0.0, 1.0),
                device: str | None = None, fetch: bool = True) -> dict | None:
-    """{at, onsets}: the onset of every sung syllable of lyrics.json (lyr) on lead.mp3, kept in syllables.json for the
-    lyrics.json it came from (its "at"). None without lyrics or a lead vocal; {at, onsets: [], failed} when the
-    syllable models can't be had (the bars are then cut by the sound alone, and again once they're there). fetch:
-    download the models if they're missing (a lyrics job does; Practice opening a song doesn't wait for a GB)."""
+    """{at, onsets, lines}: every sung syllable of lyrics.json (lyr) on lead.mp3, kept in syllables.json for the
+    lyrics.json it came from (its "at"): where the bars may be cut, and the lines as they're sung (get_lyrics). None
+    without lyrics or a lead vocal; {at, onsets: [], failed} when the syllable models can't be had (the bars are then
+    cut by the sound alone, and again once they're there; the page has Whisper's words). fetch: download the models if
+    they're missing (a lyrics job does; Practice opening a song doesn't wait for a GB)."""
     if not lyr or not os.path.isfile(os.path.join(folder, "lead.mp3")):
         return None
     path = os.path.join(folder, "syllables.json")
@@ -1807,20 +2027,27 @@ def _syllables(folder: str, lyr: dict | None, job=None, share: tuple[float, floa
         old = _load_json(path) if os.path.isfile(path) else None
     except ValueError:
         old = None
+    import melody
     import syllables
+    st = None  # both stems' read, once made: handed on to the bars (_melody_of)
     if old and old.get("at") == lyr.get("at") and old.get("v") == syllables.VERSION:
         return old
     try:
         if fetch:
-            _fetch_syllable_models(syllables.languages(lyr["lines"]), job, share)
+            _fetch_syllable_models(syllables.languages(lyr["lines"]), job, (share[0], share[0] + 0.8 * (share[1] - share[0])))
         if job:
             _stage(job, "Timing the lyrics' syllables", share[0] + 0.8 * (share[1] - share[0]))
-        al = syllables.align_lyrics(_decode_stereo(os.path.join(folder, "lead.mp3")).mean(0), lyr["lines"], dev=device)
+        lead = _decode_stereo(os.path.join(folder, "lead.mp3")).mean(0)
+        whole = os.path.join(folder, "vocals.mp3")
+        st = melody.analyse(lead, 440.0, _decode_stereo(os.path.join(folder, "backing.mp3")).mean(0), device)  # the bars' read too: RMVPE loaded once
+        al = syllables.align_lyrics(lead, lyr["lines"], dev=device, cues=melody.cues(lead, device, st), lrc=lyr.get("lrc"),
+                                    whole=_decode_stereo(whole).mean(0) if os.path.isfile(whole) else None)
     except Exception as e:  # noqa: BLE001
         print(f"No syllables for library/{os.path.basename(folder)}: {e}", file=sys.stderr)
-        return {"at": lyr.get("at"), "onsets": [], "failed": str(e)[:200], "v": syllables.VERSION}
-    data = {"at": lyr.get("at"), "onsets": [[round(t, 3), s] for t, s in al["onsets"]], "skipped": al.get("skipped"), "v": syllables.VERSION}
-    _write_json(path, data)
+        return {"at": lyr.get("at"), "onsets": [], "failed": str(e)[:200] or e.__class__.__name__, "v": syllables.VERSION, "st": st}
+    data = {"at": lyr.get("at"), "onsets": [[round(t, 3), s] for t, s in al["onsets"]], "lines": al["sung"], "skipped": al.get("skipped"), "offLines": _off_lines(al["lines"], lyr.get("match")), "v": syllables.VERSION}
+    _write_json(path, data, ensure_ascii=False, separators=(",", ":"))
+    data["st"] = st  # (not saved: _melody_of's, which lets it go)
     return data
 
 
@@ -1830,6 +2057,9 @@ def _melody_outdated(folder: str, data: dict) -> bool:
     was read without a model that's there now (_stale)."""
     import melody
     import syllables
+    running = get_job(_lyrics_jobs.get(os.path.basename(folder), ""))
+    if data and running and running["status"] in ("queued", "running"):  # being lined up: the bars follow when it's done
+        return False
     lyr = _lyrics_data(folder) if data.get("lead") else None
     if data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available()) or data.get("lyricsAt") != (lyr or {}).get("at"):
         return True
@@ -1838,19 +2068,26 @@ def _melody_outdated(folder: str, data: dict) -> bool:
         syl = _load_json(path) if lyr and os.path.isfile(path) else None
     except ValueError:
         syl = None
-    return bool(syl and syl.get("v") != syllables.VERSION) or _stale(data, lyr)
+    running = get_job(_lyrics_jobs.get(os.path.basename(folder), ""))
+    if running and running["status"] in ("queued", "running"):  # being lined up: its syllables.json runs ahead of lyrics.json till it's done, and the bars follow
+        return False
+    # (its syllables couldn't be had: left as it is until they can, _stale)
+    return (not data.get("sylFailed") and bool(syl and (syl.get("v") != syllables.VERSION or syl.get("at") != lyr.get("at") or os.path.getmtime(path) > os.path.getmtime(os.path.join(folder, "melody.json"))))) or _stale(data, lyr, os.path.getmtime(os.path.join(folder, "melody.json")))  # (syllables.json is written first: newer means the bars never came)
 
 
-def _stale(data: dict, lyr: dict | None) -> bool:
-    """melody.json was read with less than the app has now: pYIN for want of rmvpe.pt, or without the syllables of its
-    lyrics for want of their models, and those are there now."""
+_STARTED = time.time()
+
+
+def _stale(data: dict, lyr: dict | None, read_at: float = 0.0) -> bool:
+    """melody.json (written at read_at) was read with less than the app has now: pYIN for want of rmvpe.pt, or without the syllables of its
+    lyrics for want of their models, and those are there now. Models there and it failed all the same: again once a run, not at every open."""
     import melody
     if data.get("tracker") == "pyin" and importlib.util.find_spec("torch") and any(os.path.isfile(p) for p in melody.RMVPE_PATHS):
         return True
     if data.get("sylFailed") and lyr:
         import syllables
-        return all(os.path.isfile(os.path.join(MODEL_DIR, syllables.MODEL_FILES[g][0], "model.safetensors"))
-                   for g in syllables.languages(lyr["lines"]))
+        models = [os.path.join(MODEL_DIR, syllables.MODEL_FILES[g][0], "model.safetensors") for g in syllables.languages(lyr["lines"])]
+        return all(os.path.isfile(p) for p in models) and (read_at < _STARTED or any(os.path.getmtime(p) > read_at for p in models))
     return False
 
 
@@ -1875,12 +2112,20 @@ def _splice(data: dict, ranges: list) -> dict:
 def get_melody(song_id: str) -> dict:
     """Cached melody.json. Rebuilt when the extraction changed, when it came from the whole vocal stem and the lead
     model is installed now (the lead vocal is separated first: about a minute, once per song), when the lyrics changed
-    (their syllables cut the bars: the first time they're timed on the lead vocal, ≈5 s on a GPU), or when it was read
-    without a model that's there now. On the GPU unless a separation has it (then on the CPU, ≈15-30 s). With unsplit
+    (their syllables cut the bars: the first time they're timed on the lead vocal, 10-20 s on a GPU), or when it was read
+    without a model that's there now. On the GPU unless a separation has it (then on the CPU, a minute or so). With unsplit
     parts, those take the notes of all the vocals, read once (a few seconds) and kept in melody.json as "full"."""
     import melody
     folder = _song_dir(song_id)
     path = os.path.join(folder, "melody.json")
+    try:  # ready as it is: no waiting for another song's being built
+        ready = _load_json(path) if os.path.isfile(path) else None
+    except ValueError:
+        ready = None
+    if ready and "full" in ready and ready.get("lead") and (ranges := _read_meta(folder).get("unsplit")) and not _melody_outdated(folder, ready):
+        return _splice(ready, ranges)  # (read already: no waiting either)
+    if ready and not _melody_outdated(folder, ready) and not (_read_meta(folder).get("unsplit") and ready.get("lead")):
+        return {k: v for k, v in ready.items() if k != "full"}
     with _melody_lock:
         data = None
         if os.path.isfile(path):
@@ -1894,21 +2139,33 @@ def get_melody(song_id: str) -> dict:
         if data is None:
             if not os.path.isfile(vocals):
                 raise ValueError("This song has no vocal track to practice with.")
-            split = _ensure_split(folder)
-            gpu = _work_lock.acquire(blocking=False)  # the GPU, unless a separation or a lyrics job has it
             try:
-                dev = None if gpu else "cpu"
-                syl = _syllables(folder, _lyrics_data(folder), device=dev, fetch=False) if split else None
-                data = _melody_of(folder, split, syl, dev)
-            finally:
-                if gpu:
-                    _work_lock.release()
+                split = _ensure_split(folder)
+                gpu = _work_lock.acquire(blocking=False)  # the GPU, unless a separation or a lyrics job has it
+                try:
+                    dev = None if gpu else "cpu"
+                    syl = _syllables(folder, _lyrics_data(folder), device=dev, fetch=False) if split else None
+                    data = _melody_of(folder, split, syl, dev)
+                finally:
+                    if gpu:
+                        _work_lock.release()
+            except Exception as e:  # noqa: BLE001  (the bars it had still play; still outdated, so tried again next time)
+                if not ready or not ready.get("notes"):
+                    raise
+                print(f"Couldn't read library/{song_id}'s melody again: {e}", file=sys.stderr)
+                ranges = _read_meta(folder).get("unsplit")
+                return _splice(ready, ranges) if ranges and ready.get("lead") and "full" in ready else {k: v for k, v in ready.items() if k != "full"}
             _write_json(path, data, separators=(",", ":"))
         ranges = _read_meta(folder).get("unsplit") or []
         if not ranges or not data.get("lead"):
             return {k: v for k, v in data.items() if k != "full"}
         if "full" not in data:
-            full = melody.extract(_decode_stereo(vocals).mean(0), drums=_drums_mono(folder))
+            gpu = _work_lock.acquire(blocking=False)  # (as above: the GPU unless a job has it)
+            try:
+                full = melody.extract(_decode_stereo(vocals).mean(0), drums=lambda: _drums_mono(folder), device=None if gpu else "cpu")
+            finally:
+                if gpu:
+                    _work_lock.release()
             data["full"] = {"notes": full["notes"], "contour": full["contour"]}
             _write_json(path, data, separators=(",", ":"))
         return _splice(data, ranges)
@@ -1917,9 +2174,11 @@ def get_melody(song_id: str) -> dict:
 # Songs made by older logic, brought up to date in the background once the server starts, one at a time, newest
 # first: their lyrics lined up again when LYRICS_VERSION has moved on (their syllables and bars follow), else their
 # bars read again when melody.VERSION or syllables.VERSION has. The library shows the one being done (its cover
-# dimmed under a ring, library()'s "upgrade"); Practice opened on it meanwhile has what it had, then the new. Nothing
-# is downloaded for it: a song that would need a model that isn't here is left as it is.
-_upgrading = {"id": None, "job": None}  # the song being brought up to date and its job; held till the next one's
+# dimmed under a ring, library()'s "upgrade"); Practice opened on it meanwhile waits for its bars (on a lyrics
+# job: has what it had, then the new). Only the bars' own models (rmvpe.pt, the lead vocal's) are downloaded for it.
+# Lyrics that would need a Whisper model that isn't here are left as they are; bars whose syllable models aren't here are
+# read by the sound alone, and again once they are (_stale).
+_upgrading = {"id": None, "job": None}  # the song being brought up to date and its job (None while it gives way); held till the next one's
 
 
 def _lyrics_outdated(folder: str) -> bool:
@@ -1933,18 +2192,99 @@ def _melody_job(job, song_id: str):
     get_melody(song_id)
 
 
-def start_upgrades():
+_singing_until = 0.0  # a page is playing a song until about then (singing)
+
+
+def singing():
+    """A page says so every 5 s while a song plays. 12 s: a missed one is nothing; a page closed mid-song lets go."""
+    global _singing_until
+    _singing_until = time.monotonic() + 12
+
+
+def _give_way(song_id: str):
+    """Before an upgrade starts a song: none beside a song being sung, and none on the CPU because a job or a page has
+    the GPU or the melody. Holds no lock, so nothing it waits for can be waiting for it. A song opened doesn't wait for
+    this (get_melody)."""
+    _upgrading.update(id=song_id, job=None)  # library(): spinning until it's started
+    while time.monotonic() < _singing_until or _work_lock.locked() or _line or _melody_lock.locked():
+        time.sleep(1)
+
+
+def _outdated(folder: str) -> bool:
+    """Its lyrics or its melody and syllables are to be worked out again (what start_upgrades does with timing on)."""
+    try:
+        path = os.path.join(folder, "melody.json")
+        return _lyrics_outdated(folder) or (os.path.isfile(path) and _melody_outdated(folder, _load_json(path)))
+    except Exception:  # noqa: BLE001  (a damaged song: it says so when it's opened)
+        return False
+
+
+# Re-timing every song after an update takes minutes and the GPU, so the page asks first (update_offer, as it opens): until
+# it's answered, launching starts nothing of it. "now": start_upgrades with timing; "later": without (each song is worked
+# out again when it's opened, get_melody). Asked again at the next launch.
+_update_answer = None
+_timing_run = False  # start_upgrades with timing is going through the songs
+UPDATE_SONG_S = 15  # about how long a song takes, for the question's estimate
+
+
+def update_offer() -> dict | None:
+    """{songs, min} while songs wait to be worked out again and the question hasn't been answered; else None."""
+    if _update_answer is not None or not installed():
+        return None
+    n = sum(_outdated(_song_dir(m["id"])) for m in library())
+    return {"songs": n, "min": max(1, round(n * UPDATE_SONG_S / 60))} if n else None
+
+
+def update_state() -> dict:
+    """For the library's Update button: {songs, min} waiting to be worked out again, and whether that's under way."""
+    n = sum(_outdated(_song_dir(m["id"])) for m in library()) if installed() else 0
+    return {"songs": n, "min": max(1, round(n * UPDATE_SONG_S / 60)) if n else 0, "running": _timing_run}
+
+
+def answer_update(now: bool) -> bool:
+    """The page's answer: to update_offer at launch, or the library's Update button later (now). Returns whether songs are being
+    worked out again."""
+    global _update_answer
+    first = _update_answer is None
+    if now or first:
+        _update_answer = "now" if now else "later"
+    if now and not _timing_run:
+        start_upgrades(timing=True)
+    elif first:
+        start_upgrades(timing=False)
+    return _timing_run
+
+
+def start_upgrades(timing: bool = True):
+    """Songs made by an older version brought up to date in the background: their beat, and with timing their lyrics, melody and
+    syllables (see update_offer)."""
+    global _timing_run
+
     def run():
+        global _timing_run
+        try:
+            songs(run_timing=timing)
+        finally:
+            if timing:
+                _timing_run = False
+
+    def songs(run_timing):
         for meta in library() if installed() else []:
             song_id, folder = meta["id"], _song_dir(meta["id"])
             try:
                 _tempo_upgrade(folder)
             except Exception as e:  # noqa: BLE001  (its beat stays as it was)
                 print(f"Couldn't check library/{song_id}'s tempo: {e}", file=sys.stderr)
+            if not run_timing:
+                continue
             try:
                 if _lyrics_outdated(folder):
+                    _give_way(song_id)
+                    if not _lyrics_outdated(folder):  # (it can have waited long: done meanwhile)
+                        continue
                     job_id = start_lyrics(song_id, None, again=True)
                 elif os.path.isfile(os.path.join(folder, "melody.json")) and _melody_outdated(folder, _load_json(os.path.join(folder, "melody.json"))):
+                    _give_way(song_id)
                     job = _new_job("melody")
                     job["songId"] = song_id
                     job_id = _run(job, _melody_job, song_id)
@@ -1956,7 +2296,11 @@ def start_upgrades():
             _upgrading.update(id=song_id, job=job_id)  # (the last one's, done, until now: the list sees no gap between)
             while (get_job(job_id) or {}).get("status") in ("queued", "running"):
                 time.sleep(0.5)
+            if (get_job(job_id) or {}).get("status") == "error":
+                print(f"Couldn't bring library/{song_id} up to date: {get_job(job_id)['error']}", file=sys.stderr)
         _upgrading.update(id=None, job=None)
+    if timing:
+        _timing_run = True
     threading.Thread(target=run, daemon=True).start()
 
 

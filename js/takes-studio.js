@@ -43,7 +43,7 @@ function tsRender() {
     }
   }
   const takes = tsTakes(), sp = tsSpeed(), end = (t) => t.start + t.duration * sp;
-  if (!TS.on.size) { // the newest first; another only where it doesn't overlap one already on
+  if (!tsOnTakes().length) { TS.on.clear(); // the newest first; another only where it doesn't overlap one already on
     for (const t of [...takes].sort((a, b) => b.created - a.created)) if (![...TS.on].some((id) => { const o = takes.find((x) => x.id === id); return o && t.start < end(o) && o.start < end(t); })) TS.on.add(t.id);
   }
   // lanes: each take in the first one it fits in without overlapping
@@ -164,8 +164,8 @@ function tsOwnSave(t, what, wait = 0) {
 const TS_SYNC_MIN = -0.4, TS_SYNC_MAX = 0.1, TS_SYNC_STEP = 0.005;
 const takeAuto = (t) => -(t.latency || 0); // earlier by the delay allowed for when it was recorded
 const takeShift = (t) => takeAuto(t) + takeSync(t);
-// the sync that moves a take to `shift` in all, within the slider's reach and the server's (stems.TAKE_SYNC)
-const tsSyncFor = (t, shift) => Math.max(-1, Math.min(1, Math.round((Math.max(TS_SYNC_MIN, Math.min(TS_SYNC_MAX, shift)) - takeAuto(t)) * 1e4) / 1e4));
+// the sync that moves a take to `shift` in all, within the server's reach (stems.TAKE_SYNC); the slider stops at its own ends, Match and ← → may pass them
+const tsSyncFor = (t, shift) => Math.max(-1, Math.min(1, Math.round((shift - takeAuto(t)) * 1e4) / 1e4));
 const tsOnTakes = () => tsTakes().filter((t) => TS.on.has(t.id));
 let tsSyncHeld = false; // the slider's own move being applied: its handle stays where the hand put it
 function tsSyncBy(ts, d) { for (const t of ts) { tsOwnSet(t, "sync", tsSyncFor(t, takeShift(t) + d)); tsOwnSave(t, "sync", 600); } }
@@ -174,7 +174,7 @@ function tsSyncBy(ts, d) { for (const t of ts) { tsOwnSet(t, "sync", tsSyncFor(t
 function tsSyncPaint() {
   const s = $("#tsSync"), on = tsOnTakes(), ms = on.map((t) => inMs(takeShift(t))), autos = [...new Set(on.map((t) => inMs(takeAuto(t))))];
   const along = (v) => (v - +s.min) / (+s.max - +s.min), mark = $("#tsSyncAuto");
-  s.disabled = !on.length;
+  s.disabled = $("#tsMatch").disabled = !on.length;
   if (!tsSyncHeld) s.value = ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length) : 0;
   s.style.setProperty("--z", along(0) * 100 + "%");
   mark.hidden = autos.length !== 1;
@@ -258,8 +258,8 @@ async function tsPlay() {
   const [n, sp] = TS.ver.split("/").map(Number), want = TS.ver;
   let bufs;
   try { [bufs] = await Promise.all([takeBand(n, sp), ...tsTakes().filter((t) => TS.on.has(t.id)).map(tsVoice)]); }
-  catch (e) { return; }
-  if (TS.ver !== want || stemsPage !== "takes" || TS.playing) return;
+  catch (e) { say($("#tsState"), e instanceof TypeError ? "Couldn’t reach the server." : e.message); return; }
+  if (TS.ver !== want || view !== "stems" || stemsPage !== "takes" || TS.playing) return;
   const at = ac.currentTime + 0.06, V = TS.pos / sp, guide = guideName();
   TS.bus = ac.createGain(); TS.bus.gain.value = 0; fadeIn(TS.bus.gain, at, stemVol); TS.bus.connect(master); // in over FADE, as the song
   TS.gains = { band: ac.createGain(), guide: ac.createGain() };
@@ -328,12 +328,39 @@ async function tsExport() {
   const btn = $("#tsExport"), state = $("#tsState"), ids = tsTakes().filter((t) => TS.on.has(t.id)).map((t) => t.id);
   if (!ids.length) { say(state, "Turn on at least one take to export."); return; }
   btn.disabled = true; say(state, "Mixing the MP3…");
+  if (tsTimers.size) await new Promise((ok) => setTimeout(ok, 700)); // a move not saved yet (tsOwnSave's 600 ms) goes in
   try {
     const r = await fetch(`/api/library/${TS.id}/takes-mp3`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, mix: T.mix }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Export failed.");
     say(state, "Saved “{name}” to your downloads.", { name: await saveDownload(r, "takes.mp3") });
   } catch (e) { say(state, e instanceof TypeError ? "Couldn’t reach the server." : e.message); }
   btn.disabled = false;
+}
+// Match: how far a take sits from the singer, in s of the song. The singer's entries, each against the take's nearest,
+// both lines read the same way (melody.json, stems.take_pitch); the middle of those near their middle, as a gap in one
+// line and not the other pairs far off. null with under 12, or where they scatter (the band in the mic, another part).
+function voiceRuns(pts, at = (x) => x) { // a line's voice as [[start, end], …]: gaps under 60 ms closed, runs under 100 ms left out
+  const out = [];
+  let on = false;
+  for (const [t, m] of pts) {
+    const x = at(t), last = out[out.length - 1];
+    if (m == null) { if (on) last[1] = x; on = false; }
+    else if (on) last[1] = x + 0.02;
+    else { if (last && x - last[1] < 0.06) last[1] = x + 0.02; else out.push([x, x + 0.02]); on = true; }
+  }
+  return out.filter(([a, b]) => b - a >= 0.1);
+}
+function takeOffset(t, pts, contour) {
+  const sp = t.speed || 1, to = t.start + t.duration * sp, take = voiceRuns(pts, (x) => t.start + (x + takeSync(t)) * sp), ds = [];
+  let j = 0;
+  for (const [a] of voiceRuns(contour)) {
+    if (a < t.start || a >= to) continue;
+    while (j + 1 < take.length && Math.abs(take[j + 1][0] - a) <= Math.abs(take[j][0] - a)) j++;
+    if (take[j] && Math.abs(take[j][0] - a) <= 0.25) ds.push(take[j][0] - a);
+  }
+  if (ds.length < 12) return null;
+  const off = middle(ds);
+  return middle(ds.map((d) => Math.abs(d - off))) > 0.08 ? null : middle(ds.filter((d) => Math.abs(d - off) <= 0.12));
 }
 function initTakesStudio() {
   $("#tsBack").prepend(icon("back"));
@@ -346,6 +373,24 @@ function initTakesStudio() {
     for (const t of tsOnTakes()) { tsOwnSet(t, "sync", tsSyncFor(t, sync.value / 1000)); tsOwnSave(t, "sync", 600); }
     tsSyncHeld = false;
   });
+  $("#tsMatch").onclick = async () => { // each take that's on, by how far it sits from the singer; sync.ondblclick goes back
+    const id = TS.id, state = $("#tsState"), here = () => TS.id === id && T.song === id;
+    const slow = setTimeout(() => say(state, "Reading the melody… (up to a minute the first time)"), 500); // get_melody rebuilds an older song's first
+    let stuck = false;
+    try {
+      const { contour } = await (await fetch("/api/melody/" + id)).json();
+      for (const t of tsOnTakes()) {
+        const pts = await takePitch(t);
+        if (!here()) break; // another song meanwhile
+        if (!tsOnTakes().includes(t)) continue; // turned off meanwhile, or the list came again
+        const off = takeOffset(t, pts, contour);
+        if (off == null) stuck = true;
+        else { const s = tsSyncFor(t, takeShift(t) - off / (t.speed || 1)); if (Math.abs(s - takeSync(t)) >= 0.001) { tsOwnSet(t, "sync", s); tsOwnSave(t, "sync"); } } // sync is in take seconds; unmoved, its voice isn't started over
+      }
+    } catch (e) { stuck = true; } // no melody
+    clearTimeout(slow);
+    say(state, stuck && here() ? "Couldn’t line up every take with the singer." : "");
+  };
   sync.title = tr("Double-click to reset"); // to the automatic amount (again on a language switch: setLang)
   sync.ondblclick = () => { for (const t of tsOnTakes()) { tsOwnSet(t, "sync", 0); tsOwnSave(t, "sync"); } };
   for (const [id, k] of [["#tsVoice", "voice"], ["#tsBand", "band"], ["#tsGuide", "guide"]]) {
@@ -353,8 +398,8 @@ function initTakesStudio() {
     s.addEventListener("input", () => { T.mix[k] = +s.value; store.set("takeMix", T.mix); tsGains(); listenGains(); const o = $({ voice: "#tkVoice", band: "#tkBand", guide: "#tkGuide" }[k]); if (o) o.value = s.value; });
   }
   document.addEventListener("keydown", (e) => {
-    if (!(view === "stems" && stemsPage === "takes") || typing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === "Space") { e.preventDefault(); tsPlay(); }
+    if (!(view === "stems" && stemsPage === "takes") || ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === "Space") { e.preventDefault(); if (!e.repeat) tsPlay(); }
     else if (e.code === "Home") { e.preventDefault(); tsSeek(0); }
   });
   let w = 0; // laid out again for another width (not for its own height, as lanes come and go)
@@ -363,7 +408,7 @@ function initTakesStudio() {
 // A take's pitch (stems.take_pitch), fetched once: [[s into the take, midi or null], …]
 function takePitch(t) {
   if (!T.pitch.has(t.id)) {
-    const job = fetch(`/api/library/${T.song}/takes/${t.id}/pitch`).then((r) => (r.ok ? r.json() : []));
+    const job = fetch(`/api/library/${T.song}/takes/${t.id}/pitch`).then((r) => { if (r.ok) return r.json(); T.pitch.delete(t.id); return []; });
     job.catch(() => T.pitch.delete(t.id));
     T.pitch.set(t.id, job);
   }
@@ -434,7 +479,7 @@ function takeWaveEl(t) {
   w.onkeydown = (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
-    takeSeek(t, (takeWaveAt(t)?.f || 0) * t.duration + (e.key === "ArrowRight" ? 5 : -5));
+    e.stopPropagation(); takeSeek(t, (takeWaveAt(t)?.f || 0) * t.duration + (e.key === "ArrowRight" ? 5 : -5));
   };
   takeWaveIO.observe(w);
   return w;
@@ -534,7 +579,7 @@ function initTakes() {
   for (const [id, k, def] of [["#tkVoice", "voice", 1], ["#tkBand", "band", 1], ["#tkGuide", "guide", 0]]) {
     const s = $(id);
     s.value = T.mix[k];
-    s.oninput = () => { T.mix[k] = +s.value; store.set("takeMix", T.mix); listenGains(); };
+    s.oninput = () => { T.mix[k] = +s.value; store.set("takeMix", T.mix); listenGains(); const o = $({ voice: "#tsVoice", band: "#tsBand", guide: "#tsGuide" }[k]); if (o) o.value = s.value; };
     resetOnDblClick(s, def);
   }
   document.addEventListener("click", (e) => { if (!e.target.closest(".take.armed .tk-del")) disarmTakes(); });

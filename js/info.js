@@ -98,7 +98,7 @@ async function renderInfoLyrics(id) {
   box.append(acts, find, found, paste);
   if (d && d.lines) {
     const ol = el("ol", "ly-lines");
-    for (const l of d.lines) {
+    for (const l of nudged(d.lines, infoShown.m.lyricNudge, infoShown.m.lyricEdits)) {
       if (!(l.t1 > l.t0)) continue;
       const b = el("button"); b.type = "button"; b.title = tr("Play this line of the vocal track");
       b.append(el("span", null, fmtTime(l.t0)), el("div", null, l.text));
@@ -121,10 +121,12 @@ function paintInfoLyrics() {
     const n = d.lines.length;
     t = d.source && d.source.site === "lrclib" ? tr("From LRCLIB · {artist} – {track} · {n} lines", { artist: d.source.artist, track: d.source.track, n }) : tr("Pasted in · {n} lines", { n });
     if (d.match != null && d.match < 0.3) { t += " · " + tr("they hardly match what’s sung: maybe another song’s"); warn = true; }
+    else if (d.offLines) { t += " · " + tr("some lines may not be sung here"); warn = true; }
   } else if (d && d.dropped) t = tr("No lyrics: Practice splits the song into phrases where the singer breathes.");
   else if (d) t = tr("None found on LRCLIB. Search for them, or paste them in.");
   else t = tr("Not looked for yet.");
   st.textContent = t; st.classList.toggle("warn", warn);
+  st.title = !job && d && d.offLines ? tr("About {n} lines look unsung here, maybe another version’s lyrics. Try Search LRCLIB on the song’s Info page.", { n: d.offLines }) : "";
   const busy = !!job && !job.err;
   $("#iLyrics").querySelectorAll(".ly-acts button, .ly-find *, .ly-found button, .ly-paste *").forEach((b) => { b.disabled = busy; });
 }

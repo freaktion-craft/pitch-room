@@ -152,23 +152,63 @@ def _entry(r: dict) -> dict:
             "duration": r.get("duration"), "lines": lines, "times": times if any(t is not None for t in times) else None}
 
 
-STAMP = re.compile(r"^\s*\[(\d+):(\d+(?:\.\d+)?)\]")
+STAMP = re.compile(r"^\s*\[(\d+):(\d+)(?:[.:](\d+))?\]")
+WORD_STAMP = re.compile(r"<\d+:\d+(?:[.:]\d+)?>|\[\d+:\d+(?:[.:]\d+)?\]")  # enhanced LRC: a stamp per word (the row's own, at its start, are read before this)
+TIMES = re.compile(r"(?i)(?:^|\s+|\s*[(\[]\s*)(?:[x×]\s*([2-9])|([2-9])\s*[x×])\s*[)\]]?\s*$")  # "hello (x2)": sung twice
+HEAD = re.compile(r"(?i)(?:repeat\s+)?(?:(?:\d+(?:st|nd|rd|th)?|first|second|third|last|final)\s*)?(?:verse(?:\s+(?:one|two|three|four))?|chorus|pre[- ]?chorus|post[- ]?chorus|bridge|hook|refrain|intro|outro|interlude|instrumental(?:\s+break)?|(?:guitar|piano|sax|drum|bass)\s+solo|solo|inst"
+                  r"|rap|repeat|후렴구?|브릿지|브리지|벌스|간주\s*중?|전주|후주|코러스|랩|나레이션|내레이션|인트로|아웃트로|반복|\d+절)(?:\s*\d+)?(?:\s+(?:repeat|반복))?\s*:?")
+SUNG_HEAD = re.compile(r"(?i)solo|hook|bridge|rap|repeat")  # the heads that can be a word sung, with a stamp saying when
+STAGE = re.compile(r"(?i)\b(?:solo|instrumental|interlude|applause|guitar|piano|drums?|sax|spoken|chorus|verse|intro|outro)\b|간주|후렴|브릿지|인트로|아웃트로|코러스|나레이션|내레이션"
+                   r"|^\(\s*(?:(?:music|break|fades?(?:\s+out)?|repeat|bridge|hook|반복|랩|음악|dance\s+break|\d+\s*(?:번|회|times?)|\d+절|[x×]\s*[2-9]|[2-9]\s*[x×])[\s,.&/+-]*)+\)$")  # (in brackets, a line about the song, not of it; a word that's also sung counts only with no other words by it)
+CREDIT = re.compile(r"(?i)^(?:(?:(?:작사|작곡|편곡)(?:\s*[/,·&]\s*(?:작사|작곡|편곡))*|노래|lyrics?(?:\s+by)?|lyricists?|composed\s+by|composers?|written\s+by|songwriters?|writers?|music(?:\s+by)?|arrang(?:ed\s+by|ers?)|mixed\s+by|mastered\s+by|produced\s+by|producers?"
+                    r"|作词|作詞|作曲|编曲|編曲|词|詞|曲|制作人|监制|混音|母带|和声|吉他|贝斯|鼓|录音)\s*[:：]"
+                    r"|(?:작사|작곡|편곡)(?:\s+(?:작사|작곡|편곡))*\s+[^\s,&/·]+(?:\s*[,&/·]\s*[^\s,&/·]+|\s+[A-Za-z][^\s,&/·]*)*$|(?:lyrics?|composed|written|music|produced|arranged|mixed|mastered|words(?:\s*(?:&|and)\s*music)?)\s+by\b)")
+CREDIT_ROWS = 5  # credits come first or last: further in, "Music by the river" can be sung
+STAMP_MIN = 0.5  # s: an LRCLIB stamp earlier than this says nothing about where the line goes (0:00, typed for one nobody placed)
 
 
 def timed_lines(text: str) -> tuple[list[str], list[float | None]]:
-    """Lines of words from lyrics as written: no blank lines, no section heads like [Chorus] or (Verse 2); and for synced
-    lyrics, when each starts in LRCLIB's recording (its first [mm:ss.xx]; None for a line without one)."""
-    lines, times = [], []
-    for line in str(text).splitlines():
-        t = None
-        while m := STAMP.match(line):  # a line sung more than once can have a stamp for each time
-            t = int(m.group(1)) * 60 + float(m.group(2)) if t is None else t
+    """Lines of words from lyrics as written, in the order they're sung: no blank lines, no lines without a word in them, no
+    section heads like [Chorus], (Verse 2) or Hook: (a bare word like Solo with a stamp may be sung, and stays), no credits; a line
+    all in brackets only with a stamp saying when it's sung; a line marked x2 twice, one with a stamp for each time it's sung
+    once each. For synced lyrics, when each starts in LRCLIB's recording ([mm:ss.xx]; None for a line without one)."""
+    rows = []
+    for line in re.sub("[﻿​⁠]", "", unicodedata.normalize("NFC", str(text))).splitlines():  # (a BOM or a zero-width mark is in the way of a stamp; NFD, of the heads and of Whisper)
+        stamps = []
+        while m := STAMP.match(line):
+            stamps.append(int(m.group(1)) * 60 + float(f"{m.group(2)}.{m.group(3) or 0}"))
             line = line[m.end():]
-        line = " ".join(line.split())
-        if line and not re.fullmatch(r"\[[^\]]*\]|\([^)]*\)", line):
-            lines.append(line)
-            times.append(t)
-    return lines, times
+        line = " ".join(WORD_STAMP.sub("", line).translate(str.maketrans("（）【】［］", "()[][]")).split())
+        line = re.sub(r"(?i)^\[(?:ar|ti|al|au|by|re|ve|la|lr|length|offset|tool|id|#)\s*:.*\]$|^(?:\[[^\]]*\]\s*)+", "", line)  # a row of LRC's tags, ] in their values or not; "[Chorus] the words": the words
+        whole = re.fullmatch(r"\([^)]*\)", line)  # backing vocals alone, or a section's name
+        if whole and (not stamps or STAGE.search(line) or TIMES.fullmatch(line)):
+            continue
+        n = 1
+        if not whole and (m := TIMES.search(line)) and (HEAD.fullmatch(line[: m.start()].strip("()[]（）【】 ")) or not re.search(r"(?<![가-힣)])\sX[2-9]$|\d\s+[xX×]\s+[2-9]$|(?i:\b(?:the|bmw))\s+x[2-9]$", line)):  # (not "in the X6", "the x6", "4 x 4"; "Chorus X2" and "가사 X2" are marks)
+            n = int(m.group(1) or m.group(2))
+            line = line[: m.start()].strip()
+            if line.count("(") > line.count(")"):  # ("words (oh x2)": the mark is the bracket's, not the line's)
+                line, n = line + ")", 1
+            if line.count("[") > line.count("]"):  # (the same in square brackets)
+                line, n = line + "]", 1
+            if re.fullmatch(r"\([^)]*\)", line) and (not stamps or STAGE.search(line)):  # ("(oh yeah) x2": all in brackets too)
+                continue
+        bare = line.strip("()[]（）【】<>＜＞〈〉《》*#~=♪♫♬♩-–—.…: ")
+        if not re.search(r"[^\W_ㅡㅤﾠ]", line) or (HEAD.fullmatch(bare) and (not stamps or n > 1 or line != bare or not SUNG_HEAD.fullmatch(bare))):
+            continue
+        for t in stamps or [None] * n:
+            rows.append((t, line))
+    credit = [bool(CREDIT.match(r[1])) for r in rows]
+    head = next((k for k in range(CREDIT_ROWS, len(rows)) if not (credit[k] and credit[k - 1])), len(rows))  # (a longer block: on to its end)
+    tail = next((k for k in range(len(rows) - CREDIT_ROWS - 1, -1, -1) if not (credit[k] and credit[k + 1])), -1)
+    rows = [r for k, r in enumerate(rows) if not (credit[k] and (k < head or k > tail))]
+    if any(t is not None for t, _ in rows):  # in the order of their stamps; a line without a stamp that says where stays after the line before it
+        at, keyed = 0.0, []
+        for k, (t, line) in enumerate(rows):
+            at = t if t is not None and t >= STAMP_MIN else at
+            keyed.append((at, k, t, line))
+        rows = [(t, line) for _, _, t, line in sorted(keyed)]
+    return [line for _, line in rows], [t for t, _ in rows]
 
 
 def lines_of(text: str) -> list[str]:
@@ -186,6 +226,35 @@ def heard_share(heard: str, lines: list[str]) -> float:
     to 0.35 (in English, common words alone get that far)."""
     h = _grams(heard)
     return len(h & _grams(" ".join(lines))) / len(h) if h else 0.0
+
+
+def lead_text(line: str) -> str:
+    """A line as the lead sings it: without the words in brackets, which are backing vocals (lead minus backing: 3.6 dB in
+    them, 18 dB outside them), so what's lined up on the lead vocal isn't pulled onto them."""
+    s = re.sub(r"\s+([,.!?])", r"\1", " ".join(re.sub(r"\([^()]*\)|（[^（）]*）", " ", line).split()))
+    return re.sub(r"\s+[-\"'“¿(\[{「\s]+$", "", s if re.search(r"\w", s) else line)  # (stable-ts puts a lone opening mark on the next word, across lines)
+
+
+def with_brackets(line: dict, text: str) -> dict:
+    """A line lined up by lead_text, with its text as written: the words in brackets back between the ones around them, for no
+    time (syllables.py times them if it can)."""
+    if lead_text(text) == text:
+        return line
+    if not re.search(r"\w", re.sub(r"\([^()]*\)|（[^（）]*）", " ", text)):  # (only a mark outside the brackets: no word of the lead's to put them between)
+        return {**line, "text": text}
+    words, out, have, seen, k = line["words"], [], 0, 0, 0
+    for m in re.finditer(r"\([^()]*\)|（[^（）]*）|[^\s(（]+|[(（]", text):
+        piece = m.group()
+        if re.fullmatch(r"\([^()]*\)|（[^（）]*）", piece):
+            at = out[-1][1] if out else (words[0][0] if words else line["t0"])
+            out += [[at, at, " " + x] for x in piece.split()]
+            continue
+        have += len(piece)
+        while k < len(words) and seen < have:
+            out.append(words[k])
+            seen += len("".join(words[k][2].split()))
+            k += 1
+    return {**line, "text": text, "words": out + words[k:]}
 
 
 def language(lines: list[str]) -> str:

@@ -233,14 +233,14 @@ window.__autoSing = (on, cents = 0) => {
 const YB = new Float32Array(2048);
 function yin(b, sr) {
   const tMax = Math.min(Math.floor(sr / 62), b.length >> 1), tMin = Math.max(2, Math.floor(sr / 1500)), W = b.length - tMax;
-  YB[0] = 1; let run = 0;
+  YB[0] = 1; let run = 0, tau = -1;
   for (let t = 1; t <= tMax; t++) {
     let s = 0; for (let i = 0; i < W; i++) { const x = b[i] - b[i + t]; s += x * x; }
     run += s; YB[t] = run > 0 ? (s * t) / run : 1;
-  }
-  let tau = -1;
-  for (let t = tMin; t < tMax; t++) {
-    if (YB[t] < 0.15) { while (t + 1 < tMax && YB[t + 1] < YB[t]) t++; tau = t; break; }
+    // the first dip under 0.15, followed to its bottom. Nothing past the lag after the bottom is read, so stop there
+    if (tau < 0) { if (t >= tMin && t < tMax && YB[t] < 0.15) tau = t; }
+    else if (t < tMax && YB[t] < YB[t - 1]) tau = t;
+    else break;
   }
   if (tau < 0) return null;
   const a = YB[tau - 1], c = YB[tau], e = YB[tau + 1], den = a - 2 * c + e;

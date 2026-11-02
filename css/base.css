@@ -15,6 +15,7 @@ html { overflow-y: scroll; }
 ::-webkit-scrollbar-corner, ::-webkit-scrollbar-track { background: transparent; }
 @supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: var(--fg-16) transparent; } }
 body { background: var(--bg); color: var(--ink); font: var(--text-lg)/1.6 var(--font); -webkit-font-smoothing: antialiased; }
+h1.title { font-family: var(--font-title); } /* the library's heading */
 [hidden] { display: none !important; }
 /* Interface text can't be selected (a stray drag highlights nothing); what someone might copy can: song titles and
    facts, messages and errors, the install log, the server notice (it has the address), and fields */
@@ -120,6 +121,16 @@ html.booting #app { visibility: hidden; }
 #boot .bar { width: 160px; }
 #boot .bar i { width: 40%; transition: none; animation: boot-sweep 0.8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
 @keyframes boot-sweep { to { transform: translateX(150%); } }
+/* Before that, an update that would time the songs again asks first (askUpdate): its words and buttons alone on the empty
+   screen, in the middle; the bar after the answer */
+.boot-ask { position: fixed; inset: 0; z-index: var(--z-boot); width: min(360px, calc(100vw - 32px)); height: fit-content; margin: auto; display: none; gap: var(--space-3);
+  text-align: center; font-size: var(--text-md); }
+.boot-ask b { font-weight: var(--weight-medium); }
+.boot-ask p { margin: 0; }
+.boot-ask .acts { display: flex; justify-content: center; gap: var(--space-2); margin-top: var(--space-1); }
+html.asking .boot-ask { display: grid; }
+html.asking #app { visibility: hidden; }
+html.asking #boot { display: none; }
 /* Page intro: the title, set apart from what follows */
 .intro { display: grid; gap: var(--space-half); margin-bottom: var(--space-4); }
 .group { display: grid; gap: var(--space-3); }
@@ -219,6 +230,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .btn.primary:hover { background: var(--ink-strong); }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
 .btn.quiet:hover { background: var(--fg-8); }
+#voiceBtn.on { background: color-mix(in oklab, var(--voice) 22%, transparent); color: var(--ink); } /* on its page */
 .btn.quiet > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .btn.ghost { background: transparent; color: var(--muted); }
 .btn.ghost:hover { background: var(--fill); color: var(--ink); }

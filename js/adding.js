@@ -2,8 +2,8 @@
 // Adding songs: the Add song panel (links, files) and the songs being added (the ring by the mic, its panel).
 
 // Songs being added, by job: {name, status, stage, progress, ahead, cancel, error, stopping, done, songId, seen}, in
-// the order they were started. The ring beside the mic shows them while there are any: as full as they are together,
-// each counted whole once it's in; spinning while none has started; full and bright once all are in. Pressed, its
+// the order they were started. The ring beside the mic is always there, empty while there are none: as full as they are
+// together, each counted whole once it's in; spinning while none has started; full and bright once all are in. Pressed, its
 // panel lists each one: its name (a link's video title once it's known, the song's own once it's in), what it's doing
 // or how many are ahead of it, and a button to stop it. One that's in has a button to open it instead, and stays until
 // it's opened or the panel is closed having shown it (seen); one that failed stays, saying why, until it's cleared.
@@ -16,18 +16,22 @@ function paintJobs() {
   const btn = $("#jobsBtn"), open = !$("#jobsPop").hidden;
   if (!btn.querySelector(".ring")) btn.append(progRing(0));
   const ring = btn.querySelector(".ring"), arc = ring.lastElementChild;
-  showJobsBtn(jobs.length > 0);
   const waiting = live.length > 0 && !live.some((j) => j.status === "running") && p === 0;
   ring.classList.toggle("spin", waiting && !stillMotion());
   btn.classList.toggle("err", failed && !live.length && !ready.length);
   btn.classList.toggle("ready", !live.length && ready.length > 0);
-  arc.style.strokeDasharray = `${btn.classList.contains("err") ? 100 : Math.max(6, waiting ? 25 : p * 100)} 100`;
+  arc.style.strokeDasharray = `${!jobs.length ? 0 : btn.classList.contains("err") ? 100 : Math.max(6, waiting ? 25 : p * 100)} 100`;
+  arc.style.visibility = jobs.length ? "" : "hidden"; // empty: just the track, no dot of a round end
+  if (!btn.querySelector(":scope > .ico")) btn.append(icon("plus"));
+  btn.classList.toggle("idle", !jobs.length); // nothing being added: a + (the panel adds a song) in the ring's place
   const pct = Math.round(p * 100);
   say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : ready.length > 1 ? "{n} songs added"
-    : ready.length ? "Song added" : "Couldn’t add a song", { n: live.length || ready.length, pct }, "title");
+    : ready.length ? "Song added" : failed ? "Couldn’t add a song" : "Add songs", { n: live.length || ready.length, pct }, "title");
   // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
-  say($("#jobsPop > b"), !live.length && ready.length ? "Songs added" : "Adding songs");
+  say($(".jobs-head b"), !live.length && ready.length ? "Songs added" : "Adding songs");
+  const formHere = !$("#jobsAdd").hidden; // the form says what it is: the panel's own heading steps aside while it's alone
+  $(".jobs-head").hidden = formHere && !jobs.length; $("#jobsNone").hidden = formHere || jobs.length > 0;
   for (const [id, j] of adding) {
     if (j.done && open) j.seen = true; // in while the panel's open: shown
     let row = document.getElementById("job-" + id);
@@ -70,28 +74,13 @@ function forgetAdded(songId) {
   for (const [id, j] of adding) if (j.done && j.songId === songId) { adding.delete(id); document.getElementById("job-" + id)?.remove(); gone = true; }
   if (gone) paintJobs();
 }
-// The ring comes in and goes out beside the mic, which stays where it is.
-function showJobsBtn(on) {
-  const b = $("#jobsBtn"), leaving = !!b.dataset.leaving;
-  if (on ? !b.hidden && !leaving : b.hidden || leaving) return;
-  b.getAnimations().forEach((a) => a.cancel());
-  delete b.dataset.leaving;
-  if (on) {
-    b.hidden = false;
-    if (!stillMotion() && !b.dataset.await) b.animate([{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "none" }], { duration: 240, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
-    return;
-  }
-  showJobs(false); delete b.dataset.await;
-  if (stillMotion()) { b.hidden = true; return; }
-  b.dataset.leaving = "1";
-  const a = b.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.8)" }], { duration: 200, easing: "ease-in", fill: "forwards" });
-  a.finished.then(() => { if (b.dataset.leaving) { delete b.dataset.leaving; b.hidden = true; a.cancel(); } }).catch(() => {});
-}
 function showJobs(on) {
   const was = !$("#jobsPop").hidden;
   $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
-  if (on) { showMicSet(false); paintJobs(); } // marks those in as seen
-  else if (was) { // closed: the songs it showed as in have been seen
+  if (on) { showMicSet(false); showAdd(false); paintJobs(); } // marks those in as seen
+  else closeYt();
+  if (!on && was) { // closed: the songs it showed as in have been seen
+    showJobsAdd(false);
     for (const [id, j] of adding) if (j.done && j.seen) { adding.delete(id); document.getElementById("job-" + id)?.remove(); }
     paintJobs();
   }
@@ -138,6 +127,7 @@ function watchJob(id, kind, forSong) {
   pollers[id] = setInterval(async () => {
     let j;
     try { j = await (await fetch("/api/jobs/" + id, { cache: "no-store" })).json(); } catch (e) { return; }
+    if (!j.status) j = { status: "error", error: "That didn’t work.", progress: 0, stage: "" }; // the server doesn't know it any more (restarted)
     if (kind === "gpu") {
       $("#sGpuBar").hidden = false; $("#sGpuBar i").style.width = Math.round(j.progress * 100) + "%";
       say($("#sGpuState"), j.status === "error" ? j.error : j.status === "done" ? "Done — restart the app to use the GPU." : j.stage);
@@ -244,6 +234,7 @@ function landRing() {
 }
 async function tuckAway() {
   const pop = $("#addPop"), ring = $("#jobsBtn");
+  if (!$("#jobsAdd").hidden) { showJobsAdd(false); landRing(); return; } // sent from the ring's panel: the form folds away there, the songs show in its place
   if (stillMotion() || ring.hidden || pop.hidden) { showAdd(false); landRing(); return; }
   const a = pop.getBoundingClientRect(), r = ring.getBoundingClientRect();
   const dx = r.left + r.width / 2 - (a.left + a.width / 2), dy = r.top + r.height / 2 - (a.top + a.height / 2), s = r.width / a.width;
@@ -268,9 +259,88 @@ function showAdd(on) {
   const pop = $("#addPop"), btn = $("#sAddBtn");
   if (on) { showMicSet(false); showJobs(false); showSync(false); }
   const was = !pop.hidden;
+  if (on) pop.append($("#sAdd"), $("#sAddSetup")); // back from the ring's panel, if it was there
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
   $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // the page behind blurs back
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
+}
+// The ring's panel has Add song too, so a song can be added from any page: the same form, moved into the panel under
+// the songs being added, its button stepping aside; it goes back when the panel closes or a song is sent.
+function showJobsAdd(on) {
+  const host = $("#jobsAdd"), pop = $("#jobsPop");
+  if (on === !host.hidden) return;
+  if (on) host.append($("#sAdd"), $("#sAddSetup")); else $("#addPop").append($("#sAdd"), $("#sAddSetup"));
+  host.hidden = !on; $("#jobsAddBtn").hidden = on; pop.classList.toggle("adding", on);
+  paintJobs();
+  if (on) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
+  else if (!pop.hidden) $("#jobsAddBtn").focus();
+}
+// A YouTube link copied is offered as it is: Add song reads what's copied (the browser asks once whether it may), and a
+// paste anywhere but in a field (Ctrl+V) brings the panel with the same offer, needing no asking. Nothing starts until
+// Import is pressed, so a stray paste costs nothing. Anything else goes to the form, as before.
+const YT_LINK = /^(https?:\/\/)?((www|m|music)\.)?(youtube\.com\/(watch\?\S*v=|shorts\/|live\/)|youtu\.be\/)\S+$/i;
+const ytLinks = (text) => String(text || "").split(/\s+/).filter((w) => YT_LINK.test(w));
+let ytOffer = null; // the links the menu offers, while it's open
+const ytTitles = new Map(); // link → its video's title (YouTube's oEmbed: no key, a short answer)
+async function jobsAddPressed() {
+  if (ytOffer) return closeYt();
+  let text = "";
+  try { text = await navigator.clipboard.readText(); } catch (e) {} // not allowed, or nothing: the form
+  const links = ytLinks(text);
+  if (links.length && !$("#sAdd").hidden) offerYoutube(links); else showJobsAdd(true);
+}
+function offerYoutube(links) {
+  if ($("#jobsPop").hidden) showJobs(true);
+  showJobsAdd(false);
+  ytOffer = links;
+  const sub = $("#ytTitle"), one = links.length === 1;
+  say($("#ytImport .yt-what > span"), one ? "Import from YouTube" : "Import {n} from YouTube", { n: links.length });
+  sub.textContent = one ? ytTitles.get(links[0]) || links[0].replace(/^https?:\/\/(www\.)?/, "") : "";
+  $("#ytMenu").hidden = false; $("#jobsAddBtn").setAttribute("aria-expanded", "true");
+  placeYt(); $("#ytImport").focus();
+  if (one && !ytTitles.has(links[0])) {
+    const ask = new AbortController(); setTimeout(() => ask.abort(), 4000);
+    fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(links[0]), { signal: ask.signal })
+      .then((r) => (r.ok ? r.json() : null)).then((j) => {
+        if (!j?.title) return;
+        ytTitles.set(links[0], j.title);
+        if (ytOffer === links) { sub.textContent = j.title; placeYt(); }
+      }).catch(() => {});
+  }
+}
+function placeYt() { // under Add song, their right edges together
+  const menu = $("#ytMenu"), r = $("#jobsAddBtn").getBoundingClientRect();
+  menu.style.top = `${r.bottom + floatGap()}px`; menu.style.left = `${Math.max(8, r.right - menu.offsetWidth)}px`;
+}
+function closeYt() {
+  if (!ytOffer) return;
+  ytOffer = null; $("#ytMenu").hidden = true; $("#jobsAddBtn").setAttribute("aria-expanded", "false");
+}
+// Import: sent as from the form; one that couldn't start opens the form, saying why
+async function importYoutube() {
+  const links = ytOffer; closeYt();
+  if (!links) return;
+  $("#sYtUrl").value = links.join("\n"); fitLinks();
+  await submitYoutube({ preventDefault() {} });
+  if ($("#sYtUrl").value.trim()) showJobsAdd(true);
+}
+function initYoutubeOffer() {
+  $("#jobsAddBtn").onclick = jobsAddPressed;
+  $("#ytImport").onclick = importYoutube;
+  $("#ytOther").onclick = () => { closeYt(); showJobsAdd(true); };
+  $("#jobsPop").addEventListener("click", (e) => { if (ytOffer && !e.composedPath().some((n) => n === $("#ytMenu") || n === $("#jobsAddBtn"))) closeYt(); });
+  $("#ytMenu").addEventListener("keydown", (e) => {
+    const items = [...$("#ytMenu").querySelectorAll("button")], i = items.indexOf(document.activeElement);
+    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (to !== undefined) { e.preventDefault(); items[(to + items.length) % items.length].focus(); }
+    else if (e.key === "Escape") { e.stopPropagation(); closeYt(); $("#jobsAddBtn").focus(); } // the menu, not the panel
+  });
+  document.addEventListener("paste", (e) => {
+    if (e.target.closest?.("input, textarea, [contenteditable]")) return; // pasting into a field: theirs
+    const links = ytLinks(e.clipboardData?.getData("text"));
+    if (!links.length || $("#sAdd").hidden) return;
+    e.preventDefault(); offerYoutube(links);
+  });
 }
 // the links field: a line tall, growing with what's in it (CSS stops it at five)
 function fitLinks() { const f = $("#sYtUrl"); f.style.height = ""; f.style.height = Math.max(32, f.scrollHeight + 2) + "px"; }

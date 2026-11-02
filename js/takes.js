@@ -324,10 +324,10 @@ const fmtLen = (d) => (d < 59.5 ? tr("{n} s", { n: Math.round(d) }) : fmtTime(d)
 // The part of the song a take is of: the phrases whose middle it covers, or its times where it has none.
 function takePart(t) {
   const end = t.start + t.duration * (t.speed || 1), ps = []; // a take at 0.8 covers 0.8 s of the song a second
-  K.phrases.forEach((p, i) => { const mid = (p.t0 + p.t1) / 2; if (mid >= t.start && mid <= end) ps.push(i + 1); });
+  if (K.song && K.song.id === T.song) K.phrases.forEach((p, i) => { const mid = (p.t0 + p.t1) / 2; if (mid >= t.start && mid <= end) ps.push(i + 1); });
   const range = `${fmtTime(t.start)}–${fmtTime(end)}`, len = fmtLen(t.duration);
   if (!ps.length) return { what: range, more: len };
-  const which = ps.length === 1 ? tr("Phrase {n}", { n: ps[0] }) : tr("Phrases {a}–{b}", { a: ps[0], b: ps[ps.length - 1] }), words = K.phrases[ps[0] - 1].text;
+  const which = ps.length === 1 ? tr("Phrase {n}", { n: ps[0] }) : tr("Phrases {a}–{b}", { a: ps[0], b: ps[ps.length - 1] }), words = ps.map((n) => K.phrases[n - 1].text).find((x) => x && x !== "♪");
   if (words) return { what: words + (ps.length > 1 ? " …" : ""), more: `${which} · ${range} · ${len}` }; // by its words, with lyrics
   return { what: which, more: `${range} · ${len}` };
 }
