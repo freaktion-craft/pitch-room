@@ -163,9 +163,9 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         </div>
         <div class="vc-cal">
           <b>Set it to your voice</b>
-          <p class="muted">Hold an “ah”, then press.</p>
-          <div class="vc-cal-acts"><button class="btn sm" id="vcChest" type="button" title="Sing your clearest chest voice, press, and hold the note for 2 s">Chest</button><button class="btn sm" id="vcHead" type="button" title="Sing your clearest head voice, press, and hold the note for 2 s">Head</button><button class="btn sm ghost" id="vcReset" type="button" hidden>Reset</button></div>
-          <p class="vc-msg" id="vcMsg" aria-live="polite" hidden></p>
+          <p class="muted">Turn one on and sing in it. A few notes and vowels of each, the same notes in both.</p>
+          <div class="vc-cal-acts"><button class="btn sm" id="vcChest" type="button" aria-pressed="false" title="While it’s on, what you sing is learned as chest voice">Chest</button><button class="btn sm" id="vcHead" type="button" aria-pressed="false" title="While it’s on, what you sing is learned as head voice">Head</button><button class="btn sm ghost" id="vcReset" type="button" hidden>Reset</button></div>
+          <p class="muted vc-fit" id="vcFit"></p>
         </div>
       </aside>
     </div>

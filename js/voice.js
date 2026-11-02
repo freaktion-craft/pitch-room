@@ -1,18 +1,21 @@
 "use strict";
-// Chest & head voice (#voice): where the sound you're making sits, live, on a pad. Across, chest to head, by H1−H2: how
-// much louder the lowest harmonic is than the next (in head voice and falsetto far louder, in chest voice about even).
-// Up and down, forward and bright to back and dark, by the energy at 2–4 kHz against below 1 kHz. The dot's size is
-// how loud; the keyboard and the readout beside the pad show the note. Every voice reads differently, so the pad is set
-// from your own: a held chest note and a held head note put its two ends where they fall.
+// Chest & head voice (#voice): where the sound you're making sits, live, on a pad. Across, chest to head: no one number
+// tells them apart in every voice, vowel and microphone, so a few are read (H1−H2, how much louder the lowest harmonic is
+// than the next, in head voice and falsetto far louder; H2−H4; the harmonics' slope, dB an octave; how periodic the sound
+// is, falsetto being breathier) and the singer teaches the pad which way they lean in their own voice: with Chest or Head on,
+// what they sing is kept as that, and the line that best parts the two (Fisher's) is the pad's axis, their middles at its
+// dashed lines. Untaught, H1−H2 alone. Up and down, forward and bright to back and dark, by the energy at 2–4 kHz against
+// below 1 kHz, about the singer's own middle. The dot's size is how loud; the keyboard and the readout show the note.
 
-// an: an analyser of its own, long enough to tell the lowest harmonics apart; h12, bright, db: as read now, smoothed;
-// trail: where the dot has been, the last VC_TRAIL s; listen: an end being set; from: the page to go back to
-const VC = { an: null, data: null, hz: 0, h12: null, bright: null, db: null, trail: [], last: null, listen: null, from: "#stems", painted: 0, live: null };
-// chest, head: your ends' H1−H2 (dB); cb, hb: their brightness (dB), the pad's middle height their average. null: not
-// set, the default used
-const VC_DEFAULT = { chest: 3, head: 14, mid: -24 };
-const VC_SPAN = 12, VC_TRAIL = 1.5, VC_LISTEN = 2000; // dB of brightness from the middle to the top or bottom; s; ms
-let vcEnds = { chest: null, head: null, cb: null, hb: null, ...store.get("voiceEnds", {}) };
+// an: an analyser of its own, long enough to tell the lowest harmonics apart; x (0…1 across), bright, db, h12: as read now,
+// smoothed; trail: where the dot has been, the last VC_TRAIL s; rec: "chest" or "head" while one's being taught; train:
+// what's been taught ({chest, head}: frames of VC_F); model: the axis fitted to it; from: the page to go back to
+const VC = { an: null, data: null, hz: 0, x: null, h12: null, bright: null, db: null, trail: [], last: null, rec: null, model: null, from: "#stems", painted: 0, live: null };
+const VC_DEFAULT = { chest: 3, head: 14, mid: -24 }; // untaught: H1−H2 (dB) at the dashed lines, and the middle's brightness (dB)
+const VC_SPAN = 12, VC_TRAIL = 1.5; // dB of brightness from the middle to the top or bottom; s
+// a frame taught: [H1−H2, H2−H4, slope (dB an octave), periodicity, brightness]; the first VC_D part chest from head
+const VC_D = 4, VC_MIN = 45, VC_KEEP = 1800; // frames of each before the axis is fitted (about 3/4 s); at most kept of each (half a minute: they go with the settings)
+VC.train = (() => { const t = store.get("voiceTrain", null); return t && Array.isArray(t.chest) && Array.isArray(t.head) ? t : { chest: [], head: [] }; })();
 // Step up: a note to sing (target, lit on the keyboard), a semitone higher each time. Held on pitch (within VC_NEAR) for
 // VC_HOLD ms, where the dot was is marked on the pad with the note's name, and with auto the next note plays. The marks
 // joined up show where, going up, the voice turns from chest to head. Tapping a key starts again there.
@@ -36,41 +39,84 @@ function vcPeak(f) {
 }
 function vcBand(lo, hi) { let s = 0; for (let i = Math.round(lo / VC.hz); i <= Math.round(hi / VC.hz); i++) s += 10 ** (VC.data[i] / 10); return s; }
 
-// where H1−H2 and brightness fall on the pad (0…1 across from chest, down from forward): your ends at a fifth in from
-// each side, so going past them still shows
-function vcXY(h12, br) {
-  const c = vcEnds.chest ?? VC_DEFAULT.chest, h = vcEnds.head ?? VC_DEFAULT.head;
-  const mids = [vcEnds.cb, vcEnds.hb].filter((v) => v != null), mid = mids.length ? mids.reduce((a, b) => a + b) / mids.length : VC_DEFAULT.mid;
-  const clamp = (v) => Math.min(0.97, Math.max(0.03, v));
-  return [clamp(0.2 + (0.6 * (h12 - c)) / (h - c || 1)), clamp(0.5 - (br - mid) / (2 * VC_SPAN))];
+// A frame's cues, from the note's harmonics (f0: its pitch), or null where they can't be trusted: the lowest harmonic far
+// under the second (the pitch read an octave low), or a strong one half way under it (an octave high)
+function vcCues(f0, q) {
+  const A = (k) => vcPeak(k * f0), a1 = A(1), a2 = A(2);
+  if (a1 < a2 - 20 || (f0 / 2 > 60 && vcPeak(f0 / 2) > a1 - 3)) return null;
+  const ks = [], as = [];
+  for (let k = 1; k * f0 <= 4000 && k <= 12; k++) { ks.push(Math.log2(k)); as.push(A(k)); }
+  let slope = 0;
+  if (ks.length >= 3) { // least squares, dB against octaves up
+    const mk = ks.reduce((s, v) => s + v, 0) / ks.length, ma = as.reduce((s, v) => s + v, 0) / as.length;
+    slope = ks.reduce((s, v, i) => s + (v - mk) * (as[i] - ma), 0) / Math.max(1e-6, ks.reduce((s, v) => s + (v - mk) ** 2, 0));
+  }
+  const br = 10 * Math.log10(vcBand(2000, 4000) / Math.max(1e-20, vcBand(80, 1000)));
+  const f = [a1 - a2, a2 - (4 * f0 < VC.hz * VC.data.length ? A(4) : a2), slope, q ?? 0.9, br];
+  return f.every(isFinite) ? f : null;
 }
+// The axis fitted to what's been taught: z-scored cues, Fisher's direction (the pooled spread's inverse onto the gap between
+// the two middles, a little ridge so it can't blow up), each kind's middle on it, and how many taught frames it puts on their
+// own side of halfway
+function vcFit() {
+  const C = VC.train.chest, H = VC.train.head;
+  if (C.length < VC_MIN || H.length < VC_MIN) { VC.model = null; return; }
+  const all = C.concat(H), d = VC_D;
+  const mean = (X) => Array.from({ length: d }, (_, j) => X.reduce((s, x) => s + x[j], 0) / X.length);
+  const mu = mean(all), sd = mu.map((m, j) => Math.sqrt(all.reduce((s, x) => s + (x[j] - m) ** 2, 0) / all.length) || 1);
+  const z = (x) => Array.from({ length: d }, (_, j) => (x[j] - mu[j]) / sd[j]);
+  const Zc = C.map(z), Zh = H.map(z), mc = mean(Zc), mh = mean(Zh);
+  const S = Array.from({ length: d }, () => new Array(d).fill(0));
+  for (const [Z, m] of [[Zc, mc], [Zh, mh]]) for (const x of Z) for (let a = 0; a < d; a++) for (let b = 0; b < d; b++) S[a][b] += (x[a] - m[a]) * (x[b] - m[b]);
+  for (let a = 0; a < d; a++) { for (let b = 0; b < d; b++) S[a][b] /= all.length; S[a][a] += 0.05; }
+  const w = solveLin(S, mh.map((v, j) => v - mc[j]));
+  const proj = (zx) => zx.reduce((s, v, j) => s + v * w[j], 0);
+  const pc = Zc.map(proj), ph = Zh.map(proj), sc = pc.reduce((s, v) => s + v, 0) / pc.length, sh = ph.reduce((s, v) => s + v, 0) / ph.length, mid = (sc + sh) / 2;
+  const acc = (pc.filter((v) => v < mid).length + ph.filter((v) => v >= mid).length) / all.length;
+  VC.model = { mu, sd, w, sc, sh, acc, bright: all.reduce((s, x) => s + x[4], 0) / all.length };
+}
+function solveLin(A, b) { // Gaussian elimination with pivoting (a 4 by 4)
+  const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+  }
+  return M.map((r, i) => r[n] / r[i]);
+}
+// Where a frame's cues fall across (0…1 from chest): the taught kinds' middles at a fifth in from each side, so going past them shows
+function vcAcross(f) {
+  const m = VC.model;
+  if (!m) return 0.2 + (0.6 * (f[0] - VC_DEFAULT.chest)) / (VC_DEFAULT.head - VC_DEFAULT.chest);
+  const s = Array.from({ length: VC_D }, (_, j) => (f[j] - m.mu[j]) / m.sd[j]).reduce((t, v, j) => t + v * m.w[j], 0);
+  return 0.2 + (0.6 * (s - m.sc)) / (m.sh - m.sc || 1);
+}
+const vcDown = (br) => 0.5 - (br - (VC.model ? VC.model.bright : VC_DEFAULT.mid)) / (2 * VC_SPAN);
 
 // One frame, from the main loop while the page is shown: read the sound, set an end if one's being set, draw.
 function voiceFrame() {
   const now = performance.now();
-  let h12 = null, br = null;
+  let f = null;
   const hearing = !!ac && (micOn || !!testOsc);
   if (hearing) vcAnalyser().getFloatFrequencyData(VC.data);
   if (hearing && cur != null && level > S.gate) {
     const f0 = mf(cur);
-    if (f0 > 70 && f0 < 1100) { h12 = vcPeak(f0) - vcPeak(2 * f0); br = 10 * Math.log10(vcBand(2000, 4000) / Math.max(1e-20, vcBand(80, 1000))); }
+    if (f0 > 70 && f0 < 1100) f = vcCues(f0, micQ);
   }
-  if (h12 != null && isFinite(h12) && isFinite(br)) {
-    VC.h12 = VC.h12 == null ? h12 : VC.h12 + (h12 - VC.h12) * 0.25;
-    VC.bright = VC.bright == null ? br : VC.bright + (br - VC.bright) * 0.25;
+  if (f) {
+    const ease = (was, v) => (was == null ? v : was + (v - was) * 0.25), clamp = (v) => Math.min(0.97, Math.max(0.03, v));
+    VC.x = ease(VC.x, vcAcross(f)); VC.h12 = ease(VC.h12, f[0]); VC.bright = ease(VC.bright, f[4]);
     VC.db = 20 * Math.log10(level);
-    const [x, y] = vcXY(VC.h12, VC.bright);
-    VC.last = { x, y, db: VC.db, t: now };
+    VC.last = { x: clamp(VC.x), y: clamp(vcDown(VC.bright)), db: VC.db, t: now };
     VC.trail.push(VC.last);
-    if (VC.listen) { VC.listen.h.push(h12); VC.listen.b.push(br); }
-  } else if (VC.last && now - VC.last.t > 120) { VC.h12 = VC.bright = null; if (VC.trail.length && VC.trail[VC.trail.length - 1]) VC.trail.push(null); }
+    if (VC.rec) { // being taught
+      const T = VC.train[VC.rec];
+      T.push(f.map((v, j) => Math.round(v * (j === 3 ? 100 : 10)) / (j === 3 ? 100 : 10))); if (T.length > VC_KEEP) T.splice(0, T.length - VC_KEEP);
+      if (now - (VC.fitAt || 0) > 500) { VC.fitAt = now; vcFit(); paintTeach(); }
+    }
+  } else if (VC.last && now - VC.last.t > 120) { VC.x = VC.h12 = VC.bright = null; if (VC.trail.length && VC.trail[VC.trail.length - 1]) VC.trail.push(null); }
   while (VC.trail.length && (!VC.trail[0] || now - VC.trail[0].t > VC_TRAIL * 1000)) VC.trail.shift();
   vcHoldTick(now);
-  if (VC.listen) {
-    const p = Math.min(1, (now - VC.listen.at) / VC_LISTEN);
-    VC.listen.btn.style.setProperty("--p", (p * 100).toFixed(1) + "%");
-    if (p >= 1) vcSetEnd();
-  }
   const off = !micOn && !testOsc;
   if ($("#vcOff").hidden !== !off) $("#vcOff").hidden = !off;
   drawPad(now); drawSpec(now, hearing);
@@ -211,27 +257,23 @@ function vcSetTarget(m) {
 // a key tapped: the ladder starts again from it
 function vcStart(m) { VC.marks = []; vcSetTarget(m); playKey(m); }
 
-// Setting an end: VC_LISTEN ms of the held note, its middle reading kept
-function vcListen(which, btn) {
-  if (VC.listen) return;
+// Teaching: Chest or Head on (one at a time; pressed again, off). Off, what was taught is kept, and the axis fitted again.
+function vcTeach(which) {
   if (!micOn && !testOsc) { startMic(); return; }
-  $("#vcMsg").hidden = true;
-  VC.listen = { which, btn, at: performance.now(), h: [], b: [] };
-  btn.classList.add("listening"); say(btn, "Listening…");
+  const was = VC.rec;
+  VC.rec = was === which ? null : which;
+  if (was) store.set("voiceTrain", VC.train);
+  vcFit(); paintTeach();
 }
-function vcSetEnd() {
-  const L = VC.listen; VC.listen = null;
-  L.btn.classList.remove("listening"); L.btn.style.removeProperty("--p"); say(L.btn, L.which === "chest" ? "Chest" : "Head");
-  const msg = (t) => { say($("#vcMsg"), t); $("#vcMsg").hidden = false; };
-  if (L.h.length < 30) { msg("Didn’t hear a steady note. Try again."); return; }
-  const h = middle(L.h), b = middle(L.b), other = L.which === "chest" ? vcEnds.head : vcEnds.chest;
-  if (other != null && Math.abs(h - other) < 3) { msg("Too close to tell apart. Try a lighter head voice."); return; }
-  vcEnds = { ...vcEnds, [L.which]: h, [L.which === "chest" ? "cb" : "hb"]: b };
-  store.set("voiceEnds", vcEnds); paintEnds();
-}
-function paintEnds() {
-  $("#vcReset").hidden = vcEnds.chest == null && vcEnds.head == null;
-  $("#vcChest").classList.toggle("set", vcEnds.chest != null); $("#vcHead").classList.toggle("set", vcEnds.head != null);
+function paintTeach() {
+  const n = (k) => VC.train[k].length, s = (k) => Math.round(n(k) / 60); // (frames at about 60 a second)
+  for (const [id, k] of [["#vcChest", "chest"], ["#vcHead", "head"]]) {
+    const b = $(id); b.setAttribute("aria-pressed", String(VC.rec === k)); b.classList.toggle("set", n(k) >= VC_MIN);
+  }
+  $("#vcReset").hidden = !n("chest") && !n("head");
+  const m = VC.model;
+  say($("#vcFit"), !n("chest") && !n("head") ? "" : m ? "Chest {c} s · head {h} s · tells them apart {acc}%" : "Chest {c} s · head {h} s · a little more of both",
+    { c: s("chest"), h: s("head"), acc: m ? Math.round(m.acc * 100) : 0 });
 }
 
 // Shown (route): the keyboard's samples, and the keys around middle C in view
@@ -251,8 +293,8 @@ function initVoice() {
   addEventListener("hashchange", (e) => { if (location.hash === "#voice") { const was = new URL(e.oldURL).hash; if (was && was !== "#voice") VC.from = was; } });
   $("#vcBack").onclick = () => { location.hash = VC.from; };
   $("#vcMic").onclick = () => startMic();
-  $("#vcChest").onclick = (e) => vcListen("chest", e.currentTarget);
-  $("#vcHead").onclick = (e) => vcListen("head", e.currentTarget);
+  $("#vcChest").onclick = () => vcTeach("chest");
+  $("#vcHead").onclick = () => vcTeach("head");
   // the view: the pad, or the spectrogram in its place
   const showView = (v) => {
     $(".vc-pad").hidden = v !== "pad"; $(".vc-spec").hidden = v !== "spec";
@@ -266,6 +308,6 @@ function initVoice() {
   $("#vcTgt").onclick = () => playKey(VC.target);
   $("#vcAuto").checked = VC.auto; $("#vcAuto").onchange = (e) => { VC.auto = e.target.checked; store.set("voiceAuto", VC.auto); };
   vcSetTarget(VC.target);
-  $("#vcReset").onclick = () => { vcEnds = { chest: null, head: null, cb: null, hb: null }; store.set("voiceEnds", vcEnds); paintEnds(); $("#vcMsg").hidden = true; };
-  paintEnds();
+  $("#vcReset").onclick = () => { VC.rec = null; VC.train = { chest: [], head: [] }; store.set("voiceTrain", VC.train); vcFit(); paintTeach(); };
+  vcFit(); paintTeach();
 }
