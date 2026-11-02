@@ -2,6 +2,9 @@
    practice; they're split where the page's parts are, the cascade as it was). A literal value left in a rule is either
    drawing (a waveform's line, the piano's keys, the M/S keys' bevel) or an optical correction, and says so.
    Layout: one column, settings as hairline-separated rows. Colours are OKLCH, dark only. */
+/* Geist Serif, for the library's heading in English: one weight, so it's drawn at 400 whatever weight it's set at */
+@font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+:root:lang(en) { --font-title: "Geist Serif", var(--font); }
 :root {
   /* ---- colour: surfaces and ink ---- */
   --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.275 0 0); --hover-2: oklch(0.315 0 0); /* buttons and fields stand clear of the card */
@@ -37,9 +40,10 @@
   --stem-vocals: var(--stem-lead); --stem-click: var(--ink);
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
-  /* ---- type: Pretendard throughout; what was set in a monospace (times, levels, M/S) keeps its digits in line with
-     tabular-nums ---- */
+  /* ---- type: Pretendard throughout, but for the library's heading in English (Geist Serif, above); what was set in
+     a monospace (times, levels, M/S) keeps its digits in line with tabular-nums ---- */
   --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-title: var(--font);
   --mono: var(--font);
   --text-2xs: 11px; --text-xs: 12px; --text-sm: 13px; --text-md: 14px; --text-lg: 15px; --text-xl: 18px;
   --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600;

@@ -29,6 +29,9 @@
 const SAVED = /*SETTINGS*/null;
 /* the library and the songs being added, as the server had them as it sent the page: the list's first drawing */
 const SAVED_LIB = /*LIBRARY*/null;
+/* songs an update would time again ({songs, min}; stems.update_offer): asked on the opening screen before anything else */
+const SAVED_UPDATE = /*UPDATE*/null;
+if (SAVED_UPDATE) document.documentElement.classList.add("asking");
 /* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
 try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}</script>
 </head>
@@ -37,11 +40,13 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Stem</a>
-    <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop" hidden></button>
+    <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
+    <a class="btn sm icon quiet" id="voiceBtn" href="#voice" aria-label="Chest & head voice" title="Chest & head voice"></a>
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     <button class="btn sm icon quiet" id="micSetBtn" type="button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="micSet"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
-    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><b>Adding songs</b><div id="jobsList"></div></div>
+    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b>Adding songs</b><button class="btn sm" id="jobsAddBtn" type="button">Add song</button></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div>
+      <div class="menu" id="ytMenu" role="menu" aria-label="Add song" hidden><button id="ytImport" type="button" role="menuitem"><span class="yt-what"><span>Import from YouTube</span><small id="ytTitle"></small></span></button><button id="ytOther" type="button" role="menuitem"><span>Another link or a file…</span></button></div></div>
     <div class="pop" id="micSet" role="dialog" aria-label="Settings" hidden>
       <label>Language <button class="pick" id="lang" type="button"></button></label>
       <label>Input <button class="pick" id="micDev" type="button"></button></label>      <div class="gate-sec">
@@ -81,8 +86,16 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
         <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · drag across phrases on the strip to loop a run of them"></button>
         <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
-        <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy phrase marks" title="Copy phrase marks" hidden></button>
+        <button class="btn sm" id="kEdit" type="button" aria-pressed="false" title="Fix the lyrics’ timing word by word"><span class="txt">Edit</span></button>
       </div>
+    </div>
+    <div class="tl-row">
+    <div class="tl" id="kTl" aria-label="Timeline" title="Click or drag to move through the song · T leaves a note here">
+      <div class="tl-bar"><i class="tl-fill"></i></div><i class="tl-head"></i><div class="tl-pins" id="kPins"></div><span class="tl-tip" id="kTlTip" hidden></span>
+      <div class="pop tl-note" id="kNote" role="dialog" aria-label="Note" hidden><input id="kNoteText" type="text" placeholder="What’s off here?" autocomplete="off" spellcheck="false" aria-label="Note"><button class="btn sm icon ghost" id="kNoteDel" type="button" aria-label="Delete note" title="Delete note"></button></div>
+    </div>
+    <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy notes" title="Copy notes"></button>
+    <button class="btn sm icon" id="kNotesClear" type="button" aria-label="Clear notes" title="Clear this song’s notes"></button>
     </div>
 
     <section class="stage" id="stage" aria-label="Pitch display">
@@ -92,10 +105,20 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       </div>
       <div class="plot">
         <canvas id="cv"></canvas>
-        <div class="lyblur" id="lyBlur" hidden><i style="--b: 0.5px; --s: 0%"></i><i style="--b: 1px; --s: 14%"></i><i style="--b: 2px; --s: 28%"></i><i style="--b: 3px; --s: 42%"></i><i style="--b: 5px; --s: 56%"></i><i style="--b: 8px; --s: 70%"></i></div>
+        <div class="lyblur" id="lyBlur" hidden><i style="--b: 0.5px; --s: 0%"></i><i style="--b: 1px; --s: 14%"></i><i style="--b: 2px; --s: 28%"></i><i style="--b: 3px; --s: 42%"></i></div>
         <div class="countin" id="countIn" hidden><span class="lbl"></span><div class="dots" aria-hidden="true"></div></div><span class="sr" id="countNum" aria-live="assertive"></span>
         <div class="lycol" id="lyCol" hidden><div class="lylist" id="lyList"></div></div>
         <div class="overlay" id="overlay" hidden></div>
+        <div class="lyed" id="lyEdit" role="group" aria-label="Lyrics timing" hidden>
+          <div class="lyed-bar"><span class="muted lyed-hint" title="Drag a word’s mark to where you hear it start (the word before ends there) · a line’s bar moves the whole line, the mark at its end sets where it ends · click a word, a bar or the track to go there, drag the empty track to scroll · Ctrl+wheel zooms · Ctrl+Z undoes">Drag each word to where it starts · a line’s bar moves the line</span>
+            <span class="lyed-acts"><button class="btn sm" id="lySplit" type="button" title="Put the picked words on a line of their own" hidden>Split off</button><button class="btn sm" id="lyBacking" type="button" title="Mark the picked words as backing vocals (in brackets), or not" hidden>Backing</button>
+            <button class="btn sm" id="lyUndo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button><button class="btn sm" id="lyReset" type="button" title="Put the selected line back as it was timed" disabled>Reset line</button>
+            <button class="btn sm icon" id="lyImport" type="button" aria-label="Import timing" title="Import timing from a file (or paste it: Ctrl+V)"></button><button class="btn sm icon" id="lyExport" type="button" aria-label="Export timing" title="This song’s edited lines, to the clipboard or a file"></button><input type="file" id="lyFile" accept=".json,application/json" hidden></span></div>
+          <div class="menu" id="lyExportMenu" role="menu" aria-label="Export timing" hidden><button id="lyCopy" type="button" role="menuitem">Copy to clipboard</button><button id="lySave" type="button" role="menuitem">Save as a file</button></div>
+          <div class="lyed-sub" id="lySub" aria-hidden="true"></div>
+          <div class="lyed-nav" id="lyNav" title="The whole song: drag the box to move through it, its edges to zoom; click to go there"><div class="nav-lines" id="lyNavLines"></div><i class="nav-head" id="lyNavHead"></i><div class="nav-win" id="lyNavWin"><i class="h l"></i><i class="h r"></i></div></div>
+          <div class="lyed-view" id="lyView"><canvas id="lyWave" aria-hidden="true"></canvas><div class="lyed-clips" id="lyClips"></div><i class="lyed-head" id="lyHead"></i></div>
+        </div>
       </div>
     </section>
     <div class="keys-wrap" id="keysWrap"><div class="keys" id="keys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
@@ -114,6 +137,39 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <p class="tk-empty" id="tkEmpty" hidden>Recording is on. Play, and each time you sing along is kept here.</p>
     </section>
     </div>
+  </main>
+  <main id="vVoice" aria-label="Chest & head voice" hidden>
+    <div class="backbar"><button class="btn sm back" id="vcBack" type="button">Back</button>
+      <div class="bb-acts"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="true">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="false" title="Spectrogram">Spectrum</button></div></div></div>
+    <div class="vc">
+      <section class="vc-spec" aria-label="Spectrogram" hidden><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
+      <section class="vc-pad" aria-label="Where your voice is">
+        <canvas id="vcPad" aria-hidden="true"></canvas>
+        <span class="vc-ax up">Forward · bright</span><span class="vc-ax down">Back · dark</span><span class="vc-ax left">Chest</span><span class="vc-ax right">Head</span>
+        <div class="overlay" id="vcOff" hidden><p>Use headphones, so the speakers don’t leak in.</p><button class="btn primary" id="vcMic" type="button">Turn the mic on</button></div>
+      </section>
+      <aside class="vc-side">
+        <div class="vc-note"><b id="vcNote">–</b><span id="vcCents"></span></div>
+        <div class="vc-cents" aria-hidden="true"><i id="vcNeedle"></i></div>
+        <dl class="vc-stats">
+          <div title="H1−H2: how much louder your lowest harmonic is than the next. Higher is heady, lower is chesty."><dt>H1−H2</dt><dd id="vcH12">–</dd></div>
+          <div title="Energy at 2–4 kHz against below 1 kHz. Higher sounds forward and bright."><dt>Brightness</dt><dd id="vcBright">–</dd></div>
+          <div><dt>Level</dt><dd id="vcLvl">–</dd></div>
+        </dl>
+        <div class="vc-step">
+          <div class="vc-step-head"><b title="Set a note, then go up a semitone at a time">Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button" title="Play it">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
+          <label title="Hold the note on pitch for a second and the next one plays">Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
+          <p class="muted">Tap a key to start there.</p>
+        </div>
+        <div class="vc-cal">
+          <b>Set it to your voice</b>
+          <p class="muted">Hold an “ah”, then press.</p>
+          <div class="vc-cal-acts"><button class="btn sm" id="vcChest" type="button" title="Sing your clearest chest voice, press, and hold the note for 2 s">Chest</button><button class="btn sm" id="vcHead" type="button" title="Sing your clearest head voice, press, and hold the note for 2 s">Head</button><button class="btn sm ghost" id="vcReset" type="button" hidden>Reset</button></div>
+          <p class="vc-msg" id="vcMsg" aria-live="polite" hidden></p>
+        </div>
+      </aside>
+    </div>
+    <div class="keys-wrap"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
   </main>
   <main id="vStems" aria-label="Stems" hidden>
     <div class="intro" id="sIntro">
@@ -136,6 +192,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
+        <button class="btn sm" id="sUpdate" type="button" hidden>Update</button>
         <span class="sync-at"><button class="btn sm" id="syncBtn" type="button" aria-expanded="false" aria-controls="syncPop" title="Measure how late your voice reaches the app">Sync settings</button>
         <div class="pop" id="syncPop" role="dialog" aria-label="Sync settings" hidden>
           <b>Sync settings</b>
@@ -171,7 +228,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
       <div class="ts-bar">
         <button class="btn primary round" id="tsPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <output id="tsTime">0:00 / 0:00</output>
-        <label class="kfield ts-sync" title="How far the takes that are on are moved against the band, left earlier: the delay the browser reports (the mark) plus what you add. Double-click to go back to the mark; ← → on a take moves it alone">Sync <span class="ts-sync-at"><i class="ts-sync-auto" id="tsSyncAuto" hidden></i><input type="range" id="tsSync" min="-400" max="100" step="5" value="0" data-tip="ms" aria-label="Sync of the takes that are on (ms)"></span><span class="ts-sync-val" id="tsSyncVal" aria-hidden="true">—</span></label>
+        <label class="kfield ts-sync" title="How far the takes that are on are moved against the band, left earlier: the delay the browser reports (the mark) plus what you add. Double-click to go back to the mark; ← → on a take moves it alone">Sync <span class="ts-sync-at"><i class="ts-sync-auto" id="tsSyncAuto" hidden></i><input type="range" id="tsSync" min="-400" max="100" step="5" value="0" data-tip="ms" aria-label="Sync of the takes that are on (ms)"></span><span class="ts-sync-val" id="tsSyncVal" aria-hidden="true">—</span></label><button class="btn sm" id="tsMatch" type="button" title="Move the takes that are on onto the singer. Double-click the Sync slider to go back to the mark.">Match</button>
         <label class="kfield">Your voice <input type="range" id="tsVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
         <label class="kfield">Band <input type="range" id="tsBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
         <label class="kfield">Guide vocal <input type="range" id="tsGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
@@ -236,6 +293,8 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 
 <div id="listFade" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
 <div id="boot" aria-hidden="true"><div class="bar"><i></i></div></div>
+<div class="boot-ask" id="bootAsk" role="dialog" aria-modal="true" aria-labelledby="bootAskT"><b id="bootAskT">Update your songs?</b><p class="muted" id="bootAskP"></p>
+  <div class="acts"><button class="btn sm" id="bootLater" type="button" title="Each song updates when you open it">Later</button><button class="btn sm primary" id="bootNow" type="button">Update now</button></div></div>
 
 <script src="icons.local.js"></script>
 <!-- The app's code, in the order it runs: plain scripts, not modules, so what each declares at its top level is the
@@ -249,9 +308,11 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 <script src="js/adding.js"></script>
 <script src="js/studio.js"></script>
 <script src="js/practice.js"></script>
+<script src="js/lyedit.js"></script>
 <script src="js/takes.js"></script>
 <script src="js/takes-studio.js"></script>
 <script src="js/stage.js"></script>
+<script src="js/voice.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

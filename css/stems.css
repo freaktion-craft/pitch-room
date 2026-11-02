@@ -39,14 +39,26 @@
 .yt textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
 .yt .btn { align-self: flex-start; }
 .yt .btn { flex: none; }
-/* Songs being added: a ring beside the mic while there are any, as full as they are together; pressed, a panel with
-   each one's name, how it's going (or how many are ahead of it in line), and a button to stop it */
+/* Songs being added: a ring beside the mic, always there, as full as they are together; pressed, a panel with each
+   one's name, how it's going (or how many are ahead of it in line), and a button to stop it; at its top right, Add
+   song, which opens the Add song form in the panel, from any page */
 #jobsBtn .ring { width: var(--icon-sm); height: var(--icon-sm); transform: rotate(-90deg); }
+#jobsBtn.idle .ring, #jobsBtn:not(.idle) > .ico { display: none; } /* idle, a + in the ring's place */
 #jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
 #jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */
-#jobsPop > b { font-weight: var(--weight-medium); }
+.jobs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 28px; }
+.jobs-head b { font-weight: var(--weight-medium); }
+#jobsPop > p { margin: 0; }
+#jobsPop.adding { width: min(420px, calc(100vw - 32px)); font-size: var(--text-md); } /* the form, as in its own panel */
 #jobsList { display: grid; gap: var(--space-4); }
+#jobsList:empty { display: none; }
+/* a YouTube link copied: Add song (or a paste) offers it, named by its video's title */
+#ytMenu { width: max-content; max-width: min(340px, calc(100vw - 32px)); }
+#ytImport { height: auto; min-height: 36px; padding-block: var(--space-2); }
+.yt-what { display: grid; min-width: 0; }
+.yt-what small { color: var(--muted); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yt-what small:empty { display: none; }
 .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-2); align-items: center; }
 .job > .top, .job > .bar { grid-column: 1; }
 .job .top { display: grid; min-width: 0; }

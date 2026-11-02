@@ -58,14 +58,22 @@ HELD = (0.3, 0.5, 0.12, 0.75)
 #    After SwiftF0's segment_notes (MIT), re-implemented.
 HOLD = 0.08
 CAP = 2.0
+# 5. A bar this short that starts a sung note and rises 1 to STUB_ST st into a bar that holds is its scoop (_stubs).
+STUB_MOST, STUB_ST, STUB_NEXT, STUB_HOLD = 0.3, 3, 1.0, 0.25
+# 5. STUB_FALL: st a stub may fall and still join. STUB_LATE: the next bar's word must be under this strength to be
+#    passed over (a vowel's late onset). STUB_START: only a stub after a gap or on a word joins.
+STUB_FALL, STUB_LATE, STUB_START = 0, 0.0, True
+# 5. FAST_N syllables within FAST_WIN of a short bar: a fast passage, where it stays.
+FAST_WIN, FAST_N = 0.5, 3
 DIP_DB, DIP_WIN = 3.0103, 0.064
 # 5. Lyrics: a syllable onset (syllables.align_lyrics) makes a note start cheaper at one frame, the acoustic re-onset
 #    nearest to it within SYL_WIN. By SYL_REWARD * strength * p on the semitone of the note it cuts (a syllable re-sung
 #    on one pitch, which the pitch alone can't see), by SYL_REWARD_D * strength * p for a new pitch or after a gap; p,
 #    how sure the sound is of a fresh onset there (level and confidence dips, spectral flux, timbre change, rise). A
 #    note start costs 8, so a lyric time alone never cuts a held note: the sound has to agree.
-#    Children's songs (30 not used to choose anything): note F1 0.660 -> 0.690, same-pitch syllables drawn as one bar
-#    308 -> 59 of 781; with backing vocals leaking in, 0.606 -> 0.629. Vocadito's English clips: no significant change.
+#    Children's songs (30 nothing here was chosen on, though syllables.py's BLANK_MOST and English vowel shift were
+#    looked at on them): note F1 0.660 -> 0.692; with backing vocals leaking in, 0.580 -> 0.605. On the syllables before
+#    these, same-pitch syllables drawn as one bar 308 -> 59 of 781. Vocadito's English clips: no significant change.
 SYL_REWARD, SYL_REWARD_D = 16.0, 12.0
 SYL_WIN = 0.10
 SYL_PRIOR_POW, SYL_P_EPS = 0.5, 0.05  # where in the window: (1 - distance / window) ** 0.5 * (0.05 + p)
@@ -451,6 +459,30 @@ def _fit(y: np.ndarray, n: int) -> np.ndarray:
 
 # ---------------------------------------------------------------------------------------------------------------
 # 5.-6. segmentation
+def _stubs(notes: list[list], on: np.ndarray, sure: np.ndarray) -> list[list]:
+    """A short bar that starts a sung note and rises into a bar that holds, with no word of that bar's own, joins it.
+    A fast passage keeps its short bars."""
+    out = []
+    for i, nt in enumerate(notes):
+        d = nt[1] - nt[0]
+        if d > STUB_MOST:
+            out.append(nt)
+            continue
+        nxt = notes[i + 1] if i + 1 < len(notes) and notes[i + 1][0] - nt[1] < 0.02 else None
+        prev = out[-1] if out and nt[0] - out[-1][1] < 0.02 else None
+        to_me, to_next = np.abs(on - nt[0]), np.abs(on - (nxt[0] if nxt is not None else np.inf))
+        mine = ((on >= nt[0] - SYL_WIN) & (on < nt[1]) & (to_me <= to_next)).any()
+        owns = (to_next < SYL_WIN) & (to_next < to_me)
+        fast = (to_me <= FAST_WIN).sum() >= FAST_N
+        step = nxt[2] - nt[2] if nxt is not None else 0
+        if (nxt is not None and not fast and (prev is None or mine or not STUB_START) and (1 <= step <= STUB_ST or 1 <= -step <= STUB_FALL)
+                and nxt[1] - nxt[0] >= max(STUB_NEXT * d, STUB_HOLD) - 1e-9 and (not owns.any() or (prev is None and not mine and sure[owns].max() < STUB_LATE))):
+            nxt[0] = nt[0]
+        else:
+            out.append(nt)
+    return out
+
+
 def _dp_inputs(midi: np.ndarray, conf: np.ndarray, db: np.ndarray):
     """Pitch per frame (0 where unvoiced), weights, each frame's cost inside a note, and the candidate note pitches."""
     n = len(midi)
@@ -768,7 +800,11 @@ def _backing(notes: list[list], st: dict) -> tuple[list[list], list[list]]:
         return notes, []
     import librosa
     t, sm, db, loud, shift = st["t"], st["sm"], st["db"], st["loud"], st["shift"]
-    X = {}
+    def frames(y, k):  # frames k (in a row) of librosa.stft(y, n_fft=2048, hop_length=160, center=True), and no others
+        a, b = int(k[0]) * 160 - 1024, int(k[-1]) * 160 + 1024
+        seg = np.pad(y[max(a, 0): b], (max(-a, 0), max(b - len(y), 0)))
+        return librosa.stft(seg, n_fft=2048, hop_length=160, center=False)
+
     keep, drop = [], []
     for nt in notes:
         k = np.flatnonzero((t >= nt[0]) & (t < nt[1]))
@@ -779,14 +815,9 @@ def _backing(notes: list[list], st: dict) -> tuple[list[list], list[list]]:
         if agree < BACK_AGREE or loud - np.median(db[k]) < BACK_LEVEL_DB:
             keep.append(nt)
             continue
-        if not X:
-            X["lead"] = librosa.stft(st["y16"], n_fft=2048, hop_length=160, center=True)
-            X["back"] = librosa.stft(bk["y16"], n_fft=2048, hop_length=160, center=True)
         m = sm[k].copy()
         m[np.isnan(m) | (np.abs(m - nt[2]) > 1)] = nt[2]
-        mf = np.full(len(t), np.nan)
-        mf[k] = m + shift
-        own = 10 * np.log10((_comb(X["lead"], mf)[k].sum() + 1e-12) / (_comb(X["back"], mf)[k].sum() + 1e-12))
+        own = 10 * np.log10((_comb(frames(st["y16"], k), m + shift).sum() + 1e-12) / (_comb(frames(bk["y16"], k), m + shift).sum() + 1e-12))
         (drop if own < -BACK_OWN_DB else keep).append(nt)
     return keep, drop
 
@@ -837,7 +868,9 @@ def analyse(vocals: np.ndarray, a4: float = 440.0, backing: np.ndarray | None = 
 
 def build(st: dict, syllables=None, vocals: np.ndarray | None = None, drums: np.ndarray | None = None) -> dict:
     """Steps 5-8 on analyse()'s result. syllables: [(t, strength), …] (syllables.align_lyrics(…)["onsets"]) or None.
-    vocals and drums only matter with pYIN (its drum-hit filter)."""
+    vocals and drums only matter with pYIN (its drum-hit filter); drums can be a function that gets them."""
+    if callable(drums):  # (so drums.mp3 is decoded only for pYIN)
+        drums = None if st["rm"] else drums()
     t, conf, db, loud, midi, sm, a4 = st["t"], st["conf"], st["db"], st["loud"], st["midi"], st["sm"], st["a4"]
     syl = [s for s in (syllables or []) if s is not None]
     if syl:
@@ -864,6 +897,10 @@ def build(st: dict, syllables=None, vocals: np.ndarray | None = None, drums: np.
 
     notes = [n for n in notes if not quiet(n) and not drum_hit(n)]
     notes, dropped = _backing(notes, st)
+    if syl:
+        on = np.array([float(s[0]) if np.ndim(s) else float(s) for s in syl])
+        sure = np.array([float(s[1]) if np.ndim(s) else 1.0 for s in syl])
+        notes = _stubs(notes, on, sure)
 
     def trim(nt):
         k = np.flatnonzero((t >= nt[0]) & (t < nt[1]))
@@ -885,11 +922,21 @@ def build(st: dict, syllables=None, vocals: np.ndarray | None = None, drums: np.
             "syl": len(syl), "backingDropped": len(dropped), "tracker": "rmvpe" if st["rm"] else "pyin"}
 
 
+def cues(vocals: np.ndarray, device: str | None = None, st: dict | None = None) -> dict:
+    """What the sound alone says about where syllables start and stop, with no lyrics (syllables.align_lyrics): {step, t:
+    the frames' times, voiced: a voice there, p_re: how sure of a fresh onset there, notes [[t0, t1, midi]]}."""
+    st = analyse(np.asarray(vocals, np.float32), 440.0, None, device) if st is None else st  # st: analyse() of these vocals, if read already
+    if st["feats"] is None:
+        st["feats"] = _onset_features(st["y16"], st["t"], st["db"], st["sal"])
+    return {"step": STEP, "t": st["t"], "voiced": (st["sal"] >= CONTOUR_SAL) & (st["db"] > st["loud"] - GATE_DB),
+            "p_re": _onset_prob(st["feats"]), "notes": build({**st, "backing": None})["notes"]}  # (no backing check: the chain has always had these notes)
+
+
 def extract(vocals: np.ndarray, a4: float = 440.0, drums: np.ndarray | None = None, backing: np.ndarray | None = None,
-            syllables=None, device: str | None = None) -> dict:
+            syllables=None, device: str | None = None, st: dict | None = None) -> dict:
     """vocals (the lead stem, or the whole vocal stem), drums and backing (the rest of the vocals) if there are: mono
     float32 at 44.1 kHz. syllables: the lyrics' syllable onsets, if known.
     Returns notes [[t0, t1, midi]], the contour [[t, midi|None]] the bars came from, the range, a4 (the reference the
     midi numbers are relative to: the page reads the mic against it), v, syl (how many syllable onsets were used),
     backingDropped (bars dropped as backing leakage) and tracker ("rmvpe", or "pyin" when RMVPE couldn't run)."""
-    return build(analyse(vocals, a4, backing, device), syllables, vocals, drums)
+    return build(analyse(vocals, a4, backing, device) if st is None else st, syllables, vocals, drums)  # st: analyse() of these stems, if read already

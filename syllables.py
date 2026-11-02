@@ -1,30 +1,32 @@
-"""Syllable onsets of a song's lyrics on its lead vocal, for the melody's bars (melody.build(…, syllables=…)).
+"""A song's lyrics on its lead vocal, syllable by syllable: what the karaoke fills by (sung_lines), and where the melody's
+bars may be cut (melody.build(…, syllables=…)).
 
-Whisper's word times in lyrics.json are too coarse to cut notes by (on children's songs with every syllable marked:
-162 ms off on median, a third within 100 ms). Here the lyric text is lined up again on the lead vocal by a small
-speech model that hears one syllable (Korean) or one letter (English) at a time, and every sung syllable gets an onset:
-27 ms off on median, 87% within 100 ms.
+Whisper's word times in lyrics.json are too coarse for either (on children's songs with every syllable marked: 162 ms off
+on median, a third within 100 ms, and 146 ms early). Here the lyric text is lined up again on the lead vocal by a small
+speech model that hears one syllable (Korean) or one letter (English) at a time, and every sung syllable gets a start and
+an end: 25 ms off on median and 90% within 100 ms, 35 ms off for the end.
 
   Korean   kresnik/wav2vec2-large-xlsr-korean (Apache-2.0): one token per Hangul syllable (one missing from its
            vocabulary: the same syllable without its final consonant, else any token)
   English  facebook/wav2vec2-base-960h (Apache-2.0): letters; a word's syllables by rule (en_syllables), each timed by
            its first letter
-The song's main language goes first, all lines in one alignment over the whole song, each held near its lyrics.json
-line (Whisper's times only as a search window); lines that fit badly are searched again between the ones that fit, and
-the alignment with no windows at all is kept when it fits better (Whisper's lines sometimes pile up at one time). English
-lines in a Korean song are then lined up with the English model between their aligned neighbours. Latin-script lyrics
-that aren't English (Spanish, Tagalog, …) are left out: the English model put their notes in the wrong places.
+All the lines go in one alignment over the whole song, Korean and English tokens in one chain, each scored by its own
+model, on the lead vocal, and on the whole vocal stem where only the backing vocals sing. lyrics.json's lines (Whisper's times,
+LRCLIB's where it strayed) only say where to look first: what's heard decides. The sound's own note starts (melody.cues), read
+with no lyrics at all, say where a syllable is likely to start; words in brackets may be skipped, as backing vocals.
+Latin-script lyrics that aren't English (Spanish, Tagalog, …) are left out, and lines in any other script: the page has their
+Whisper words, a little later and moved to where the sound starts something.
 Each onset has a strength, how likely it is to be right (how well its line and its syllable fit; vowel-initial
 syllables are less sure), and lines whose syllables come out squeezed together or torn apart count less.
 
 The alignment itself is plain numpy (torchaudio's forced_align is gone from recent versions); the networks run in
-torch, on the GPU when GPU_FREE_GB is free there (half precision, 1.1 GB at most), else on the CPU (about a minute for a
+torch, on the GPU when GPU_FREE_GB is free there (half precision, 1.2 GB at most), else on the CPU (about a minute for a
 3-minute song). The weights are the models' own model.safetensors, loaded into torchaudio's wav2vec2 network.
 
 Model folders: models/w2v_ko and models/w2v_en next to this file (or $STEM_W2V_KO / $STEM_W2V_EN), each with
 config.json, vocab.json and model.safetensors: MODEL_FILES says where to get them.
-align_lyrics(vocals, lines) -> {"onsets": [(t, strength)], "syllables": [{t, t_end, strength, text, lang, line, …}],
-"lines": [{i, n_syl, n_aligned, mode, …}], "primary", "device", "skipped" (why there are none, if so)}.
+align_lyrics(vocals, lines, whole=…, cues=…) -> {"sung": sung_lines(…), "onsets": [(t, strength)], "syllables": [{t, t_end,
+strength, text, lang, line, …}], "lines": [{i, n_syl, n_aligned, …}], "primary", "device", "skipped" (why there are none, if so)}.
 """
 from __future__ import annotations
 
@@ -36,8 +38,10 @@ import unicodedata
 
 import numpy as np
 
+from lyrics import STAMP_MIN
+
 SR = 44100
-VERSION = 1  # bump when the onsets change: songs' syllables.json are worked out again (stems.start_upgrades)
+VERSION = 7  # bump when the onsets or the lines as sung change (syllables.json keeps both): it's worked out again for every song (stems.start_upgrades)
 FRAME = 0.02  # wav2vec2 frame hop (320 samples at 16 kHz)
 FRAME_CENTER = 0.0125  # frame k covers samples [320k, 320k + 400): centre 12.5 ms after k * 20 ms
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -59,18 +63,16 @@ MODEL_FILES = {
 DEVICE = "auto"  # "auto": cuda when it has GPU_FREE_GB free, else cpu
 GPU_FREE_GB = 2.0
 HALF = True  # fp16 on the GPU
+CPU_THREADS = 8  # at most, on the CPU: this can run in the background of a song being sung
 KEEP = False  # keep the models loaded between calls (ko 1.27 GB fp32 / 0.63 GB fp16 on the GPU)
 
-MARGIN = 0.6  # seconds searched before a line's Whisper start and after its end
 STAR_PEN = 1.0  # nats per frame a wildcard pays below the frame's best class
-EDGE_STAR = True  # wildcards at both ends of a line window absorb neighbouring lines and ad-libs
 # onset of a syllable = first frame of its first token + SHIFT (seconds), fitted on the CSD dev split
 SHIFT = {"ko": 0.0, "en": 0.0}
-EN_ONSET = "first"  # English syllable time: "first" letter or the "vowel" (nucleus) letter
 # syllables that start on a vowel (Korean initial ieung, English vowel letter): (time shift s, unused). CTC puts their
-# spike late and loose: CSD dev, English: median 65 ms late, 47% within 100 ms (consonant-initial: +3 ms, 95%);
-# Korean: 11 ms late, 86% (consonant-initial: 95%). Their lower reliability is in the strength model.
-VOWEL_INITIAL = {"ko": (-0.01, 0.8), "en": (-0.065, 0.6)}
+# spike late and loose, in English most of all. CSD dev, in the end, with _vowel_starts: 95.0% within 100 ms. Their lower
+# reliability is in the strength model.
+VOWEL_INITIAL = {"ko": (-0.01, 0.8), "en": (-0.11, 0.6)}
 
 
 def _vowel_initial(lang: str, syl: str) -> bool:
@@ -168,12 +170,18 @@ def emissions(lang: str, y16: np.ndarray, dev: str | None = None) -> np.ndarray:
     import torch
     net, _, _, _, dev = load(lang, dev)
     x = (y16 - y16.mean()) / np.sqrt(y16.var() + 1e-7)
-    with torch.inference_mode():
-        xt = torch.from_numpy(x.astype(np.float32))[None].to(dev)
-        if dev != "cpu" and HALF:
-            xt = xt.half()
-        logits, _ = net(xt)
-        lp = torch.log_softmax(logits[0].float(), -1).cpu().numpy()
+    threads = torch.get_num_threads()
+    if dev == "cpu":
+        torch.set_num_threads(min(threads, CPU_THREADS))  # put back below: the app's other torch users keep theirs
+    try:
+        with torch.inference_mode():
+            xt = torch.from_numpy(x.astype(np.float32))[None].to(dev)
+            if dev != "cpu" and HALF:
+                xt = xt.half()
+            logits, _ = net(xt)
+            lp = torch.log_softmax(logits[0].float(), -1).cpu().numpy()
+    finally:
+        torch.set_num_threads(threads)
     return lp
 
 
@@ -196,29 +204,62 @@ def _num_words(s: str) -> str:
     return " ".join(_ONES[int(c)] for c in s)
 
 
-def words_of(line: str) -> list[tuple[str, str]]:
-    """[(word, "ko"|"en")] of a lyric line: Hangul runs are Korean words, Latin/digit runs English (digits spelled)."""
-    line = unicodedata.normalize("NFC", line)
-    out = []
-    for raw in re.split(r"[\s\-/]+", line):
-        for run in re.findall(r"[가-힣]+|[A-Za-z0-9']+", raw):
-            if HANGUL.match(run):
-                out.append((run, "ko"))
-            else:
-                run = run.strip("'")
-                if not run:
-                    continue
-                if run.isdigit():
-                    out += [(w, "en") for w in _num_words(run).split()]
-                else:
-                    for part in re.findall(r"[A-Za-z']+|[0-9]+", run):
-                        out += [(w, "en") for w in (_num_words(part).split() if part.isdigit() else [part])]
+def _bracketed(text: str) -> list[int]:
+    """Per character of a line, whether it's in brackets (one never closed is just a character)."""
+    out = [0] * len(text)
+    for m in re.finditer(r"[(\[（【][^()\[\]（）【】]*[)\]）】]", text):
+        out[m.start(): m.end()] = [1] * (m.end() - m.start())
     return out
+
+
+def _folded(line: str) -> str:
+    """A line as word_spans reads it: NFC, typed apostrophes as the one it takes. One for one: spans still fit the NFC text."""
+    return re.sub("[`´‘ʼ′]", "'", unicodedata.normalize("NFC", line))
+
+
+def word_spans(line: str) -> list[tuple]:
+    """(word, "ko"|"en", start, end, in brackets, a number spelled out) of a lyric line (start, end: its characters in the
+    line, NFC): Hangul runs are Korean words, Latin/digit runs English, digits spelled out (each word of them the digits'
+    characters); in a line with Hangul, digits are read in Korean, so they're Korean words of no known token."""
+    line = _folded(line)
+    bg = _bracketed(line)
+    hangul = bool(HANGUL.search(line))
+    out = []
+    for raw in re.finditer(r"[^\s\-/]+", line):
+        for r in re.finditer(r"[가-힣]+|[A-Za-z0-9'’]+", raw.group()):
+            run, at = r.group(), raw.start() + r.start()
+            if HANGUL.match(run):
+                out.append((run, "ko", at, at + len(run), bool(bg[at]), False))
+                continue
+            at += len(run) - len(run.lstrip("'’"))
+            run = run.strip("'’").replace("’", "'")
+            for q in re.finditer(r"[A-Za-z']+|[0-9]+", run):
+                part, a = q.group(), at + q.start()
+                if not part.isdigit():
+                    out.append((part, "en", a, a + len(part), bool(bg[a]), False))
+                elif hangul:
+                    out.append((part, "ko", a, a + len(part), bool(bg[a]), False))
+                else:
+                    out += [(w, "en", a, a + len(part), bool(bg[a]), True) for w in _num_words(part).split()]
+    return out
+
+
+def _unheard_before(line: str, spans: list) -> list:
+    """Per word of word_spans(line): whether letters no model hears (kana, Han, jamo, ...), out of brackets, come just before it:
+    they get a wildcard (_labels). The library's mixed songs with every Hangul syllable made kana: English words over 0.5 s off 167 -> 130, a line's first 73 -> 47."""
+    line = _folded(line)
+    bg = _bracketed(line)
+    return [any(line[c].isalpha() and not bg[c] and not unicodedata.name(line[c], "").startswith("LATIN") for c in range(spans[k - 1][3] if k else 0, spans[k][2])) for k in range(len(spans))]
+
+
+def words_of(line: str) -> list[tuple[str, str]]:
+    """[(word, "ko"|"en")] of a lyric line (word_spans)."""
+    return [x[:2] for x in word_spans(line)]
 
 
 # Latin-script lyrics are aligned with the English model only when they read as English: at least LATIN_EN_MIN of their
 # words are among these common English words. Spanish, Tagalog, French ... lyrics aligned with the English model cost
-# note F1 (Vocadito: -0.014); such runs are left out (wildcards in a Korean pass).
+# note F1 (Vocadito: -0.014); such runs are left out (a wildcard beside a line's Korean; Whisper's words on the page).
 LATIN_EN_MIN = 0.25  # English lyrics 0.29-0.86 of their words in EN_COMMON; Spanish, Tagalog, French, Catalan <= 0.23
 EN_COMMON = set("""a about after again all am an and any are as at away baby back be because been before being but by
 can can't come could day did didn't do don't down every feel for from get girl give go going gonna good got had has have he
@@ -250,17 +291,40 @@ _ONSETS2 = {"bl", "br", "cl", "cr", "dr", "fl", "fr", "gl", "gr", "pl", "pr", "s
 _KEEP_CODA = {"ck", "ng", "gh"}
 
 
+# Common sung words the rule below gets wrong, as they're split: a silent e inside, a vowel pair it splits or keeps
+EN_WORDS = {x.replace("-", ""): x for x in """peo-ple ev-ery dif-ferent fav-orite fav-ourite hun-dred ha-tred lem-me gim-me
+may-be good-bye nine-teen nine-ty geor-gia lone-ly love-ly life-time real-ly bare-ly sure-ly safe-ly go-in do-in be-in see-in say-in play-in stay-in try-in cry-in fly-in dy-in ly-in
+qui-et di-et sci-ence cli-ent a-li-en po-em po-et ru-in cru-el fu-el cre-ate""".split()}
+EN_HEADS = ("some", "every", "any")  # the first part of these, then thing, one, body, where, ... : each part by itself
+EN_TAILS = ("thing", "thin", "one", "body", "where", "times", "time", "place", "how", "day", "way", "what")
+
+
 def en_syllables(word: str) -> list[int]:
     """Start index (into the word's letters, apostrophes kept) of each syllable of an English word, by rule: vowel
     groups (y a vowel unless word-initial or before a vowel; silent final e, -es/-ed after most consonants; -le after
-    a consonant is a syllable; ia/io/eo/ua split), and the onset of each later syllable maximal over common clusters."""
+    a consonant is a syllable; ia/io/eo/ua split; -ing after a vowel is a syllable), and the onset of each later
+    syllable maximal over common clusters. EN_WORDS and EN_HEADS first."""
     w = word.lower()
+    if w in EN_WORDS:
+        return [0] + [len(p) for p in (lambda s: ["".join(s[:k + 1]) for k in range(len(s) - 1)])(EN_WORDS[w].split("-"))]
+    for head in EN_HEADS:
+        if w[len(head):] in EN_TAILS and w.startswith(head):
+            return en_syllables(head) + [len(head) + x for x in en_syllables(w[len(head):])]
+    if (w.endswith("n't") or w.endswith("'ve")) and len(w) > 4 and w[-4] not in "aeiouyr'":  # a syllable of its own after a consonant
+        return en_syllables(w[:-3]) + [len(w) - 3]
+    for suf in ("ly", "less", "ful", "ness"):  # a silent e before these (late-ly, hope-less, care-ful; not never-the-less)
+        if w.endswith(suf) and len(w) - len(suf) > 2 and w[-len(suf) - 1] == "e" and w[-len(suf) - 2] not in "aeiouyh":
+            return en_syllables(w[:-len(suf)]) + [len(w) - len(suf)]
+    if w.endswith("'s") and len(w) > 2:
+        return en_syllables(w[:-2])
+    if len(w) > 4 and w.endswith("ing") and w[-4] in "aeiouy":
+        return en_syllables(w[:-3]) + [len(w) - 3]
     letters = [c for c in w]
     n = len(letters)
     isv = []
     for i, c in enumerate(letters):
         if c in "aeiou":
-            isv.append(True)
+            isv.append(not (c == "u" and i > 0 and letters[i - 1] == "q"))  # (qu is a consonant: _ONSETS2)
         elif c == "y":
             isv.append(i > 0 and not (i + 1 < n and letters[i + 1] in "aeiou"))
         else:
@@ -277,10 +341,16 @@ def en_syllables(word: str) -> list[int]:
             cut = None
             for pair in ("ia", "io", "eo", "ua", "uo", "iu", "ea"):
                 k = seg.find(pair)
-                if k >= 0 and not (pair == "io" and w[i + k + 2: i + k + 3] == "n" and i + k > 0 and w[i + k - 1] in "st"):
-                    if pair == "ea" and not (i + k + 2 == n):  # "ea" splits only word-finally (idea) - else one vowel
+                if k >= 0 and not (pair == "io" and w[i + k + 2: i + k + 3] in ("n", "u") and i + k > 0 and w[i + k - 1] in "stcgxh"):  # (na-tion, fa-shion, re-gion, pre-cious)
+                    if pair == "ea" and not (groups and i + k + 2 == n):  # "ea" splits only word-finally after another vowel (idea, not tea) - else one vowel
                         continue
-                    if pair == "ia" and i + k + 2 < n and w[i + k + 2] in "ln" and i + k + 3 >= n:  # special, asian
+                    if pair in ("ua", "uo") and i + k > 0 and w[i + k - 1] in "qg":  # that u is a consonant
+                        continue
+                    if pair in ("io", "eo") and w[i + k + 2: i + k + 4] == "us" and i + k > 0 and w[i + k - 1] in "ctgx":  # one sound before -us
+                        continue
+                    if pair == "ia" and groups and i + k + 2 < n and w[i + k + 2] in "ln" and i + k + 3 >= n:  # special, asian (not tri-al)
+                        continue
+                    if pair in ("ua", "uo") and i + k > 0 and w[i + k - 1] == "g":  # guard, language: this u is silent
                         continue
                     cut = i + k + 1
                     break
@@ -298,9 +368,9 @@ def en_syllables(word: str) -> list[int]:
         g = groups[-1]
         tail = w[g[0]:]
         prev_c = w[g[0] - 1] if g[0] > 0 else ""
-        if tail == "e" and not (w.endswith("le") and n >= 3 and not isv[n - 3]):
+        if tail == "e" and not (w.endswith("le") and n >= 3 and not isv[n - 3] and w[n - 3] not in "lrw"):
             groups.pop()
-        elif tail in ("es", "ed") and g[1] - g[0] == 1:
+        elif tail in ("es", "ed") and g[1] - g[0] == 1 and not (prev_c == "l" and g[0] >= 2 and not isv[g[0] - 2] and w[g[0] - 2] not in "lrw"):  # (ta-bles, hand-led: -le is a syllable; not called, curled)
             if tail == "ed" and prev_c not in "td":
                 groups.pop()
             elif tail == "es" and prev_c not in "sxzhgc":
@@ -350,21 +420,23 @@ STAR = -1
 NEG = -1e18
 
 
-def viterbi(lp: np.ndarray, labels: list, optional: list, blank: int, star_pen: float | None = None,
-            lo: np.ndarray | None = None, hi: np.ndarray | None = None):
-    """CTC forced alignment of a label sequence on log-posteriors lp (T, C). labels: class ids or STAR (a wildcard that
-    scores the frame's best class minus star_pen and may last any number of frames); optional[j]: label j may be
-    skipped. lo/hi (optional): label j may only take frames lo[j]..hi[j]. Blanks go anywhere. Returns (spans
-    [(first, last) frame per label; (-1, -1) if skipped], path score) or None when the labels do not fit."""
-    star_pen = STAR_PEN if star_pen is None else star_pen
-    T, N = len(lp), len(labels)
+def viterbi(E: dict, blanks: dict, labels: list, optional: list, lo: np.ndarray, hi: np.ndarray, far: np.ndarray, opens: np.ndarray | None = None,
+            enter: np.ndarray | None = None, inside: np.ndarray | None = None, gap: np.ndarray | None = None, early: np.ndarray | None = None):
+    """CTC forced alignment of one chain of labels over the song, each label on the frames of its own model. E: {lang: (T,
+    C) regrets}, a frame's log-posteriors under its best class, so that Korean and English tokens compare. labels: (lang,
+    class id, or STAR: a wildcard paying STAR_PEN per frame, for any number of frames); optional[j]: label j may be skipped.
+    lo, hi: label j pays far[j] per frame it's further than that from frames lo[j]..hi[j]. Blanks go anywhere, for at most
+    BLANK_MOST a frame. enter[t]:
+    what starting a syllable at frame t gains, for the labels opens marks. gap[t]: what a frame of blank costs inside a
+    line, for the blanks inside lists (blank j: the one before label j). early[j]: label j pays FIRST_EARLY more per frame before
+    that frame (-1: nothing), all of it where its token's regret is UNHEARD or worse. Returns (spans [(first, last) frame per label;
+    (-1, -1) if skipped], path score), or None when the labels don't fit."""
+    T, N = len(next(iter(E.values()))), len(labels)
     S = 2 * N + 1  # blank_0, lab_0, blank_1, ..., lab_{N-1}, blank_N
-    lab = np.asarray(labels, np.int64)
-    isstar = lab == STAR
-    labc = np.where(isstar, 0, lab)
-    best = lp.max(1) - star_pen
-    lo = np.zeros(N, np.int64) if lo is None else np.asarray(lo, np.int64)
-    hi = np.full(N, T - 1, np.int64) if hi is None else np.asarray(hi, np.int64)
+    lang = np.array([g for g, _ in labels])
+    cls = np.array([c for _, c in labels], np.int64)
+    real = {g: np.flatnonzero((lang == g) & (cls != STAR)) for g in E}
+    by = {g: np.flatnonzero(lang[np.minimum(np.arange(N + 1), N - 1)] == g) for g in E}  # blank_j: heard by the model of the label after it (the last: before it)
     preds = []
     for st in range(S):
         p = []
@@ -372,11 +444,11 @@ def viterbi(lp: np.ndarray, labels: list, optional: list, blank: int, star_pen: 
             p.append(st - 1)
         j = st // 2
         if st % 2 == 1:
-            if j >= 1 and (labels[j] != labels[j - 1] or labels[j] == STAR):
+            if j >= 1 and (labels[j] != labels[j - 1] or cls[j] == STAR):
                 p.append(st - 2)
             if j >= 1 and optional[j - 1]:
                 p.append(st - 3)
-                if j >= 2 and (labels[j] != labels[j - 2] or labels[j] == STAR):
+                if j >= 2 and (labels[j] != labels[j - 2] or cls[j] == STAR):
                     p.append(st - 4)
         elif j >= 1 and optional[j - 1]:
             p.append(st - 2)
@@ -389,13 +461,23 @@ def viterbi(lp: np.ndarray, labels: list, optional: list, blank: int, star_pen: 
     valid = pidx >= 0
     pidx_c = np.where(valid, pidx, 0)
     rows = np.arange(S)
+    on_rows = 2 * np.flatnonzero(opens) + 1 if opens is not None and enter is not None else None
+    early_at = np.flatnonzero(early >= 0) if early is not None else np.zeros(0, np.int64)
 
     def emit(t):
         e = np.empty(S)
-        e[0::2] = lp[t, blank]
-        el = np.where(isstar, best[t], lp[t, labc])
-        el[(t < lo) | (t > hi)] = NEG
-        e[1::2] = el
+        eb = np.empty(N + 1)
+        el = np.full(N, -STAR_PEN)
+        for g, x in E.items():
+            eb[by[g]] = x[t, blanks[g]]
+            el[real[g]] = x[t, cls[real[g]]]
+        eb = np.maximum(eb, -BLANK_MOST)
+        if inside is not None:
+            eb[inside] -= gap[t]
+        e[0::2] = eb
+        e[1::2] = el - far * np.minimum(np.maximum(np.maximum(lo - t, t - hi), 0), FAR_MOST)
+        if len(early_at):
+            e[2 * early_at + 1] -= FIRST_EARLY * np.minimum(np.maximum(early[early_at] - t, 0), FAR_MOST) * np.minimum(-el[early_at] / UNHEARD, 1.0)
         return e
 
     dp = np.full(S, NEG)
@@ -412,6 +494,8 @@ def viterbi(lp: np.ndarray, labels: list, optional: list, blank: int, star_pen: 
     back = np.zeros((T, S), np.int8)
     for t in range(1, T):
         cand = np.where(valid, dp[pidx_c], NEG)
+        if on_rows is not None:
+            cand[on_rows, 1:] += enter[t]
         k = np.argmax(cand, 1)
         dp = cand[rows, k] + emit(t)
         back[t] = k
@@ -439,11 +523,77 @@ def viterbi(lp: np.ndarray, labels: list, optional: list, blank: int, star_pen: 
 
 
 # ------------------------------------------------------------------------------------------------- alignment
-MODE = "global"  # "global": all lines in one Viterbi, each held near its Whisper times; "line": one Viterbi per line
-GLOBAL_MARGIN = 2.0  # global mode: a line's tokens may sit this far outside its Whisper line (seconds)
-SHORT_LINE = 0.08  # a Whisper line shorter than this many seconds per syllable is not trusted: its window is widened
-#                    to the neighbouring trusted lines
+GLOBAL_MARGIN = 2.0  # a line sits this far (seconds) outside its Whisper line for free, then pays FAR_COST
+SHORT_LINE = 0.12  # a Whisper line shorter than this many seconds per syllable is not trusted: its window is widened
+#                    to the neighbouring trusted lines (Whisper's lines sometimes pile up at one time)
+# What a token pays per frame outside its window. Next to nothing: where the words are heard beats where Whisper or
+# LRCLIB put them, this only decides between places that sound alike (a chorus and its repeat). CSD with backing vocals
+# leaking in, syllables over 500 ms off: 9.4% at 0.05, 6.0% at 0.002.
+FAR_COST = 0.002
+# Where LRCLIB's stamp (moved by how far this recording runs from LRCLIB's) and Whisper say the same to within AGREE s,
+# two sources that fail differently, a line is held harder: a voice nothing hears well (backing vocals, a whisper) can't
+# drag it off.
+AGREE, FAR_AGREED, MARGIN_AGREED = 1.0, 0.05, 1.0
+# A line's first syllable most of all: nothing before it holds it, and it goes to the last note of the line before, or a
+# token it barely fits (When | everything 1.5 s apart; 넌 2.5 s late). Within FIRST_NEAR s of where they say the line
+# starts it's free, past that it pays FIRST_FAR per frame. Over a whole line these wouldn't do: LRCLIB's stamps are hundreds
+# of ms out at times and Whisper's lines pile up at one time, so what's heard must be able to win. Lines over 500 ms from
+# their stamp 9.8 -> 7.0%, and plain Whisper hears as many lines where they're put as it does for Whisper's own lines.
+FIRST_NEAR_AGREED, FIRST_FAR_AGREED, FIRST_NEAR, FIRST_FAR = 0.35, 0.3, 0.7, 0.03
+FIRST_FAR_STAMPED = 0.2  # (the two disagree, but a place far from both is far from two sources: stamps over 3 s off 4 -> 1)
+# Where the two agree, a line doesn't start before a breath they put it after: the first note NOTE_REST s after the last one, from the
+# window's start on, from STAMP_LATE s before the stamp to FIRST_NEAR_AGREED past it. Earlier than REST_BACK s ahead of that note its first
+# syllable pays FIRST_EARLY more per frame, all of it where its token's regret is UNHEARD or worse. On that note it pays nothing, and a voice
+# running on through the window sets no such note. A rest up to REST_PAST s past the window charges only what's before the window. So does a
+# rest Whisper starts the line RUN_ON s or more ahead of the end of the voice before it: that voice is the line's, the rest is inside it.
+FIRST_EARLY, UNHEARD, NOTE_REST, REST_BACK, REST_PAST, RUN_ON, STAMP_LATE = 0.7, 6.0, 0.25, 0.25, 0.5, 0.15, 0.5
+# A word after a line's first, where Whisper's own word for it has the shape of one (not stretched, not a stub): its first syllable is free
+# within WORD_NEAR s of Whisper's start and pays WORD_FAR a frame past that. Whisper's words are rough (162 ms on median) but seldom a word off,
+# where the chain can be: a voiced stretch it hears nothing in, then the line's words a word late (heard: up to 1.5 s).
+WORD_NEAR, WORD_FAR = 0.6, 0.02
+FENCE_FAR = 0.2  # what a line pays per frame across a line beside it that no model can time, and no chain will hold it from
+FAR_MOST = 250  # frames: further than this pays no more (5 s; a place Whisper's wrong about can be far off)
+# A line nothing else holds (no stamp agrees) can run past its end, over a rest with someone else's voice in it. Its last token pays LAST_FAR a frame past LAST_NEAR s after Whisper's end,
+# one way only, if Whisper gave the line at least LAST_RATE s a syllable (under that its time is a pile-up, not a line). FAR_MOST stops a wrong Whisper line pulling from far off.
+LAST_NEAR, LAST_FAR, LAST_RATE = 0.7, 0.1, 0.2
+# What a frame of blank pays at most, however sure the model is it hears a letter there. Without a limit, voice no line is on
+# draws lines onto it: ad-libs in an intro took a song's first two lines, 16 s early, where a harder hold on the first syllable
+# only moved right lines off. CSD's as good with it; the library's lines heard where they're put 90.7 -> 91.0%.
+BLANK_MOST = 3.0
 CHUNK, CONTEXT = 20.0, 1.0  # emissions over long spans: chunks of CHUNK s with CONTEXT s on each side
+# Where the sound itself says something starts (melody.cues). Starting a syllable pays NOTE_PRIOR less on the start of a
+# note, REONSET_PRIOR * p less by how sure the sound is of a fresh onset, SILENT_COST more with no voice in the next
+# VOICED_AHEAD s. A frame of blank inside a line costs GAP_SILENT in silence, GAP_VOICED in voice, or a line's first word
+# (nothing before it holds it back) drifts off over the rest before it. CSD, with all of this (the 30 songs not used to
+# choose any of it): syllables within 100 ms 84 -> 88%, over 500 ms off 3.3 -> 1.2%; with backing vocals leaking in, 71 ->
+# 79%, 11.6 -> 6.0%.
+NOTE_PRIOR, REONSET_PRIOR, SILENT_COST = 8.0, 2.0, 6.0
+GAP_SILENT, GAP_VOICED, GAP_REST = 0.3, 0.02, 25  # (a rest pays for its first GAP_REST frames only: however long, it can be real)
+VOICED_AHEAD = 0.15
+# Then each syllable is moved to where the sound starts something (refine): a sure token is hard to move, an unsure one
+# easy. CTC puts a token it barely hears in the very frame beside its neighbour: 4.4% of the library's syllables sat under
+# 60 ms from the next, 0.7% after.
+REFINE_REACH, REFINE_GAP, REFINE_GAP_COST = 0.35, 0.07, 6.0  # how far (s), how close two syllables may sit, what closer costs
+REFINE_MOVE, REFINE_STAY = 0.05, 1.0  # moving costs a sure token 1 per REFINE_MOVE s; a place the sound starts nothing, REFINE_STAY
+REFINE_SURE, REFINE_FLOOR = 3.0, 0.1  # how sure: exp(regret / REFINE_SURE), at least REFINE_FLOOR
+ONSET_PEAK = 0.5  # the re-onset probability that counts as the sound starting something where no note does
+REFINE_KEEP = 0.9  # a consonant's token this sure (regret over -0.35) isn't drawn by a peak
+VOWEL_BACK = 1.0  # how far back (s) a vowel's token can be from the first note of its run of voice: further, the run holds more than the vowel
+VOWEL_CLAIM = 0.18  # a note start closer than this after the syllable before is that syllable's: a vowel doesn't go back to it
+VOWEL_BREATH = 0.08  # a run this close (s) after the one holding the syllable before is a breath in that syllable: no far move back to its start
+# A syllable ends where the voice stops (a break of over BRIDGE s), or where the next one starts. CSD: 36 ms off on median,
+# against 205 ms for a CTC token's last frame (a spike) and 154 ms for Whisper's word ends; a line's end, 357 -> 34 ms.
+BRIDGE, FILL_LEAST = 0.06, 0.12  # (FILL_LEAST: a syllable's shortest, room allowing: under it the fill crosses its letters in a few frames, then stands still)
+LAST_HOLD = 10.0  # s at most. The song's last syllable has no next one to end it, only the voice: on backing vocals alone, just the stem's level
+# Lines no model here can time (Japanese, Spanish, ...) keep Whisper's words, WHISPER_EARLY later (it starts them 146 ms
+# early on median) and moved to where the sound starts something: their median error 162 -> 39 ms.
+WHISPER_EARLY = 0.12
+# A word of Whisper's this far (s) past this many syllables after it, in a line a model has most of, is what's wrong (dragged off) and goes, for sung_lines to share out: kept, the
+# fill, going one way, would bring them all to its time. Past fewer, the syllable's the stray and rising to the word is right. On real emissions, against the same song untouched:
+# one word of every 3rd line out of the chain, 3.7 syllables raised a line, helped 0 of 11; most of the song out, 1.1 a line, helped 42 of 48.
+PIECE_LIFT = (2.0, 3)
+UNSUNG = (0.5, 0.1)  # (a Whisper line at least this long, s; with under this share of it voiced: _unsung)
+WHOLE_HOLD, WHOLE_RUN = 0.15, 0.25  # the whole vocal stem is heard where the lead's quiet this long around (s) and it isn't, for this long at least
 
 
 def _resample16(x: np.ndarray, sr: int) -> np.ndarray:
@@ -475,127 +625,430 @@ def emissions_span(lang: str, y16: np.ndarray, t_a: float, t_b: float, dev: str)
     return (np.vstack(out) if out else np.zeros((0, 1))), g_a
 
 
-def _tokens(lang: str, words: list, idx: list, vocab: dict, delim: int):
-    """Labels for words[idx] in lang's model: syllable / letter tokens, optional word delimiters, one STAR per run of
-    other-language words. meta per label: ("tok", word index, char index) | ("delim",..) | ("run", [word indices],..)."""
-    labels, optional, meta = [], [], []
+def _song_emissions(lang: str, y16: np.ndarray, w16: np.ndarray | None, on_whole: np.ndarray | None, dev: str) -> np.ndarray:
+    """Log-posteriors over the song, heard on the lead, and on the whole vocal stem in the stretches on_whole marks
+    (frames): a line the backing vocals sing alone (a scat, a call between the lead's lines) is there and only there."""
+    lp = emissions_span(lang, y16, 0.0, len(y16) / 16000, dev)[0]
+    if w16 is None or on_whole is None:
+        return lp
+    edges = np.flatnonzero(np.diff(np.r_[0, on_whole[: len(lp)].astype(np.int8), 0]))
+    for a, b in zip(edges[::2], edges[1::2]):
+        if (b - a) * FRAME < WHOLE_RUN:
+            continue
+        x, g0 = emissions_span(lang, w16, a * FRAME, b * FRAME, dev)
+        m = min(b, g0 + len(x)) - a
+        if m > 0:
+            lp[a: a + m] = x[a - g0: a - g0 + m]
+    return lp
+
+
+def _whole_stem_cues(w16: np.ndarray, cues: dict) -> tuple[np.ndarray, np.ndarray]:
+    """(loud, quiet lead): per cue frame, whether the whole vocal stem has a voice, and whether it does with the lead quiet
+    all around."""
+    h = int(16000 * cues["step"])
+    n = len(w16) // h
+    db = 20 * np.log10(np.sqrt((w16[: n * h].reshape(n, h) ** 2).mean(1)) + 1e-9)
+    m = len(cues["voiced"])
+    loud = np.zeros(m, bool)
+    loud[: min(m, n)] = (db > max((np.percentile(db, 90) if n else 0.0) - 25, -60.0))[: m]  # (-60: with a voice in under 10% of it, p90 is hiss, and all passes)
+    k = int(round(WHOLE_HOLD / cues["step"]))
+    near = np.convolve(cues["voiced"].astype(float), np.ones(2 * k + 1), "full")[k: k + m] > 0  # ("same" is the window's length on a shorter stem)
+    return loud, loud & ~near
+
+
+def _cue_frames(cues: dict, T: int) -> np.ndarray:
+    """The cue frame (melody.cues, 10 ms) of each frame."""
+    return np.clip(((np.arange(T) * FRAME + FRAME_CENTER) / cues["step"]).astype(np.int64), 0, len(cues["voiced"]) - 1)
+
+
+def _agreed(L: list, lrc: dict | None) -> list:
+    """Per line: LRCLIB's stamp and Whisper agree where it starts (AGREE)."""
+    times = (lrc or {}).get("times")
+    if not times or max(ln["i"] for ln in L) >= len(times):
+        return [False] * len(L)
+    stamp = [times[ln["i"]] if times[ln["i"]] is not None and times[ln["i"]] >= STAMP_MIN else None for ln in L]
+    gaps = [ln["t0"] - t for ln, t in zip(L, stamp) if t is not None]
+    if len(gaps) < 5:
+        return [False] * len(L)
+    off = float(np.median(gaps))
+    if sum(abs(g - off) < AGREE for g in gaps) < 0.6 * len(gaps):  # another edit: one offset doesn't hold (stems._anchors)
+        return [False] * len(L)
+    for ln, t in zip(L, stamp):
+        ln["stamp"] = None if t is None else t + off
+    return [t is not None and abs(ln["t0"] - t - off) < AGREE for ln, t in zip(L, stamp)]
+
+
+def _line_windows(L, dur, agreed):
+    """Where to look for each line (s), and whether its Whisper line is to be trusted (SHORT_LINE)."""
+    win = []
+    for ln, sure in zip(L, agreed):
+        n = sum(len(_parts(w, lg)) for (w, lg), b_ in zip(ln["words"], ln["bg"]) if not b_) or sum(len(_parts(w, lg)) for w, lg in ln["words"])  # Whisper's line has no time for brackets (lyrics.lead_text)
+        m = MARGIN_AGREED if sure else GLOBAL_MARGIN
+        win.append([ln["t0"] - m, ln["t1"] + m, (ln["t1"] - ln["t0"]) >= SHORT_LINE * max(1, n)])
+    for i, wv in enumerate(win):
+        if not wv[2]:  # (agreeing on its start says nothing for its end)
+            prev = next((win[j][0] for j in range(i - 1, -1, -1) if win[j][2]), 0.0)
+            nxt = next((win[j][1] for j in range(i + 1, len(win)) if win[j][2]), dur)
+            wv[0], wv[1] = min(wv[0], prev), max(wv[1], nxt)
+    return [(max(0.0, a), min(dur, b)) for a, b, _ in win], [w[2] for w in win]
+
+
+def _labels(ln: dict, vocab: dict, delim: dict, en_ok: bool, base: str):
+    """A line's labels: (lang, class id or STAR), whether each may be skipped (word delimiters; words in brackets, which are
+    backing vocals the lead may not sing), and what each is: ("tok", word index, char index), ("delim", ...) or ("run",
+    [word indices], ...). A run of Latin words that aren't English is one wildcard, and so is text no model hears before a word."""
+    words, labels, optional, meta = ln["words"], [], [], []
     k = 0
-    while k < len(idx):
-        wi = idx[k]
-        w, lg = words[wi]
+    while k < len(words):
+        w, lg = words[k]
         if labels:
-            labels.append(delim)
+            d = lg if lg in delim and (lg != "en" or en_ok) else base
+            labels.append((d, delim[d]))
             optional.append(True)
             meta.append(("delim", None, None))
-        if lg == lang:
-            if lang == "ko":
-                for ci, tok in enumerate(ko_tokens(w, vocab)):
-                    labels.append(STAR if tok is None else tok)
-                    optional.append(False)
-                    meta.append(("tok", wi, ci))
-            else:
-                for ci, ch in enumerate(w.upper()):
-                    if ch in vocab:
-                        labels.append(vocab[ch])
-                        optional.append(False)
-                        meta.append(("tok", wi, ci))
-            k += 1
-        else:
+        if ln["unheard"][k]:  # text no model hears before this word: or its voice, paid as blank, dearer than a wildcard between lines, closes the words up
+            labels += [(base, STAR), labels[-1] if labels else (base, delim[base])]
+            optional += [True, True]
+            meta += [("run", [], None), ("delim", None, None)]
+        if lg == "en" and not en_ok:
             run = []
-            while k < len(idx) and words[idx[k]][1] != lang:
-                run.append(idx[k])
+            while k < len(words) and words[k][1] == "en":
+                run.append(k)
                 k += 1
-            labels.append(STAR)
-            optional.append(False)
+            labels.append((base, STAR))
+            optional.append(True)
             meta.append(("run", run, None))
+            continue
+        if lg == "ko":
+            for ci, tok in enumerate(ko_tokens(w, vocab["ko"])):
+                labels.append(("ko", STAR if tok is None else tok))
+                optional.append(ln["bg"][k])
+                meta.append(("tok", k, ci))
+        else:
+            for ci, ch in enumerate(w.upper()):
+                if ch in vocab["en"]:
+                    labels.append(("en", vocab["en"][ch]))
+                    optional.append(ln["bg"][k])
+                    meta.append(("tok", k, ci))
+        k += 1
     return labels, optional, meta
 
 
-def _post(lp, a, b, lab):
-    if lab == STAR or a < 0:
-        return 0.0
-    return float(np.exp(lp[a: b + 1, lab]).max())
+def _parts(w: str, lg: str) -> list:
+    """A word's syllables, as (first char, end char)."""
+    if lg == "ko":
+        return [(c, c + 1) for c in range(len(w))]
+    st = en_syllables(w)
+    return list(zip(st, st[1:] + [len(w)]))
 
 
-def _syllables_from(lang, words, meta, labels, spans, lp, off, li, out):
-    """Syllable onsets from the aligned tokens of one pass (appended to out). Returns the other-language runs
-    [(word indices, t_a, t_b)]."""
-    toks, runs = {}, []
-    for (kind, wi, ci), lab, (fa, fb) in zip(meta, labels, spans):
-        if kind == "tok" and fa >= 0:
-            toks[(wi, ci)] = (fa, fb, lab)
-        elif kind == "run" and fa >= 0:
-            runs.append((wi, off + fa * FRAME, off + (fb + 1) * FRAME))
-    done = set()
-    for kind, wi, ci in meta:
-        if kind != "tok" or wi in done:
-            continue
-        done.add(wi)
-        w = words[wi][0]
-        if lang == "ko":
-            parts = [(c, c + 1) for c in range(len(w))]
-        else:
-            st = en_syllables(w)
-            parts = list(zip(st, st[1:] + [len(w)]))
-        for c0, c1 in parts:
-            got = [toks[(wi, c)] for c in range(c0, c1) if (wi, c) in toks]
-            if not got:
-                continue
-            fa = got[0][0]
-            last = max(g[1] for g in got)
-            real = [g for g in got if g[2] != STAR]
-            tl = max(float(lp[g[0]: g[1] + 1, g[2]].max()) for g in real) if real else None
-            strength = 1.0
-            vi = _vowel_initial(lang, w[c0:c1])
-            out.append({"t": round(off + fa * FRAME + SHIFT[lang] + (VOWEL_INITIAL[lang][0] if vi else 0.0), 3),
-                        "t_end": round(off + (last + 1) * FRAME, 3), "vowel_initial": vi,
-                        "strength": round(strength, 3), "tok_logp": None if tl is None else round(tl, 2),
-                        "text": w[c0:c1], "lang": lang, "line": li, "word": wi})
-    return runs
-
-
-def _align_window(lang, y16, t0, t1, words, idx, dev, out, li):
-    """One Viterbi over [t0, t1] for words[idx] in lang (other-language runs as STAR), with optional wildcards at both
-    ends. Returns (runs, score per frame)."""
-    net, vocab, blank, delim, _ = load(lang, dev)
-    t0, t1 = max(0.0, t0), min(len(y16) / 16000, t1)
-    if t1 - t0 < 0.1:
-        return [], None
-    lp, g0 = emissions_span(lang, y16, t0, t1, dev)
-    labels, optional, meta = _tokens(lang, words, idx, vocab, delim)
-    if not labels or len(lp) < 2:
-        return [], None
-    if EDGE_STAR:
-        labels = [STAR] + labels + [STAR]
-        optional = [True] + optional + [True]
-        meta = [("edge", None, None)] + meta + [("edge", None, None)]
-    res = viterbi(lp, labels, optional, blank)
+def _align(L: list, raw: dict, vocab: dict, blanks: dict, delim: dict, en_ok: bool, cues: dict | None, lrc: dict | None = None) -> tuple[list, list] | None:
+    """All the lines in one Viterbi over the song, on raw {lang: log-posteriors}. Returns (their syllables {t, tok, tok_logp,
+    line_logp, text, lang, line, word, a, b (its characters in the line), bg, vowel_initial}, per line {logp, regret}: how
+    well its tokens fit)."""
+    top = {g: x.max(1, keepdims=True) for g, x in raw.items()}
+    E = {g: raw[g] - top[g] for g in raw}
+    T = len(next(iter(E.values())))
+    agreed = _agreed(L, lrc if lrc and abs((lrc.get("duration") or 0) - T * FRAME) <= max(10.0, 0.08 * T * FRAME) else None)  # (not another edit: one offset wouldn't hold, stems._anchors)
+    win, trusted = _line_windows(L, T * FRAME, agreed)
+    base = next(iter(E))
+    labels, optional, meta, owner, lo, hi, far, opens = [(base, STAR)], [True], [("edge", None, None)], [-1], [0], [T - 1], [0.0], [False]
+    early = [-1]
+    ns = np.array([n[:2] for n in cues["notes"]], float).reshape(-1, 2) if cues is not None else np.zeros((0, 2))
+    begin = np.r_[True, ns[1:, 0] - ns[:-1, 1] >= NOTE_REST][: len(ns)]
+    rested = np.round((ns[begin, 0] - FRAME_CENTER) / FRAME)  # (by the notes: voiced has the whole stem's loud frames)
+    rest_from = np.r_[-np.inf, ns[:-1, 1]][: len(ns)][begin]  # where the voice stopped before each
+    for k, ln in enumerate(L):
+        lab, opt, met = _labels(ln, vocab, delim, en_ok, base)
+        a = min(T - 1, max(0, int(win[k][0] * 50)))
+        b = max(a, min(T - 1, int(np.ceil(win[k][1] * 50))))
+        fence = ln.get("fence") or (None, None)
+        if fence[0] is not None:
+            a = min(T - 1, max(a, int(fence[0] * 50)))
+            b = max(a, b)  # (a fence past the window: lo > hi would pay least halfway back across it)
+        if fence[1] is not None:
+            b = max(a, min(b, int(fence[1] * 50)))
+        st = {wi: {p[0] for p in _parts(w, lg)} for wi, (w, lg) in enumerate(ln["words"])}
+        labels += lab + [(base, STAR)]
+        optional += opt + [True]
+        meta += met + [("edge", None, None)]
+        owner += [k] * len(lab) + [-1]
+        lo += [a] * len(lab) + [0]
+        hi += [b] * len(lab) + [T - 1]
+        far += [FENCE_FAR if fence != (None, None) else FAR_AGREED if agreed[k] else FAR_COST] * len(lab) + [0.0]
+        early += [-1] * (len(lab) + 1)
+        first = next((len(labels) - 1 - len(lab) + j for j, m in enumerate(met) if m[0] == "tok" and not ln["bg"][m[1]]), None)
+        if first is not None and (agreed[k] or trusted[k]) and not any(ln["unheard"][: meta[first][1] + 1]):  # its first syllable, held harder than the rest (see FIRST_NEAR), unless text no model hears starts the line
+            m_f = FIRST_NEAR_AGREED if agreed[k] else FIRST_NEAR
+            starts = [ln["t0"]] + ([ln["stamp"]] if ln.get("stamp") is not None else [])
+            lo[first], hi[first] = max(0, int((min(starts) - m_f) * 50)), min(T - 1, int((max(starts) + m_f) * 50))
+            far[first] = FIRST_FAR_AGREED if agreed[k] else FIRST_FAR_STAMPED if ln.get("stamp") is not None else FIRST_FAR
+            at = np.flatnonzero(rested >= lo[first])[:1]
+            if agreed[k] and len(at):
+                r = rested[at[0]]
+                off = r * FRAME - ln["stamp"]
+                if -STAMP_LATE <= off <= m_f and rest_from[at[0]] - ln["t0"] < RUN_ON:
+                    early[first] = max(lo[first], int(r - REST_BACK / FRAME))
+                elif off >= -STAMP_LATE and r <= hi[first] + REST_PAST / FRAME:
+                    early[first] = lo[first]
+            if fence != (None, None):  # the fence holds its first syllable too
+                if fence[0] is not None:
+                    lo[first] = max(lo[first], a)
+                if fence[1] is not None:
+                    hi[first] = min(hi[first], b)
+                hi[first] = max(lo[first], hi[first])
+                far[first] = max(far[first], FENCE_FAR)
+        ww = ln.get("ww") or []
+        if WORD_FAR and fence == (None, None) and (agreed[k] or trusted[k]) and len(ww) == len(ln["words"]):
+            for wi in range(1, len(ww)):
+                w, lg = ln["words"][wi]
+                wa, wb, n = float(ww[wi][0]), float(ww[wi][1]), len(_parts(w, lg))
+                j = next((len(labels) - 1 - len(lab) + q for q, m in enumerate(met) if m[0] == "tok" and m[1] == wi), None)
+                if j is None or ln["bg"][wi] or ln["unheard"][wi] or not 0.05 * n <= wb - wa <= 0.6 * n + 0.4:
+                    continue
+                lo[j], hi[j], far[j] = max(lo[j], int((wa - WORD_NEAR) * 50)), min(hi[j], int((wa + WORD_NEAR) * 50)), max(far[j], WORD_FAR)
+                hi[j] = max(lo[j], hi[j])
+        last = next((len(labels) - 2 - j for j, m in enumerate(met[::-1]) if m[0] == "tok" and not ln["bg"][m[1]]), None)
+        if last not in (None, first) and not agreed[k] and fence == (None, None) and ln["t1"] - ln["t0"] >= LAST_RATE * (sum(len(_parts(w, lg)) for (w, lg), b_ in zip(ln["words"], ln["bg"]) if not b_) or 1):
+            end = max(ln["t1"], (ln.get("stamp") or 0.0) + ln["t1"] - ln["t0"])
+            lo[last], hi[last], far[last] = 0, min(T - 1, int((end + LAST_NEAR) * 50)), LAST_FAR
+        opens += [m[0] == "tok" and m[2] in st.get(m[1], ()) for m in met] + [False]
+    if len(labels) < 3:
+        return None
+    enter, inside, gap = None, None, None
+    if cues is not None:
+        c = _cue_frames(cues, T)
+        voiced = cues["voiced"]
+        sum_v = np.r_[0, np.cumsum(voiced)]
+        ahead = sum_v[np.minimum(c + int(round(VOICED_AHEAD / cues["step"])), len(voiced))] - sum_v[c]
+        enter = REONSET_PRIOR * cues["p_re"][c] - SILENT_COST * (ahead == 0)
+        for n in cues["notes"]:
+            f = int(round((n[0] - FRAME_CENTER) / FRAME))
+            for d in range(-2, 3):
+                if 0 <= f + d < T:
+                    enter[f + d] += NOTE_PRIOR * (1 - abs(d) / 3)
+        own = np.array(owner)
+        inside = np.flatnonzero(np.r_[False, (own[1:] == own[:-1]) & (own[1:] >= 0), False])
+        v = voiced[c]
+        run = np.arange(T) - np.maximum.accumulate(np.where(v, np.arange(T), 0))  # frames since the voice stopped
+        gap = np.where(v, GAP_VOICED, np.where(run <= GAP_REST, GAP_SILENT, 0.0))
+    res = viterbi(E, blanks, labels, optional, np.array(lo), np.array(hi), np.array(far), np.array(opens), enter, inside, gap, np.array(early))
     if res is None:
-        return [], None
-    spans, score = res
-    n0 = len(out)
-    runs = _syllables_from(lang, words, meta, labels, spans, lp, g0 * FRAME + FRAME_CENTER, li, out)
-    tls = [s["tok_logp"] for s in out[n0:] if s["tok_logp"] is not None]
-    for s in out[n0:]:
-        s["line_logp"] = round(float(np.mean(tls)), 3) if tls else None
-    return runs, score / max(1, len(lp))
+        return None
+    per = [{} for _ in L]
+    for (kind, wi, ci), (lg, c), (fa, fb), o in zip(meta, labels, res[0], owner):
+        if kind == "tok" and fa >= 0:
+            per[o][(wi, ci)] = (fa, fb, lg, c)
+    regret = lambda x: float(E[x[2]][x[0]: x[1] + 1, x[3]].max())  # noqa: E731
+    logp = lambda x: float((E[x[2]][x[0]: x[1] + 1, x[3]] + top[x[2]][x[0]: x[1] + 1, 0]).max())  # noqa: E731
+    out, fit = [], []
+    for k, ln in enumerate(L):
+        sure = [x for x in per[k].values() if x[3] != STAR]
+        fit.append({"logp": float(np.mean([logp(x) for x in sure])) if sure else None, "regret": float(np.mean([regret(x) for x in sure])) if sure else None})
+        for wi, (w, lg) in enumerate(ln["words"]):
+            a, b = ln["spans"][wi]
+            for c0, c1 in _parts(w, lg):
+                got = [per[k][(wi, c)] for c in range(c0, c1) if (wi, c) in per[k]]
+                if not got:
+                    continue
+                real = [x for x in got if x[3] != STAR]
+                vi = _vowel_initial(lg, w[c0:c1])
+                out.append({"t": round(got[0][0] * FRAME + FRAME_CENTER + SHIFT[lg] + (VOWEL_INITIAL[lg][0] if vi else 0.0), 3),
+                            "tok": round(max(regret(x) for x in real), 2) if real else None,
+                            "tok_logp": round(max(logp(x) for x in real), 2) if real else None,
+                            "line_logp": None if fit[-1]["logp"] is None else round(fit[-1]["logp"], 3),
+                            "text": w[c0:c1], "lang": lg, "line": ln["i"], "word": wi, "vowel_initial": vi, "bg": bool(ln["bg"][wi]),
+                            "a": a if ln["num"][wi] else a + c0, "b": b if ln["num"][wi] else a + c1})  # a number spelled out: its digits, as one
+    return out, fit
 
 
-REALIGN_LOGP = {"ko": -10.5, "en": -3.2}  # global mode: a line whose tokens' mean peak log-posterior is under this
-#   is searched again anywhere between the neighbouring lines that did align (Whisper's line times can be far off).
-#   Per language: the Korean model spreads its posterior over 1,203 syllables (well-aligned sung lines: median -6.6,
-#   badly aligned -11.9 on the CSD dev split), the English one over letters (-1.0 / -4.8).
-REALIGN_PAD = 0.5  # seconds around a line that aligned, in the second pass
-UNCONSTRAINED = True  # also align with no Whisper windows at all and keep that when its lines fit better (repeated
-#   choruses after a Whisper collapse: lines squeezed into the wrong repetition)
-# normalisers of the strength model's inputs (log-posteriors scaled 0..1 between these, per language)
-REL_LOGP = {"ko": (-11.0, -7.0), "en": (-4.5, -1.5)}
-TOK_LOGP = {"ko": (-13.0, -3.0), "en": (-6.0, -0.5)}
+def _onsets_heard(cues: dict) -> tuple[np.ndarray, np.ndarray]:
+    """Where the sound starts something, and how sure: note starts (1), and the peaks of the re-onset probability."""
+    t, p = cues["t"], cues["p_re"]
+    at = {round(float(n[0]), 2): 1.0 for n in cues["notes"]}
+    for k in np.flatnonzero((p[1:-1] >= p[:-2]) & (p[1:-1] > p[2:]) & (p[1:-1] >= ONSET_PEAK)) + 1:
+        x = round(float(t[k]), 2)
+        if not any(round(x + d / 100, 2) in at for d in range(-3, 4)):
+            at[x] = 0.8 * float(p[k])
+    keys = sorted(at)
+    return np.array(keys, float), np.array([at[x] for x in keys], float)
+
+
+def _far_back(a: dict, b: dict) -> bool:
+    """b follows a in the lyrics but, in another line, lay further behind it than moving both could put right: a line only
+    Whisper timed. Keeping order across them only drags a back and cuts its end to 50 ms. (heard_at: refine's input.)"""
+    return a["line"] != b["line"] and b.get("heard_at", b["t"]) < a.get("heard_at", a["t"]) - 2 * REFINE_REACH
+
+
+def refine(syl: list, cues: dict) -> list:
+    """Syllables, in order, each moved to where the sound starts something: the path through those places that costs least
+    (see REFINE_REACH)."""
+    if not syl:
+        return syl
+    ct, cv = _onsets_heard(cues)
+    states, costs = [], []
+    for s in syl:
+        sure = REFINE_FLOOR + (1 - REFINE_FLOOR) * (float(np.exp(s["tok"] / REFINE_SURE)) if s.get("tok") is not None else 0.0)
+        near = np.flatnonzero(np.abs(ct - s["t"]) <= REFINE_REACH)
+        at = np.r_[s["t"], ct[near]]
+        states.append(at)
+        pull = np.where((cv[near] < 1) & (sure >= REFINE_KEEP) & (not s.get("vowel_initial")), 0.0, cv[near])  # (a peak doesn't draw a token heard without doubt: 13-37 ms onto nothing better; a note start still does)
+        costs.append(np.r_[REFINE_STAY, (1 - pull) * REFINE_STAY] + sure * np.abs(at - s["t"]) / REFINE_MOVE)
+    D, back = costs[0].copy(), []
+    for i in range(1, len(syl)):
+        g = states[i][:, None] - states[i - 1][None, :]
+        tot = D[None, :] + (not _far_back(syl[i - 1], syl[i])) * np.where(g < REFINE_GAP, REFINE_GAP_COST + 20 * np.maximum(0.0, REFINE_GAP - g) + 500 * np.maximum(0.0, -g), 0.0)
+        k = tot.argmin(1)
+        D = tot[np.arange(len(states[i])), k] + costs[i]
+        back.append(k)
+    j = int(D.argmin())
+    at = [0.0] * len(syl)
+    for i in range(len(syl) - 1, -1, -1):
+        at[i] = float(states[i][j])
+        if i:
+            j = int(back[i - 1][j])
+    return [{**s, "t": round(x, 3), "heard_at": s["t"]} for s, x in zip(syl, at)]
+
+
+def _vowel_starts(syl: list, cues: dict | None) -> list:
+    """A vowel's token says which vowel, not when: on a long note it falls anywhere, so no fixed shift suits slow and fast
+    alike. A vowel-initial syllable with nothing before it in its run of voice goes to that run's first note. One sung on
+    from the syllable before (English only: Korean's tokens aren't late) goes to the note its token is in, unless that note
+    is the syllable before's. Left to right, so one that moves frees its place for the next. Nothing else moves, and the
+    order holds."""
+    if cues is None or not cues["voiced"].any():
+        return syl
+    t, k = cues["t"], np.flatnonzero(cues["voiced"])
+    br = np.flatnonzero(np.diff(t[k]) > BRIDGE)
+    ra, rb = t[k[np.r_[0, br + 1]]], t[k[np.r_[br, len(k) - 1]]] + cues["step"]
+    ns = np.sort(np.array([round(float(n[0]), 2) for n in cues["notes"]], float))
+    for i, s in enumerate(syl):
+        if not s.get("vowel_initial"):
+            continue
+        raw = s["heard_at"] - VOWEL_INITIAL[s["lang"]][0]  # the token itself, before the fixed shift
+        near = raw + 1.5 * FRAME  # (the note prior can put a token a frame ahead of its note)
+        j = int(np.searchsorted(ra, near)) - 1
+        if j < 0 or rb[j] + FRAME < raw:  # no voice at the token
+            continue
+        before = syl[i - 1]["t"] if i else -np.inf
+        if before < ra[j] - VOICED_AHEAD:  # (closer than this, the syllable before is what starts the run)
+            c = ns[ns >= ra[j] - FRAME][:1]
+            ok = len(c) and raw - VOWEL_BACK <= c[0] <= near
+            if ok and j and s["t"] - c[0] > REFINE_REACH and ra[j] - rb[j - 1] < VOWEL_BREATH and before >= ra[j - 1] - VOICED_AHEAD:
+                ok = False  # (a breath in the syllable before's held note: what follows it is still that syllable)
+        elif s["lang"] == "en":
+            c = ns[ns <= max(near, s["t"])][-1:]  # (a note a frame ahead of the token, or one refine chose: it stays)
+            ok = len(c) and s["heard_at"] - REFINE_REACH <= c[0] <= max(raw + 0.6 * FRAME, s["t"])
+            ok = ok and c[0] - before >= (VOWEL_CLAIM if c[0] < s["heard_at"] else REFINE_GAP)  # (forward, its token is on the note)
+        else:
+            continue
+        if ok and (i + 1 == len(syl) or c[0] + REFINE_GAP <= syl[i + 1]["t"]):
+            s["t"] = round(float(c[0]), 3)
+    return syl
+
+
+# A line's head left on the notes before a rest, where Whisper and the stamp start the line after it (_heads_after_rest).
+HEAD_REST, HEAD_REST_STRETCHED, HEAD_BLOCK, HEAD_UNSURE, HEAD_SURE, HEAD_STEP = 0.25, 0.6, 3, -1.5, -0.5, 0.25
+
+
+def _said_start(ln: dict, n: int) -> tuple:
+    """(where Whisper's line starts, the rest that takes), its first word of n syllables read for shape: next to no length and far before the
+    second word, the second word's start; stretched back over what came before, its end less its own length, and only across a long rest."""
+    ws = ln.get("words") or []
+    if not ws:
+        return float(ln["t0"]), HEAD_REST
+    a, b = float(ws[0][0]), float(ws[0][1])
+    if b - a < 0.05 * n and len(ws) > 1 and float(ws[1][0]) - b > 0.5:
+        return float(ws[1][0]), HEAD_REST
+    if b - a > 0.6 * n + 0.4:
+        return b - 0.25 * n, HEAD_REST_STRETCHED
+    return a, HEAD_REST
+
+
+def _heads_after_rest(syl: list, cues: dict | None, lines: list, stamps: dict) -> list:
+    """A note start pays a head more than its hold costs, so it stays on the previous line's last notes or a wordless hook, across a rest
+    refine can't cross. Where Whisper's start and the stamp fall after that rest, the head goes to the first note after it. A sure token
+    at or after Whisper's start stays: the head is then a pickup just before it. Without a stamp, a sibling line must show the head isn't torn."""
+    if cues is None or len(cues["notes"]) < 2:
+        return syl
+    ns = sorted((float(n[0]), float(n[1])) for n in cues["notes"])
+    on, off = np.array([n[0] for n in ns]), np.maximum.accumulate([n[1] for n in ns])
+    g = np.flatnonzero(on[1:] - off[:-1] >= HEAD_REST)
+    ge, gs = off[g], on[g + 1]
+    tok = lambda i: -99.0 if syl[i].get("tok") is None else syl[i]["tok"]  # noqa: E731
+    by, same = {}, {}
+    for i, s in enumerate(syl):
+        if not s.get("bg"):
+            by.setdefault(s["line"], []).append(i)
+    for li in by:
+        same.setdefault(re.sub(r"\W", "", lines[li].get("text") or ""), []).append(li)
+    for li, idx in by.items():
+        if len(idx) < 3 or not syl[idx[0]].get("lang") or idx[-1] - idx[0] + 1 != len(idx) or tok(idx[0]) > HEAD_UNSURE:
+            continue
+        t = [syl[i]["t"] for i in idx]
+        said, rest = _said_start(lines[li], sum(syl[i]["word"] == syl[idx[0]]["word"] for i in idx))
+        near = np.flatnonzero((ge <= said + 0.1) & (gs - ge >= rest))
+        if not len(near):
+            continue
+        a, b = float(ge[near[-1]]), float(gs[near[-1]])
+        stamp = stamps.get(li)
+        if t[0] > b - HEAD_STEP or said - t[0] < 0.2 or said - b > 0.5 or (stamp is not None and (stamp < a - 0.2 or stamp - t[0] < 0.18)):  # (a head already at its stamp isn't torn)
+            continue
+        m = sum(x < b + REFINE_GAP for x in t)
+        if m >= len(idx):
+            continue
+        keep = next((k for k in range(1, m) if t[k] >= max(a, said) and tok(idx[k]) >= HEAD_SURE), None)
+        if keep is not None:
+            m = keep
+            room = t[m] - max(a, said)
+            if room < REFINE_GAP * m:
+                continue
+            step = min(HEAD_STEP, room / m)
+            new = [t[m] - step * (m - k) for k in range(m)]
+        else:
+            while m + 1 < len(idx) and m < HEAD_BLOCK and (t[m] - b) / m < REFINE_GAP and tok(idx[m]) <= -3:
+                m += 1
+            if (t[m] - b) / m < REFINE_GAP - 0.005:
+                continue
+            c = on[(on >= b - 0.005) & (on <= t[m] - REFINE_GAP)]
+            new = c[:m] if len(c) >= m else b + (t[m] - b) * np.arange(m) / m
+        if m > HEAD_BLOCK:
+            continue
+        if stamp is None and not any(x != li and len(by[x]) == len(idx) and syl[by[x][m]]["t"] - syl[by[x][0]]["t"] < 0.6 * (t[m] - t[0]) for x in same[re.sub(r"\W", "", lines[li].get("text") or "")]):
+            continue
+        for k in range(m):
+            syl[idx[k]]["t"] = syl[idx[k]]["heard_at"] = round(float(new[k]), 3)
+    return syl
+
+
+def _with_ends(syl: list, cues: dict | None) -> list:
+    """Each syllable's end: where the voice stops, or the next one's start (without cues, the next one's start). A word of
+    Whisper's can be several syllables, breaks of voice in it: it ends where the voice stops nearest Whisper's end for it."""
+    ra = rb = None
+    if cues is not None and cues["voiced"].any():
+        t, k = cues["t"], np.flatnonzero(cues["voiced"])
+        br = np.flatnonzero(np.diff(t[k]) > BRIDGE)
+        ra, rb = t[k[np.r_[0, br + 1]]], t[k[np.r_[br, len(k) - 1]]] + cues["step"]
+    out = []
+    for i, s in enumerate(syl):
+        later = next((x["t"] for x in syl[i + 1:] if x["t"] >= s["t"] or not _far_back(s, syl[i + 1])), None)  # (past a line gone far back, the next that's later)
+        nxt = max(later if later is not None else s["t"] + (LAST_HOLD if ra is not None else 2.0), s["t"] + 0.05)
+        e = nxt
+        if ra is not None:
+            j = int(np.searchsorted(ra, max(s.get("end", 0.0), s["t"] + VOICED_AHEAD))) - 1  # (refine can move a word of Whisper's past its own end)
+            e = float(rb[j]) if j >= 0 and rb[j] > s["t"] else s["t"] + 0.1
+        out.append({**s, "t_end": round(min(nxt, max(e, s["t"] + FILL_LEAST)), 3)})
+    return out
+
+
 # strength = P(onset within 50 ms of the sung syllable) by a logistic model on [line log-posterior (scaled), token
-# log-posterior (scaled), vowel-initial, English, line searched again] + bias; fitted on the CSD dev split
+# log-posterior (scaled), vowel-initial, English, 0] + bias; fitted on the CSD dev split
+REL_LOGP = {"ko": (-11.0, -7.0), "en": (-4.5, -1.5)}  # normalisers of its inputs: scaled 0..1 between these, per language
+TOK_LOGP = {"ko": (-13.0, -3.0), "en": (-6.0, -0.5)}
 SQUEEZED = (0.06, 0.2)  # (median gap between a line's syllable onsets under which it is squeezed, strength factor)
 TORN = (8.0, 0.5)  # (largest gap inside a line over which it is torn apart, strength factor)
 STRENGTH_W = [0.8885, 0.6944, -1.1348, -0.7888, -0.0748, 0.1329]  # AUC 0.69 on the dev split
+VOWEL_BAR_ODDS = 3.11  # a vowel's onset for the bars undoes STRENGTH_W's vowel term (exp 1.1348): fitted on late tokens, and it now pays at the moved start
 
 
 def _norm(lg, rng):
@@ -604,256 +1057,236 @@ def _norm(lg, rng):
     return float(np.clip((lg - rng[0]) / (rng[1] - rng[0]), -1.0, 2.0))
 
 
-def strength_features(s: dict) -> list:
-    lang = s["lang"]
-    return [_norm(s.get("line_logp"), REL_LOGP[lang]), _norm(s.get("tok_logp"), TOK_LOGP[lang]),
-            float(bool(s.get("vowel_initial"))), float(lang == "en"), float(bool(s.get("searched_again")))]
-
-
 def strength_of(s: dict) -> float:
-    if STRENGTH_W is None:
-        return 1.0
+    lang = s["lang"]
+    x = [_norm(s.get("line_logp"), REL_LOGP[lang]), _norm(s.get("tok_logp"), TOK_LOGP[lang]), float(bool(s.get("vowel_initial"))), float(lang == "en"), 0.0]
     w = np.asarray(STRENGTH_W, float)
-    z = float(np.dot(strength_features(s), w[:-1]) + w[-1])
-    return float(1 / (1 + np.exp(-np.clip(z, -30, 30))))
+    return float(1 / (1 + np.exp(-np.clip(float(np.dot(x, w[:-1]) + w[-1]), -30, 30))))
 
 
-def _line_windows(L, dur):
-    win = []
-    for ln in L:
-        n = sum(len(w) if lg == "ko" else len(en_syllables(w)) for w, lg in ln["words"])
-        win.append([ln["t0"] - GLOBAL_MARGIN, ln["t1"] + GLOBAL_MARGIN, (ln["t1"] - ln["t0"]) >= SHORT_LINE * max(1, n)])
-    for i, wv in enumerate(win):
-        if not wv[2]:
-            prev = next((win[j][0] for j in range(i - 1, -1, -1) if win[j][2]), 0.0)
-            nxt = next((win[j][1] for j in range(i + 1, len(win)) if win[j][2]), dur)
-            wv[0], wv[1] = min(wv[0], prev), max(wv[1], nxt)
-    return [(max(0.0, a), min(dur, b)) for a, b, _ in win]
+def _whisper_syllables(ln: dict, li: int) -> list:
+    """A line, or words of one, no model here can time: Whisper's words, as syllables of no strength, a little later
+    (WHISPER_EARLY)."""
+    text = unicodedata.normalize("NFC", ln.get("text") or "")
+    out, at = [], 0
+    for wi, w in enumerate(ln.get("words") or []):
+        piece = unicodedata.normalize("NFC", str(w[2])).strip()
+        k = text.find(piece, at) if piece else -1
+        if k < 0 and piece.rstrip(",.!?"):  # lead_text closed up a space before the mark
+            piece = piece.rstrip(",.!?")
+            k = text.find(piece, at)
+        if k < 0:
+            continue
+        at = k + len(piece)
+        if float(w[1]) <= float(w[0]) and any(_bracketed(text)[k: at]):  # with_brackets' stand-in: no time of its own, and no claim on a note
+            continue
+        out.append({"t": round(float(w[0]) + WHISPER_EARLY, 3), "end": float(w[1]) + WHISPER_EARLY, "tok": None, "text": piece, "lang": None,
+                    "line": li, "word": wi, "bg": False, "a": k, "b": at})
+    return out
 
 
-def _global_pass(lang, lp, g0, L, windows, vocab, blank, delim):
-    T = len(lp)
-    labels, optional, meta, lo, hi, owner = [STAR], [True], [("edge", None, None)], [0], [T - 1], [-1]
-    for k, ln in enumerate(L):
-        lab, opt, met = _tokens(lang, ln["words"], list(range(len(ln["words"]))), vocab, delim)
-        a = min(T - 1, max(0, int(windows[k][0] * 50) - g0))
-        b = max(a, min(T - 1, int(np.ceil(windows[k][1] * 50)) - g0))
-        labels += lab + [STAR]
-        optional += opt + [True]
-        meta += met + [("edge", None, None)]
-        lo += [a] * len(lab) + [0]
-        hi += [b] * len(lab) + [T - 1]
-        owner += [k] * len(lab) + [-1]
-    res = viterbi(lp, labels, optional, blank, lo=np.array(lo), hi=np.array(hi))
-    if res is None:
-        return None
-    spans = res[0]
-    per = []
-    for k in range(len(L)):
-        sel = [j for j, o in enumerate(owner) if o == k]
-        tk = [j for j in sel if spans[j][0] >= 0 and labels[j] != STAR and meta[j][0] == "tok"]
-        lps = [float(lp[spans[j][0]: spans[j][1] + 1, labels[j]].max()) for j in tk]
-        gaps = [float((lp[spans[j][0]: spans[j][1] + 1, labels[j]] - lp[spans[j][0]: spans[j][1] + 1].max(1)).max()) for j in tk]
-        fr = [spans[j][0] for j in sel if spans[j][0] >= 0] + [spans[j][1] for j in sel if spans[j][0] >= 0]
-        per.append({"sel": sel, "logp": float(np.mean(lps)) if lps else None,
-                    "gap": float(np.mean(gaps)) if gaps else None,
-                    "top1": float(np.mean([g > -1e-6 for g in gaps])) if gaps else None,
-                    "span": ((g0 + min(fr)) / 50, (g0 + max(fr) + 1) / 50) if fr else None})
-    return labels, meta, spans, per
+def _unsung(ln: dict, cues: dict, a: float, b: float) -> bool:
+    """A line of the lyrics this recording doesn't sing (another edit, words after the singing stops): next to no voice,
+    on any stem, in all of where Whisper laid it. Forced onto the singing, it would pull the lines before it off theirs."""
+    if ln["t1"] - ln["t0"] < UNSUNG[0]:
+        return False
+    v = cues["voiced"][int(ln["t0"] / cues["step"]): int(ln["t1"] / cues["step"]) + 1]
+    if len(v) and float(np.mean(v)) >= UNSUNG[1]:
+        return False
+    # (Whisper can push a sung line into a rest: it stays if the stretch between the lines either side, a to b, has voice enough for it)
+    room = cues["voiced"][int(min(a, ln["t0"]) / cues["step"]): int(max(b, ln["t1"]) / cues["step"]) + 1]
+    return float(np.sum(room)) * cues["step"] < SHORT_LINE * sum(len(_parts(w, lg)) for w, lg in ln["words"])
 
 
-def _second_pass(lang, lp, g0, L, r, dur, vocab, blank, delim):
-    bad = [p["logp"] is None or p["logp"] < REALIGN_LOGP[lang] for p in r[3]]
-    if not any(bad) or all(bad):
-        return r, bad, 1
-    per = r[3]
-    win2 = []
-    for k in range(len(L)):
-        if not bad[k]:
-            a, b = per[k]["span"]
-            win2.append((max(0.0, a - REALIGN_PAD), min(dur, b + REALIGN_PAD)))
-        else:
-            prev = next((per[j]["span"][1] for j in range(k - 1, -1, -1) if not bad[j]), 0.0)
-            nxt = next((per[j]["span"][0] for j in range(k + 1, len(L)) if not bad[j]), dur)
-            win2.append((max(0.0, prev - REALIGN_PAD), min(dur, max(nxt, prev + 0.5) + REALIGN_PAD)))
-    r2 = _global_pass(lang, lp, g0, L, win2, vocab, blank, delim)
-    return (r2, bad, 2) if r2 is not None else (r, bad, 1)
+BG_WORD = 0.25  # s a word nothing heard gets, after the last word of its line
 
 
-def _fit(r):
-    v = [p["logp"] for p in r[3]]
-    return float(np.mean([x if x is not None else -20.0 for x in v])) if v else -99.0
+def _spread(words: list, a: float, b: float):
+    """Words without a time of their own (nothing in them a model hears) shared out between the ones either side, by
+    length."""
+    tot = sum(len(w[2].strip()) for w in words) or 1
+    at = a
+    for w in words:
+        d = (b - a) * len(w[2].strip()) / tot
+        w[0], w[1] = round(at, 3), round(at + d, 3)
+        at += d
 
 
-def _align_global(lang, y16, L, dev, out, info):
-    """All lines in one Viterbi over the whole song: line l's tokens confined to its Whisper line +- GLOBAL_MARGIN
-    (lines too short to be trusted: widened to the neighbouring trusted lines), optional wildcards between lines. Lines
-    that align poorly (mean token log-posterior < REALIGN_LOGP) are searched again between the lines that aligned.
-    With UNCONSTRAINED, the lyrics are also aligned with no windows at all, and that alignment is kept when its lines'
-    mean token log-posterior is higher. Returns runs [(line index in L, word indices, t_a, t_b)]."""
-    net, vocab, blank, delim, _ = load(lang, dev)
-    dur = len(y16) / 16000
-    lp, g0 = emissions_span(lang, y16, 0.0, dur, dev)
-    r = _global_pass(lang, lp, g0, L, _line_windows(L, dur), vocab, blank, delim)
-    if r is None:
-        return []
-    r, bad, passes = _second_pass(lang, lp, g0, L, r, dur, vocab, blank, delim)
-    mode = "whisper"
-    fit_w = _fit(r)
-    fit_u = None
-    if UNCONSTRAINED and len(L) > 1:
-        ru = _global_pass(lang, lp, g0, L, [(0.0, dur)] * len(L), vocab, blank, delim)
-        if ru is not None:
-            fit_u = _fit(ru)
-            if fit_u > fit_w:
-                r, bad, passes, mode = ru, [False] * len(L), 1, "free"
-    labels, meta, spans, per = r
-    off = g0 * FRAME + FRAME_CENTER
-    # other-language runs: each block of consecutive runs (across lines, with nothing but wildcards and delimiters
-    # between them) is searched from the end of the primary token before it to the start of the one after it
-    owner = [-1] * len(labels)
-    for k in range(len(L)):
-        for j in per[k]["sel"]:
-            owner[j] = k
-    real = [j for j in range(len(labels)) if meta[j][0] == "tok" and spans[j][0] >= 0]
-    blocks, cur = [], None
-    for j in range(len(labels)):
-        if meta[j][0] == "run":
-            if cur is None:
-                cur = {"items": [], "j0": j}
-            cur["items"].append((owner[j], meta[j][1]))
-            cur["j1"] = j
-        elif meta[j][0] == "tok" and cur is not None:
-            blocks.append(cur)
-            cur = None
-    if cur is not None:
-        blocks.append(cur)
-    for b in blocks:
-        prev = [spans[j][1] for j in real if j < b["j0"]]
-        nxt = [spans[j][0] for j in real if j > b["j1"]]
-        ta = off + ((max(prev) + 1) * FRAME if prev else 0.0) - FRAME_CENTER
-        tb = off + (min(nxt) * FRAME if nxt else len(lp) * FRAME)
-        b["t"] = (ta, tb)
-    runs = []
-    for k, ln in enumerate(L):
-        sel = per[k]["sel"]
-        n0 = len(out)
-        rr = _syllables_from(lang, ln["words"], [meta[j] for j in sel], [labels[j] for j in sel], [spans[j] for j in sel],
-                             lp, off, ln["i"], out)
-        lg = per[k]["logp"]
-        again = bool(bad[k]) and passes == 2
-        for s in out[n0:]:
-            s["line_logp"] = None if lg is None else round(lg, 3)
-            s["searched_again"] = again
-        info[k].update({"n_aligned": len(out) - n0, "tok_logp": None if lg is None else round(lg, 3),
-                        "tok_gap": None if per[k]["gap"] is None else round(per[k]["gap"], 3),
-                        "tok_top1": None if per[k]["top1"] is None else round(per[k]["top1"], 3),
-                        "passes": passes, "searched_again": again, "mode": mode,
-                        "fit_whisper": round(fit_w, 3), "fit_free": None if fit_u is None else round(fit_u, 3),
-                        "span": None if per[k]["span"] is None else [round(per[k]["span"][0], 2), round(per[k]["span"][1], 2)]})
-    return blocks
+def sung_lines(lines: list, syl: list) -> list:
+    """lyrics.json's lines as they're sung, for the page. A word is [t0, t1, " text", syllables, in brackets]: syllables are
+    [t0, t1, text], their texts making up the word (None for a word with no time of its own). A line ends where its last word
+    outside brackets does. A line nothing could time stays as Whisper had it."""
+    by = {}
+    for s in syl:
+        by.setdefault(s["line"], []).append(s)
+    out = []
+    for li, ln in enumerate(lines):
+        text = unicodedata.normalize("NFC", ln.get("text") or "")
+        ss = sorted(by.get(li, []), key=lambda s: (s["a"], s["t"]))
+        if not ss:
+            out.append({"t0": ln.get("t0"), "t1": ln.get("t1"), "text": ln.get("text"), "words": ln.get("words") or []})
+            continue
+        depth = _bracketed(text)
+        words = []
+        for m in re.finditer(r"\S+", text):
+            A, B = m.span()
+            merged = []  # a number's words are one
+            for s in ss:
+                if not A <= s["a"] < B:
+                    continue
+                if merged and merged[-1]["a"] == s["a"]:
+                    merged[-1] = {**merged[-1], "t": min(merged[-1]["t"], s["t"]), "t_end": max(merged[-1]["t_end"], s["t_end"])}
+                else:
+                    merged.append(s)
+            cuts = [A] + [s["a"] for s in merged[1:]] + [B]
+            parts = [[s["t"], s["t_end"], text[c0:c1]] for s, c0, c1 in zip(merged, cuts, cuts[1:])]
+            letters = [depth[c] for c in range(A, B) if text[c].isalnum()]  # (a word glued to a bracket is the lead's)
+            words.append([parts[0][0] if parts else None, parts[-1][1] if parts else None, " " + m.group(), parts or None, int(bool(letters) and all(letters))])
+        k = 0
+        while k < len(words):
+            if words[k][0] is not None:
+                k += 1
+                continue
+            j = k
+            while j < len(words) and words[j][0] is None:
+                j += 1
+            prev = words[k - 1][1] if k else (words[j][0] if j < len(words) else ss[0]["t"])
+            later = next((by[n] for n in range(li + 1, len(lines)) if by.get(n)), None)  # words after the last one heard: a short while, not past the next line
+            nxt = words[j][0] if j < len(words) else min(prev + BG_WORD * (j - k), min((s["t"] for s in later), default=np.inf) if later else np.inf)
+            _spread(words[k:j], prev, max(prev, nxt))
+            k = j
+        main = [w for w in words if not w[4]] or words
+        out.append({"t0": min(w[0] for w in main), "t1": max(w[1] for w in main), "text": ln.get("text"), "words": words})
+    return out
 
 
-def _align_block(lang, y16, t0, t1, L, items, dev, out, info):
-    """One Viterbi over [t0, t1] for several lines' word runs in lang (optional wildcards between and around them)."""
-    net, vocab, blank, delim, _ = load(lang, dev)
-    t0, t1 = max(0.0, t0), min(len(y16) / 16000, t1)
-    if t1 - t0 < 0.1:
-        return
-    lp, g0 = emissions_span(lang, y16, t0, t1, dev)
-    labels, optional, meta, owner = [STAR], [True], [("edge", None, None)], [-1]
-    for n, (k, wi) in enumerate(items):
-        lab, opt, met = _tokens(lang, L[k]["words"], wi, vocab, delim)
-        labels += lab + [STAR]
-        optional += opt + [True]
-        meta += met + [("edge", None, None)]
-        owner += [n] * len(lab) + [-1]
-    if len(lp) < 2 or len(labels) < 3:
-        return
-    res = viterbi(lp, labels, optional, blank)
-    if res is None:
-        return
-    spans = res[0]
-    off = g0 * FRAME + FRAME_CENTER
-    for n, (k, wi) in enumerate(items):
-        sel = [j for j, o in enumerate(owner) if o == n]
-        n0 = len(out)
-        _syllables_from(lang, L[k]["words"], [meta[j] for j in sel], [labels[j] for j in sel], [spans[j] for j in sel],
-                        lp, off, L[k]["i"], out)
-        tls = [x["tok_logp"] for x in out[n0:] if x["tok_logp"] is not None]
-        for x in out[n0:]:
-            x["line_logp"] = round(float(np.mean(tls)), 3) if tls else None
-        info[k]["n_aligned"] += len(out) - n0
-
-
-def align_lyrics(vocals: np.ndarray, lines: list, sr: int = SR, dev: str | None = None, timings: dict | None = None) -> dict:
-    """Syllable onsets of lyrics.json's lines on the lead vocal (mono float32 at sr). lines: [{t0, t1, text, ...}]
-    (Whisper's line times, used as search windows). See the module docstring for the output."""
+def align_lyrics(vocals: np.ndarray, lines: list, sr: int = SR, dev: str | None = None, timings: dict | None = None,
+                 whole: np.ndarray | None = None, cues: dict | None = None, lrc: dict | None = None) -> dict:
+    """The lyrics.json lines on the lead vocal (mono float32 at sr). lines: [{t0, t1, text, words}] (Whisper's times, where
+    to look first). whole: the whole vocal stem, for the lines the lead doesn't sing. cues: melody.cues(vocals). lrc:
+    lyrics.json's {times}, LRCLIB's stamps, one per line. See the module docstring for the output."""
     import time
     tm = timings if timings is not None else {}
     c0 = time.perf_counter()
     y16 = _resample16(np.asarray(vocals, np.float32), sr)
+    w16 = _resample16(np.asarray(whole, np.float32), sr) if whole is not None else None
     tm["resample"] = time.perf_counter() - c0
     L = []
     for li, ln in enumerate(lines or []):
         if ln.get("t0") is None or ln.get("t1") is None:
             continue
-        words = words_of(ln.get("text") or "")
-        if words:
-            L.append({"i": li, "t0": float(ln["t0"]), "t1": float(ln["t1"]), "words": words})
-    syl = []
-    info = [{"i": ln["i"], "t0": ln["t0"], "t1": ln["t1"], "n_aligned": 0,
-             "n_syl": sum(len(w) if lg == "ko" else len(en_syllables(w)) for w, lg in ln["words"])} for ln in L]
-    n_ko = sum(len(w) for ln in L for w, lg in ln["words"] if lg == "ko")
-    n_en = sum(len(en_syllables(w)) for ln in L for w, lg in ln["words"] if lg == "en")
-    primary = "ko" if n_ko >= n_en else "en"
-    other = "en" if primary == "ko" else "ko"
+        sp = word_spans(ln.get("text") or "")
+        if sp:
+            L.append({"i": li, "t0": float(ln["t0"]), "t1": float(ln["t1"]), "words": [(x[0], x[1]) for x in sp],
+                      "spans": [(x[2], x[3]) for x in sp], "bg": [x[4] for x in sp], "num": [x[5] for x in sp], "unheard": _unheard_before(ln.get("text") or "", sp), "ww": ln.get("words") or []})
+    info = [{"i": ln["i"], "t0": ln["t0"], "t1": ln["t1"], "n_aligned": 0, "n_syl": sum(len(_parts(w, lg)) for w, lg in ln["words"])} for ln in L]
     en_share = english_share([w for ln in L for w in ln["words"]])
-    en_ok = n_en == 0 or en_share >= LATIN_EN_MIN
+    en_ok = en_share >= LATIN_EN_MIN
+    n_ko = sum(len(w) for ln in L for w, lg in ln["words"] if lg == "ko")
+    n_en = sum(len(en_syllables(w)) for ln in L for w, lg in ln["words"] if lg == "en") if en_ok else 0
     tm["english_share"] = round(en_share, 3)
-    if primary == "en" and not en_ok:  # not English: no syllable cue for this song
-        return {"syllables": [], "onsets": [], "lines": info, "timings": tm, "primary": None, "device": None,
-                "skipped": "latin lyrics that are not English (english_share %.2f)" % en_share}
-    with _lock:
-        dev = dev or _device()
+    langs = (["ko"] if n_ko else []) + (["en"] if n_en else [])
+    primary = None if not langs else "ko" if n_ko >= n_en else "en"
+    syl, skipped, cue_end, on_whole = [], None, cues, None
+    if w16 is not None and cues is not None:  # backing vocals alone aren't silence, and a syllable of theirs ends where they stop
+        loud, only = _whole_stem_cues(w16, cues)
+        on_whole = only[_cue_frames(cues, (len(y16) - 400) // 320 + 1)]
+        cue_end = {**cues, "voiced": cues["voiced"] | only}
+        cues = {**cues, "voiced": cues["voiced"] | loud}
+    if not langs:  # (no syllable cue for the bars; Whisper's words for the page, below)
+        skipped = f"no lyrics a model here can time (english_share {en_share:.2f})"
+    L = [ln for ln in L if any(lg in langs for _, lg in ln["words"])]
+    chained = {ln["i"] for ln in L}
+    L = [ln for k, ln in enumerate(L) if not (cues is not None and _unsung(ln, cues, L[k - 1]["t1"] if k else ln["t0"], L[k + 1]["t0"] if k + 1 < len(L) else ln["t1"]))]
+    for x in info:  # (stems._off_lines; a line no model can time has no regret either, and isn't one of these)
+        x["dropped"] = x["i"] in chained and all(ln["i"] != x["i"] for ln in L)
+    for ln in L:  # a line no model can time beside one, that no chain hears: it can't run across it
+        before, after = lines[ln["i"] - 1] if ln["i"] else None, lines[ln["i"] + 1] if ln["i"] + 1 < len(lines) else None
+        ln["fence"] = (before["t1"] if before and ln["i"] - 1 not in chained and before.get("t1") is not None else None,
+                       after["t0"] if after and ln["i"] + 1 not in chained and after.get("t0") is not None else None)
+    if L:
+        with _lock:
+            dev = dev or _device()
+            c0 = time.perf_counter()
+            try:
+                vocab, blank, delim = {}, {}, {}
+                for g in langs:
+                    vocab[g], blank[g], delim[g] = load(g, dev)[1:4]
+                raw = {g: _song_emissions(g, y16, w16, on_whole, dev) for g in langs}
+            finally:
+                if not KEEP:
+                    unload()
+            tm["emissions"] = time.perf_counter() - c0
+        n = min(len(x) for x in raw.values())
+        raw = {g: x[:n] for g, x in raw.items()}
         c0 = time.perf_counter()
-        try:
-            if MODE == "global" and L:
-                for b in _align_global(primary, y16, L, dev, syl, info):
-                    if other == "en" and not en_ok:
-                        continue  # Latin runs that are not English stay wildcards
-                    _align_block(other, y16, b["t"][0] - 0.2, b["t"][1] + 0.2, L, b["items"], dev, syl, info)
-            else:
-                for k, ln in enumerate(L):
-                    n0 = len(syl)
-                    runs, sc = _align_window(primary, y16, ln["t0"] - MARGIN, ln["t1"] + MARGIN, ln["words"],
-                                             list(range(len(ln["words"]))), dev, syl, ln["i"])
-                    for wi, ra, rb in runs:
-                        _align_window(other, y16, ra - 0.3, rb + 0.3, ln["words"], wi, dev, syl, ln["i"])
-                    info[k].update({"n_aligned": len(syl) - n0, "score": None if sc is None else round(sc, 3)})
-        finally:
-            if not KEEP:
-                unload()
+        r = _align(L, raw, vocab, blank, delim, en_ok, cues, lrc if lrc and len(lrc.get("times") or []) == len(lines) else None)  # (Whisper can give back fewer lines than it was given: the stamps would be other lines')
         tm["align"] = time.perf_counter() - c0
-    syl.sort(key=lambda s: s["t"])
-    for s in syl:
-        s["strength"] = round(strength_of(s), 3)
-    # implausible lines: syllables squeezed together (median gap < SQUEEZED s) or a line torn apart (a gap > TORN s
-    # inside it); on the CSD dev split no line comes near either (median gap >= 0.18 s, largest gap 6.5 s)
+        if r:
+            syl = r[0]
+            at = {x["i"]: x for x in info}
+            for ln, f in zip(L, r[1]):
+                at[ln["i"]]["tok_logp"], at[ln["i"]]["regret"] = (None if f[k] is None else round(f[k], 3) for k in ("logp", "regret"))
+    # A line the chain squeezed into nothing (a voice too soft to hear, a verse this recording doesn't have) has Whisper's words on
+    # the page, if Whisper's line is any longer; the bars go by the chain's, for little. And words of a line no model could time.
     by = {}
     for s in syl:
         by.setdefault(s["line"], []).append(s)
+    squeezed = []
     for li, ss in by.items():
+        lead_ = sorted([s for s in ss if not s["bg"]] or ss, key=lambda s: (s["a"], s["t"]))  # (words in brackets can sit on nothing, the line's not lost for it)
+        if len(lead_) >= 3 and np.median(np.diff([s["t"] for s in lead_])) < SQUEEZED[0]:
+            if float(lines[li]["t1"]) - float(lines[li]["t0"]) >= SHORT_LINE * len(lead_):
+                squeezed += ss
+                by[li] = None
+    syl = [s for li, ss in by.items() if ss for s in ss]
+    for li, ln in enumerate(lines or []):
+        text = unicodedata.normalize("NFC", ln.get("text") or "")
+        have, depth = by.get(li) or [], _bracketed(text)
+        kept = [w for w in _whisper_syllables(ln, li) if not any(s["a"] < w["b"] and w["a"] < s["b"] for s in have)
+                and not (have and (any(depth[w["a"]: w["b"]]) or not any(c.isalnum() for c in w["text"])))]
+        if have:  # in a line a model timed: not past the next line's start
+            later = next((by[n] for n in range(li + 1, len(lines)) if by.get(n)), None)
+            end = min((s["t"] for s in later), default=np.inf) if later else np.inf
+            kept = [w for w in kept if w["t"] <= end]
+            if len(have) > sum(len(_parts(w["text"], "en" if LATIN.search(w["text"]) else "ko")) for w in kept):  # (see PIECE_LIFT)
+                kept = [w for w in kept if sum(s["a"] > w["a"] and s["t"] < w["t"] - PIECE_LIFT[0] for s in have) < PIECE_LIFT[1]]
+        syl += kept
+    order = sorted(syl, key=lambda s: (s["line"], s["a"], s["t"]))
+    if cues is not None:
+        order = refine(order, cues)
+    for prev, s in zip(order, order[1:]):  # (a vowel's start is put a little early, and refine only makes going back dear: the fill goes one way)
+        if s["line"] == prev["line"] and s["t"] < prev["t"]:
+            s["t"] = prev["t"]
+    order = _with_ends(_heads_after_rest(_vowel_starts(order, cue_end), cue_end, lines, {ln["i"]: ln.get("stamp") for ln in L}), cue_end)
+    heard = [s for s in order if s["lang"]]  # the bars go by the syllables a model heard
+    for s in heard:
+        s["strength"] = round(strength_of(s), 3)
+    # implausible lines: syllables squeezed together (median gap < SQUEEZED s) or a line torn apart (a gap > TORN s
+    # inside it); on the CSD dev split no line comes near either (median gap >= 0.18 s, largest gap 6.5 s)
+    for s in squeezed:
+        heard.append({**s, "heard_at": s["t"], "t_end": s["t"], "strength": round(strength_of(s) * SQUEEZED[1], 3), "implausible": True})
+    by = {}
+    for s in heard:
+        by.setdefault(s["line"], []).append(s)
+    at = {x["i"]: x for x in info}
+    for li, ss in by.items():
+        if li in at:
+            at[li]["n_aligned"] = len(ss)
         if len(ss) < 3:
             continue
-        d = np.diff([s["t"] for s in ss])
-        f = SQUEEZED[1] if np.median(d) < SQUEEZED[0] else (TORN[1] if d.max() > TORN[0] else 1.0)
+        cut = [x for x in ss if not x["bg"]] if sum(not x["bg"] for x in ss) >= 3 else ss
+        d = np.diff([s["t"] for s in cut])
+        if ss[0].get("implausible"):
+            f = 1.0
+        else:
+            f = SQUEEZED[1] if min(np.median(d), np.median(np.diff([s.get("heard_at", s["t"]) for s in cut]))) < SQUEEZED[0] else (TORN[1] if d.max() > TORN[0] else 1.0)  # (the chain's times too: refine can spread a squeezed line, and the bars are cut from those)
         if f < 1.0:
             for s in ss:
                 s["strength"] = round(s["strength"] * f, 3)
                 s["implausible"] = True
-            for x in info:
-                if x["i"] == li:
-                    x["implausible"] = True
-    return {"syllables": syl, "onsets": [(s["t"], s["strength"]) for s in syl], "lines": info, "timings": tm,
-            "primary": primary, "device": dev}
+        if li in at and ss[0].get("implausible"):
+            at[li]["implausible"] = True
+    heard.sort(key=lambda s: s["t"])
+    return {"syllables": heard, "onsets": [(s["t"] if s.get("vowel_initial") else s.get("heard_at", s["t"]), s["strength"] if s.get("implausible") or not s.get("vowel_initial") else round(VOWEL_BAR_ODDS * s["strength"] / (1 + (VOWEL_BAR_ODDS - 1) * s["strength"]), 3)) for s in heard], "lines": info, "timings": tm, "primary": primary,
+            "device": dev, "skipped": skipped, "sung": sung_lines(lines or [], order)}

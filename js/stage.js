@@ -20,15 +20,16 @@ function resize() {
   if (cv.height !== Math.round(H * dpr)) cv.height = Math.round(H * dpr);
   // the count-in midway between the note names and the playhead, its four dots (and three gaps of 0.6 of one) inside
   // that stretch with 8 px to spare either side (on a phone, 10 px dots and less to spare)
-  const left = (W - GUT) * HIT, ci = $("#countIn");
+  const left = (W - GUT) * hitShare(), ci = $("#countIn");
   ci.style.setProperty("--mid", Math.round(GUT + left / 2) + "px");
   ci.style.setProperty("--dot", Math.max(10, Math.min(20, Math.floor((left - 16) / 5.8))) + "px");
   // the lyrics over the same stretch, their blur stopping short of the playhead (or it smears it)
   const lc = $("#lyCol"), lb = $("#lyBlur");
   lc.style.left = lb.style.left = GUT + 1 + "px"; lc.style.width = Math.round(left) - 1 + "px"; lb.style.width = Math.round(left) - 2 + "px";
+  lc.style.setProperty("--ly", Math.max(15, Math.floor(Math.min((left - 37) / 19, H / 20))) + "px"); // a row of 19 em, what it holds today at full width; the rows must fit the plot too
   K.lyAt = null;
 }
-new ResizeObserver(resize).observe(cv);
+new ResizeObserver(() => { resize(); if (K.on && view === "practice") practiceFrame(); }).observe(cv);
 readColors();
 
 // accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked from the
@@ -59,13 +60,15 @@ function rr(x, y, w, h, r) {
 let vLo = 50, vHi = 64;
 const GUT = 48; // the note names' column; they start 16 px in, under the stage's head line
 const HIT = 0.24; // where the playhead line is, as a share of the width right of the note names
+// with lyrics, more of it for the words: a third, at least 360 px, at most 60% (the bars still show 4.4 s)
+const hitShare = () => (K.lyrics ? Math.min(0.6, Math.max(0.33, 360 / (W - GUT))) : HIT);
 // now: song time at the hit line; cur: your pitch; hist: your recent pitch; evs: the bars; guide: the original singer's
 // pitch line ({pts, shift})
 function draw(now, cur, hist, evs, guide) {
   const key = playedKey(guide.shift); // the note names' spelling
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = C.surface; g.fillRect(0, 0, W, H);
-  const hitX = Math.round(GUT + (W - GUT) * HIT), pps = (W - hitX) / 4.4;
+  const hitX = Math.round(GUT + (W - GUT) * hitShare()), pps = (W - hitX) / 4.4;
   const X = (t) => hitX + (t - now) * pps;
   const top = 8, bot = H - 8, ppS = (bot - top) / (vHi - vLo), Y = (m) => bot - (m - vLo) * ppS;
 
@@ -97,8 +100,7 @@ function draw(now, cur, hist, evs, guide) {
     const edge = active ? C.ink : C.muted;
     const y = Y(e.midi) - bh / 2, w = Math.max(4, x1 - x0 - 2);
     rr(x0, y, w, bh, 6);
-    g.fillStyle = C["surface-2"]; g.fill();
-    rr(x0, y, w, bh, 6);
+    g.fillStyle = C["surface-2"]; g.fill(); // (the path stays: the stroke draws the same one)
     g.lineWidth = active ? 2 : 1.25;
     g.strokeStyle = edge;
     g.stroke();
@@ -111,8 +113,10 @@ function draw(now, cur, hist, evs, guide) {
   if (guide && guide.pts.length) {
     const t0 = now - (hitX - GUT) / pps - 0.1, t1 = now + (W - hitX) / pps + 0.1;
     g.beginPath(); let gp = false;
-    for (const [t, m] of guide.pts) {
-      if (t < t0) continue;
+    let lo = 0, hi = guide.pts.length; // the first point from t0 on: they're in time order (melody.py build, stems.py _splice)
+    while (lo < hi) { const c = (lo + hi) >> 1; if (guide.pts[c][0] < t0) lo = c + 1; else hi = c; }
+    for (let j = lo; j < guide.pts.length; j++) {
+      const [t, m] = guide.pts[j];
       if (t > t1) break;
       if (m == null) { gp = false; continue; }
       const x = X(t), y = Y(m + guide.shift);
@@ -136,7 +140,7 @@ function draw(now, cur, hist, evs, guide) {
   if (K.lyrics) {
     const a = GUT + 1;
     g.fillStyle = C.surface;
-    for (let x = a; x < hitX; x += 2) { g.globalAlpha = 0.92 - 0.57 * ((x - a) / (hitX - a)) ** 1.5; g.fillRect(x, 0, Math.min(2, hitX - x), H); }
+    for (let x = a; x < hitX; x += 2) { g.globalAlpha = 0.92 - 0.57 * ((x - a) / (hitX - a)) ** 3; g.fillRect(x, 0, Math.min(2, hitX - x), H); }
     g.globalAlpha = 1;
   }
   // while counting in, what's on the stretch already sung (where the count-in stands) fades back behind its lanes, so
@@ -151,6 +155,8 @@ function draw(now, cur, hist, evs, guide) {
     g.restore();
   }
 
+  const put = K.tick && K.tick.m === K.song && performance.now() < K.tick.until ? X(K.tick.t) : 0; // where a line was just put (jumpLine)
+  if (put > GUT) { g.fillStyle = C.voice; g.fillRect(Math.round(put) - 1, 0, 2, H); }
   // hit line
   g.fillStyle = C.ink; g.globalAlpha = 0.75; g.fillRect(hitX - 1, 0, 2, H); g.globalAlpha = 1;
   if (cur != null) {
@@ -164,9 +170,9 @@ function draw(now, cur, hist, evs, guide) {
 // the page, mostly in your colour with a neighbouring hue or two in it. AUR.n bands from 60 Hz to 8 kHz, low on the
 // left; each swells and sinks back slowly, its curtain swaying a little, faint enough to stay out of the way. Drawn into a 64 × 40 canvas that CSS
 // stretches across the window and blurs, so it costs next to nothing; off with reduced motion, and outside Practice.
-const AUR = { n: 28, lv: new Float32Array(28), cv: $("#aurora"), fft: null, voice: "", hues: [] };
+const AUR = { n: 28, lv: new Float32Array(28), cv: $("#aurora"), fft: null, voice: "", hues: [], still: matchMedia("(prefers-reduced-motion: reduce)") };
 function drawAurora() {
-  const on = K.on && view === "practice" && !!bandTap && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const on = K.on && view === "practice" && !!bandTap && !AUR.still.matches; // (matches is live: no new list a frame)
   AUR.cv.classList.toggle("on", on);
   if (!on) return;
   const a = AUR, fft = a.fft || (a.fft = new Uint8Array(bandTap.frequencyBinCount)), hz = ac.sampleRate / bandTap.fftSize;
@@ -234,6 +240,7 @@ function loop() {
     if (level > S.gate) { const r = yin(tbuf, ac.sampleRate); if (r && r.f > 60 && r.f < 1500) m = 69 + 12 * Math.log2(r.f / A4); }
   } else level = 0;
   reading(m);
+  if (view === "voice") voiceFrame();
   drawSpectrum(); // the mic chip is in the header on every page
   paintGate();
   if (K.on && view === "practice") practiceFrame();
@@ -254,11 +261,12 @@ function practiceFrame() {
   draw(heard, cur, K.hist, K.evs, { pts: K.contour, shift: P.key });
   setText("kTime", `${fmtTime(Math.max(0, heard))} / ${fmtTime(songDur())}`);
   renderHud(heard, cur); renderCountIn(heard); renderLyric(); renderLyrics(heard);
+  if (ED.on) edHead();
 }
 // While a take plays, the stage follows it: the bars in the key and octave it was sung in, where it is in the song, and
 // the line you sang, drawn as it goes, the dot where it is now (compared too: the original is in the other ear).
 function takeFrame(tp) {
-  const tk = tp.take, sp = tk.speed || 1, gone = tp.pos + Math.max(0, ac.currentTime - heardLag() - tp.at); // as heard
+  const tk = tp.take, sp = tk.speed || 1, gone = tp.pos + Math.max(0, heardClock() - tp.at); // as heard
   const now = tk.start + gone * sp, sh = (tk.oct || 0) * 12 + (tk.key || 0);
   if (!tp.evs) tp.evs = K.notes.map(([t0, t1, m]) => ({ kind: "note", midi: m + sh, midi2: null, root: 60, t0, t1 }));
   const hist = [];
@@ -266,11 +274,16 @@ function takeFrame(tp) {
   if (tp.pitch) for (const [t, m] of tp.pitch) { const at = tk.start + (t + takeSync(tk)) * sp; if (at > now) break; if (at >= now - 6) hist.push({ t: at, m: m == null ? m : m - a4sh }); }
   const last = hist[hist.length - 1], cur = last && now - last.t < 0.1 ? last.m : null;
   songView();
-  draw(now, cur, hist, tp.evs, { pts: K.contour, shift: sh });
-  setText("kTime", `${fmtTime(now)} / ${fmtTime(songDur())}`);
-  renderHud(now, cur); renderLyric();
+  const d = sh - P.key; vLo += d; vHi += d; draw(now, cur, hist, tp.evs, { pts: K.contour, shift: sh }); vLo -= d; vHi -= d; // the view on the take's key, not the song's as it plays now
+  stripHead(now); setText("kTime", `${fmtTime(now)} / ${fmtTime(songDur())}`);
+  const evs = K.evs; K.evs = tp.evs; renderHud(now, cur); K.evs = evs; renderLyric(); // the keyboard in the take's key
+  if (K.lyrics) { // the lines follow the take too
+    if (!K.loop) { const at = K.phrases.findIndex((p) => now < p.to); K.ph = at < 0 ? null : at; paintPhrases(); }
+    K.lyRow = null; K.ln = lineShown(now, true); renderLyrics(now);
+    stripHead(now);
+  }
   setText("hudRep", tr(tp.mode !== "compare" ? "Playing a take" : "Comparing with the original"));
-  $("#countIn").hidden = true; K.counting = false;
+  if (!$("#countIn").hidden) $("#countIn").hidden = true; K.counting = false;
 }
 // The mic chip's spectrum: 7 bands from 90 Hz to 4 kHz, where a voice's energy is, spaced evenly in pitch. Each bar is
 // as tall as the loudest bin in its band (-95 dB flat … -35 dB full), rising at once and falling back gently.

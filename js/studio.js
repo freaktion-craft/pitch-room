@@ -110,8 +110,17 @@ function stageTime() { return P.playing ? Math.min(songDur(), P.offset + (ac.cur
 // video) follows what's heard; what's played and recorded keeps the audio clock. A start doesn't step the drawing back
 // first: it holds where it was shown (P.shownFrom, set by playSong) until what's heard gets there.
 function heardLag() { return ac ? Math.max(0, (ac.baseLatency || 0) + (ac.outputLatency || 0) + limitDelay) : 0; }
-function heardPos() { return P.playing ? Math.max(P.shownFrom ?? 0, songPos() - heardLag() * P.rate) : songPos(); }
-function heardStage() { return P.playing ? Math.max(P.shownFrom ?? -Infinity, stageTime() - heardLag() * P.rate) : stageTime(); }
+// The moment of the audio clock being heard right now. That clock moves in steps of about 10 ms, and what's drawn from it
+// steps with it; the output's own timestamp, read against the page's clock, runs smooth (and agrees with heardLag to about
+// 2 ms).
+function heardClock() {
+  const plain = ac.currentTime - heardLag(), ts = ac.getOutputTimestamp ? ac.getOutputTimestamp() : null;
+  if (!ts || !ts.contextTime || !ts.performanceTime) return plain;
+  const t = ts.contextTime + (performance.now() - ts.performanceTime) / 1000 - limitDelay;
+  return Math.abs(t - plain) < 0.1 ? t : plain; // (just after a change of output, it can say anything)
+}
+function heardPos() { return P.playing ? Math.max(P.shownFrom ?? 0, Math.min(songDur(), P.offset + (heardClock() - P.startAt) * P.rate)) : songPos(); }
+function heardStage() { return P.playing ? Math.max(P.shownFrom ?? -Infinity, Math.min(songDur(), P.offset + (heardClock() - P.startAt) * P.rate)) : stageTime(); }
 // Your voice is read later than it's sung: the mic's own latency, the pitch tracker's window (it hears the middle of its
 // last fftSize samples) and the median over the last few readings (about two frames). A reading stands for this long ago.
 let frameDt = 1 / 60; // s between frames, measured (loop)
@@ -178,7 +187,7 @@ function playSong() {
     P.tracks[name].gain = g; P.sources.push(s);
   }
   const cg = ac.createGain(); cg.gain.value = audible("click") ? P.tracks.click.vol : 0; cg.connect(P.ears.click.in); P.tracks.click.gain = cg;
-  P.startAt = at; P.playing = true; renderStart();
+  P.startAt = at; P.playing = true; renderStart(); sayPlaying();
   applyGains(); // muted tracks' kept parts, from here
   recBegin(at);
   const beats = P.song.beats || []; P.clickNext = beats.findIndex((b) => b >= P.offset); if (P.clickNext < 0) P.clickNext = beats.length;
@@ -249,6 +258,9 @@ function stemsTick() {
   if (pos >= songDur() - 0.02) { pauseSong(); P.offset = songDur(); }
 }
 setInterval(stemsTick, 50);
+// Upgrades wait while a song plays (stems.singing), in any tab; a page closed or paused stops saying so.
+function sayPlaying() { if (P.playing || (T.play && T.play.srcs) || TS.playing || syncBusy) fetch("/api/jobs/singing", { method: "POST" }).catch(() => {}); }
+setInterval(sayPlaying, 5000);
 
 // The waveform's bars: the whole mix, and each track on the same scale (shown in its colour while it's soloed).
 function computePeaks() {
@@ -603,7 +615,7 @@ function applyKey(n, s) {
   P.key = n; P.rate = s;
   P.buffers = Object.fromEntries(Object.entries(P.orig).map(([k, b]) => [k, bufs[k] || b]));
   if (P.playing) swapSources(was);
-  if (K.on && K.song === P.song) songEvs();
+  if (K.on && K.song?.id === P.song?.id) songEvs();
   labelKeys(); // the keyboard's names, as the key now has them
   if (s !== was) renderTracks(); // the metronome's tempo, as played now
   paintKey();
@@ -885,7 +897,7 @@ function initStems() {
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
   $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
   // text buttons with an icon in front of the label
-  [["#sAddBtn", "plus"], ["#sBack", "back"], ["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
+  [["#sAddBtn", "plus"], ["#jobsAddBtn", "plus"], ["#sUpdate", "retry"],["#sBack", "back"], ["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
     ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   $("#pSave").onclick = saveMix;
   document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page

@@ -64,6 +64,21 @@ let libDrawnNow;
 const libDrawn = new Promise((res) => { libDrawnNow = res; });
 async function renderLibrary() {
   try { await drawLibrary(); } finally { libDrawnNow(); }
+  paintUpdate();
+}
+// Update, right of the search: there while songs wait to be timed again by an update (stems.update_state), after "Later" at
+// launch or with songs that couldn't be done; gone while it runs (the songs being done show it in the list). Asked at most
+// every few seconds, with the list.
+let updateAsked = 0;
+async function paintUpdate(force) {
+  if (!force && performance.now() - updateAsked < 3000) return;
+  updateAsked = performance.now();
+  const b = $("#sUpdate");
+  let u = null;
+  try { u = await (await fetch("/api/upgrades", { cache: "no-store" })).json(); } catch (e) { u = null; }
+  b.hidden = !u || !u.songs || u.running;
+  if (!b.hidden) say(b, u.songs === 1 ? "Re-time your song with the new lyrics and melody timing, about a minute, in the background"
+    : "Re-time {n} songs with the new lyrics and melody timing, about {m} min, in the background", { n: u.songs, m: u.min }, "title");
 }
 // The first drawing is from what came with the page (SAVED_LIB), at once, before the page is first shown; a reload
 // then shows the list as it was rather than an empty page filling in. Later ones ask the server.

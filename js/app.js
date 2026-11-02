@@ -49,27 +49,29 @@ function notice(msg) {
   clearTimeout(notice.timer); notice.timer = setTimeout(() => { box.hidden = true; }, 4000);
 }
 
-// keyboard
+// keyboards: Practice's, and the one on Chest & head voice
 const KEY_LO = 36, KEY_HI = 84, KW = 26;
-const keyEls = new Map();
-const labelKeys = () => keyEls.forEach((b, m) => b.setAttribute("aria-label", absName(m)));
-(function buildKeys() {
-  const box = $("#keys"); let wi = 0;
+const keyEls = new Map(), vcKeyEls = new Map();
+const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
+function buildKeys(box, keyEls, onPress = playKey) {
+  let wi = 0;
   for (let m = KEY_LO; m <= KEY_HI; m++) {
     const b = document.createElement("button"); b.type = "button";
     const black = BLACK.has(pc(m));
     b.className = "key " + (black ? "b" : "w");
     if (black) b.style.left = (wi * (KW - 1) - 8) + "px";
     else { if (pc(m) === 0) b.textContent = "C" + oct(m); wi++; }
-    // held down: a class rather than :active, so Enter and Space show it too and it ends when the pointer slides off
+    // held down: a class rather than :active, so Enter and Space show it too and it ends when the pointer slides off. Held and
+    // slid across the keys, each plays as it's reached, a glissando (a touch isn't kept by the key it started on, so it can slide)
     const up = () => b.classList.remove("down");
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); b.classList.add("down"); playKey(m); });
+    b.addEventListener("pointerdown", (e) => { e.preventDefault(); if (b.hasPointerCapture(e.pointerId)) b.releasePointerCapture(e.pointerId); b.classList.add("down"); onPress(m); });
+    b.addEventListener("pointerenter", (e) => { if (e.buttons & 1) { b.classList.add("down"); onPress(m); } });
     for (const ev of ["pointerup", "pointerleave", "pointercancel", "keyup", "blur"]) b.addEventListener(ev, up);
-    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); b.classList.add("down"); playKey(m); } });
+    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); b.classList.add("down"); onPress(m); } });
     box.append(b); keyEls.set(m, b);
   }
-  labelKeys();
-})();
+}
+buildKeys($("#keys"), keyEls); buildKeys($("#vcKeys"), vcKeyEls, (m) => vcStart(m)); labelKeys();
 let kGuide = null, kLive = null;
 function renderKeys(tm, m) {
   const gN = tm, lN = m != null ? Math.round(m) : null;
@@ -97,7 +99,7 @@ function stemsRoute(sub, extra) {
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
   if (stemsPage === "song" && (!P.song || P.song.id !== sub || P.song.stale)) openSongById(sub);
-  else if (stemsPage === "song") renderTracks(); // the mix as it was before Practice
+  else if (stemsPage === "song") { const c = libCache.get(sub); if (c) { P.song.title = c.title; P.song.artist = c.artist; $("#pTitle").textContent = c.title; } renderTracks(); } // the mix as it was before Practice; the name as found since
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
 // The song as the library list last read it opens at once, so its page appears whole. Otherwise (a reload, a link,
@@ -112,21 +114,22 @@ async function openSongById(id) {
   if (m) { openSong(m); $("#sPlayer").hidden = false; } else location.replace("#stems");
 }
 // #stems… for the library and its pages, #practice for Practice, which needs its song open, so a reload there (or
-// an old link to a page that's gone) lands in the library.
+// an old link to a page that's gone) lands in the library; #voice for Chest & head voice.
 function route() {
   const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
   const singing = v === "practice" && K.on && P.song && K.song.id === P.song.id;
-  if (v !== "stems" && !singing) { location.replace("#stems"); return; }
+  if (v !== "stems" && v !== "voice" && !singing) { location.replace("#stems"); return; }
   const was = view;
   view = v;
   if (was === "practice" && view !== "practice" && K.studio) { // the Studio's mix, as it was before Practice
     if (P.song && K.song && K.song.id === P.song.id) { applyMix(K.studio); applyGains(); }
     K.studio = null;
   }
-  $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems";
+  $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems"; $("#vVoice").hidden = view !== "voice";
+  $("#voiceBtn").classList.toggle("on", view === "voice");
   showMicSet(false); showEars(false); showSync(false);
   applyEars(); // the headphones' ears are Practice's
-  if (view !== "practice") { recOff(); listenStop(); } // takes are recorded and played in Practice only
+  if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra);
   pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
@@ -141,6 +144,7 @@ function route() {
     paintTakesShown(); resize(); centerKeys();
     if (K.on) practiceFrame();
   }
+  if (view === "voice") voiceShow();
   window.scrollTo(0, 0);
   paintFade();
 }
@@ -156,11 +160,36 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const RISE_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 const rise = (node, delay, dy = 8, blur = 8) => node && node.animate([{ opacity: 0, transform: `translateY(${dy}px)`, filter: `blur(${blur}px)` },
   { opacity: 1, transform: "none", filter: "blur(0)" }], { duration: 640, delay, easing: RISE_EASE, fill: "backwards" });
+// An update that would time every song again waits for a yes (stems.update_offer), asked before the bar: "Later" leaves each
+// song to be worked out again when it's opened. Escape is "Later".
+function askUpdate() {
+  const root = document.documentElement, u = SAVED_UPDATE;
+  say($("#bootAskP"), u.songs === 1 ? "Lyrics and melody timing got better. Re-timing your song takes about a minute, in the background."
+    : "Lyrics and melody timing got better. Re-timing {n} songs takes about {m} min, in the background.", { n: u.songs, m: u.min });
+  return new Promise((done) => {
+    const answer = (now) => {
+      fetch("/api/upgrades", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ now }) }).catch(() => {}).then(() => paintUpdate(true)); // ("Later": the library's Update stays for it)
+      removeEventListener("keydown", esc, true); root.classList.remove("asking"); done();
+    };
+    const esc = (e) => { if (e.key === "Escape") { e.preventDefault(); answer(false); } };
+    addEventListener("keydown", esc, true);
+    $("#bootNow").onclick = () => answer(true); $("#bootLater").onclick = () => answer(false);
+    $("#bootNow").focus();
+  });
+}
+// The library's Update (paintUpdate): the same, any time after
+$("#sUpdate").onclick = async () => {
+  $("#sUpdate").hidden = true;
+  await fetch("/api/upgrades", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ now: true }) }).catch(() => {});
+  renderLibrary(); // the songs being done, each with its progress
+};
 async function boot() {
   const root = document.documentElement;
+  let from = 0; // the bar's sweep is timed from when it shows
+  if (root.classList.contains("asking")) { await askUpdate(); from = performance.now(); }
   if (!root.classList.contains("booting")) return;
   await Promise.race([Promise.all([libDrawn, document.fonts.ready]), sleep(5000)]);
-  await sleep(BOOT_MIN - performance.now());
+  await sleep(BOOT_MIN - (performance.now() - from));
   await $("#boot").animate([{ opacity: 1, filter: "blur(0)" }, { opacity: 0, filter: "blur(4px)" }], { duration: 240, easing: "ease-out", fill: "forwards" }).finished;
   root.classList.remove("booting");
   $("#boot").getAnimations().forEach((a) => a.cancel());
@@ -195,9 +224,10 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (view === "practice" && K.on) {
-    if (e.repeat && e.code === "Space") { e.preventDefault(); return; }
+    if (e.repeat && /^(Space|KeyL|KeyR|KeyM)$/.test(e.code)) { e.preventDefault(); return; }
     const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
-      Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null }[e.code];
+      Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: !e.repeat ? () => dropNote(e) : null,
+      BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }
   }
 });
@@ -256,5 +286,5 @@ function setLang(v) {
   if (infoShown) drawInfo();
 }
 
-renderMic(); initStems(); initSing(); initLang(); route(); boot();
+renderMic(); initStems(); initSing(); initVoice(); initLang(); route(); boot();
 requestAnimationFrame(() => { resize(); loop(); });

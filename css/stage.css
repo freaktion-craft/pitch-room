@@ -11,15 +11,15 @@
 .stage-head .legend i { width: 16px; height: 2px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--muted) 45%, var(--surface)); } /* as drawn */
 .stage-head .legend i.you { height: 3px; border-radius: var(--radius-pill); background: var(--voice); }
 /* the head's left: what Practice is doing, then (while there are no lyrics) what finding them says */
-.sh-left { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.sh-left { flex: 1 1 180px; display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
 .sh-left .rep { flex: none; }
 .ly-note { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--faint); }
 .ly-note:empty { display: none; }
 .ly-note a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .plot { position: relative; flex: 1; min-height: 0; }
 .plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-/* the lyrics in the stretch already sung (left of the playhead), as Apple Music shows them: the phrase being sung in
-   the middle, filled in as it's sung, the next ones under it, the one before over it; a line up at a time */
+/* the lyrics in the stretch already sung (left of the playhead), as Apple Music shows them: the phrase being sung
+   a little above the middle, filled in as it's sung, the next ones under it, the one before over it; a line up at a time */
 .lycol { position: absolute; top: 0; bottom: 0; overflow: hidden; pointer-events: none;
   -webkit-mask: linear-gradient(transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(transparent, #000 12%, #000 88%, transparent); }
 .lycol[hidden], .lyblur[hidden] { display: none; }
@@ -29,13 +29,27 @@
 .lyblur i { position: absolute; inset: 0; -webkit-backdrop-filter: blur(var(--b)); backdrop-filter: blur(var(--b));
   -webkit-mask: linear-gradient(to left, transparent var(--s), #000 calc(var(--s) + 20%)); mask: linear-gradient(to left, transparent var(--s), #000 calc(var(--s) + 20%)); }
 .lylist { padding: 0 var(--space-4) 0 var(--space-5); transition: transform var(--duration-slowest) var(--ease); }
-.lylist p { margin: 0 0 var(--space-3); font-size: var(--text-lg); line-height: 24px; font-weight: var(--weight-semibold); word-break: keep-all; color: var(--ink); opacity: 0;
-  transition: opacity var(--duration-slower); }
+.lylist p { margin: 0 0 0.8em; font-size: var(--ly, var(--text-lg)); line-height: 1.6; font-weight: var(--weight-semibold); word-break: keep-all; overflow-wrap: anywhere;
+  text-wrap: pretty; color: var(--ink); opacity: 0; transition: opacity var(--duration-slower); }
+.lylist p:not(:has(br)) { text-wrap: balance; } /* even rows; with a <br> it keeps pretty, which still avoids a lone last word */
+.lylist .cl { display: inline-block; font-style: normal; } /* a clause (lySeams): a row breaks between them first */
 .lylist p.now { opacity: 1; }
-.lylist p.now span { background: linear-gradient(90deg, var(--voice) var(--p, 0%), var(--ink) var(--p, 0%)); -webkit-background-clip: text;
+/* filled as it's sung, a soft edge running through the word (renderLyrics: --p, past either end of it when it's not on
+   it); the line before keeps its fill, so it doesn't flash back to plain as it leaves, and stays lit while it's still
+   being sung */
+@supports (color: oklch(from red l c h)) { .lylist { --sung: oklch(from var(--voice) min(l, 0.72) c h); } } /* the edge you follow: a pale accent goes deeper, or it hardly shows against the ink */
+.lylist p:is(.now, .b1) span { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
-.lylist p.n1 { opacity: 0.4; }
-.lylist p.n2, .lylist p.b1 { opacity: 0.2; }
+.lylist p.n1 { opacity: 0.55; } /* 5.3:1, read without effort like --muted */
+.lylist p.n1.soon { opacity: 0.8; } /* its turn is coming: time to read it */
+.lylist p.n2 { opacity: 0.35; }
+.lylist p.b1 { opacity: 0.2; }
+.lylist p.b1.live { opacity: 1; transition: none; }
+/* backing vocals, in brackets in the lyrics: smaller, quieter, still filled as they're heard */
+.lylist .bg { --un: var(--muted); font-size: 0.85em; font-weight: var(--weight-medium); color: var(--muted); }
+/* a syllable held a long time: a glow that grows as it's held (the letters stay still) */
+.lylist span { transition: filter var(--duration-slow); } /* let go of, it fades */
+.lylist .held { transition: none; filter: drop-shadow(0 0 calc(var(--g, 0) * 7px) color-mix(in oklab, var(--voice) 70%, transparent)); }
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
    drawn there during an intro or break, while the coming bars arrive from the right */
@@ -45,13 +59,14 @@
 .countin { --dot: 20px; position: absolute; left: var(--mid); top: 50%; width: 0; transform: translateY(-50%); display: flex; flex-direction: column;
   align-items: center; gap: var(--space-2); pointer-events: none; text-align: center; }
 /* with lyrics, a line of them (renderLyrics): smaller, at their left edge, over the line it counts into; once counted,
-   it goes up and out with the lines sung */
+   it fades where it stands */
 .lylist .countin { position: static; width: auto; transform: none; align-items: flex-start; text-align: left; margin: 0 0 var(--space-3);
   transition: opacity var(--duration-slower); }
 .lylist .countin .dots { --dot: 10px; }
 .lylist .countin.past { opacity: 0; }
-.lylist .countin.next { opacity: 0.4; } /* before its turn, as the next line is */
+.lylist .countin.next { opacity: 0.55; } /* before its turn, as the next line is */
 .countin .lbl:empty { display: none; }
+.lylist .countin .lbl:empty { display: block; height: 20px; } /* its row kept: a label coming or going mustn't move the line under it */
 .countin span { font-size: var(--text-sm); line-height: 20px; color: var(--muted); white-space: nowrap; }
 .countin .dots { display: flex; gap: calc(var(--dot) * 0.6); height: var(--dot); }
 .countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--ink); transition: opacity var(--duration-fast); }
