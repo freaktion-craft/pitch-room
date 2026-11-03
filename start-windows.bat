@@ -1,5 +1,5 @@
 @echo off
-rem Stem - Windows: double-click to start. First run sets up Python packages (1-2 min).
+rem Pitchroom - Windows: double-click to start. First run sets up Python packages (1-2 min).
 chcp 65001 >nul
 cd /d "%~dp0"
 
@@ -17,8 +17,8 @@ if defined PY (
   goto run
 )
 
-rem No Python 3.9+ on this PC: uv (astral.sh) fetches one for Stem alone, into .tools; nothing outside this folder changes
-echo First run: Python isn't installed, so Stem fetches its own copy (about 40 MB, once)...
+rem No Python 3.9+ on this PC: uv (astral.sh) fetches one for Pitchroom alone, into .tools; nothing outside this folder changes
+echo First run: Python isn't installed, so Pitchroom fetches its own copy (about 40 MB, once)...
 set "UV_PYTHON_INSTALL_DIR=%CD%\.tools\python"
 set "UV_CACHE_DIR=%CD%\.tools\cache"
 if not exist ".tools\uv.exe" powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; $a = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64' } else { 'x86_64' }; Invoke-WebRequest \"https://github.com/astral-sh/uv/releases/download/0.12.24/uv-$a-pc-windows-msvc.zip\" -OutFile .tools-uv.zip; Expand-Archive .tools-uv.zip .tools -Force; Remove-Item .tools-uv.zip"

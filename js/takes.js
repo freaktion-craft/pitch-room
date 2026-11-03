@@ -142,7 +142,7 @@ function recTick(sn) {
   if (R.sec && R.cap && P.playing && sn >= R.sec.end - 0.05) { R.sec = null; pauseSong(); recOff(); }
 }
 
-// ---------- the delay, measured (Sync settings, in the Library) ----------
+// ---------- the delay, measured (Sync, in Practice beside Record, and in the settings) ----------
 // recLatency knows only the delays the browser reports. Whatever else lies between the band and a take (a DAW's
 // buffers, a loopback driver, the air from headphones to the mic) is measured here: CLICKS played as the band is (into
 // master, so through the limiter too), heard by the mic and recorded as a take is. How late they come back, less the
@@ -217,50 +217,49 @@ function findClicks(chunks, from, sr, click) {
   if (near.length < 5) throw new Error("The clicks came back unevenly. Keep quiet and try again.");
   return near.reduce((a, b) => a + b, 0) / near.length;
 }
-// The panel: what new takes allow for, from the input chosen (the browser's part as it reports it now, and the part
-// measured, when and on what), Measure, and Forget. msg: a word under it (English, with vars; "" for none, undefined to
-// leave it as it is).
-function paintSync(msg, err, vars) {
+// Sync, in Practice beside Record and in the settings under the input: what new takes allow for, from the input
+// chosen; a press measures it. In Practice's tooltip the browser's part as it reports it now and the part measured,
+// when and on what, and how to measure (the settings' delay has the parts in its own). syncErr: a measurement that
+// didn't work (English), said on both in red until the next.
+let syncErr = "";
+function paintSync() {
   if (!ac) return;
   const m = syncExtras[syncKey()], b = inMs(browserLatency(micStream && micStream.getAudioTracks()[0]));
-  const now = $("#syncNow");
-  if (m) say(now, "Now: {t} ms (browser {b} + measured {e})", { t: Math.max(0, Math.min(1000, b + inMs(m.s))), b, e: keySign(inMs(m.s)) });
-  else say(now, "Now: {b} ms (browser only)", { b });
-  now.title = m ? `${m.label || tr("System default")} · ${longDate(new Date(m.at))}` : ""; // where and when it was measured
-  const go = $("#syncGo");
-  go.disabled = syncBusy; say(go, syncBusy ? "Measuring…" : m ? "Measure again" : "Measure");
-  $("#syncForget").hidden = !m || syncBusy;
-  if (msg !== undefined) { const p = $("#syncMsg"); p.hidden = !msg; say(p, msg, vars); p.classList.toggle("err", !!err); }
+  const t = m ? Math.max(0, Math.min(1000, b + inMs(m.s))) : b;
+  const parts = m ? ["Browser {b} ms + measured {e} ms · {on} · {when}", { b, e: keySign(inMs(m.s)), on: m.label || tr("System default"), when: longDate(new Date(m.at)) }]
+    : ["The browser’s {b} ms only: not measured yet", { b }];
+  const go = $("#syncGo"), now = $("#syncNow");
+  go.disabled = syncBusy; go.classList.toggle("err", !!syncErr && !syncBusy);
+  if (syncBusy) say(now, "Listening…");
+  else if (syncErr) say(now, "Couldn’t measure");
+  else say(now, "{t} ms", { t });
+  if (syncErr) say(go, "{why} Press to try again.", { why: tr(syncErr) }, "title");
+  else if (m) say(go, "Sync: browser {b} ms + measured {e} ms · {on} · {when}. Hold your headphones close to the mic and press to measure again.", parts[1], "title");
+  else say(go, "Sync: the browser’s {b} ms only, not measured yet. Hold your headphones close to the mic and press to measure.", { b }, "title");
+  // the settings' row: the delay, Measure, and what went wrong in its line under Sync
+  const sNow = $("#setSyncNow"), sGo = $("#setSyncGo"), why = $("#setSyncWhy");
+  say(sNow, syncBusy ? "Listening…" : "{t} ms", { t }); say(sNow, parts[0], parts[1], "title");
+  sGo.disabled = syncBusy; say(sGo, syncBusy ? "Measuring…" : "Measure");
+  if (syncErr && !syncBusy) say(why, syncErr); else say(why, "How late your voice reaches the app; new takes allow for it");
+  why.classList.toggle("err", !!syncErr && !syncBusy);
 }
 async function runSync() {
   if (syncBusy) return;
-  syncBusy = true; paintSync("Listening…");
-  pauseSong(); listenStop(); tsStop(); // nothing else playing while it listens
+  syncBusy = true; syncErr = ""; paintSync();
+  pauseSong(); listenStop(); tsStop(); hearMe(false); // nothing else playing while it listens (the mic back in your ears neither)
   try {
     const r = await measureDelay();
     syncExtras = { ...syncExtras, [syncKey()]: { s: Math.round(Math.max(-1, Math.min(1, r.s - r.browser)) * 1e4) / 1e4, label: r.label, at: Date.now() } };
     store.set("syncExtra", syncExtras);
-    syncBusy = false; paintSync("Measured {t} ms. New takes use it.", false, { t: inMs(r.s) });
-  } catch (e) { syncBusy = false; paintSync(e.message, true); }
+  } catch (e) { syncErr = e.message; }
+  syncBusy = false; paintSync();
 }
-function showSync(on) {
-  const pop = $("#syncPop");
-  if (on) {
-    showAdd(false); showMicSet(false); showJobs(false); ensureCtx(); paintSync(syncBusy ? undefined : "");
-    setTimeout(() => { if (!pop.hidden) paintSync(); }, 500); // the sound system's delay, which the browser knows once its audio runs
-  }
-  pop.hidden = !on; $("#syncBtn").setAttribute("aria-expanded", String(on)); pop.parentElement.classList.toggle("open", on);
+// as Practice or the settings open: as it is now
+function openSync() {
+  ensureCtx(); paintSync();
+  setTimeout(() => { if (view === "practice" || view === "settings") paintSync(); }, 500); // the sound system's delay, which the browser knows once its audio runs
 }
-function initSync() {
-  const btn = $("#syncBtn"), pop = $("#syncPop");
-  btn.prepend(icon("timer"));
-  btn.onclick = (e) => { e.stopPropagation(); showSync(pop.hidden); };
-  pop.onclick = (e) => e.stopPropagation(); // its buttons don't count as a click outside
-  document.addEventListener("click", () => { if (!pop.hidden) showSync(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showSync(false); btn.focus(); } });
-  $("#syncGo").onclick = runSync;
-  $("#syncForget").onclick = () => { const { [syncKey()]: gone, ...rest } = syncExtras; syncExtras = rest; store.set("syncExtra", syncExtras); paintSync(""); };
-}
+function initSync() { $("#syncGo").prepend(icon("timer")); $("#syncGo").onclick = runSync; $("#setSyncGo").onclick = runSync; }
 
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
 // (play) or paused (at: {id, pos}). mix: how takes sound, played here and downloaded; Your voice works on top of the
@@ -343,8 +342,20 @@ function paintTakesShown() {
   cols.style.setProperty("--out", Math.max(0, Math.min(376, Math.floor(room))) + "px");
 }
 addEventListener("resize", paintTakesShown);
+// Folded, the takes are their head alone (for any song, remembered); there's something to fold once there are takes.
+let takesFolded = !!store.get("takesFolded", false);
+$("#tkFold").append(icon("chevronDown"));
+$("#tkFold").onclick = () => { takesFolded = !takesFolded; store.set("takesFolded", takesFolded); renderTakes(); };
+function paintFold() {
+  const on = takesFolded && T.list.length > 0, f = $("#tkFold");
+  $("#takes").classList.toggle("folded", on);
+  f.hidden = !T.list.length; f.setAttribute("aria-expanded", String(!on));
+  f.title = tr(on ? "Show the takes" : "Hide the takes"); f.setAttribute("aria-label", f.title);
+  $("#tkCount").textContent = T.list.length || "";
+}
 function renderTakes() {
   paintTakesShown();
+  paintFold();
   $("#tkEmpty").hidden = !T.loaded || T.list.length > 0;
   $("#tkMix").hidden = !T.list.length;
   $("#tkStudio").hidden = !T.list.some((t) => !t.saving && !t.failed);
@@ -464,14 +475,14 @@ async function listenTake(t, mode = "take") {
   }
   clearTimeout(slow); takeNote(t.id, null);
   if (T.play !== p) return; // stopped, or another take started, meanwhile
-  const at = ac.currentTime + 0.06, left = t.duration - pos, guide = guideName();
+  const at = ac.currentTime + 0.06, left = t.duration - pos;
   p.bus = ac.createGain(); p.bus.gain.value = stemVol; p.bus.connect(master); // the Studio's volume, as for the song
   p.srcs = [];
   // the band from the take's place in the song (at its tempo), and your voice, from `from` s into the take, at `when`
   const pass = (when, from, gains, withVoice, to = p.bus) => {
     for (const g of Object.values(gains)) g.connect(to);
     for (const [name, buf] of Object.entries(bufs)) {
-      const s = ac.createBufferSource(); s.buffer = buf; s.connect(name === guide ? gains.guide : gains.band); s.start(when, t.start / sp + from, t.duration - from); p.srcs.push(s);
+      const s = ac.createBufferSource(); s.buffer = buf; s.connect(isGuide(name) ? gains.guide : gains.band); s.start(when, t.start / sp + from, t.duration - from); p.srcs.push(s);
     }
     if (withVoice) { const v = ac.createBufferSource(); v.buffer = voice; v.connect(gains.voice); voiceStart(v, when, from, t.duration - from, takeSync(t)); p.srcs.push(v); }
   };

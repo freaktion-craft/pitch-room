@@ -18,7 +18,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://lrclib.net/api"
-AGENT = "Stem (a local singing-practice app)"  # LRCLIB asks apps to name themselves
+AGENT = "Pitchroom (a local singing-practice app)"  # LRCLIB asks apps to name themselves
 WHISPER_MODEL, WHISPER_FILE = "turbo", "large-v3-turbo.pt"  # ≈1.5 GB, in models/
 
 

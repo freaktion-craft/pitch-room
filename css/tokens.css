@@ -1,10 +1,10 @@
-/* Stem's design system: its tokens. The other stylesheets build from them (in this order: base, stage, stems,
+/* Pitchroom's design system: its tokens. The other stylesheets build from them (in this order: base, stage, stems,
    practice; they're split where the page's parts are, the cascade as it was). A literal value left in a rule is either
    drawing (a waveform's line, the piano's keys, the M/S keys' bevel) or an optical correction, and says so.
    Layout: one column, settings as hairline-separated rows. Colours are OKLCH, dark only. */
-/* Geist Serif, for the library's heading in English: one weight, so it's drawn at 400 whatever weight it's set at */
+/* Geist Serif, for the app's name: one weight, so it's drawn at 400 whatever weight it's set at */
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-:root:lang(en) { --font-title: "Geist Serif", var(--font); }
+:root { --font-brand: "Geist Serif", var(--font); } /* the name's in Latin letters in either language */
 :root {
   /* ---- colour: surfaces and ink ---- */
   --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.275 0 0); --hover-2: oklch(0.315 0 0); /* buttons and fields stand clear of the card */
@@ -43,7 +43,6 @@
   /* ---- type: Pretendard throughout, but for the library's heading in English (Geist Serif, above); what was set in
      a monospace (times, levels, M/S) keeps its digits in line with tabular-nums ---- */
   --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-title: var(--font);
   --mono: var(--font);
   --text-2xs: 11px; --text-xs: 12px; --text-sm: 13px; --text-md: 14px; --text-lg: 15px; --text-xl: 18px;
   --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600;
@@ -58,10 +57,12 @@
   --radius-xs: 4px; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px; --radius-xl: 12px; --radius-2xl: 14px; --radius-pill: 999px;
 
   /* ---- depth ---- */
-  --shadow-hairline: 0 0 0 1px var(--line); /* a card's edge */
+  --radius-card: var(--radius-2xl); --pad-card: var(--space-4); /* a card: one corner and one inset for all of them, set off by its tone alone (no edge) */
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2); /* a switch's knob */
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.25); /* a control over a waveform */
-  --shadow-float: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.4); /* a panel, menu or list over the page */
+  /* a panel, menu or list over the page: set off by its tone, not drawn round (a card's hairline, a faint light along
+     its top, a soft shadow close under it) */
+  --shadow-float: 0 0 0 1px var(--line), inset 0 1px 0 var(--fg-6), 0 8px 24px rgba(0, 0, 0, 0.32);
   --gap-float: var(--space-2); /* …and how far it stands off the button that opened it (floatGap() for those placed by script) */
   --z-veil: 15; --z-popover: 20; --z-dropdown: 30; --z-tooltip: 40; --z-modal: 50; --z-boot: 60;
 

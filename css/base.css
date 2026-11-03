@@ -9,13 +9,12 @@ html { overflow-y: scroll; }
 /* Scrollbars: a thin pill of the ink on nothing (the page's own background shows round it), brighter under the
    pointer and while held; no arrows. Where the standard properties are set (a dropdown's list), those win. */
 ::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
-::-webkit-scrollbar-thumb { min-height: 40px; border: 3px solid transparent; border-radius: var(--radius-sm); background: var(--fg-16) padding-box; }
-::-webkit-scrollbar-thumb:hover { background-color: var(--fg-30); }
-::-webkit-scrollbar-thumb:active { background-color: var(--fg-38); }
+::-webkit-scrollbar-thumb { min-height: 40px; border: 4px solid transparent; border-radius: var(--radius-sm); background: var(--fg-8) padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--fg-16); }
+::-webkit-scrollbar-thumb:active { background-color: var(--fg-30); }
 ::-webkit-scrollbar-corner, ::-webkit-scrollbar-track { background: transparent; }
-@supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: var(--fg-16) transparent; } }
+@supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: var(--fg-8) transparent; } }
 body { background: var(--bg); color: var(--ink); font: var(--text-lg)/1.6 var(--font); -webkit-font-smoothing: antialiased; }
-h1.title { font-family: var(--font-title); } /* the library's heading */
 [hidden] { display: none !important; }
 /* Interface text can't be selected (a stray drag highlights nothing); what someone might copy can: song titles and
    facts, messages and errors, the install log, the server notice (it has the address), and fields */
@@ -41,7 +40,7 @@ a { color: inherit; text-decoration: none; }
 
 /* Top bar: app name, then its chips (quiet small buttons): songs being added, the mic, settings */
 header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-18); } /* the chips 8 px apart, as buttons side by side are elsewhere */
-.brand { margin-right: auto; font-size: var(--text-lg); font-weight: var(--weight-medium); }
+.brand { margin-right: auto; font: 400 var(--text-xl)/1 var(--font-brand); letter-spacing: -0.01em; }
 /* The mic chip: a square with the mic struck through while it's off; turned on, it slides open to show the spectrum.
    Both icons share one cell. */
 .btn.quiet.mic { padding: 0 var(--space-2); transition: background-color var(--duration-fast), color var(--duration-fast); }
@@ -67,14 +66,39 @@ header { display: flex; align-items: center; gap: var(--space-2); margin-bottom:
 .mic.on .spec { width: 33px; margin-left: 0; opacity: 1; } /* 7 bars of 3 px, 2 px apart */
 .spec i { flex: none; }
 .spec i { width: 3px; height: 16px; border-radius: var(--radius-pill); background: var(--dim); transform: scaleY(0.15); }
-.mic.on .spec i { background: var(--ink); }
-/* settings (the mic's, note names, colour), under the gear */
+.mic.on .spec i { background: var(--voice); } /* what it hears, in your accent colour */
+/* a panel under the button in the bar that opened it (the songs being added, why the mic didn't start) */
 header { position: relative; }
 .pop { position: absolute; right: 0; top: calc(100% + var(--gap-float)); z-index: var(--z-popover); width: min(340px, calc(100vw - 32px)); padding: var(--space-4); border-radius: var(--radius-xl);
   background: var(--surface); box-shadow: var(--shadow-float); display: grid; gap: var(--space-3); font-size: var(--text-sm); }
 .pop label { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .pop input[type="range"] { width: 140px; }
 .pop .hint { margin: 0; }
+.pop-title { font-size: var(--text-md); font-weight: var(--weight-medium); line-height: 20px; color: var(--ink); } /* a panel's name: one size in all of them */
+/* Settings, a page (#vSettings): groups under their headings, each a card of rows (what it is and what it does at the
+   left, its control at the right) with hairlines between; as wide as reads well */
+/* …beside a list of the groups that stays in view, the one being read lit (initSetNav); a narrow window has the groups alone */
+.set-layout { display: grid; grid-template-columns: 180px minmax(0, 760px); gap: var(--space-8); align-items: start; }
+.set-nav { position: sticky; top: var(--space-6); display: grid; gap: 2px; }
+.set-nav button { height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: none; color: var(--muted);
+  font: var(--text-md)/20px var(--font); text-align: left; cursor: pointer; transition: background-color var(--duration-fast), color var(--duration-fast); }
+.set-nav button:hover { color: var(--ink); }
+.set-nav button[aria-current="true"] { background: var(--fill); color: var(--ink); }
+.set-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+@media (max-width: 720px) { .set-layout { grid-template-columns: minmax(0, 1fr); } .set-nav { display: none; } }
+.settings { display: grid; gap: var(--space-8); }
+.set-group { display: grid; gap: var(--space-3); scroll-margin-top: var(--space-6); }
+.set-group > h2 { margin: 0; }
+.set-list { padding: 0 var(--pad-card); border-radius: var(--radius-card); background: var(--surface); }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); min-height: 68px; padding: var(--space-3) 0; }
+.set-row + .set-row { border-top: 1px solid var(--line); }
+.set-what { display: grid; gap: 2px; min-width: 0; }
+.set-what b { font-weight: var(--weight-regular); font-size: var(--text-md); line-height: 20px; color: var(--ink); }
+.set-what small { font-size: var(--text-sm); line-height: 18px; color: var(--muted); }
+label.set-row { cursor: pointer; }
+.set-what small.err { color: var(--bad); } /* Sync's measurement that didn't work, in its line */
+.set-sync { display: flex; align-items: center; gap: var(--space-3); flex: none; font-variant-numeric: tabular-nums; } /* the delay (its parts in its tooltip), then Measure */
+@media (max-width: 560px) { .set-row:not(.gate-sec) { flex-wrap: wrap; } }
 #micNote { gap: var(--space-1); } /* why the mic didn't start, outside Practice */
 #micNote p { margin: 0; color: var(--muted); }
 /* the input menu keeps one width whatever the inputs are called (a long name ends in …) */
@@ -83,7 +107,7 @@ header { position: relative; }
    on it to drag. Past the line the bar is in your colour: that sound counts as singing; short of it, it's grey. The bar
    lines up with the rows above; the slider reaches half its handle past each end, so the line sits exactly where the
    bar reaches when a sound is just loud enough. */
-.gate-sec { display: grid; gap: var(--space-2); }
+.gate-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
 .gate-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .gate-acts { display: flex; gap: var(--space-2); }
 #hearMe { min-width: 112px; justify-content: center; } /* one width, whichever it says */
@@ -95,16 +119,15 @@ header { position: relative; }
 .gate-meter { position: absolute; left: 0; right: 0; top: 6px; height: 8px; border-radius: var(--radius-pill); background: var(--fg-8); overflow: hidden; }
 .gate-meter i { display: block; height: 100%; width: 0; background: var(--fg-30); }
 .gate-meter i.on { background: var(--voice); }
-.pop .gate input[type="range"] { position: absolute; top: 0; left: -6px; width: calc(100% + 12px); height: 20px; margin: 0; }
+.gate input[type="range"] { position: absolute; top: 0; left: -6px; width: calc(100% + 12px); height: 20px; margin: 0; }
 /* the track as tall as the handle, so the handle's line stands over the bar, its middle on the bar's */
 #gate::-webkit-slider-runnable-track { height: 20px; background: transparent; }
 #gate::-moz-range-track, #gate::-moz-range-progress { height: 20px; background: transparent; }
 #gate::-webkit-slider-thumb { width: 12px; height: 20px; margin-top: 0; border-radius: var(--radius-xs); background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
 #gate::-moz-range-thumb { width: 12px; height: 20px; border-radius: var(--radius-xs); background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
 #gate.hot::-webkit-slider-thumb { background: linear-gradient(90deg, transparent 4px, var(--knob-hot) 4px 8px, transparent 8px); transform: none; }
-/* the accent colour: a row of swatches in the settings, under a hairline, spread across the panel */
-.pop-sec { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--line); line-height: 20px; }
-.swatches { display: flex; justify-content: space-between; margin: 0 calc(var(--space-1) * -1); } /* the dots, not their rings, line up with the rows above */
+/* the accent colour: a row of swatches in the settings, at the right of its row */
+.swatches { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); margin-right: calc(var(--space-1) * -1); } /* the last dot, not its ring, at the rows' right edge */
 .swatch { width: 32px; height: 32px; padding: var(--space-1); border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow var(--duration-fast); }
 /* the picked one: a quiet ring in its own colour, not a bright one that outshines the colours */
 .swatch:hover { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c) 25%, transparent); }
@@ -132,12 +155,11 @@ html.asking .boot-ask { display: grid; }
 html.asking #app { visibility: hidden; }
 html.asking #boot { display: none; }
 /* Page intro: the title, set apart from what follows */
-.intro { display: grid; gap: var(--space-half); margin-bottom: var(--space-4); }
 .group { display: grid; gap: var(--space-3); }
 /* Section titles: they head the content, so they read stronger than it */
 .group-label { font-size: var(--text-lg); font-weight: var(--weight-medium); color: var(--ink); }
 .group-label.minor { font-size: var(--text-md); color: var(--muted); }
-.rows { background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); }
+.rows { background: var(--surface); border-radius: var(--radius-card); }
 .row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 52px; padding: var(--space-2) var(--space-4); flex-wrap: wrap; }
 .row + .row { border-top: 1px solid var(--line); }
 .row > span:first-child { font-size: var(--text-md); }
@@ -228,9 +250,13 @@ input[type="range"]:disabled { opacity: 0.4; }
 .btn.round { border-radius: 50%; }
 .btn.primary { background: var(--ink); color: var(--on-ink); }
 .btn.primary:hover { background: var(--ink-strong); }
+/* in a panel over the page, its main button a step down: the solid ink is for the page's own (Add song) */
+.pop .btn.primary { background: var(--surface-2); color: var(--ink); }
+.pop .btn.primary:hover { background: var(--hover-2); }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
 .btn.quiet:hover { background: var(--fg-8); }
 #voiceBtn.on { background: color-mix(in oklab, var(--voice) 22%, transparent); color: var(--ink); } /* on its page */
+#micSetBtn.on { background: var(--hover-2); color: var(--ink); } /* the gear, on the settings' page */
 .btn.quiet > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .btn.ghost { background: transparent; color: var(--muted); }
 .btn.ghost:hover { background: var(--fill); color: var(--ink); }

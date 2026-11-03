@@ -17,7 +17,7 @@ async function openSong(m) {
   ensureCtx();
   P.song = m; P.offset = 0; P.ph = null; labelKeys();
   $("#pSing").hidden = !m.stems.includes("vocals");
-  $("#pTitle").textContent = m.title;
+  $("#pTitle").textContent = m.title; paintCrumbs();
   paintMeta(); keyOf(m).then(() => { if (P.song === m) { paintMeta(); paintKey(); } });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
@@ -181,8 +181,8 @@ function playSong() {
   const tracks = ac.createGain(); tracks.gain.value = 0; fadeIn(tracks.gain, at); tracks.connect(P.bus);
   P.ears = { band: earNode("band", tracks), guide: earNode("guide", tracks), click: earNode("click", P.bus) }; // which ear each plays in
   for (const [name, buf] of Object.entries(P.buffers)) {
-    const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.ears[name === guideName() ? "guide" : "band"].in);
-    if (name !== guideName()) g.connect(bandTap);
+    const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.ears[isGuide(name) ? "guide" : "band"].in);
+    if (!isGuide(name)) g.connect(bandTap);
     const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(at, P.offset / P.rate); // song time → its time in this version
     P.tracks[name].gain = g; P.sources.push(s);
   }
@@ -897,7 +897,7 @@ function initStems() {
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
   $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
   // text buttons with an icon in front of the label
-  [["#sAddBtn", "plus"], ["#jobsAddBtn", "plus"], ["#sUpdate", "retry"],["#sBack", "back"], ["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
+  [["#sAddBtn", "plus"], ["#jobsAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
     ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   $("#pSave").onclick = saveMix;
   document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page
@@ -907,6 +907,7 @@ function initStems() {
   initCoverView();
   initTakesStudio();
   initLibSearch();
+  initNew();
   $("#pVol").value = stemVol;
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
   resetOnDblClick($("#pVol"), 1);

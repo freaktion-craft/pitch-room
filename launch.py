@@ -1,4 +1,4 @@
-"""One-click start for Stem.
+"""One-click start for Pitchroom.
 
 Run by the start-* launchers with the project's .venv Python:
 installs missing packages, picks a free port (or reuses a copy that is already

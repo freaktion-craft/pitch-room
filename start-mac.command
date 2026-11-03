@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stem — macOS: double-click to start. First run sets up Python packages (1–2 min).
+# Pitchroom — macOS: double-click to start. First run sets up Python packages (1–2 min).
 cd "$(dirname "$0")" || exit 1
 
 if [ ! -x .venv/bin/python ]; then
@@ -13,8 +13,8 @@ if [ ! -x .venv/bin/python ]; then
     echo "First run: creating a private Python environment…"
     "$PY" -m venv .venv || { read -r -p "Couldn’t create the environment. Press Enter to close."; exit 1; }
   else
-    # No Python 3.9+ on this Mac: uv (astral.sh) fetches one for Stem alone, into .tools; nothing outside this folder changes
-    echo "First run: Python isn’t installed, so Stem fetches its own copy (about 40 MB, once)…"
+    # No Python 3.9+ on this Mac: uv (astral.sh) fetches one for Pitchroom alone, into .tools; nothing outside this folder changes
+    echo "First run: Python isn’t installed, so Pitchroom fetches its own copy (about 40 MB, once)…"
     export UV_PYTHON_INSTALL_DIR="$PWD/.tools/python" UV_CACHE_DIR="$PWD/.tools/cache"
     arch=x86_64; [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = 1 ] && arch=aarch64 # Apple silicon, even from a Terminal under Rosetta
     if [ ! -x .tools/uv ]; then

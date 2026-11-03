@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stem — Linux: run ./start-linux.sh (or double-click if your file manager allows).
+# Pitchroom — Linux: run ./start-linux.sh (or double-click if your file manager allows).
 cd "$(dirname "$0")" || exit 1
 
 if [ ! -x .venv/bin/python ]; then
@@ -10,9 +10,9 @@ if [ ! -x .venv/bin/python ]; then
   echo "First run: creating a private Python environment…"
   if [ -z "$PY" ] || ! "$PY" -m venv .venv 2>/dev/null; then
     # No Python 3.9+ (or no venv module, as on Debian and Ubuntu without python3-venv): uv (astral.sh) fetches one for
-    # Stem alone, into .tools; nothing outside this folder changes
+    # Pitchroom alone, into .tools; nothing outside this folder changes
     rm -rf .venv
-    echo "Python isn’t ready here, so Stem fetches its own copy (about 40 MB, once)…"
+    echo "Python isn’t ready here, so Pitchroom fetches its own copy (about 40 MB, once)…"
     export UV_PYTHON_INSTALL_DIR="$PWD/.tools/python" UV_CACHE_DIR="$PWD/.tools/cache"
     if [ ! -x .tools/uv ]; then
       url="https://github.com/astral-sh/uv/releases/download/0.12.24/uv-$(uname -m)-unknown-linux-gnu.tar.gz"

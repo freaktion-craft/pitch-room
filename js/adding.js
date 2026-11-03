@@ -77,7 +77,7 @@ function forgetAdded(songId) {
 function showJobs(on) {
   const was = !$("#jobsPop").hidden;
   $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
-  if (on) { showMicSet(false); showAdd(false); paintJobs(); } // marks those in as seen
+  if (on) { showAdd(false); paintJobs(); } // marks those in as seen
   else closeYt();
   if (!on && was) { // closed: the songs it showed as in have been seen
     showJobsAdd(false);
@@ -124,7 +124,9 @@ function unfold(node, from = 0) {
 }
 function watchJob(id, kind, forSong) {
   if (pollers[id]) return;
+  let skip = 0; // a song with others ahead of it in line is asked after less often (a playlist's can be many)
   pollers[id] = setInterval(async () => {
+    if (skip-- > 0) return;
     let j;
     try { j = await (await fetch("/api/jobs/" + id, { cache: "no-store" })).json(); } catch (e) { return; }
     if (!j.status) j = { status: "error", error: "That didn’t work.", progress: 0, stage: "" }; // the server doesn't know it any more (restarted)
@@ -152,6 +154,7 @@ function watchJob(id, kind, forSong) {
       if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
     } else if (j.status !== "cancelled") {
       const { name, status, stage, progress, ahead, cancel, error, songId } = j;
+      skip = status === "queued" && ahead > 1 ? 4 : 0;
       addingJob(id, { ...(name ? { name } : {}), status, stage, progress, ahead, cancel, error, songId, done: status === "done" });
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
@@ -187,9 +190,12 @@ const stemModel = () => "htdemucs";
 // Several at once: links a line each (or spaces between), files several at a time. Each is sent in the order given;
 // the server takes them in that order, one at a time, the rest waiting with how many are ahead of them. Once one is
 // in, the library shows their progress; one that couldn't start says why here, the others going on.
+// A playlist link among them is read once the others are sent, its songs listed to pick from (readPlaylist).
 async function submitYoutube(e) {
   e.preventDefault();
-  const field = $("#sYtUrl"), urls = field.value.split(/\s+/).filter(Boolean); if (!urls.length) return;
+  closePlaylist();
+  const field = $("#sYtUrl"), all = field.value.split(/\s+/).filter(Boolean); if (!all.length) return;
+  const list = all.find((u) => PLAYLIST.test(u)), urls = all.filter((u) => u !== list);
   addMsg("Starting…");
   const failed = [];
   let sent = 0;
@@ -200,8 +206,9 @@ async function submitYoutube(e) {
       jobStarted(id, url);
     } catch (err) { failed.push(url); addMsg(urls.length > 1 ? tr("{url}: {why}", { url, why: () => tr(err.message) }) : err.message, true); }
   }
-  field.value = failed.join("\n"); fitLinks(); // what didn't start stays, to fix
-  if (!failed.length) { addMsg(""); await tuckAway(); } // all sent: the panel goes into the ring
+  field.value = [...failed, ...(list ? [list] : [])].join("\n"); fitLinks(); // what didn't start stays, to fix
+  if (list) { if (sent) landRing(); if (!failed.length) await readPlaylist(list); }
+  else if (!failed.length) { addMsg(""); await tuckAway(); } // all sent: the panel goes into the ring
   else if (sent) landRing(); // some sent: the ring shows them; the panel stays, saying why the rest couldn't start
 }
 async function submitFiles(files) {
@@ -217,6 +224,72 @@ async function submitFiles(files) {
     catch (err) { addMsg(files.length > 1 ? tr("{url}: {why}", { url: file.name, why: () => tr(err.message) }) : err.message, true); if (ok) landRing(); return; }
   }
   addMsg(""); await tuckAway();
+}
+// A playlist (YouTube's or Spotify's, or a Spotify album): its songs listed under the field first, to pick from, ticked
+// unless in the library already or gone from YouTube. Those picked are added as links are, waiting their turn one at a
+// time, at low priority (stems._low_priority); a Spotify song is looked for on YouTube once its turn comes, and one
+// that can't be had says so in the ring's panel like any song that couldn't be added.
+const PLAYLIST = /^(https?:\/\/)?(((www|m|music)\.)?youtube\.com\/playlist\?\S*list=|open\.spotify\.com\/(intl-[\w-]+\/)?(playlist|album)\/|spotify:(playlist|album):)\S+$/i;
+let plFound = null; // {from, title, items: [{title, artist, duration, url, gone, have, box}], more} while it's picked from
+async function readPlaylist(url) {
+  addMsg("Reading the playlist…");
+  let j;
+  try {
+    const r = await fetch("/api/stems/playlist", { method: "POST", body: JSON.stringify({ url }), headers: { "Content-Type": "application/json" } });
+    j = await r.json().catch(() => ({ error: "The server didn’t answer properly." }));
+    if (!r.ok) throw new Error(j.error || "That didn’t work.");
+  } catch (err) { return addMsg(err instanceof TypeError ? "Couldn’t reach the server." : err.message, true); }
+  if (!j.items.length) return addMsg("That playlist is empty.", true);
+  addMsg(""); showPlaylist(j);
+}
+function showPlaylist(found) {
+  plFound = found;
+  const list = $("#plList"); list.replaceChildren();
+  for (const it of found.items) {
+    const row = el("label", "pl-row" + (it.gone ? " gone" : "")), box = el("input"), text = el("span"), b = el("b"), small = el("small");
+    box.type = "checkbox"; box.checked = !it.gone && !it.have; box.disabled = it.gone; box.onchange = countPicked;
+    b.textContent = it.title;
+    small.textContent = [it.artist, it.duration ? fmtTime(it.duration) : ""].filter(Boolean).join(" · ");
+    text.append(b, small); row.append(box, text);
+    if (it.gone || it.have) row.append(say(el("em"), it.gone ? "Unavailable" : "In library"));
+    it.box = box; list.append(row);
+  }
+  $("#plName").textContent = found.title || tr(found.from === "spotify" ? "Spotify playlist" : "YouTube playlist");
+  const n = found.items.length, count = $("#plCount");
+  say(count, found.more ? "First {n}" : n === 1 ? "1 song" : "{n} songs", { n });
+  say(count, found.more ? "Only the first {n} are listed" : "", { n }, "title");
+  $("#plPick").hidden = false; list.scrollTop = 0; countPicked();
+  $("#plGo").focus();
+}
+function countPicked() {
+  if (!plFound) return;
+  const open = plFound.items.filter((i) => !i.gone), n = open.filter((i) => i.box.checked).length, all = $("#plAll");
+  all.checked = n > 0 && n === open.length; all.indeterminate = n > 0 && n < open.length; all.disabled = !open.length;
+  say($("#plGo"), n ? "Add {n}" : "Add", { n }); $("#plGo").disabled = !n;
+}
+function closePlaylist() {
+  if (!plFound) return;
+  plFound = null; $("#plPick").hidden = true; $("#plList").replaceChildren();
+}
+async function addPicked() {
+  const found = plFound, picked = found?.items.filter((i) => i.box.checked);
+  if (!picked?.length) return;
+  $("#plGo").disabled = true; addMsg("Starting…");
+  const failed = [];
+  let sent = 0;
+  for (const it of picked) {
+    const name = it.url || !it.artist ? it.title : `${it.artist} – ${it.title}`;
+    const body = it.url ? { url: it.url, name: it.title } : { find: { artist: it.artist, title: it.title, duration: it.duration } };
+    try {
+      const id = await postJob("/api/stems/youtube", JSON.stringify({ ...body, model: stemModel(), low: true }), { "Content-Type": "application/json" });
+      if (!sent++) holdRing();
+      jobStarted(id, name); it.box.checked = false;
+    } catch (err) { failed.push(tr("{url}: {why}", { url: name, why: () => tr(err.message) })); }
+  }
+  if (plFound !== found) return;
+  if (!failed.length) {
+    closePlaylist(); $("#sYtUrl").value = ""; fitLinks(); addMsg(""); await tuckAway();
+  } else { countPicked(); addMsg(failed.join("\n"), true); if (sent) landRing(); } // what didn't start stays ticked, to try again
 }
 // A song sent: the whole panel draws in, shrinking smoothly into the ring by the mic, where the songs being added
 // show; the page behind clears as it goes, and the ring comes in as it arrives (or gives a nudge, there already).
@@ -257,11 +330,11 @@ function jobStarted(id, name) { addingJob(id, { name, status: "queued", progress
 let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
 function showAdd(on) {
   const pop = $("#addPop"), btn = $("#sAddBtn");
-  if (on) { showMicSet(false); showJobs(false); showSync(false); }
+  if (on) showJobs(false);
   const was = !pop.hidden;
   if (on) pop.append($("#sAdd"), $("#sAddSetup")); // back from the ring's panel, if it was there
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
-  $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // the page behind blurs back
+  $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // a click beside it closes it
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
 }
 // The ring's panel has Add song too, so a song can be added from any page: the same form, moved into the panel under
@@ -279,7 +352,7 @@ function showJobsAdd(on) {
 // paste anywhere but in a field (Ctrl+V) brings the panel with the same offer, needing no asking. Nothing starts until
 // Import is pressed, so a stray paste costs nothing. Anything else goes to the form, as before.
 const YT_LINK = /^(https?:\/\/)?((www|m|music)\.)?(youtube\.com\/(watch\?\S*v=|shorts\/|live\/)|youtu\.be\/)\S+$/i;
-const ytLinks = (text) => String(text || "").split(/\s+/).filter((w) => YT_LINK.test(w));
+const ytLinks = (text) => String(text || "").split(/\s+/).filter((w) => YT_LINK.test(w) || PLAYLIST.test(w));
 let ytOffer = null; // the links the menu offers, while it's open
 const ytTitles = new Map(); // link → its video's title (YouTube's oEmbed: no key, a short answer)
 async function jobsAddPressed() {
@@ -293,12 +366,12 @@ function offerYoutube(links) {
   if ($("#jobsPop").hidden) showJobs(true);
   showJobsAdd(false);
   ytOffer = links;
-  const sub = $("#ytTitle"), one = links.length === 1;
-  say($("#ytImport .yt-what > span"), one ? "Import from YouTube" : "Import {n} from YouTube", { n: links.length });
+  const sub = $("#ytTitle"), one = links.length === 1, list = one && PLAYLIST.test(links[0]);
+  say($("#ytImport .yt-what > span"), list ? "Import playlist" : one ? "Import from YouTube" : "Import {n} from YouTube", { n: links.length });
   sub.textContent = one ? ytTitles.get(links[0]) || links[0].replace(/^https?:\/\/(www\.)?/, "") : "";
   $("#ytMenu").hidden = false; $("#jobsAddBtn").setAttribute("aria-expanded", "true");
   placeYt(); $("#ytImport").focus();
-  if (one && !ytTitles.has(links[0])) {
+  if (one && !list && !ytTitles.has(links[0])) {
     const ask = new AbortController(); setTimeout(() => ask.abort(), 4000);
     fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(links[0]), { signal: ask.signal })
       .then((r) => (r.ok ? r.json() : null)).then((j) => {
@@ -321,6 +394,7 @@ async function importYoutube() {
   const links = ytOffer; closeYt();
   if (!links) return;
   $("#sYtUrl").value = links.join("\n"); fitLinks();
+  if (links.some((u) => PLAYLIST.test(u))) showJobsAdd(true); // its songs are listed in the form, to pick from
   await submitYoutube({ preventDefault() {} });
   if ($("#sYtUrl").value.trim()) showJobsAdd(true);
 }
@@ -328,6 +402,9 @@ function initYoutubeOffer() {
   $("#jobsAddBtn").onclick = jobsAddPressed;
   $("#ytImport").onclick = importYoutube;
   $("#ytOther").onclick = () => { closeYt(); showJobsAdd(true); };
+  $("#plGo").onclick = addPicked;
+  $("#plBack").onclick = () => { closePlaylist(); $("#sYtUrl").focus(); };
+  $("#plAll").onchange = (e) => { for (const i of plFound?.items || []) if (!i.gone) i.box.checked = e.target.checked; countPicked(); };
   $("#jobsPop").addEventListener("click", (e) => { if (ytOffer && !e.composedPath().some((n) => n === $("#ytMenu") || n === $("#jobsAddBtn"))) closeYt(); });
   $("#ytMenu").addEventListener("keydown", (e) => {
     const items = [...$("#ytMenu").querySelectorAll("button")], i = items.indexOf(document.activeElement);
