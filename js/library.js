@@ -388,7 +388,7 @@ function initNewFold() {
 const SORTS = {
   title: { label: "Title", text: true, by: (m) => m.title },
   bpm: { label: "BPM", wide: true, by: (m) => m.bpm || null },
-  key: { label: "Key", wide: true, by: (m) => (m.key ? m.key.pc * 2 + (m.key.mode === "minor") : null) }, // C, C minor, D♭, …
+  key: { label: "Key", wide: true, by: (m) => (m.key ? camelot(m.key) * 2 + (m.key.mode === "major") : null) }, // round the wheel its colours follow: 1A, 1B, 2A, …
   added: { label: "Added", desc: true, hidden: true, by: (m) => m.created },
   length: { label: "Length", icon: "clock", by: (m) => m.duration },
 };
