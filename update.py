@@ -1,4 +1,4 @@
-"""Brings this copy of Stem up to date with the one on GitHub.
+"""Brings this copy of Pitchroom up to date with the one on GitHub.
 
 Run by the launchers in update/ with the project's .venv Python (or any Python 3.9+):
 
@@ -7,7 +7,7 @@ Run by the launchers in update/ with the project's .venv Python (or any Python 3
 A git clone is pulled (git pull --ff-only). Any other copy (a ZIP from GitHub, or one passed on) gets the latest
 ZIP of the main branch: each file that changed is written over, each file the last update brought that's gone now is
 deleted (.update-files lists them), and what's yours stays as it is (KEEP: the library, the models, the settings,
-the environments). Stem has to be closed first: a page with the new code would be talking to a server running the old.
+the environments). Pitchroom has to be closed first: a page with the new code would be talking to a server running the old.
 """
 import hashlib
 import io
@@ -32,7 +32,7 @@ def step(n: int, text: str):
 
 
 def running() -> str:
-    """The address of a Stem that's running on this computer, or "". The ports are asked all at once: one at a time,
+    """The address of a Pitchroom that's running on this computer, or "". The ports are asked all at once: one at a time,
     Windows takes a second or two on each closed one, and the window sat blank for most of a minute."""
     sys.path.insert(0, ROOT)
     from launch import is_ours
@@ -50,7 +50,7 @@ def requirements() -> str:
 def from_git() -> bool:
     git = shutil.which("git")
     if not git:
-        sys.exit("This copy is a git clone, but git isn't installed here. Install git, or download Stem again as a ZIP.")
+        sys.exit("This copy is a git clone, but git isn't installed here. Install git, or download Pitchroom again as a ZIP.")
     before = subprocess.run([git, "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     print("      git pull (this copy is a git clone)…", flush=True)
     if subprocess.run([git, "pull", "--ff-only", "--progress"], cwd=ROOT).returncode != 0:
@@ -112,11 +112,11 @@ def from_zip() -> bool:
 
 
 def main():
-    print("Stem updater\n", flush=True)
-    step(1, "Checking that Stem is closed…")
+    print("Pitchroom updater\n", flush=True)
+    step(1, "Checking that Pitchroom is closed…")
     at = running()
     if at:
-        sys.exit(f"Stem is running ({at}). Close its window first, then run this again.")
+        sys.exit(f"Pitchroom is running ({at}). Close its window first, then run this again.")
     req = requirements()
     step(2, "Getting the latest version…")
     changed = from_git() if os.path.isdir(os.path.join(ROOT, ".git")) else from_zip()
@@ -129,7 +129,7 @@ def main():
         subprocess.check_call([venv, "-m", "pip", "install", "--disable-pip-version-check", "-r", os.path.join(ROOT, "requirements.txt")])
     else:
         step(3, "Base tools: nothing new to install.")
-    step(4, "Updated. Start Stem as usual.")
+    step(4, "Updated. Start Pitchroom as usual.")
 
 
 def run():
