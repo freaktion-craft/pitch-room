@@ -83,6 +83,33 @@ def channel_artist(channel: str) -> str:
     return " ".join(CHANNEL_NOISE.sub(" ", channel or "").split())
 
 
+def own_name(title: str, track: str) -> str:
+    """A song is named in its own language: the name its video or file gives it, where that's in Korean (or another
+    CJK script) and the record's is in another. iTunes and Deezer have the US store's names, so 난춘 comes back as
+    "Nan Chun" and 인생네컷 as "Photo Booth". The name is what's outside brackets: "신호는 잘 지켜 (signs)" is
+    신호는 잘 지켜, its English in brackets. "" otherwise (the record's name stands), and for a cover (named for the
+    song it covers)."""
+    if is_cover(title):
+        return ""
+    song = " ".join(BRACKETS.sub(" ", FEAT.sub(" ", lyrics.split_title(title)[1] or "")).split())
+    if not CJK.search(song) or CJK.search(track or ""):
+        return ""
+    # The title giving the record's name too: as the Korean's translation, in brackets just after it ("신호는 잘 지켜
+    # (signs)"), the Korean stands; anywhere else it names the song ('"다가오지 않음 사랑인가요?" [CIKI : Amnesia]',
+    # a line of its words in front), and the record's stands.
+    tw = lyrics._words(FEAT.sub(" ", track or ""))
+    if tw and tw <= lyrics._words(title):
+        alias = re.search(re.escape(song) + r"[\"'”’」』]?\s*[(\[]([^)\]]*)[)\]]", title)
+        if not (alias and lyrics._words(FEAT.sub(" ", alias.group(1))) == tw):
+            return ""
+    feat = FEAT.search(track or "")  # the record's "(feat. …)" kept, as the rest of the library has it
+    return f"{song} {feat.group(0).strip()}" if feat else song
+
+
+FEAT = re.compile(r"(?i)[(\[]?\s*(?<![a-z])(?:feat\.?|ft\.|featuring)(?![a-z])[^)\]]*[)\]]?")
+BRACKETS = re.compile(r"[(\[{【][^)\]}】]*[)\]}】]")
+
+
 def _spellings(name: str) -> list[str]:
     """A name written twice, each on its own: "백현 Baekhyun" gives "백현" and "Baekhyun"."""
     words = name.split()
@@ -157,6 +184,59 @@ def attached(ffmpeg: str, path: str) -> int | None:
     err = subprocess.run([ffmpeg, "-hide_banner", "-i", path], capture_output=True, text=True, errors="replace").stderr
     m = re.search(r"Stream #0:(\d+)[^\n]*Video:[^\n]*\(attached pic\)", err)
     return int(m.group(1)) if m else None
+
+
+THUMB = 96  # px: the list's tile (48) on a sharp screen, as cover-96.jpg beside cover.jpg
+B83 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
+
+
+def extras(ffmpeg: str, folder: str) -> dict | None:
+    """For a song's cover.jpg, what lets a page show it at once: cover-96.jpg (THUMB px, for the list; it decodes in
+    no time), and {tone: its average colour as "#rrggbb", hash: a BlurHash of it (4 × 3), a blur of its colours in a
+    few characters, shown where the cover will be while it loads}. None without a cover, or if ffmpeg can't read it."""
+    import numpy as np
+    path = os.path.join(folder, "cover.jpg")
+    if not os.path.isfile(path):
+        return None
+    tmp = os.path.join(folder, f"cover-{THUMB}.{secrets.token_hex(4)}.part.jpg")
+    try:
+        r = subprocess.run([ffmpeg, "-v", "error", "-y", "-i", path, "-vf", f"scale={THUMB}:{THUMB}:flags=lanczos", "-q:v", "3", tmp], capture_output=True)
+        if r.returncode or not os.path.isfile(tmp):
+            return None
+        os.replace(tmp, os.path.join(folder, f"cover-{THUMB}.jpg"))
+    finally:
+        if os.path.isfile(tmp):
+            os.remove(tmp)
+    raw = subprocess.run([ffmpeg, "-v", "error", "-i", path, "-vf", "scale=32:32:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
+                         capture_output=True).stdout
+    if len(raw) != 32 * 32 * 3:
+        return None
+    h = blurhash(np.frombuffer(raw, dtype=np.uint8).reshape(32, 32, 3).astype(np.float64) / 255)
+    return {"tone": "#" + h[1], "hash": h[0]}
+
+
+def blurhash(px, cx: int = 4, cy: int = 3) -> tuple[str, str]:
+    """A BlurHash (blurha.sh) of an image (rows × columns × 3, sRGB 0…1): (the hash, its average colour as rrggbb)."""
+    import numpy as np
+    lin = np.where(px <= 0.04045, px / 12.92, ((px + 0.055) / 1.055) ** 2.4)
+    hgt, wid = lin.shape[:2]
+    ys, xs = np.arange(hgt)[:, None], np.arange(wid)[None, :]
+    comps = []
+    for j in range(cy):
+        for i in range(cx):
+            basis = np.cos(np.pi * i * xs / wid) * np.cos(np.pi * j * ys / hgt)
+            comps.append((1 if i == j == 0 else 2) * (basis[..., None] * lin).sum((0, 1)) / (wid * hgt))
+    to8 = lambda v: int(round((v * 12.92 if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055) * 255)) if v > 0 else 0
+    srgb = lambda v: min(255, to8(min(1.0, float(v))))
+    b83 = lambda v, n: "".join(B83[(v // 83 ** (n - 1 - k)) % 83] for k in range(n))
+    dc, ac = comps[0], comps[1:]
+    rgb = [srgb(c) for c in dc]
+    q = max(0, min(82, int(np.floor(max(abs(float(v)) for c in ac for v in c) * 166 - 0.5)))) if ac else 0
+    top = (q + 1) / 166 if ac else 1
+    quant = lambda v: max(0, min(18, int(np.floor(np.sign(v) * abs(v / top) ** 0.5 * 9 + 9.5))))
+    out = b83((cx - 1) + (cy - 1) * 9, 1) + b83(q, 1) + b83((rgb[0] << 16) + (rgb[1] << 8) + rgb[2], 4)
+    out += "".join(b83(quant(c[0]) * 361 + quant(c[1]) * 19 + quant(c[2]), 2) for c in ac)
+    return out, "".join(f"{v:02x}" for v in rgb)
 
 
 def save(ffmpeg: str, src: str | bytes, out: str, stream: int | None = None, letterboxed: bool = False) -> bool:

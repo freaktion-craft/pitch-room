@@ -85,6 +85,40 @@ function centerKeys() { // the song's middle note in the middle
 
 // ---------- routes ----------
 function go(v) { if (location.hash !== "#" + v) location.hash = v; else route(); }
+// Where you are, over the page: Library / the song / Practice (or its Info, or the Takes Studio, after Practice when
+// it's from there), each step before the last a link back there in one click. Leaving Practice that way leaves the
+// song, as its own way out did. Again once the song's name is known (openSong) or changed.
+// Settings carry on from the page they were opened on (setFrom: its address and its steps, the last a link back to it).
+let lastCrumbs = null, lastHash = "", setFrom = { hash: "#stems", steps: null };
+function paintCrumbs() {
+  const lib = { en: "Library", href: "#stems" };
+  if (view === "settings") {
+    const from = setFrom.steps || [lib];
+    return crumbsIn($("#setCrumbs"), [...from.map((s, i) => (i === from.length - 1 ? { ...s, href: setFrom.hash } : s)), { en: "Settings" }]);
+  }
+  if (view === "practice" && K.song) {
+    const leave = (to) => () => { leaveSong(); go(to); };
+    return crumbsIn($("#kCrumbs"), [{ ...lib, go: leave("stems") }, { text: K.song.title, href: `#stems/${K.song.id}`, go: leave("stems/" + K.song.id) }, { en: "Practice" }]);
+  }
+  if (view === "voice") { lastCrumbs = [lib, { en: "Lab" }]; return; }
+  if (view !== "stems" || stemsPage === "lib") { lastCrumbs = [lib]; return; }
+  const id = location.hash.split("/")[1], m = libCache.get(id) || (P.song && P.song.id === id ? P.song : null);
+  const song = { text: m ? m.title : "", href: `#stems/${id}` };
+  if (stemsPage === "song") crumbsIn($("#sCrumbs"), [lib, { text: song.text }]);
+  else if (stemsPage === "info") crumbsIn($("#sCrumbs"), [lib, song, { en: "Info" }]);
+  else if (stemsPage === "takes") crumbsIn($("#tsCrumbs"), [lib, song, ...(K.on && K.song && K.song.id === id ? [{ en: "Practice", href: "#practice" }] : []), { en: "Takes Studio" }]);
+}
+// steps: {en (a word to translate) or text, href, go (in place of following href)}; the last is where you are
+function crumbsIn(nav, steps) {
+  lastCrumbs = steps;
+  nav.replaceChildren(...steps.flatMap((s, i) => {
+    const here = i === steps.length - 1, n = el(here ? "span" : "a", "crumb" + (s.text != null ? " name" : ""));
+    if (s.en) say(n, s.en); else { n.textContent = s.text; n.title = s.text; }
+    if (here) n.setAttribute("aria-current", "page");
+    else { n.href = s.href; if (s.go) n.onclick = (e) => { e.preventDefault(); s.go(); }; }
+    return i ? [el("span", "crumb-sep", "/"), n] : [n];
+  }));
+}
 // Stems pages: the library (#stems) and one song (#stems/<id>, its Info and its Takes Studio). Adding a song is a panel
 // in the library; an old link to #stems/add opens the library with it up.
 function stemsRoute(sub, extra) {
@@ -92,7 +126,7 @@ function stemsRoute(sub, extra) {
   stemsPage = !sub ? "lib" : extra === "info" ? "info" : extra === "takes" ? "takes" : "song";
   if (sub) forgetAdded(sub);
   if (stemsPage !== "lib") showAdd(false);
-  $("#sIntro").hidden = stemsPage !== "lib"; $("#sBackBar").hidden = stemsPage === "lib" || stemsPage === "takes"; $("#sSongActs").hidden = stemsPage !== "song";
+  $("#sBackBar").hidden = stemsPage === "lib" || stemsPage === "takes"; $("#sSongActs").hidden = stemsPage !== "song";
   $("#sTakesStudio").hidden = stemsPage !== "takes";
   if (stemsPage === "takes") openTakesStudio(sub); else tsStop();
   $("#sLibPage").hidden = stemsPage !== "lib"; $("#sPlayer").hidden = stemsPage !== "song";
@@ -118,19 +152,22 @@ async function openSongById(id) {
 function route() {
   const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
   const singing = v === "practice" && K.on && P.song && K.song.id === P.song.id;
-  if (v !== "stems" && v !== "voice" && !singing) { location.replace("#stems"); return; }
+  if (v !== "stems" && v !== "voice" && v !== "settings" && !singing) { location.replace("#stems"); return; }
   const was = view;
+  if (v === "settings" && was !== "settings") setFrom = { hash: lastHash || "#stems", steps: lastHash ? lastCrumbs : null };
   view = v;
   if (was === "practice" && view !== "practice" && K.studio) { // the Studio's mix, as it was before Practice
     if (P.song && K.song && K.song.id === P.song.id) { applyMix(K.studio); applyGains(); }
     K.studio = null;
   }
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems"; $("#vVoice").hidden = view !== "voice";
-  $("#voiceBtn").classList.toggle("on", view === "voice");
-  showMicSet(false); showEars(false); showSync(false);
+  $("#vSettings").hidden = view !== "settings";
+  $("#voiceBtn").classList.toggle("on", view === "voice"); $("#micSetBtn").classList.toggle("on", view === "settings");
+  showMicSet(view === "settings"); showEars(false);
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra);
+  paintCrumbs(); lastHash = location.hash || "#stems";
   pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   // back in the library: the song (still loaded) starts from the top when it's opened again, in the Studio or Practice
@@ -139,15 +176,22 @@ function route() {
     $("#overlay").hidden = true;
     if (!K.studio) practiceMix(); // back from the Takes Studio
     loadSamples(); // for the keyboard
+    openSync(); // beside Record: the delay as it is now
     renderStart();
     // size and draw the stage now, so the view's first frame is complete rather than an empty stage
     paintTakesShown(); resize(); centerKeys();
     if (K.on) practiceFrame();
   }
   if (view === "voice") voiceShow();
-  window.scrollTo(0, 0);
-  paintFade();
+  // a new page from its top; a reload where it was (kept by this page, not the browser: its own comes back once the
+  // page has loaded, after it's been shown at the top, and the fades follow a frame behind), the fades there with it
+  const back = scrolledTo; scrolledTo = null;
+  window.scrollTo(0, back && back.hash === (location.hash || "#stems") ? back.y : 0);
+  paintFade(!!back);
 }
+let scrolledTo = (() => { try { return JSON.parse(sessionStorage.getItem("stem:scroll")); } catch (e) { return null; } })();
+history.scrollRestoration = "manual";
+addEventListener("pagehide", () => { try { sessionStorage.setItem("stem:scroll", JSON.stringify({ hash: location.hash || "#stems", y: scrollY })); } catch (e) {} });
 window.addEventListener("hashchange", route);
 // ---------- opening ----------
 // The page waits behind the bar until the library is in and the font has loaded (BOOT_MIN at least, so the bar makes
@@ -196,8 +240,13 @@ async function boot() {
   rise($("#app > header"), 0, 0, 6);
   if (!(view === "stems" && stemsPage === "lib")) { rise($("#app main:not([hidden])"), 60, 4, 6); return; }
   let t = 80;
-  for (const node of [...$("#sIntro").children, $("#sLibPage .lib-head")]) {
+  for (const node of [$("#sLibPage .lib-head")]) {
     if (node) { rise(node, t); t += 90; }
+  }
+  if (!$("#sNew").hidden) { // New's heading, then its covers one after another, as the list's rows
+    rise($("#sNew .ln-head"), t);
+    $("#sNew").querySelectorAll(".ln-card").forEach((c, i) => rise(c, t + 60 + Math.min(i, 8) * 50, 6, 6));
+    t += 90;
   }
   rise($("#sLib"), t);
   [...$("#sLib").querySelectorAll(".row")].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6));

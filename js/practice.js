@@ -402,7 +402,7 @@ async function copyText(text) {
 // them. The notes stay; phrase marks copied are handed on, so they come off the song, the strip clear for the next ones.
 function notesText() {
   const m = K.song, tc = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
-  return [`Notes from Stem's Practice: ${[m.artist, m.title].filter(Boolean).join(" – ")} · id ${m.id}`,
+  return [`Notes from Pitchroom's Practice: ${[m.artist, m.title].filter(Boolean).join(" – ")} · id ${m.id}`,
     ...NOTE.list.map((n) => `${tc(n.t)} · ${n.text || "(no words)"}${n.line ? ` · line showing: "${n.line}"` : ""}`)].join("\n");
 }
 function paintCopy() { $("#kMarks").disabled = !NOTE.list.length && !(S.dev && K.marks.length); $("#kNotesClear").disabled = !NOTE.list.length; }
@@ -1036,9 +1036,29 @@ async function singSong(m, btn) {
   await loadTakes(m); // in first, so Practice opens with its takes beside it, rather than them pushing in after
   go("practice");
 }
+// Settings: a page of their own (#settings, route): going out, their lists closed and Hear yourself off
 function showMicSet(on) {
-  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); hearMe(false); } else showJobs(false);
-  $("#micSet").hidden = !on; $("#micSetBtn").setAttribute("aria-expanded", String(on));
+  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); hearMe(false); } else { showJobs(false); paintSetNav(); openSync(); }
+}
+// The list beside them: a group's name goes to it; lit, the group being read (the first still reaching past a line
+// 40 % down the window, so a short page lights each in turn; the last once the page is scrolled to its end), or the one
+// just picked when there's no scrolling to do
+let setGroups = [];
+function paintSetNav(at) {
+  if (view !== "settings" || !setGroups.length) return;
+  if (at == null) {
+    const line = innerHeight * 0.4;
+    at = setGroups.findIndex((g) => g.getBoundingClientRect().bottom > line);
+    if (at < 0 || (scrollY > 0 && innerHeight + scrollY >= document.documentElement.scrollHeight - 2)) at = setGroups.length - 1;
+  }
+  $("#setNav").querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-current", String(i === at)));
+}
+function initSetNav() {
+  const btns = [...$("#setNav").querySelectorAll("button")];
+  setGroups = btns.map((b) => $("#" + b.dataset.to).closest(".set-group"));
+  btns.forEach((b, i) => { b.onclick = () => { setGroups[i].scrollIntoView({ behavior: stillMotion() ? "auto" : "smooth", block: "start" }); paintSetNav(i); }; });
+  addEventListener("scroll", () => paintSetNav(), { passive: true }); addEventListener("resize", () => paintSetNav());
+  paintSetNav(); // a reload on the page: shown before this was set up
 }
 // Hear yourself: the mic back through the speakers (headphones, really), while the settings are open, to set the
 // sensitivity by ear; the mic comes on for it.
@@ -1105,7 +1125,7 @@ function renderEars() {
 }
 function showEars(on) {
   $("#earsPop").hidden = !on; $("#kEars").setAttribute("aria-expanded", String(on));
-  if (on) { showMicSet(false); showJobs(false); renderEars(); }
+  if (on) { showJobs(false); renderEars(); }
 }
 function initEars() {
   const btn = $("#kEars"), pop = $("#earsPop");
@@ -1117,18 +1137,19 @@ function initEars() {
   pop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!pop.hidden && to && !pop.contains(to) && to !== btn) showEars(false); });
   paintEarsBtn();
 }
-// The sensitivity bar, while the settings are open: how loud the mic hears you (falling back gently), in your colour
+// The sensitivity bar, while the settings are shown: how loud the mic hears you (falling back gently), in your colour
 // once it's past the line.
 let gateShown = -Infinity;
 function paintGate() {
-  if ($("#micSet").hidden) return;
+  if (view !== "settings") return;
   const s = $("#gate"), min = +s.min, max = +s.max, db = micOn && level > 0 ? 20 * Math.log10(level) : -Infinity;
   gateShown = Math.max(db, gateShown - 0.6);
   const f = Math.max(0, Math.min(1, (gateShown - min) / (max - min)));
   const lvl = $("#gateLvl"); lvl.style.width = (f * 100).toFixed(1) + "%"; lvl.classList.toggle("on", micOn && gateShown > +s.value); // as drawn: in colour while the bar is past the line
 }
-// The guide vocal: the lead alone once split (backing vocals play with the band), else the whole vocal track.
-const guideName = () => (P.tracks.lead ? "lead" : "vocals");
+// The guide vocal: all the singing, the lead and the backing vocals once split, else the whole vocal track. Its slider,
+// its ear and a take's guide are all of them; the band, the rest (stems._take_band too).
+const isGuide = (name) => VOCAL_TRACKS.includes(name);
 function leaveSong() { if (ED.on) edOpen(false); if (P.playing) pauseSong(); K.on = false; K.counting = false; A4 = 440; $("#countIn").hidden = true; }
 function songToggle() {
   if (P.playing) { pauseSong(); return; }
@@ -1148,7 +1169,7 @@ function songToggle() {
 // Practice sets the tracks its own way (Guide vocal, Band); the Studio's mix is kept to put back on the way out (route)
 function practiceMix() {
   K.studio = mixNow();
-  for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = n === guideName() ? K.guideVol : K.bandVol; }
+  for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") { t.mute = false; t.solo = false; t.vol = isGuide(n) ? K.guideVol : K.bandVol; }
   renderTracks(); applyGains();
 }
 function songNote(t) { for (const e of K.evs) { if (e.t0 > t + 0.05) break; if (t <= e.t1) return e; } return null; }
@@ -1158,8 +1179,8 @@ function initSing() {
     if (K.song) remake(); // the phrases start from their count-ins
   });
   countPick.set(countItems(), S.countIn);
-  $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; const t = P.tracks[guideName()]; if (t) { t.vol = K.guideVol; applyGains(); } };
-  $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (n !== guideName() && n !== "click") t.vol = K.bandVol; applyGains(); };
+  $("#kGuide").oninput = (e) => { K.guideVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (isGuide(n)) t.vol = K.guideVol; applyGains(); };
+  $("#kBand").oninput = (e) => { K.bandVol = +e.target.value; for (const [n, t] of Object.entries(P.tracks)) if (!isGuide(n) && n !== "click") t.vol = K.bandVol; applyGains(); };
   resetOnDblClick($("#kGuide"), 0.5); resetOnDblClick($("#kBand"), 1);
   $("#kClick").append(icon("click"));
   $("#kClick").onclick = () => { const c = P.tracks.click; c.mute = !c.mute; $("#kClick").setAttribute("aria-pressed", String(!c.mute)); applyGains(); };
@@ -1192,17 +1213,12 @@ function initSing() {
     if (b) { phraseGo(+b.dataset.i); return; }
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
   });
-  $("#kLeave").prepend(icon("back"));
-  $("#kLeave").onclick = () => { leaveSong(); go(P.song ? "stems/" + P.song.id : "stems"); };
   initTakes(); initEars(); initSync(); initLyEdit();
-  // settings: a panel under the gear beside the mic chip; a click elsewhere or Escape closes it
-  const setBtn = $("#micSetBtn"), pop = $("#micSet");
+  // settings: their page, under the gear beside the mic chip; the gear again goes back to where you were
+  const setBtn = $("#micSetBtn");
   setBtn.append(icon("settings"));
-  setBtn.onclick = (e) => { e.stopPropagation(); showMicSet(pop.hidden); };
-  document.addEventListener("click", (e) => { if (!pop.hidden && !e.composedPath().includes(pop)) showMicSet(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showMicSet(false); setBtn.focus(); } });
-  // tabbed out of it, it closes, so what the focus moved to (under it) shows
-  pop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!pop.hidden && to && !pop.contains(to) && to !== setBtn) showMicSet(false); });
+  setBtn.onclick = (e) => { if (view === "settings") { e.preventDefault(); location.hash = setFrom.hash; } };
+  initSetNav();
   // the songs being added: their panel under their ring, the same way
   const jobsBtn = $("#jobsBtn"), jobsPop = $("#jobsPop");
   jobsBtn.onclick = (e) => { e.stopPropagation(); showJobs(jobsPop.hidden); };
@@ -1218,7 +1234,7 @@ function initSing() {
   $("#devTools").checked = S.dev;
   $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); };
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
-  micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); });
+  micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); syncErr = ""; paintSync(); }); // Sync's is the new input's
   micPick.set([{ v: "", t: "System default" }], "");
   if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
   namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); labelKeys(); });

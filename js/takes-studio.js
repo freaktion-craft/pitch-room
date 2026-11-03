@@ -16,12 +16,10 @@ function verName(v) {
 }
 async function openTakesStudio(id) {
   if (TS.id !== id) { tsStop(); Object.assign(TS, { id, ver: null, pos: 0 }); TS.on.clear(); TS.bufs.clear(); TS.peaks.clear(); }
-  const back = $("#tsBack"), practicing = K.on && K.song && K.song.id === id;
-  back.href = practicing ? "#practice" : `#stems/${id}`; say(back.lastChild, practicing ? "Practice" : "Studio");
   let m = libCache.get(id);
   if (!m) { try { m = (await (await fetch("/api/library", { cache: "no-store" })).json()).find((x) => x.id === id); } catch (e) { m = null; } }
   if (!m) { location.replace("#stems"); return; }
-  $("#tsTitle").textContent = m.title;
+  paintCrumbs(); // with its name
   if (!P.song || P.song.id !== id) await openSong(m); // the band's tracks
   await loadTakes(m);
   if (location.hash !== `#stems/${id}/takes`) return;
@@ -260,7 +258,7 @@ async function tsPlay() {
   try { [bufs] = await Promise.all([takeBand(n, sp), ...tsTakes().filter((t) => TS.on.has(t.id)).map(tsVoice)]); }
   catch (e) { say($("#tsState"), e instanceof TypeError ? "Couldn’t reach the server." : e.message); return; }
   if (TS.ver !== want || view !== "stems" || stemsPage !== "takes" || TS.playing) return;
-  const at = ac.currentTime + 0.06, V = TS.pos / sp, guide = guideName();
+  const at = ac.currentTime + 0.06, V = TS.pos / sp;
   TS.bus = ac.createGain(); TS.bus.gain.value = 0; fadeIn(TS.bus.gain, at, stemVol); TS.bus.connect(master); // in over FADE, as the song
   TS.gains = { band: ac.createGain(), guide: ac.createGain() };
   TS.gains.band.gain.value = T.mix.band; TS.gains.guide.gain.value = T.mix.guide;
@@ -268,7 +266,7 @@ async function tsPlay() {
   TS.srcs = [];
   for (const [name, buf] of Object.entries(bufs)) {
     if (V >= buf.duration) continue;
-    const src = ac.createBufferSource(); src.buffer = buf; src.connect(name === guide ? TS.gains.guide : TS.gains.band); src.start(at, V); TS.srcs.push(src);
+    const src = ac.createBufferSource(); src.buffer = buf; src.connect(isGuide(name) ? TS.gains.guide : TS.gains.band); src.start(at, V); TS.srcs.push(src);
   }
   TS.playing = true; TS.at = at;
   for (const t of tsTakes()) if (TS.on.has(t.id)) tsVoiceOn(t, at);
@@ -363,7 +361,6 @@ function takeOffset(t, pts, contour) {
   return middle(ds.map((d) => Math.abs(d - off))) > 0.08 ? null : middle(ds.filter((d) => Math.abs(d - off) <= 0.12));
 }
 function initTakesStudio() {
-  $("#tsBack").prepend(icon("back"));
   $("#tsPlay").onclick = tsPlay;
   $("#tsExport").append(icon("download")); $("#tsExport").onclick = tsExport;
   $("#tsTl").onclick = (e) => { const r = $("#tsTl").getBoundingClientRect(); tsSeek(((e.clientX - r.left - 12) / (r.width - 24)) * songDur()); };

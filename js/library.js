@@ -89,6 +89,8 @@ async function drawLibrary() {
   if (libSent) { ({ lib, jobs } = libSent); libSent = null; }
   else [lib, jobs] = await Promise.all(["/api/library", "/api/jobs"].map((u) => fetch(u, { cache: "no-store" }).then((r) => r.json()).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])));
   libCache = new Map(lib.map((m) => [m.id, m]));
+  // the covers drawn already go into the new rows as they are (a reload draws the list twice), so none goes blank
+  const tiles = new Map([...libRows].map(([id, row]) => [id, row.querySelector(".cover")]));
   libRows = new Map();
   // songs still being added (this page was reloaded, or opened in a second tab meanwhile) are shown by the mic again
   for (const j of jobs) {
@@ -102,15 +104,16 @@ async function drawLibrary() {
   if (addOnShow) { addOnShow = false; showAdd(true); } // asked for by a link
   const head = el("div", "lib-cols");
   for (const [by, c] of Object.entries(SORTS)) {
-    const b = el("button", "sort" + (c.end ? " end" : "") + (c.wide ? " wide" : ""));
+    if (c.hidden) continue;
+    const b = el("button", "sort" + (c.wide ? " wide" : ""));
     const lab = el("span", "lab");
     if (c.icon) lab.append(icon(c.icon));
     lab.append(tr(c.label));
     b.type = "button"; b.dataset.by = by; b.append(lab, sortArrow("sortBoth"));
-    b.onclick = () => { libSort = libSort.by === by ? { by, desc: !libSort.desc } : { by, desc: c.desc }; store.set("libSort", libSort); arrangeRows(); };
+    // its first way, the other, then newest first again
+    b.onclick = () => { libSort = libSort.by !== by ? { by, desc: !!c.desc } : libSort.desc === !!c.desc ? { by, desc: !c.desc } : SORT_FIRST; store.set("libSort", libSort); arrangeRows(); };
     head.append(b);
   }
-  head.append(el("span"));
   box.append(head);
   // nothing yet: a row in the list's place that opens Add song, or (one on its way) a word on where it's at
   if (!lib.length && coming) box.append(el("p", "lib-none", tr("Your first song is on its way. How it’s going shows beside the mic.")));
@@ -121,14 +124,15 @@ async function drawLibrary() {
     text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or drop an audio file.")));
     a.append(plus, text); box.append(a);
   }
-  if (!lib.length) { pinLibTop(); paintFade(); return; } // the column heads are new: pinned where they stand
+  if (!lib.length) { drawNew(lib); pinLibTop(); paintFade(true); return; } // the column heads are new: pinned where they stand
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     row.dataset.id = m.id; libRows.set(m.id, row);
     link.href = "#stems/" + m.id; link.title = m.title; link.setAttribute("aria-label", libLine(m)); link.append(el("b", null, m.title));
     info.append(link, el("small", null, m.artist || ""));
-    const key = el("span", "c wide", keyName(m.key));
-    keyOf(m).then(() => { key.textContent = keyName(m.key); link.setAttribute("aria-label", libLine(m)); if (libSort.by === "key") arrangeRows(); });
+    const key = el("span", "c wide song-key");
+    paintKeyCell(key, m.key);
+    keyOf(m).then(() => { paintKeyCell(key, m.key); link.setAttribute("aria-label", libLine(m)); if (libSort.by === "key") arrangeRows(); });
     // a click that starts while the title is being renamed (in its field, or beside it to finish) doesn't open the song
     row.onpointerdown = () => { row.dataset.renaming = row.querySelector(".rename") ? "1" : ""; };
     row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
@@ -137,25 +141,259 @@ async function drawLibrary() {
     more.classList.add("icon", "ghost"); more.title = tr("More"); more.setAttribute("aria-label", tr("More for {title}", { title: m.title }));
     more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false"); more.append(icon("more"));
     acts.append(more);
-    row.append(coverTile(m), info, el("span", "c num wide", m.bpm ? String(Math.round(m.bpm)) : "–"), key,
-      el("span", "c num wide", dayOf(m.created)), el("span", "c num end", fmtTime(m.duration)), acts);
+    const tile = tiles.get(m.id);
+    if (tile) { paintCover(tile, m); paintUpgrade(tile, m); }
+    row.append(tile || coverTile(m), info, el("span", "c num wide", m.bpm ? String(Math.round(m.bpm)) : "–"), key,
+      el("span", "c num", fmtTime(m.duration)), acts);
     box.append(row);
   });
   arrangeRows();
-  pinLibTop(); paintFade(); // the column heads are new: pinned where they stand
+  drawNew(lib); // with the list back in (where the page is scrolled to is read there)
+  pinLibTop(); paintFade(true); // the column heads are new: pinned where they stand; the fades there with the list, not after it
   awaitLookups(lib);
 }
-// The list's order: by a column, either way, kept (store "libSort"); newest first until another is chosen. desc: the
-// way a column sorts first (the newest, otherwise A to Z and low to high). Songs a column has nothing for (no steady
-// beat, a key not read yet) go last, and ties newest first.
+// New: the songs added in the last NEW_DAYS days (NEW_MAX at most, newest first), bigger covers in a row above the
+// list (where they are too) that slides sideways. Not while a search is typed.
+const NEW_DAYS = 3, NEW_MAX = 12;
+let newIds = new Set();
+function drawNew(lib) {
+  const since = Date.now() / 1000 - NEW_DAYS * 86400;
+  const fresh = lib.filter((m) => m.created >= since).sort((a, b) => b.created - a.created).slice(0, NEW_MAX);
+  if (newSeen && fresh.some((m) => !newSeen.has(m.id)) && !newOpen) newWaiting = true; // a song just ready: New opens for it
+  newSeen = new Set(lib.map((m) => m.id));
+  newIds = new Set(fresh.map((m) => m.id));
+  $("#sNewCount").textContent = fresh.length || "";
+  // the cards there already kept, covers and all (a reload draws the list twice: what came with the page, then the
+  // server's), so nothing goes blank and comes back
+  const track = $("#sNewTrack"), had = new Map([...track.children].map((c) => [c.dataset.id, c]));
+  track.replaceChildren(...fresh.map((m) => { const c = had.get(m.id); if (c) paintNewCard(c, m); return c || newCard(m); }));
+  paintNew();
+}
+// A song added comes into the library once it's ready: New opens with it there, folded or not, now if the page is at
+// its top, or else once you're back up there (opening above where you are would move the list under you).
+let newSeen = null, newWaiting = false; // newSeen: the songs the library had at its last drawing (none before the first)
+function revealNew() {
+  if (!newWaiting || newOpen || scrollY > 0 || !canNew() || newMove === "shut" || newMove === "open") return;
+  newWaiting = false;
+  if (newMove === "pull") dropPull();
+  $("#sNewTrack").scrollLeft = 0; // the new one, first
+  openNew();
+}
+const newDay = (t) => { const d = new Date(t * 1000), n = Math.round((new Date().setHours(12, 0, 0, 0) - new Date(d).setHours(12, 0, 0, 0)) / 864e5);
+  return n === 0 ? tr("Today") : n === 1 ? tr("Yesterday") : d.toLocaleDateString(locale(), { month: "short", day: "numeric" }); };
+function newCard(m) {
+  const a = el("a", "ln-card"), cv = el("span", "cover");
+  a.href = "#stems/" + m.id; a.dataset.id = m.id; a.draggable = false;
+  a.append(cv, el("b"), el("small"));
+  paintNewCard(a, m);
+  return a;
+}
+// its title, artist and day, and its cover once there is one (as in the list)
+function paintNewCard(a, m) {
+  a.title = m.title; a.setAttribute("aria-label", libLine(m));
+  a.querySelector("b").textContent = m.title;
+  a.querySelector("small").textContent = [m.artist, newDay(m.created)].filter(Boolean).join(" · ");
+  putCover(a.querySelector(".cover"), m, coverSrc(m, false));
+}
+// A BlurHash (blurha.sh, made by covers.blurhash) as a picture: 32 px square, stretched smooth over its box. Each made once.
+const B83 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~";
+const blurs = new Map();
+function blurUrl(hash) {
+  if (blurs.has(hash)) return blurs.get(hash);
+  const d83 = (s) => [...s].reduce((v, c) => v * 83 + B83.indexOf(c), 0);
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const srgb = (v) => { v = Math.max(0, Math.min(1, v)); return Math.round((v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055) * 255); };
+  const size = d83(hash[0]), nx = (size % 9) + 1, ny = Math.floor(size / 9) + 1, top = (d83(hash[1]) + 1) / 166;
+  const cs = [];
+  for (let i = 0; i < nx * ny; i++) {
+    if (!i) { const v = d83(hash.slice(2, 6)); cs.push([lin(v >> 16), lin((v >> 8) & 255), lin(v & 255)]); continue; }
+    const v = d83(hash.slice(4 + i * 2, 6 + i * 2)), q = [Math.floor(v / 361), Math.floor(v / 19) % 19, v % 19];
+    cs.push(q.map((n) => { const f = (n - 9) / 9; return Math.sign(f) * f * f * top; }));
+  }
+  const N = 32, cvs = document.createElement("canvas"); cvs.width = cvs.height = N;
+  const ctx = cvs.getContext("2d"), px = ctx.createImageData(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let r = 0, g = 0, b = 0;
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = Math.cos((Math.PI * x * i) / N) * Math.cos((Math.PI * y * j) / N), c = cs[i + j * nx];
+      r += c[0] * k; g += c[1] * k; b += c[2] * k;
+    }
+    const o = 4 * (x + y * N); px.data[o] = srgb(r); px.data[o + 1] = srgb(g); px.data[o + 2] = srgb(b); px.data[o + 3] = 255;
+  }
+  ctx.putImageData(px, 0, 0);
+  const url = cvs.toDataURL();
+  blurs.set(hash, url);
+  return url;
+}
+// shown unless a search is typed; the arrows, and the fades at either end (as wide as there's more that way, up to
+// NEW_FADE), as it scrolls
+const NEW_FADE = 72;
+function paintNew() {
+  const box = $("#sNew"), track = $("#sNewTrack");
+  if (newMove && newMove !== "pull") return; // opening or folding: that says
+  box.hidden = !newIds.size || !!$("#sSearch").value.trim() || !newOpen;
+  if (newWaiting) { revealNew(); return; }
+  if (!box.hidden) paintNewEnds();
+}
+// the arrows (none while all the covers fit) and the fades: as soon as the row's shown, opening too, so the arrows
+// aren't there for a moment first
+function paintNewEnds() {
+  const box = $("#sNew"), track = $("#sNewTrack");
+  const left = track.scrollLeft, right = track.scrollWidth - track.clientWidth - left;
+  track.style.setProperty("--fl", Math.max(0, Math.min(NEW_FADE, left)) + "px");
+  track.style.setProperty("--fr", Math.max(0, Math.min(NEW_FADE, right)) + "px");
+  $("#sNewPrev").classList.toggle("off", left < 1); $("#sNewNext").classList.toggle("off", right < 1);
+  box.classList.toggle("fits", track.scrollWidth <= track.clientWidth + 1);
+}
+// The track: wheel or trackpad sideways, the arrows a page at a time, or a mouse dragged across it (a drag isn't a
+// click on the song it ends over); its top cut off where it's gone under the library's pinned head (paintFade)
+function initNew() {
+  const track = $("#sNewTrack"), page = (dir) => track.scrollBy({ left: dir * Math.max(144, track.clientWidth - 144), behavior: stillMotion() ? "auto" : "smooth" });
+  $("#sNewPrev").append(icon("prev")); $("#sNewNext").append(icon("next"));
+  $("#sNewPrev").onclick = () => page(-1); $("#sNewNext").onclick = () => page(1);
+  track.addEventListener("scroll", paintNew, { passive: true });
+  addEventListener("resize", paintNew);
+  let drag = null;
+  track.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse" && e.button === 0) drag = { x: e.clientX, at: track.scrollLeft, moved: false }; });
+  track.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    if (!drag.moved && Math.abs(e.clientX - drag.x) > 4) { drag.moved = true; track.setPointerCapture(e.pointerId); track.classList.add("drag"); }
+    if (drag.moved) track.scrollLeft = drag.at - (e.clientX - drag.x);
+  });
+  const end = () => { if (drag?.moved) { track.classList.remove("drag"); setTimeout(() => { drag = null; }); } else drag = null; };
+  track.addEventListener("pointerup", end); track.addEventListener("pointercancel", end);
+  track.addEventListener("click", (e) => { if (drag?.moved) { e.preventDefault(); e.stopPropagation(); } }, true);
+  const ring = progRing(0); ring.classList.remove("spin"); $("#sNewPull").append(ring);
+  initNewFold();
+}
+// The row is there at the top of the library; the first scroll down folds it away, the page holding still meanwhile.
+// Scrolling up on at the top brings it back: a ring in the search's line (nothing moves) fills while you keep on (NEW_PULL ms),
+// emptying again when you stop; full, the row opens out. A mouse wheel, a trackpad, the keys or a finger, alike.
+const NEW_PULL = 200, NEW_MS = 320, NEW_OPEN_MS = 440; // opening (as in the CSS's .opening) evenly, so a little longer
+// Folded, it stays folded through a reload of the tab (which puts the page back where it was scrolled, and would have
+// shown it for a moment, then folded it again); a new window starts with it open.
+const NEW_SHUT = "stem:newShut";
+const keepShut = (on) => { try { if (on) sessionStorage.setItem(NEW_SHUT, "1"); else sessionStorage.removeItem(NEW_SHUT); } catch (e) {} };
+let newOpen = (() => { try { return sessionStorage.getItem(NEW_SHUT) !== "1"; } catch (e) { return true; } })();
+let newMove = null; // "shut", "open" or "pull" while one's under way
+const pull = { p: 0, last: 0, t: 0, raf: 0 };
+const canNew = () => view === "stems" && stemsPage === "lib" && newIds.size > 0 && !$("#sSearch").value.trim() && !CV.tile;
+// Folded, the list goes up into the page's gap after it too (a grid row can't be less than nothing, so New's own
+// margin can't take it back), and it's where it is with New gone
+const NEW_TUCK = "calc(var(--space-3) * -1)";
+// to a height, out (its margin, the list in its place) or in (none, the list up by the gap), as a transition from
+// where it is now
+function newTo(px, out, done) {
+  const box = $("#sNew");
+  box.style.height = box.offsetHeight + "px"; void box.offsetHeight;
+  box.style.height = px + "px"; box.style.marginBottom = out ? "" : "0px"; $("#sLib").style.marginTop = out ? "" : NEW_TUCK;
+  clearTimeout(newTo.t); newTo.t = setTimeout(done, stillMotion() ? 0 : (out ? NEW_OPEN_MS : NEW_MS) + 20);
+}
+function newRest() { // folded and gone
+  const box = $("#sNew"), lib = $("#sLib");
+  newMove = null; cancelAnimationFrame(pull.raf);
+  box.classList.remove("shut", "opening"); box.style.height = box.style.marginBottom = "";
+  lib.style.transition = "none"; lib.style.marginTop = ""; // the gap back with New gone, at once: the list stays put
+  paintNew(); void lib.offsetHeight; lib.style.transition = "";
+  paintFade();
+}
+function shutNew() {
+  if (newMove === "pull") { dropPull(); return; }
+  if (newMove === "shut" || (!newOpen && !newMove)) return;
+  newOpen = false; newMove = "shut"; cancelAnimationFrame(pull.raf); keepShut(true);
+  openNew.in?.forEach((a) => a.cancel()); $("#sNew").classList.remove("opening"); $("#sNew").classList.add("shut");
+  newTo(0, false, newRest);
+}
+function openNew() { // from folded: out of nothing
+  const box = $("#sNew"), lib = $("#sLib");
+  newOpen = true; newMove = "open"; $("#sNewPull").classList.remove("on"); keepShut(false);
+  box.classList.remove("shut"); box.classList.add("opening"); box.style.height = ""; box.style.marginBottom = "0px"; box.hidden = false;
+  paintNewEnds(); // its arrows as they'll be, from the start
+  const to = box.offsetHeight; // its own height (squeezed to nothing, its row of covers would measure nothing)
+  box.style.height = "0px";
+  lib.style.transition = "none"; lib.style.marginTop = NEW_TUCK; void lib.offsetHeight; lib.style.transition = ""; // up there at once
+  newTo(to, true, () => { newMove = null; box.classList.remove("opening"); box.style.height = box.style.marginBottom = ""; paintNew(); });
+  // its contents coming in as it opens (not its edge going down over them), from a little above
+  if (!stillMotion()) openNew.in = [...box.children].map((c) => c.animate([{ opacity: 0, translate: "0 -8px" }, { opacity: 1, translate: "0 0" }],
+    { duration: 340, delay: 100, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)", fill: "backwards" }));
+}
+function dropPull() { // let go before it filled: the ring goes, nothing else had moved
+  newMove = null; cancelAnimationFrame(pull.raf); clearTimeout(pull.tmr);
+  $("#sNewPull").classList.remove("on");
+}
+// Each scroll up adds the time since the last, while they come within NEW_GAP of each other; a longer gap is let go,
+// and it empties again from then (NEW_DRAIN ms from full), folding away once empty. All by the clock, whatever the
+// frame rate.
+const NEW_GAP = 200, NEW_DRAIN = 150;
+const pullNow = (now) => Math.max(0, pull.p - Math.max(0, now - pull.last - NEW_GAP) / NEW_DRAIN);
+function pullUp() {
+  if (newOpen || newMove === "shut" || !canNew() || scrollY > 0) return;
+  const now = performance.now(), gap = now - pull.last;
+  if (newMove === "pull") {
+    pull.p = gap < NEW_GAP ? Math.min(1, pull.p + gap / NEW_PULL) : pullNow(now);
+    pull.last = now;
+    paintPull(now);
+    if (pull.p >= 1) { cancelAnimationFrame(pull.raf); clearTimeout(pull.tmr); openNew(); return; }
+  } else {
+    newMove = "pull"; pull.p = 0; pull.last = now; paintPull(now);
+    $("#sNewPull").classList.add("on");
+    pull.raf = requestAnimationFrame(pullTick);
+  }
+  clearTimeout(pull.tmr); // empty by then, unless another comes
+  pull.tmr = setTimeout(() => { if (newMove === "pull" && pullNow(performance.now()) <= 0) dropPull(); }, NEW_GAP + pull.p * NEW_DRAIN + 20);
+}
+function paintPull(now) { $("#sNewPull .ring").lastChild.setAttribute("stroke-dasharray", `${(pullNow(now) * 100).toFixed(1)} 100`); }
+function pullTick(now) {
+  if (newMove !== "pull") return;
+  paintPull(performance.now());
+  pull.raf = requestAnimationFrame(pullTick);
+}
+function initNewFold() {
+  const off = (t) => !!t.closest?.(".pop, .menu, .pick-list, #coverView, #addVeil");
+  addEventListener("wheel", (e) => {
+    if (!canNew() || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || off(e.target)) return;
+    if (e.deltaY > 0 && (newOpen || newMove)) { e.preventDefault(); shutNew(); } // the page waits for it to fold
+    else if (e.deltaY < 0) pullUp();
+  }, { passive: false });
+  document.addEventListener("keydown", (e) => {
+    if (!canNew() || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || inList(e.target) || off(e.target)) return;
+    const space = e.key === " " && !e.target.closest?.("button, a[href]");
+    if ((["ArrowDown", "PageDown", "End"].includes(e.key) || (space && !e.shiftKey)) && (newOpen || newMove)) { e.preventDefault(); shutNew(); }
+    else if (["ArrowUp", "PageUp", "Home"].includes(e.key) || (space && e.shiftKey)) pullUp();
+  });
+  let tx = null, ty = null;
+  addEventListener("touchstart", (e) => { [tx, ty] = e.touches.length === 1 ? [e.touches[0].clientX, e.touches[0].clientY] : [null, null]; }, { passive: true });
+  addEventListener("touchmove", (e) => {
+    if (ty == null || !canNew() || off(e.target)) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY, dx = x - tx, dy = y - ty;
+    tx = x; ty = y;
+    if (Math.abs(dy) <= Math.abs(dx)) return; // across the covers
+    if (dy < -1 && (newOpen || newMove)) { if (e.cancelable) e.preventDefault(); shutNew(); }
+    else if (dy > 1) pullUp();
+  }, { passive: false });
+  // scrolled some other way (the scrollbar, say): gone at once, the list kept where it was on screen
+  addEventListener("scroll", () => {
+    if (scrollY > 0 && newMove === "pull") dropPull();
+    if (scrollY <= 0 && newWaiting) revealNew();
+    if (scrollY <= 0 || !canNew() || !(newOpen || newMove === "open")) return;
+    const h = newRoom();
+    newOpen = false; keepShut(true); $("#sNew").hidden = true; newRest();
+    scrollTo(0, Math.max(0, scrollY - h));
+  }, { passive: true });
+}
+// The list's order: by a column, either way, kept (store "libSort"); newest first (added, not a column: New shows the
+// days) until another is chosen, and again when a column's pressed a third time. desc: the way a column sorts first
+// (otherwise A to Z and low to high). Songs a column has nothing for (no steady beat, a key not read yet) go last, and
+// ties newest first.
 const SORTS = {
   title: { label: "Title", text: true, by: (m) => m.title },
   bpm: { label: "BPM", wide: true, by: (m) => m.bpm || null },
   key: { label: "Key", wide: true, by: (m) => (m.key ? m.key.pc * 2 + (m.key.mode === "minor") : null) }, // C, C minor, D♭, …
-  added: { label: "Added", wide: true, desc: true, by: (m) => m.created },
-  length: { label: "Length", icon: "clock", end: true, by: (m) => m.duration },
+  added: { label: "Added", desc: true, hidden: true, by: (m) => m.created },
+  length: { label: "Length", icon: "clock", by: (m) => m.duration },
 };
-let libSort = (() => { const v = store.get("libSort", null); return v && SORTS[v.by] ? { by: v.by, desc: !!v.desc } : { by: "added", desc: true }; })();
+const SORT_FIRST = { by: "added", desc: true };
+let libSort = (() => { const v = store.get("libSort", null); return v && SORTS[v.by] ? { by: v.by, desc: !!v.desc } : SORT_FIRST; })();
 function sortArrow(name) { const a = icon(name); a.classList.add("arrow"); return a; }
 // The list's songs, in order, those the search finds: rows moved, taken out and put back, never made again (covers
 // stay loaded, a rename stays open). libRows: each song's row, shown or not.
@@ -176,6 +414,7 @@ function arrangeRows() {
     const row = libRows.get(m.id), text = folded(`${m.title} ${m.artist || ""} ${m.sourceTitle || ""}`);
     if (want.every((w) => text.includes(w))) { box.append(row); shown++; } else row.remove();
   }
+  paintNew();
   let none = box.querySelector(".lib-none");
   if (!shown && songs.length) {
     none ??= el("p", "lib-none");
@@ -209,15 +448,40 @@ function paintUpgrade(tile, m) {
   ring.lastChild.setAttribute("stroke-dasharray", `${Math.max(6, m.upgrade * 100)} 100`);
   tile.title = tr("Updating for the new version…");
 }
-function paintCover(tile, m) {
-  if (!m.cover || tile.querySelector("img")) return;
+// A cover into its box once it's decoded, so the box is never empty: meanwhile it's a blur of it (its BlurHash), or its
+// colour. One in sight then fades up out of the blur, later the lower and further right it is (REVEAL ms across the
+// window), so on a reload they come in from the top down rather than all blinking at once; one out of sight is
+// simply there. A cover found again takes the old one's place once it's in. False when it's there already, or none.
+const REVEAL = 360;
+function putCover(box, m, src) {
+  const was = box.querySelector("img");
+  if (!m.cover || (was && was.dataset.at === String(m.cover.at))) return false;
+  if (m.cover.hash) box.style.backgroundImage = `url(${blurUrl(m.cover.hash)})`;
+  else if (m.cover.tone) box.style.backgroundColor = m.cover.tone;
   const img = new Image();
-  // fading in only when it had to be fetched: one the browser already holds (a reload) is simply there
-  const asked = performance.now();
-  img.alt = ""; img.decoding = "async";
-  img.onload = () => { if (performance.now() - asked < 100) img.classList.add("now"); img.classList.add("in"); };
-  img.src = `/library/${m.id}/cover.jpg?v=${m.cover.at}`;
-  tile.append(img);
+  img.alt = ""; img.draggable = false; img.dataset.at = m.cover.at;
+  img.src = src;
+  let done = false;
+  const put = () => {
+    if (done || box.querySelector("img") !== was) return; // in already, or another came meanwhile
+    done = true;
+    const r = box.getBoundingClientRect(), seen = r.bottom > 0 && r.top < innerHeight && !stillMotion();
+    if (!seen) img.classList.add("now", "in");
+    else { // (its delay off again once it's in: a hover's brightening isn't held back)
+      img.style.transitionDelay = Math.round(Math.min(1, Math.max(0, r.top / innerHeight)) * REVEAL * 0.7 + Math.min(1, Math.max(0, r.left / innerWidth)) * REVEAL * 0.3) + "ms";
+      img.addEventListener("transitionend", () => { img.style.transitionDelay = ""; }, { once: true });
+    }
+    was ? was.replaceWith(img) : box.prepend(img);
+    if (seen) { void img.offsetWidth; img.classList.add("in"); }
+  };
+  img.decode().then(put, () => {}); // not to be had: the box as it was
+  img.addEventListener("load", () => setTimeout(put, 120)); // a page not being drawn (in the background) doesn't decode: in a moment after it's loaded
+  return true;
+}
+const coverSrc = (m, small) => `/library/${m.id}/${small && m.cover.thumb ? `cover-${m.cover.thumb}` : "cover"}.jpg?v=${m.cover.at}`;
+function paintCover(tile, m) {
+  if (!putCover(tile, m, coverSrc(m, true))) return; // the small one: as sharp at 48 px, and decoded in no time
+  tile.dataset.full = coverSrc(m, false); // up close (showCover), the whole of it
   tile.removeAttribute("aria-hidden"); tile.setAttribute("role", "button"); tile.tabIndex = 0;
   tile.setAttribute("aria-label", tr("Album art of {title}", { title: m.title }));
   tile.onclick = (e) => { e.stopPropagation(); showCover(tile); };
@@ -240,7 +504,7 @@ function overTile(tile, fly) {
 function showCover(tile) {
   if (CV.tile) return;
   const view = $("#coverView"), fly = view.querySelector(".cv-fly"), card = view.querySelector(".cv-card");
-  card.querySelector("img").src = tile.querySelector("img").src;
+  card.querySelector("img").src = tile.dataset.full || tile.querySelector("img").src;
   CV.tile = tile; CV.closing = false; CV.x = CV.y = CV.tx = CV.ty = 0;
   card.style.transform = ""; ["--glow", "--lx", "--ly", "--sx"].forEach((v) => card.style.removeProperty(v));
   view.hidden = false; view.focus({ preventScroll: true });
@@ -315,7 +579,9 @@ function pinLibTop() {
     for (let e = n; e; e = e.offsetParent) top += e.offsetTop;
     return { top, bottom: top + n.offsetHeight };
   };
-  const parts = { header: at($("#app > header")), intro: at($("#sIntro")), head: at($("#sLibPage .lib-head")), cols: at($("#sLib .lib-cols")) };
+  const parts = { header: at($("#app > header")), head: at($("#sLibPage .lib-head")), cols: at($("#sLib .lib-cols")) };
+  // the column heads pin where they'd stand without the New row, which goes up under the search's line first
+  if (parts.cols) { parts.cols.top -= newRoom(); parts.cols.bottom -= newRoom(); }
   let bottom = 0;
   for (const [k, r] of Object.entries(parts)) if (r) { root.style.setProperty(`--top-${k}`, r.top + "px"); bottom = Math.max(bottom, r.bottom); }
   root.style.setProperty("--mast", bottom + "px");
@@ -323,12 +589,17 @@ function pinLibTop() {
 }
 addEventListener("resize", pinLibTop);
 // The fades on the library, each as tall as there's list beyond it, up to FADE_H: under its pinned top it grows in
-// with the scroll as rows go under, and at its foot it draws back as the end comes up. now: a change of page, where
-// they're there (or gone) at once with the page, not fading in.
+// with the scroll as rows go under, and at its foot it draws back as the end comes up. now: a change of page or the
+// list drawn (a reload, scrolled down it), where they're there (or gone) at once with it, not fading in after.
 const FADE_H = 192;
+// the room the New row takes above the list (none while it's hidden): hidden, the list starts where it does
+const newRoom = () => { const n = $("#sNew"); return n.hidden ? 0 : $("#sLib").offsetTop - n.offsetTop; };
 function paintFade(now) {
   const lib = view === "stems" && stemsPage === "lib", below = document.documentElement.scrollHeight - (scrollY + innerHeight);
-  for (const [f, px] of [[$("#listFade"), below], [$("#listFadeTop"), scrollY]]) {
+  // the New row, over the band behind the pinned top while it goes up: cut off where it reaches the search's line
+  const nw = $("#sNew");
+  if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
+  for (const [f, px] of [[$("#listFade"), below], [$("#listFadeTop"), scrollY - newRoom()]]) {
     if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
     f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
     f.classList.toggle("on", lib && px > 0);
@@ -374,6 +645,8 @@ function awaitLookups(lib, tries = 0) {
       if ("cover" in m) known.cover = m.cover;
       known.upgrade = m.upgrade;
       paintCover(row.querySelector(".cover"), m); paintUpgrade(row.querySelector(".cover"), m);
+      const card = $(`#sNewTrack .ln-card[data-id="${m.id}"]`);
+      if (card && !row.querySelector(".rename")) paintNewCard(card, { ...known, title: m.title, artist: m.artist });
       if ((known.title !== m.title || known.artist !== m.artist) && !row.querySelector(".rename")) { // not while it's being renamed
         known.title = m.title; known.artist = m.artist; renamed = true;
         const link = row.querySelector(".song a");
@@ -390,10 +663,21 @@ function awaitLookups(lib, tries = 0) {
 const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]; // G♭ (6 flats, as its notes are spelt) for F♯
 const KEY_MINOR = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"];
 const keyName = (k) => (k ? `${(k.mode === "major" ? KEY_MAJOR : KEY_MINOR)[k.pc]} ${tr(k.mode)}` : ""); // G♯ minor, G♯ 단조
+const keyShort = (k) => (k ? (k.mode === "major" ? KEY_MAJOR[k.pc] : KEY_MINOR[k.pc] + "m") : ""); // as chord charts have it: A, G♯m
+// A key's colour, as DJs' Camelot wheel has it: its place on the circle of fifths (C major 8B, A minor 8A beside it),
+// a hue each, 1 teal round through green, yellow, orange, red, pink, purple and blue to 12 cyan, so keys that go
+// together look alike; a minor key its relative major's. Even lightness and chroma (OKLCH, in the CSS), minor dimmer.
+const CAMELOT_HUE = [180, 150, 128, 100, 65, 30, 0, 330, 305, 280, 250, 215]; // 1 to 12
+const camelot = (k) => ((((k.mode === "major" ? k.pc : k.pc + 3) * 7) % 12) + 7) % 12 + 1;
+function paintKeyCell(cell, k) {
+  cell.textContent = keyShort(k);
+  cell.classList.toggle("keyed", !!k); cell.classList.toggle("minor", k?.mode === "minor");
+  if (!k) { cell.style.removeProperty("--key-h"); cell.removeAttribute("title"); return; }
+  cell.style.setProperty("--key-h", CAMELOT_HUE[camelot(k) - 1]);
+  cell.title = `${keyName(k)} · Camelot ${camelot(k)}${k.mode === "major" ? "B" : "A"}`; // in full, and its code for DJs
+}
 const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : tr("no steady beat"), keyName(m.key)].filter(Boolean);
 const libLine = (m) => [m.title, m.artist, ...songFacts(m)].filter(Boolean).join(" · "); // read out for a row
-// the day a song was added, as 2026-10-20 (the computer's own day)
-const dayOf = (t) => { const d = new Date(t * 1000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 // Songs added before keys were read get theirs from /info, which works it out once (about a second) and saves it.
 const keyJobs = new Map();
 function keyOf(m) {
@@ -403,19 +687,60 @@ function keyOf(m) {
 }
 
 // The library's ⋮ menu: Info, Rename, and Delete (which asks "Really delete?" first). One shared menu, placed under the button.
-let menuSong = null, menuBtn = null;
+// Under the ⋮, clear of the list's foot fade (drawn over the page, menu and all); else above it, clear of the pinned
+// top. A ⋮ down in the fade: its song glides up (New folding away first, if it's open), then the menu opens under it.
+let menuSong = null, menuBtn = null, menuWay = 0; // menuWay: counts menus asked for, so one superseded mid-glide doesn't open
+function menuSpot(btn) { // where the menu goes, {top, left}, or how far its song has to come up, {need}
+  const menu = $("#songMenu"), shown = !menu.hidden;
+  menu.hidden = false; const gap = floatGap(), h = menu.offsetHeight, w = menu.offsetWidth; menu.hidden = !shown;
+  const r = btn.getBoundingClientRect(), foot = innerHeight - $("#listFade").offsetHeight - gap;
+  const head = document.documentElement.classList.contains("lib-top") ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mast")) + gap : gap;
+  if (r.bottom + gap + h <= foot) return { top: r.bottom + gap, left: r.right - w };
+  if (r.top - gap - h >= head && r.bottom <= foot + gap) return { top: r.top - gap - h, left: r.right - w }; // (the ⋮ clear of the fade)
+  // its song up only as far as the ⋮ coming out of the fade, the menu then above it (as for the songs just above);
+  // under it only where there's no room above (a short window)
+  const up = Math.ceil(r.bottom - foot - gap) + 1; // (a pixel over: clear of it, not on its edge)
+  const need = r.top - up - gap - h >= head ? up : r.bottom + gap + h - foot;
+  return { need, top: Math.max(head, Math.min(r.top, foot - h)), left: r.left - gap - w }; // (where it goes if it can't come up that far)
+}
 function songMenu(btn, m) {
   if (menuBtn === btn) { closeMenu(); return; }
   closeMenu();
+  const way = ++menuWay, s = menuSpot(btn);
+  if (!s.need || stillMotion()) { openMenu(btn, m, s); return; }
+  if (newOpen && !newMove) { shutNew(); setTimeout(() => { if (way === menuWay) songMenuUp(btn, m, way); }, NEW_MS + 40); return; } // New's fold brings it up
+  songMenuUp(btn, m, way);
+}
+function songMenuUp(btn, m, way) {
+  const s = menuSpot(btn), most = document.documentElement.scrollHeight - innerHeight;
+  if (!s.need || scrollY >= most) { openMenu(btn, m, s); return; }
+  glideBy(Math.min(s.need, most - scrollY), way, () => openMenu(btn, m, menuSpot(btn)));
+}
+// the page scrolled by dy over GLIDE ms, easing out, for the menu asked for as way (stopping if another's asked for);
+// done once it's there and the scroll it made has been seen. gliding: that scroll doesn't close menus.
+const GLIDE = 280;
+let gliding = false;
+function glideBy(dy, way, done) {
+  const from = scrollY, t0 = performance.now();
+  gliding = true;
+  const step = (now) => {
+    if (way !== menuWay) { gliding = false; return; }
+    const p = Math.min(1, (now - t0) / GLIDE);
+    scrollTo(0, from + dy * (1 - (1 - p) ** 3));
+    requestAnimationFrame(p < 1 ? step : () => { gliding = false; if (way === menuWay) done(); });
+  };
+  requestAnimationFrame(step);
+}
+function openMenu(btn, m, s) {
   const menu = $("#songMenu"), del = $("#mDelete");
   menuSong = m; menuBtn = btn; btn.setAttribute("aria-expanded", "true"); btn.classList.add("open");
   del.dataset.armed = ""; del.querySelector("span").textContent = tr("Delete");
   menu.hidden = false;
-  const r = btn.getBoundingClientRect();
-  menu.style.top = `${r.bottom + floatGap()}px`; menu.style.left = `${Math.max(8, r.right - menu.offsetWidth)}px`;
-  $("#mInfo").focus();
+  menu.style.top = `${s.top}px`; menu.style.left = `${Math.max(8, s.left)}px`;
+  $("#mInfo").focus({ preventScroll: true });
 }
 function closeMenu() {
+  menuWay++; // one on its way doesn't open
   if (!menuBtn) return;
   $("#songMenu").hidden = true; menuBtn.setAttribute("aria-expanded", "false"); menuBtn.classList.remove("open");
   menuSong = null; menuBtn = null;
@@ -442,7 +767,8 @@ function initSongMenu() {
     if (to !== undefined) { e.preventDefault(); items[(to + items.length) % items.length].focus(); }
     else if (e.key === "Tab" && menuBtn) { e.preventDefault(); const b = menuBtn; closeMenu(); focusFrom(b, e.shiftKey); }
   });
-  for (const ev of ["scroll", "resize", "hashchange"]) addEventListener(ev, closeMenu, { passive: true });
+  for (const ev of ["resize", "hashchange"]) addEventListener(ev, closeMenu, { passive: true });
+  addEventListener("scroll", () => { if (!gliding) closeMenu(); }, { passive: true }); // fixed in place, it'd be left behind
 }
 // Rename, in place: a field over the row's title (a textarea, so a long title keeps its line breaks), all of it
 // selected. Enter or leaving the field saves; Escape, an empty title or the same one changes nothing.
@@ -480,5 +806,8 @@ function renameSong(row, m) {
 // afresh each time it opens.)
 function songRenamed(id, title) {
   for (const s of [libCache.get(id), P.song, K.song]) if (s && s.id === id) s.title = title;
+  const card = $(`#sNewTrack .ln-card[data-id="${id}"]`);
+  if (card && libCache.get(id)) paintNewCard(card, libCache.get(id));
   if (P.song && P.song.id === id) $("#pTitle").textContent = title;
+  paintCrumbs(); // the song's name in them too
 }

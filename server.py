@@ -1,4 +1,4 @@
-"""Local server for Stem: serves the page and the song library (stems, beats, melody, exports, takes).
+"""Local server for Pitchroom: serves the page and the song library (stems, beats, melody, exports, takes).
 
 Normally started by launch.py (via the start-* launchers). Direct use:
 
@@ -66,6 +66,9 @@ class Handler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     _unread = 0  # request body bytes not read yet
     _code = False  # the page's own code being sent: asked about again each time (no-cache), so an update is seen
+    # a song's cover asked for by its version (?v=, the time it was made): kept, never asked about again. Without it a
+    # reload asked the server about each cover made lately before showing it, and they came in blank.
+    _keep = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
@@ -128,6 +131,9 @@ class Handler(SimpleHTTPRequestHandler):
         if self._code:  # one reply's; a keep-alive connection's next request starts without it
             self.send_header("Cache-Control", "no-cache")
             self._code = False
+        if self._keep:
+            self.send_header("Cache-Control", "max-age=31536000, immutable")
+            self._keep = False
         super().end_headers()
 
     def list_directory(self, path):
@@ -214,6 +220,7 @@ class Handler(SimpleHTTPRequestHandler):
         if not path.startswith("/api/"):
             if not self._static(path):
                 return self.send_error(404)
+            self._keep = path.endswith(("/cover.jpg", "/cover-96.jpg")) and "v" in parse_qs(urlparse(self.path).query)
             return None if self._send_range() else super().do_GET()
         try:
             return self._get_api(path)
@@ -295,7 +302,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"job": stems.start_upload(self._body(MAX_SONG), name, model)})
         if url.path == "/api/stems/youtube":
             body = json.loads(self._body(10_000) or b"{}")
-            return self._json(200, {"job": stems.start_youtube(body.get("url", "").strip(), body.get("model", model))})
+            return self._json(200, {"job": stems.start_youtube(str(body.get("url") or "").strip(), body.get("model", model), body.get("find"), bool(body.get("low")), body.get("name"))})
+        if url.path == "/api/stems/playlist":  # {url}: what's on a YouTube or Spotify playlist, to pick from (stems.playlist)
+            body = json.loads(self._body(10_000) or b"{}")
+            return self._json(200, stems.playlist(str(body.get("url") or "") if isinstance(body, dict) else ""))
         parts = url.path.strip("/").split("/")  # api/library/<id>/<action>, api/jobs/<id>/cancel
         if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "cancel":
             return self._json(200, {"status": stems.cancel_job(parts[2])})
@@ -404,5 +414,5 @@ def serve(port: int) -> ThreadingHTTPServer:
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5178
-    print(f"Stem: http://localhost:{port}")
+    print(f"Pitchroom: http://localhost:{port}")
     serve(port).serve_forever()

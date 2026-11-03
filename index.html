@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Stem</title>
+<title>Pitchroom</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script>
   // The page waits behind the opening bar (boot() lets it in) the first time the app opens in a tab: not on a reload,
@@ -39,29 +39,19 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 <canvas id="aurora" width="64" height="40" aria-hidden="true"></canvas>
 <div class="app" id="app">
   <header>
-    <a class="brand" href="#stems">Stem</a>
+    <a class="brand" href="#stems">Pitchroom</a>
     <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
-    <a class="btn sm icon quiet" id="voiceBtn" href="#voice" aria-label="Chest & head voice" title="Chest & head voice"></a>
+    <a class="btn sm icon quiet" id="voiceBtn" href="#voice" aria-label="Lab" title="Lab: chest and head voice, the spectrum, formants"></a>
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
-    <button class="btn sm icon quiet" id="micSetBtn" type="button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="micSet"></button>
+    <a class="btn sm icon quiet" id="micSetBtn" href="#settings" aria-label="Settings" title="Settings"></a>
     <div class="pop" id="micNote" role="alert" hidden></div>
-    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b>Adding songs</b><button class="btn sm" id="jobsAddBtn" type="button">Add song</button></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div>
+    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b class="pop-title">Adding songs</b><button class="btn sm" id="jobsAddBtn" type="button">Add song</button></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div>
       <div class="menu" id="ytMenu" role="menu" aria-label="Add song" hidden><button id="ytImport" type="button" role="menuitem"><span class="yt-what"><span>Import from YouTube</span><small id="ytTitle"></small></span></button><button id="ytOther" type="button" role="menuitem"><span>Another link or a file…</span></button></div></div>
-    <div class="pop" id="micSet" role="dialog" aria-label="Settings" hidden>
-      <label>Language <button class="pick" id="lang" type="button"></button></label>
-      <label>Input <button class="pick" id="micDev" type="button"></button></label>      <div class="gate-sec">
-        <div class="gate-head"><span>Mic sensitivity</span><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button><button class="btn sm" id="hearMe" type="button" aria-pressed="false" title="Through headphones: through speakers it can howl">Hear yourself</button></div></div>
-        <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>      </div>
-      <label>Filter out speaker sound <input type="checkbox" class="switch" id="echo"></label>
-      <label>Note names <button class="pick" id="names" type="button"></button></label>
-      <div class="pop-sec"><span>Accent colour</span><div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div></div>
-      <div class="pop-sec"><label>Developer tools <input type="checkbox" class="switch" id="devTools"></label></div>
-    </div>
   </header>
 
   <main id="vPractice" aria-label="Practice" hidden>
-    <div class="backbar"><button class="btn sm back" id="kLeave" type="button">Studio</button>
-      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b>Headphones</b><div id="earRows"></div></div></span><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
+    <div class="backbar"><nav class="crumbs" id="kCrumbs" aria-label="Where you are"></nav>
+      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b class="pop-title">Headphones</b><div id="earRows"></div></div></span><button class="btn sm quiet sync-btn" id="syncGo" type="button" aria-live="polite"><span id="syncNow"></span></button><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
     <div class="pr-cols" id="prCols">
     <div class="pr-main">
     <div class="songbar" id="songBar">
@@ -126,23 +116,25 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     </div>
     <section class="takes" id="takes" aria-labelledby="tkTitle" hidden>
       <div class="tk-head">
-        <div class="tk-title"><h2 class="group-label" id="tkTitle">Takes</h2><a class="btn sm" id="tkStudio" hidden>Takes Studio</a></div>
+        <div class="tk-title"><h2 class="group-label" id="tkTitle">Takes</h2><span class="tk-n" id="tkCount"></span><button class="btn xs icon ghost disclose" id="tkFold" type="button" aria-expanded="true" hidden></button></div>
         <div class="tk-mix" id="tkMix" role="group" aria-label="How takes sound, played and downloaded" hidden>
           <label class="kfield">Your voice <input type="range" id="tkVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
           <label class="kfield">Band <input type="range" id="tkBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
           <label class="kfield">Guide vocal <input type="range" id="tkGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
         </div>
+        <a class="btn sm" id="tkStudio" hidden>Takes Studio</a>
       </div>
       <div class="tk-days" id="tkList"></div>
       <p class="tk-empty" id="tkEmpty" hidden>Recording is on. Play, and each time you sing along is kept here.</p>
     </section>
     </div>
   </main>
-  <main id="vVoice" aria-label="Chest & head voice" hidden>
+  <main id="vVoice" aria-label="Lab" hidden>
     <div class="backbar"><button class="btn sm back" id="vcBack" type="button">Back</button>
-      <div class="bb-acts"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="true">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="false" title="Spectrogram">Spectrum</button></div></div></div>
+      <div class="bb-acts"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="true">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="false">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div></div>
     <div class="vc">
       <section class="vc-spec" aria-label="Spectrogram" hidden><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
+      <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false" title="Keep this moment faintly behind, to sing against (an onion skin): the spectrum, the vowel's shape, the formants, and the dot on the pad. Pressed again, it goes">Freeze</button></section>
       <section class="vc-pad" aria-label="Where your voice is">
         <canvas id="vcPad" aria-hidden="true"></canvas>
         <span class="vc-ax up">Forward · bright</span><span class="vc-ax down">Back · dark</span><span class="vc-ax left">Chest</span><span class="vc-ax right">Head</span>
@@ -155,6 +147,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
           <div title="H1−H2: how much louder your lowest harmonic is than the next. Higher is heady, lower is chesty."><dt>H1−H2</dt><dd id="vcH12">–</dd></div>
           <div title="Energy at 2–4 kHz against below 1 kHz. Higher sounds forward and bright."><dt>Brightness</dt><dd id="vcBright">–</dd></div>
           <div><dt>Level</dt><dd id="vcLvl">–</dd></div>
+          <div title="Formants, the vowel's shape: F1 rises as the mouth opens, F2 as the tongue comes forward. Less sure on high notes, where the harmonics are far apart"><dt>F1 · F2</dt><dd id="vcF12">–</dd></div>
         </dl>
         <div class="vc-step">
           <div class="vc-step-head"><b title="Set a note, then go up a semitone at a time">Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button" title="Play it">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
@@ -171,11 +164,42 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     </div>
     <div class="keys-wrap"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
   </main>
-  <main id="vStems" aria-label="Stems" hidden>
-    <div class="intro" id="sIntro">
-      <h1 class="title">Practice any song</h1>
+  <main id="vSettings" aria-label="Settings" hidden>
+    <div class="backbar"><nav class="crumbs" id="setCrumbs" aria-label="Where you are"></nav></div>
+    <div class="set-layout">
+      <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Microphone</button><button type="button" data-to="setMore">Advanced</button></nav>
+      <div class="settings" id="micSet">
+        <section class="set-group" aria-labelledby="setGeneral">
+          <h2 class="group-label" id="setGeneral">General</h2>
+          <div class="set-list">
+            <div class="set-row"><div class="set-what"><b>Language</b><small>The app’s words</small></div><button class="pick" id="lang" type="button"></button></div>
+            <div class="set-row"><div class="set-what"><b>Note names</b><small>On the stage and the keyboard</small></div><button class="pick" id="names" type="button"></button></div>
+            <div class="set-row"><div class="set-what"><b>Accent colour</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div></div>
+          </div>
+        </section>
+        <section class="set-group" aria-labelledby="setMic">
+          <h2 class="group-label" id="setMic">Microphone</h2>
+          <div class="set-list">
+            <div class="set-row"><div class="set-what"><b>Input</b><small>What you sing into</small></div><button class="pick" id="micDev" type="button"></button></div>
+            <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button" title="Hold your headphones close to the mic, then press">Measure</button></div></div>
+            <div class="set-row gate-sec">
+              <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button><button class="btn sm" id="hearMe" type="button" aria-pressed="false" title="Through headphones: through speakers it can howl">Hear yourself</button></div></div>
+              <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>
+            </div>
+            <label class="set-row"><span class="set-what"><b>Filter out speaker sound</b><small>For speakers; leave it off with headphones</small></span><input type="checkbox" class="switch" id="echo"></label>
+          </div>
+        </section>
+        <section class="set-group" aria-labelledby="setMore">
+          <h2 class="group-label" id="setMore">Advanced</h2>
+          <div class="set-list">
+            <label class="set-row"><span class="set-what"><b>Developer tools</b><small>Mark where Practice’s phrases should split or join</small></span><input type="checkbox" class="switch" id="devTools"></label>
+          </div>
+        </section>
+      </div>
     </div>
-    <div class="backbar" id="sBackBar" hidden><a class="btn sm back" id="sBack" href="#stems">Library</a><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)">Save</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
+  </main>
+  <main id="vStems" aria-label="Stems" hidden>
+    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)">Save</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
@@ -189,26 +213,25 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <div id="libMast" aria-hidden="true"></div>
     <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
     <div id="addVeil" aria-hidden="true"></div>
-    <section class="group" id="sLibPage" aria-label="Library">
+    <section class="group" id="sLibPage" aria-labelledby="sLibTitle">
       <div class="lib-head">
+        <span class="ln-pull" id="sNewPull" aria-hidden="true"></span>
+        <h2 class="group-label lib-title" id="sLibTitle">Library</h2>
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
         <button class="btn sm" id="sUpdate" type="button" hidden>Update</button>
-        <span class="sync-at"><button class="btn sm" id="syncBtn" type="button" aria-expanded="false" aria-controls="syncPop" title="Measure how late your voice reaches the app">Sync settings</button>
-        <div class="pop" id="syncPop" role="dialog" aria-label="Sync settings" hidden>
-          <b>Sync settings</b>
-          <p class="hint" id="syncNow"></p>
-          <p class="hint">Hold your headphones close to the mic and press Measure.</p>
-          <div class="sync-acts"><button class="btn sm primary" id="syncGo" type="button">Measure</button><button class="btn sm ghost" id="syncForget" type="button" hidden>Forget it</button></div>
-          <p class="sync-msg" id="syncMsg" aria-live="polite" hidden></p>
-        </div></span>
         <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button>
         <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
           <div class="add-form" id="sAdd" hidden>
-            <b>Add a song</b>
+            <b class="pop-title">Add a song</b>
             <form class="yt" id="sYtForm">
-              <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links, one per line" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
+              <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links or a playlist" title="YouTube links, one per line, or a YouTube or Spotify playlist link" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
               <button class="btn sm primary" type="submit">Add</button>
             </form>
+            <div class="pl" id="plPick" hidden>
+              <div class="pl-head"><input type="checkbox" id="plAll" title="All or none" aria-label="All or none"><b id="plName"></b><span id="plCount"></span></div>
+              <div class="pl-list" id="plList"></div>
+              <div class="pl-acts"><button class="btn sm ghost" id="plBack" type="button">Cancel</button><button class="btn sm primary" id="plGo" type="button" title="Added one at a time, at low priority, so the PC stays free">Add</button></div>
+            </div>
             <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
             <div class="gpu-row" id="sGpu" hidden>
               <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
@@ -220,11 +243,15 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
           </div>
           <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
         </div></span></div>
+      <section class="lib-new" id="sNew" aria-labelledby="sNewTitle" hidden>
+        <div class="ln-head"><h2 class="group-label" id="sNewTitle">New <span class="ln-n" id="sNewCount"></span></h2><span class="ln-arrows"><button class="btn sm icon ghost" id="sNewPrev" type="button" aria-label="Back" title="Back"></button><button class="btn sm icon ghost" id="sNewNext" type="button" aria-label="More" title="More"></button></span></div>
+        <div class="ln-track" id="sNewTrack"></div>
+      </section>
       <div class="rows" id="sLib"></div>
     </section>
 
     <section class="ts" id="sTakesStudio" aria-label="Takes Studio" hidden>
-      <div class="ts-top"><a class="btn sm back" id="tsBack" href="#stems">Practice</a><b id="tsTitle"></b></div>
+      <div class="ts-top"><nav class="crumbs" id="tsCrumbs" aria-label="Where you are"></nav></div>
       <div class="ts-bar">
         <button class="btn primary round" id="tsPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <output id="tsTime">0:00 / 0:00</output>

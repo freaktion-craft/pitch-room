@@ -66,7 +66,7 @@ def _new_job(kind: str, name: str = "") -> dict:
     """name: what a song being added is called, as far as it's known (a file's name; a link's video's title, once
     it's been got, the link until then)."""
     job = {"id": secrets.token_hex(6), "kind": kind, "status": "queued", "stage": "Waiting", "progress": 0.0,
-           "error": None, "songId": None, "log": [], "started": time.time(), "cancel": False, "name": name}
+           "error": None, "songId": None, "log": [], "started": time.time(), "cancel": False, "name": name, "link": None}
     with _jobs_lock:
         _jobs[job["id"]] = job
     return job
@@ -76,7 +76,7 @@ def active_jobs() -> list[dict]:
     """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress."""
     with _jobs_lock:
         jobs = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
-        return [{k: j[k] for k in ("id", "kind", "status", "stage", "progress", "cancel", "name")} for j in sorted(jobs, key=lambda j: j["started"])]
+        return [{k: j[k] for k in ("id", "kind", "status", "stage", "progress", "cancel", "name", "link")} for j in sorted(jobs, key=lambda j: j["started"])]
 
 
 def get_job(job_id: str) -> dict | None:
@@ -141,13 +141,30 @@ def _turn(job):
                 time.sleep(0.1)
         try:
             _check(job)
+            if job.get("low"):
+                _low_priority(True)
             yield
         finally:
+            if job.get("low"):
+                _low_priority(False)
             _free_gpu()
             _work_lock.release()
     finally:
         with _jobs_lock:
             _line.remove(job["id"])
+
+
+def _low_priority(on: bool):
+    """A playlist's songs are worked on below normal priority, so the PC stays smooth for whatever else runs (a DAW):
+    the whole app, while one has its turn (the ffmpeg it runs inherits it), back to normal after. Windows only; elsewhere
+    a process can't raise its priority back once lowered."""
+    if os.name != "nt":
+        return
+    import ctypes
+    k = ctypes.windll.kernel32
+    k.GetCurrentProcess.restype = ctypes.c_void_p
+    k.SetPriorityClass.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
+    k.SetPriorityClass(k.GetCurrentProcess(), 0x4000 if on else 0x20)  # BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS
 
 
 def _free_gpu():
@@ -425,8 +442,52 @@ def library() -> list[dict]:
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
             if _lookup_wanted(meta):
                 _want_lookup(d)
+            c = meta.get("cover")
+            if isinstance(c, dict) and "hash" not in c and not c.get("none"):
+                _want_extras(d)
             out.append(meta)
     return sorted(out, key=lambda m: m.get("created", 0), reverse=True)
+
+
+# A cover saved before there were these (or since): its small copy, colour and BlurHash (covers.extras), made in the
+# background one at a time (two ffmpeg runs, about a tenth of a second) so the listing doesn't wait, into meta.json's
+# cover as thumb (its size), tone and hash; the next listing has them.
+_extras_line: list[str] = []
+_extras_lock = threading.Lock()
+
+
+def _want_extras(song_id: str):
+    with _extras_lock:
+        if song_id in _extras_line:
+            return
+        _extras_line.append(song_id)
+        if len(_extras_line) == 1:
+            threading.Thread(target=_extras_worker, daemon=True).start()
+
+
+def _extras_worker():
+    import covers
+    while True:
+        with _extras_lock:
+            if not _extras_line:
+                return
+            song_id = _extras_line[0]
+        folder = _song_dir(song_id)
+        try:
+            at = (_read_meta(folder).get("cover") or {}).get("at")
+            x = covers.extras(ffmpeg_exe(), folder)
+            x = dict(x, thumb=covers.THUMB) if x else {"none": True}  # (none: not tried again on every listing)
+            with _meta_lock:
+                disk = _read_meta(folder)
+                if isinstance(disk.get("cover"), dict) and disk["cover"].get("at") == at:  # still the cover it was made from
+                    disk["cover"].update(x)
+                    _write_json(os.path.join(folder, "meta.json"), disk, ensure_ascii=False)
+        except (OSError, ValueError) as e:  # deleted meanwhile, or unreadable: the cover shows as it is
+            print(f"Couldn't make library/{song_id}'s small cover: {e}", file=sys.stderr)
+        with _extras_lock:
+            _extras_line.pop(0)
+            if not _extras_line:
+                return
 
 
 # What a song is (covers.py), looked up one song at a time in the background: as it's added, and for the songs added
@@ -435,7 +496,7 @@ def library() -> list[dict]:
 #   artist       the record's artist, or a cover's singer; "" when not known; absent until looked up
 #   sourceTitle  the video's or file's own title, which lyrics and covers are looked for by
 #   cover        {"from": "file", "itunes", "deezer" or "youtube", "at", "px"} once cover.jpg is saved, None when
-#                there's none to be had
+#                there's none to be had; with thumb, tone and hash (cover-96.jpg, its colour, a BlurHash: _want_extras)
 _lookup_line: list[str] = []
 _lookup_asked: set[str] = set()
 _lookup_lock = threading.Lock()
@@ -444,7 +505,11 @@ _lookup_lock = threading.Lock()
 def _lookup_wanted(meta: dict) -> bool:
     import covers
     c = meta.get("cover", False)
-    return "artist" not in meta or (c is not None and (not c or c.get("px", 0) < covers.SIZE))
+    # named from before covers.own_name: by the record's translation of its own name (a link's, not renamed since; a
+    # file's own tags name it as they are)
+    translated = (not meta.get("named") and bool(re.match(r"^https?://", meta.get("source") or ""))
+                  and bool(covers.own_name(meta.get("sourceTitle") or "", meta.get("title") or "")))
+    return "artist" not in meta or translated or (c is not None and (not c or c.get("px", 0) < covers.SIZE))
 
 
 def _want_lookup(song_id: str):
@@ -529,7 +594,7 @@ def _look_up(song_id: str):
     except RuntimeError as e:
         failed = e
     if record and not name:
-        name = (record["track"], record["artist"])
+        name = (covers.own_name(own, record["track"]) or record["track"], record["artist"])
     if cover and not tagged:  # the song it covers, sung by: whoever the title says, or the artist before " - " if
         # that isn't the record's, or the channel
         song = name[0] if name else lyrics.split_title(covers.COVER.sub(" ", covers.COVER_BY.sub(" ", own)))[1] or own
@@ -590,11 +655,60 @@ def start_upload(data: bytes, filename: str, model: str) -> str:
     return _run(job, _pipeline, {"kind": "upload", "data": data, "filename": filename}, model)
 
 
-def start_youtube(url: str, model: str) -> str:
-    if not re.match(r"^https?://", url or ""):
+def start_youtube(url: str, model: str, find=None, low: bool = False, name=None) -> str:
+    """A song from a link. find: {artist, title, duration} for a playlist's song from Spotify, looked for on YouTube once
+    its turn comes (playlists.match) rather than linked. low: a playlist's, worked on at low priority (_low_priority).
+    name: what to call it until its video's title is known."""
+    if find is not None:
+        if not isinstance(find, dict) or not isinstance(find.get("title"), str) or not find["title"].strip():
+            raise ValueError("Send the song’s title to look for.")
+        find = {"artist": str(find.get("artist") or "")[:TITLE_MAX], "title": find["title"][:TITLE_MAX],
+                "duration": find["duration"] if isinstance(find.get("duration"), (int, float)) else None}
+        name = f"{find['artist']} – {find['title']}" if find["artist"] else find["title"]
+    elif not re.match(r"^https?://", url or ""):
         raise ValueError("Paste a full link that starts with https://")
-    job = _new_job("separate", url)
-    return _run(job, _pipeline, {"kind": "url", "url": url}, model)
+    else:
+        import playlists
+        if playlists.is_playlist(url):
+            raise ValueError("That’s a playlist: add it from the Add song form.")
+        name = name[:TITLE_MAX] if isinstance(name, str) and name.strip() else url  # a playlist's video: its title, known already
+    job = _new_job("separate", name)
+    job["link"], job["low"] = url or None, bool(low)
+    return _run(job, _pipeline, {"kind": "url", "url": url, "find": find}, model)
+
+
+def playlist(url: str) -> dict:
+    """What's on a playlist (playlists.read), each song with have: whether it's in the library already or being added.
+    A video: the same one, or a song's name and artist both in its title and channel. A Spotify track: its name among
+    a song's (or a song being added's) words, and its artist's too."""
+    import playlists
+    found = playlists.read(url)
+    songs = library()
+    with _jobs_lock:
+        adding = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
+    ids = {v for s in [m.get("source") or "" for m in songs] + [j["link"] or "" for j in adding] if (v := _video_id(s))}
+    known = [(_words_of(playlists._base(m.get("title") or "")), _words_of(m.get("artist") or ""), _words_of(f"{m.get('title')} {m.get('sourceTitle') or ''}"),
+              _words_of(f"{m.get('artist') or ''} {m.get('channel') or ''} {m.get('sourceTitle') or ''}")) for m in songs]
+    known += [(set(), set(), _words_of(j["name"] or ""), _words_of(j["name"] or "")) for j in adding]
+    for it in found["items"]:
+        if it["url"]:
+            said = _words_of(f"{it['title']} {it['artist']}")
+            it["have"] = _video_id(it["url"]) in ids or any(t and a and t <= said and a <= said for t, a, _, _ in known)
+        else:
+            t, a = _words_of(playlists._base(it["title"])), _words_of(it["artist"])
+            it["have"] = any(t and t <= names and (not a or a & who) for _, _, names, who in known)
+    return found
+
+
+def _video_id(url: str) -> str | None:
+    import covers
+    m = covers.YT_ID.search(url)
+    return m.group(1) if m else None
+
+
+def _words_of(s: str) -> set[str]:
+    import lyrics
+    return lyrics._words(s)
 
 
 @lru_cache(maxsize=1)
@@ -804,7 +918,7 @@ def _beats(drums: np.ndarray, mix: np.ndarray, dur: float) -> tuple[float | None
 def _pipeline(job, src: dict, model_name: str):
     """The song into the library: its stems, beat and key, then (in a job of their own) its lyrics."""
     if not installed():
-        raise RuntimeError("Stem tools aren’t installed yet.")
+        raise RuntimeError("Pitchroom’s tools aren’t installed yet.")
     if model_name not in MODELS:
         model_name = "htdemucs"
     song_id = secrets.token_hex(6)
@@ -816,6 +930,18 @@ def _pipeline(job, src: dict, model_name: str):
             _set(job, status="running", stage="Getting the audio", progress=0.02)
             video, channel = None, ""
             if src["kind"] == "url":
+                if src.get("find"):  # a Spotify playlist's song: the likeliest video of it
+                    import playlists
+                    _set(job, stage="Finding it on YouTube")
+                    f = src["find"]
+                    try:
+                        src["url"] = playlists.match(f["artist"], f["title"], f["duration"])
+                    except Exception:  # noqa: BLE001
+                        raise ValueError("Couldn’t search YouTube. Is this computer online?") from None
+                    if not src["url"]:
+                        raise ValueError("Not found on YouTube.")
+                    _set(job, link=src["url"])
+                    _check(job)
                 path, title, channel = _download(job, src["url"], folder)
                 _set(job, name=title)
                 source = src["url"]
@@ -883,7 +1009,7 @@ def _pipeline(job, src: dict, model_name: str):
         raise
     _want_lookup(song_id)
     try:
-        start_lyrics(song_id, None)
+        start_lyrics(song_id, None, low=bool(job.get("low")))
     except Exception as e:  # noqa: BLE001  (the song is in; its lyrics can be found from Practice)
         print(f"Couldn't start finding library/{song_id}'s lyrics: {e}", file=sys.stderr)
 
@@ -1347,7 +1473,7 @@ def get_lyrics(song_id: str) -> dict:
     return {"lyrics": data, "job": running["id"] if running and running["status"] in ("queued", "running") else None}
 
 
-def start_lyrics(song_id: str, how, again: bool = False) -> str:
+def start_lyrics(song_id: str, how, again: bool = False, low: bool = False) -> str:
     """Find a song's lyrics and line them up with its voice, in the background (half a minute at most on a GPU; the
     first time, Whisper's model is downloaded too). how: None to look on LRCLIB by the title, {"id": n} for an entry
     picked from search_lyrics, {"text": …} for lyrics pasted in. again: the lines the song has, lined up again as the
@@ -1404,6 +1530,7 @@ def start_lyrics(song_id: str, how, again: bool = False) -> str:
     job = _new_job("lyrics")
     job["songId"] = song_id
     job["upgrade"] = again
+    job["low"] = low  # a playlist's song's: at low priority too
     _lyrics_jobs[song_id] = _run(job, work)
     return _lyrics_jobs[song_id]
 
@@ -2864,11 +2991,11 @@ def _wav(samples: np.ndarray) -> bytes:
 
 def _take_band(song_id: str, folder: str, meta: dict, key: int, speed: float, band: float, guide: float, s0: int, n: int) -> np.ndarray:
     """The band as takes are heard with it, n samples from s0 (at the tempo they were sung at): every track but the
-    guide vocal (the lead once split, else the vocal stem) times band, as with Practice's Band slider, so backing
-    vocals are in it; the guide vocal times guide; in the key they were sung in."""
+    guide vocal times band, as with Practice's Band slider; the guide vocal (all the singing: the lead and the backing
+    vocals once split, else the vocal stem, as Practice's Guide vocal slider has it) times guide; in the key they were
+    sung in."""
     names = _tracks(folder, meta)
-    lead = "lead" if "lead" in names else "vocals"
-    parts = [(t, g) for t, g in [(t, band) for t in names if t != lead] + [(lead, guide)] if g > 0]
+    parts = [(t, g) for t, g in [(t, guide if t in ("vocals", "lead", "backing") else band) for t in names] if g > 0]
     if (key and any(t != "drums" for t, _ in parts)) or speed != 1:
         _key_ready(song_id, key, speed)
     out, vocal = np.zeros((2, n), dtype=np.float32), None

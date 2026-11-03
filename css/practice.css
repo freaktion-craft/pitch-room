@@ -1,15 +1,16 @@
 /* Practice's bars and panels, its phrases, Record; the takes and the Takes Studio. */
 /* Practice */
-.songbar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; margin: calc(var(--space-1) * -1) 0 var(--space-3); padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-hairline); font-size: var(--text-sm); }
+/* the Studio's player card's box (.player), so its key and tempo stay put going from the one to the other */
+.songbar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; margin: 0 0 var(--space-3); padding: var(--pad-card); border-radius: var(--radius-card); background: var(--surface); font-size: var(--text-sm); }
 /* the controls, wrapping as the width needs: play, seek and the time, then the guide vocal's and the band's volumes at
    the right end of that line; the key, tempo and click on the next. Find lyrics and Record are in the bar above, at its
    right, as Save and Practice are on the Studio's. */
-.sb-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; }
+.sb-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2) var(--space-4); flex-wrap: wrap; } /* rows 8 apart, as the Studio's title and key */
 .sb-vol { display: flex; align-items: center; gap: var(--space-2) var(--space-4); margin-left: auto; }
+@media (max-width: 800px) { .sb-vol { order: 1; } } /* too narrow to share the play line: under the key, which stays where the Studio has it */
 /* Headphones: a panel under its button, a row for each part with the ears it can play in */
 .ears-at { position: relative; display: inline-flex; }
 .ears-at .pop { width: min(360px, calc(100vw - 32px)); }
-.ears-at .pop > b { font-weight: var(--weight-medium); }
 #earRows { display: grid; gap: var(--space-2); }
 .ear-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 32px; }
 .ear-row > span { color: var(--muted); }
@@ -66,6 +67,9 @@
 .btn.rec { color: var(--bad); }
 /* Record, split: the icon records, the label beside it (with its chevron) picks how; one control, a hairline apart */
 .rec-split { display: inline-flex; gap: 1px; }
+/* Sync, just before Record: the delay takes allow for, a press measuring it (paintSync); in red when that didn't work */
+.sync-btn { font-variant-numeric: tabular-nums; }
+.sync-btn.err { color: var(--bad); }
 .rec-split .btn.rec { border-radius: var(--radius-md) 0 0 var(--radius-md); }
 .rec-split .rec-mode { border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: var(--text-sm); }
 .btn.rec .ico { width: var(--icon-sm); height: var(--icon-sm); }
@@ -87,17 +91,23 @@
 .takes { display: grid; gap: var(--space-4); margin-top: var(--space-10); }
 .tk-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); flex-wrap: wrap; min-height: 32px; }
 .tk-head h2 { margin: 0; }
-.tk-title { display: flex; align-items: center; gap: var(--space-3); }
+.tk-title { flex: 1 1 auto; display: flex; align-items: center; gap: var(--space-3); }
+/* Takes Studio at the head's right end, after the sliders where they share its line; where they have a line of their
+   own they go under it (order), so folding moves nothing */
+/* folded (the chevron by the title): the head alone; the column keeps its width. How many takes beside the title,
+   folded or not, so the chevron stays put */
+.tk-title .disclose { margin-left: calc(var(--space-2) * -1); }
+.tk-n { margin-left: calc(var(--space-2) * -1); font-size: var(--text-lg); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tk-n:empty { display: none; }
+#takes.folded :is(.tk-mix, .tk-days, .tk-empty) { display: none; } /* over the column's own display for the sliders */
 /* Takes Studio (#stems/<song>/takes): the song's takes laid out on its timeline, each where it was sung, to hear any of
    them with the band, in time. The band's waveform on top; under it the takes, a lane each where they overlap; a take
    pressed is on (in your colour) and plays where it falls; a click anywhere else on the timeline goes there; the
    playhead runs across it all. Takes sung in another key or tempo play with the band in theirs: one version at a time. */
 .ts { display: grid; gap: var(--space-4); }
 .ts-top { display: flex; align-items: center; gap: var(--space-4); }
-.ts-top .back { margin-bottom: 0; }
-#tsTitle { font-weight: var(--weight-medium); font-size: var(--text-lg); }
-.ts-bar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface);
-  box-shadow: var(--shadow-hairline); font-size: var(--text-sm); }
+.ts-bar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; padding: var(--pad-card); border-radius: var(--radius-card); background: var(--surface);
+  font-size: var(--text-sm); }
 .ts-bar output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
 /* Sync, a slider filled from 0 (--z along it) to the handle, left earlier, right later, with a mark across it where the
    delay the browser reports puts the takes (--a); then its ms, grey there and in your colour when moved from it, as
@@ -114,7 +124,7 @@
 .ts-sync.changed .ts-sync-val { color: var(--voice); }
 .ts-vers { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted); }
 .ts-vers .btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
-.ts-tl { position: relative; padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-hairline); cursor: pointer; }
+.ts-tl { position: relative; padding: var(--space-3); border-radius: var(--radius-card); background: var(--surface); cursor: pointer; } /* its inset as tsRender and its click have it */
 #tsWave { display: block; width: 100%; height: 64px; }
 .ts-lanes { display: grid; gap: var(--space-1); margin-top: var(--space-2); }
 .ts-lane { position: relative; height: 48px; border-radius: var(--radius-sm); background: var(--fg-2); }
@@ -180,7 +190,7 @@
 .tk-empty { display: flex; align-items: center; gap: var(--space-3); margin: 0; padding: var(--space-5); border-radius: var(--radius-2xl); border: 1px dashed var(--track); color: var(--muted); font-size: var(--text-md); }
 .tk-empty .ico { width: var(--icon-md); height: var(--icon-md); color: var(--bad); }
 @media (max-width: 760px) {
-  .tk-mix { flex: 1 1 100%; display: grid; gap: var(--space-2); }
+  .tk-mix { flex: 1 1 100%; order: 1; display: grid; gap: var(--space-2); }
   .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
   .tk-mix input[type="range"] { width: 100%; }
   .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px auto; gap: var(--space-2); }
@@ -192,8 +202,8 @@
    paintTakesShown), so the stage keeps its width; where the margin is narrower the stage gives up the rest. */
 @media (min-width: 1080px) {
   .pr-cols.with-takes { grid-template-columns: minmax(0, 1fr) 360px; margin-right: calc(-1 * var(--out, 0px)); }
-  .pr-cols.with-takes .takes { margin-top: calc(var(--space-1) * -1); } /* level with the bar, which sits 4 px up */
-  .pr-cols.with-takes .tk-mix { flex: 1 1 100%; display: grid; gap: var(--space-2); }
+  .pr-cols.with-takes .takes { margin-top: 0; } /* level with the bar */
+  .pr-cols.with-takes .tk-mix { flex: 1 1 100%; order: 1; display: grid; gap: var(--space-2); }
   .pr-cols.with-takes .tk-mix .kfield { display: grid; grid-template-columns: 88px minmax(0, 1fr); }
   .pr-cols.with-takes .tk-mix input[type="range"] { width: 100%; }
   .pr-cols.with-takes .take { grid-template-columns: 32px minmax(0, 1fr) 32px 32px auto; gap: var(--space-2); }
@@ -205,14 +215,14 @@
 /* Chest & head voice (#voice): the pad, and beside it the note and the numbers the dot is drawn from; the keyboard
    under both. The pad's sides are named on it: chest left, head right, forward up, back down. */
 .vc { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--space-3); }
-.vc-pad { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); overflow: hidden; }
+.vc-pad { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; }
 #vcPad { position: absolute; inset: 0; width: 100%; height: 100%; }
 .vc-ax { position: absolute; font-size: var(--text-sm); color: var(--muted); pointer-events: none; white-space: nowrap; }
 .vc-ax.up { top: var(--space-3); left: 50%; transform: translateX(-50%); }
 .vc-ax.down { bottom: var(--space-3); left: 50%; transform: translateX(-50%); }
 .vc-ax.left { left: var(--space-4); top: 50%; transform: translateY(calc(-100% - var(--space-1))); }
 .vc-ax.right { right: var(--space-4); top: 50%; transform: translateY(calc(-100% - var(--space-1))); }
-.vc-side { display: grid; align-content: start; gap: var(--space-4); padding: var(--space-5); background: var(--surface); border-radius: var(--radius-2xl); box-shadow: var(--shadow-hairline); }
+.vc-side { display: grid; align-content: start; gap: var(--space-4); padding: var(--pad-card); background: var(--surface); border-radius: var(--radius-card); }
 .vc-note { display: flex; align-items: baseline; gap: var(--space-2); min-height: 40px; }
 .vc-note b { font-size: 36px; line-height: 1; font-weight: var(--weight-medium); }
 .vc-note span { font: var(--text-md) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -242,14 +252,14 @@
 .vc-cal-acts [aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 35%, var(--fill)); color: var(--ink); } /* being taught */
 .vc-fit { font-variant-numeric: tabular-nums; }
 /* the spectrogram, in the pad's place when it's the view: always dark, whatever the theme, so its kHz marks are light */
-.vc-spec { position: relative; height: min(60vh, 520px); min-height: 280px; border-radius: var(--radius-2xl); overflow: hidden; background: rgb(6 6 24); box-shadow: var(--shadow-hairline); }
+.vc-spec { position: relative; height: min(60vh, 520px); min-height: 280px; border-radius: var(--radius-card); overflow: hidden; background: rgb(6 6 24); }
 #vcSpec { position: absolute; inset: 0; width: 100%; height: 100%; }
 .vc-spec span { position: absolute; left: var(--space-2); transform: translateY(50%); font: var(--text-2xs) var(--mono); color: rgba(255, 255, 255, 0.55); pointer-events: none; }
 #vVoice .keys-wrap { margin-top: var(--space-3); }
 #vcKeys { margin-inline: auto; } /* in the middle while it fits */
 @media (max-width: 760px) {
   .vc { grid-template-columns: minmax(0, 1fr); }
-  .vc-pad, .vc-spec { height: 52vh; }
+  .vc-pad, .vc-spec, .vc-eq { height: 52vh; }
 }
 
 /* Practice's timeline, under the song's bar: the whole song, the part played filled, a head where it's heard; click or
@@ -321,3 +331,8 @@
 .nav-win .h.r { right: -4px; }
 .nav-win .h::after { content: ""; position: absolute; top: 5px; bottom: 5px; left: 3px; width: 2px; border-radius: 1px; background: var(--ink); }
 #lyImport .ico, #lyExport .ico { width: var(--icon-sm); height: var(--icon-sm); } /* (their tray and arrow fill the box: a size down sits level with the rest) */
+/* the Lab's EQ view: the spectrum as an EQ shows it, with the formants (drawEq) */
+.vc-eq { position: relative; height: min(60vh, 520px); min-height: 280px; border-radius: var(--radius-card); overflow: hidden; background: var(--surface); }
+#vcEq { position: absolute; inset: 0; width: 100%; height: 100%; }
+.vc-freeze { position: absolute; top: var(--space-3); right: var(--space-3); }
+.vc-freeze[aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 35%, var(--fill)); color: var(--ink); }

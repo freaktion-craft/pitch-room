@@ -37,6 +37,36 @@ function vcPeak(f) {
   for (let i = Math.max(1, c - w); i <= c + w && i < VC.data.length; i++) mx = Math.max(mx, VC.data[i]);
   return mx;
 }
+// The formants: an all-pole fit (LPC) of the last 2048 samples, brought down to about 11 kHz, pre-emphasised and windowed; the
+// fit's envelope (dB at VC_ENV points up to half that rate) and its peaks from 200 Hz up, the first three. null while there's
+// no voice. On high notes the harmonics are far apart and the fit follows them more than the vowel: less sure there.
+const VC_ENV = 256, VC_LPC = 12;
+function vcFormants() {
+  const sr = ac.sampleRate, D = Math.max(1, Math.round(sr / 11025)), fs = sr / D, n = Math.floor(tbuf.length / D);
+  const x = new Float64Array(n);
+  for (let i = 0; i < n; i++) { let s = 0; for (let k = 0; k < D; k++) s += tbuf[i * D + k]; x[i] = s / D; }
+  for (let i = n - 1; i > 0; i--) x[i] -= 0.97 * x[i - 1];
+  for (let i = 0; i < n; i++) x[i] *= 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (n - 1));
+  const p = VC_LPC, r = new Float64Array(p + 1);
+  for (let l = 0; l <= p; l++) { let s = 0; for (let i = l; i < n; i++) s += x[i] * x[i - l]; r[l] = s; }
+  if (r[0] <= 0) return null;
+  r[0] *= 1 + 1e-9;
+  let a = new Float64Array(p + 1), e = r[0]; a[0] = 1;
+  for (let i = 1; i <= p; i++) { // Levinson-Durbin
+    let k = -r[i]; for (let j = 1; j < i; j++) k -= a[j] * r[i - j]; k /= e;
+    const b = a.slice(); for (let j = 1; j < i; j++) b[j] = a[j] + k * a[i - j]; b[i] = k; a = b; e *= 1 - k * k;
+    if (e <= 0) return null;
+  }
+  const env = new Float32Array(VC_ENV), hz = new Float32Array(VC_ENV);
+  for (let q = 0; q < VC_ENV; q++) {
+    const w = (Math.PI * (q + 0.5)) / VC_ENV; let re = 0, im = 0;
+    for (let j = 0; j <= p; j++) { re += a[j] * Math.cos(w * j); im -= a[j] * Math.sin(w * j); }
+    env[q] = 10 * Math.log10(e / (re * re + im * im + 1e-30)); hz[q] = (w / Math.PI) * (fs / 2);
+  }
+  const peaks = [];
+  for (let q = 1; q < VC_ENV - 1; q++) if (env[q] > env[q - 1] && env[q] >= env[q + 1] && hz[q] >= 200 && hz[q] <= 4500) peaks.push(hz[q]);
+  return { env, hz, f: peaks.slice(0, 3) };
+}
 function vcBand(lo, hi) { let s = 0; for (let i = Math.round(lo / VC.hz); i <= Math.round(hi / VC.hz); i++) s += 10 ** (VC.data[i] / 10); return s; }
 
 // A frame's cues, from the note's harmonics (f0: its pitch), or null where they can't be trusted: the lowest harmonic far
@@ -107,6 +137,9 @@ function voiceFrame() {
     const ease = (was, v) => (was == null ? v : was + (v - was) * 0.25), clamp = (v) => Math.min(0.97, Math.max(0.03, v));
     VC.x = ease(VC.x, vcAcross(f)); VC.h12 = ease(VC.h12, f[0]); VC.bright = ease(VC.bright, f[4]);
     VC.db = 20 * Math.log10(level);
+    const fm = vcFormants(); // (smoothed, each formant to the one read near it)
+    VC.env = fm;
+    if (fm) VC.fm = fm.f.map((v, i) => (VC.fm && VC.fm[i] != null && Math.abs(VC.fm[i] - v) < 400 ? VC.fm[i] + (v - VC.fm[i]) * 0.3 : v));
     VC.last = { x: clamp(VC.x), y: clamp(vcDown(VC.bright)), db: VC.db, t: now };
     VC.trail.push(VC.last);
     if (VC.rec) { // being taught
@@ -114,12 +147,12 @@ function voiceFrame() {
       T.push(f.map((v, j) => Math.round(v * (j === 3 ? 100 : 10)) / (j === 3 ? 100 : 10))); if (T.length > VC_KEEP) T.splice(0, T.length - VC_KEEP);
       if (now - (VC.fitAt || 0) > 500) { VC.fitAt = now; vcFit(); paintTeach(); }
     }
-  } else if (VC.last && now - VC.last.t > 120) { VC.x = VC.h12 = VC.bright = null; if (VC.trail.length && VC.trail[VC.trail.length - 1]) VC.trail.push(null); }
+  } else if (VC.last && now - VC.last.t > 120) { VC.x = VC.h12 = VC.bright = VC.fm = VC.env = null; if (VC.trail.length && VC.trail[VC.trail.length - 1]) VC.trail.push(null); }
   while (VC.trail.length && (!VC.trail[0] || now - VC.trail[0].t > VC_TRAIL * 1000)) VC.trail.shift();
   vcHoldTick(now);
   const off = !micOn && !testOsc;
   if ($("#vcOff").hidden !== !off) $("#vcOff").hidden = !off;
-  drawPad(now); drawSpec(now, hearing);
+  drawPad(now); drawSpec(now, hearing); drawEq(now, hearing);
   if (now - VC.painted > 100) { VC.painted = now; paintVoiceRead(); }
   vcKeys(cur);
 }
@@ -153,6 +186,10 @@ function drawPad(now) {
     if (!a || !b) continue;
     g.globalAlpha = Math.max(0, 1 - (now - b.t) / (VC_TRAIL * 1000)) * 0.6;
     g.beginPath(); g.moveTo(a.x * W, a.y * H); g.lineTo(b.x * W, b.y * H); g.stroke();
+  }
+  if (VC.ghost && VC.ghost.dot) { // the moment kept (Freeze): where the dot was, hollow
+    const q = VC.ghost.dot; g.strokeStyle = C.ink; g.lineWidth = 2; g.globalAlpha = 0.6; g.setLineDash([3, 3]);
+    g.beginPath(); g.arc(q.x * W, q.y * H, 10, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
   }
   const p = VC.last, fade = p ? Math.max(0, 1 - Math.max(0, now - p.t - 120) / 400) : 0;
   if (fade > 0) {
@@ -205,6 +242,93 @@ function drawSpec(now, hearing) {
   g.putImageData(col, w - step, 0);
 }
 
+// The EQ view: the spectrum as an EQ's analyser shows it, 30 Hz to 16 kHz on an octave scale, tilted 4.5 dB an octave about
+// 1 kHz (as Pro-Q's is: a voice's falling top end drawn level), falling back gently with a slower peak line; over it the
+// formants' envelope (the vowel's shape), F1-F3 marked with their Hz, and the note's fundamental marked with its name.
+const EQ = { lo: 30, hi: 16000, top: 10, span: 80, tilt: 4.5, fall: 0.85, peakFall: 12 }; // Hz; dB at the top; dB down to the bottom; dB/oct; per frame; dB/s
+let eqCols = null, eqPeak = null, eqAt = 0;
+function drawEq(now, hearing) {
+  const cv = $("#vcEq"), r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+  const W = r.width, H = r.height;
+  if (!W || !H) return;
+  if (cv.width !== Math.round(W * d) || cv.height !== Math.round(H * d)) { cv.width = Math.round(W * d); cv.height = Math.round(H * d); eqCols = null; }
+  const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, W, H);
+  const L = Math.log(EQ.hi / EQ.lo), xOf = (f) => (Math.log(f / EQ.lo) / L) * W, fOf = (x) => EQ.lo * Math.exp((x / W) * L);
+  const yOf = (db) => ((EQ.top - db) / EQ.span) * H, tilt = (f) => EQ.tilt * Math.log2(f / 1000);
+  const n = Math.max(2, Math.round(W / 2)); // a column every 2 px
+  if (!eqCols || eqCols.length !== n) { eqCols = new Float32Array(n).fill(EQ.top - EQ.span); eqPeak = new Float32Array(n).fill(EQ.top - EQ.span); }
+  const dt = eqAt ? Math.min(0.1, (now - eqAt) / 1000) : 0; eqAt = now;
+  // the grid
+  g.font = `11px ${getComputedStyle(cv).fontFamily}`; g.lineWidth = 1;
+  for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) {
+    const x = Math.round(xOf(f)) + 0.5; g.strokeStyle = C.line; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
+    g.fillStyle = C.muted; g.fillText(f >= 1000 ? f / 1000 + "k" : String(f), x + 3, H - 6);
+  }
+  for (let db = EQ.top - 20; db > EQ.top - EQ.span; db -= 20) {
+    const y = Math.round(yOf(db)) + 0.5; g.strokeStyle = C.line; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    g.fillStyle = C.muted; g.fillText(db + " dB", 4, y - 3);
+  }
+  // the spectrum: each column the loudest bin under it (between bins down low, read off the line between them)
+  for (let c = 0; c < n; c++) {
+    const f0 = fOf((c / n) * W), f1 = fOf(((c + 1) / n) * W);
+    let v = -200;
+    if (hearing && VC.data) {
+      const a = f0 / VC.hz, b = f1 / VC.hz;
+      if (Math.floor(b) <= Math.floor(a)) { const i = Math.floor(a), t = a - i; v = VC.data[i] * (1 - t) + VC.data[Math.min(VC.data.length - 1, i + 1)] * t; }
+      else for (let i = Math.ceil(a); i <= Math.floor(b); i++) v = Math.max(v, VC.data[i]);
+      v += tilt(Math.sqrt(f0 * f1));
+    }
+    eqCols[c] = Math.max(v, eqCols[c] - (1 - EQ.fall) * 60); // (rises at once, falls back gently)
+    eqPeak[c] = Math.max(eqCols[c], eqPeak[c] - EQ.peakFall * dt);
+  }
+  const colX = (c) => ((c + 0.5) / n) * W;
+  g.beginPath(); g.moveTo(0, H);
+  for (let c = 0; c < n; c++) g.lineTo(colX(c), yOf(eqCols[c]));
+  g.lineTo(W, H); g.closePath();
+  const grad = g.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, C.voice); grad.addColorStop(1, "transparent");
+  g.globalAlpha = 0.35; g.fillStyle = grad; g.fill(); g.globalAlpha = 1;
+  g.strokeStyle = C.voice; g.lineWidth = 1.5; g.beginPath();
+  for (let c = 0; c < n; c++) (c ? g.lineTo : g.moveTo).call(g, colX(c), yOf(eqCols[c])); g.stroke();
+  g.strokeStyle = C.muted; g.lineWidth = 1; g.globalAlpha = 0.6; g.beginPath();
+  for (let c = 0; c < n; c++) (c ? g.lineTo : g.moveTo).call(g, colX(c), yOf(eqPeak[c])); g.stroke(); g.globalAlpha = 1;
+  // a moment kept (Freeze): faint and dashed, under what's heard now
+  const G = VC.ghost;
+  if (G) {
+    g.setLineDash([4, 4]); g.lineWidth = 1.5; g.globalAlpha = 0.55;
+    g.strokeStyle = C.muted; g.beginPath(); G.cols.forEach((v, c) => (c ? g.lineTo : g.moveTo).call(g, ((c + 0.5) / G.cols.length) * W, yOf(v))); g.stroke();
+    if (G.env.length) { g.strokeStyle = C.ink; g.beginPath(); G.env.forEach(([f, v], k) => (k ? g.lineTo : g.moveTo).call(g, xOf(f), yOf(v))); g.stroke(); }
+    g.setLineDash([]); g.fillStyle = C.muted; g.textAlign = "center";
+    let lx = -1e9, row = 0;
+    G.fm.forEach((f, i) => { const x = xOf(f); row = x - lx < 64 ? row + 1 : 0; lx = x; g.fillText(`F${i + 1} ${Math.round(f)}`, x, 46 + row * 13); });
+    g.globalAlpha = 1; g.textAlign = "left";
+  }
+  // the vowel's shape: the envelope, set on top of the harmonics it's under, and the formants
+  const E = VC.env, envPts = [];
+  if (E) {
+    let topS = -200, topE = -200;
+    for (let c = 0; c < n; c++) { const f = fOf(colX(c)); if (f > 150 && f < 4500) topS = Math.max(topS, eqCols[c] - tilt(f)); }
+    for (let q = 0; q < E.env.length; q++) if (E.hz[q] > 150 && E.hz[q] < 4500) topE = Math.max(topE, E.env[q]);
+    const off = topS - topE;
+    g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath();
+    let on = false;
+    for (let q = 0; q < E.env.length; q++) { const f = E.hz[q]; if (f < EQ.lo) continue; const v = E.env[q] + off + tilt(f), x = xOf(f), y = yOf(v); envPts.push([f, v]); on ? g.lineTo(x, y) : g.moveTo(x, y); on = true; }
+    g.stroke();
+  }
+  VC.eqNow = { cols: eqCols.slice(), env: envPts, fm: (VC.fm || []).slice() }; // (what Freeze keeps)
+  g.textAlign = "center";
+  let lx = -1e9, row = 0; // (labels close together: the next a line down)
+  (VC.fm || []).forEach((f, i) => {
+    const x = xOf(f); row = x - lx < 64 ? row + 1 : 0; lx = x;
+    g.strokeStyle = C.ink; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(x, 20 + row * 13); g.lineTo(x, H - 20); g.stroke(); g.setLineDash([]);
+    g.fillStyle = C.ink; g.fillText(`F${i + 1} ${Math.round(f)}`, x, 15 + row * 13);
+  });
+  if (cur != null && VC.h12 != null) { // the note's fundamental
+    const x = xOf(mf(cur)); g.strokeStyle = C.voice; g.beginPath(); g.moveTo(x, H - 34); g.lineTo(x, H - 20); g.stroke();
+    g.fillStyle = C.voice; g.fillText(absName(cur + 12 * Math.log2(A4 / 440)), x, H - 38);
+  }
+  g.textAlign = "left";
+}
+
 // Beside the pad: the note and how far off it is (in cents, against A440), and the numbers the dot is drawn from
 function paintVoiceRead() {
   const m = cur == null ? null : cur + 12 * Math.log2(A4 / 440);
@@ -215,6 +339,7 @@ function paintVoiceRead() {
   $("#vcNeedle").style.opacity = c == null ? 0 : 1;
   const db = (v) => (v == null ? "–" : (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " dB");
   setText("vcH12", db(VC.h12)); setText("vcBright", db(VC.bright)); setText("vcLvl", db(VC.h12 == null ? null : VC.db));
+  setText("vcF12", VC.fm && VC.fm.length >= 2 ? `${Math.round(VC.fm[0])} · ${Math.round(VC.fm[1])} Hz` : "–");
 }
 
 // The note you're singing, lit on the keyboard (kept in view)
@@ -297,11 +422,17 @@ function initVoice() {
   $("#vcHead").onclick = () => vcTeach("head");
   // the view: the pad, or the spectrogram in its place
   const showView = (v) => {
-    $(".vc-pad").hidden = v !== "pad"; $(".vc-spec").hidden = v !== "spec";
+    $(".vc-pad").hidden = v !== "pad"; $(".vc-spec").hidden = v !== "spec"; $(".vc-eq").hidden = v !== "eq";
     for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
   };
   for (const b of $("#vcView").children) b.onclick = () => { showView(b.dataset.v); store.set("voiceView", b.dataset.v); };
-  showView(store.get("voiceView", "pad") === "spec" ? "spec" : "pad");
+  showView(["spec", "eq"].includes(store.get("voiceView", "pad")) ? store.get("voiceView", "pad") : "pad");
+  // Freeze: this moment kept faintly behind (the EQ's spectrum, envelope and formants, and the pad's dot), or let go
+  $("#vcFreeze").onclick = () => {
+    const live = VC.last && performance.now() - VC.last.t < 300;
+    VC.ghost = VC.ghost ? null : VC.eqNow ? { ...VC.eqNow, cols: Float32Array.from(VC.eqNow.cols), dot: live ? { x: VC.last.x, y: VC.last.y } : null } : null;
+    $("#vcFreeze").setAttribute("aria-pressed", String(!!VC.ghost)); say($("#vcFreeze"), VC.ghost ? "Unfreeze" : "Freeze");
+  };
   $("#vcDown").append(icon("prev")); $("#vcUp").append(icon("next"));
   $("#vcDown").onclick = () => { vcSetTarget(VC.target - 1); playKey(VC.target); };
   $("#vcUp").onclick = () => { vcSetTarget(VC.target + 1); playKey(VC.target); };
