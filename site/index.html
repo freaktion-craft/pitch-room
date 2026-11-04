@@ -126,25 +126,26 @@ tip.addEventListener("click", () => tip.classList.remove("on"));
 </script>
 
 <script>
-// ---------- the welcome's picture, out of the dark, while the button's hovered ----------
+// ---------- the welcome's picture, faint behind it all, out of the dark while the button's hovered ----------
 // The welcome's scene (js/onboard.js, obArt, and its look in css/base.css, .ob-visual) behind the button, as tall as
 // the page: the photo dimmed and a little soft, grain over it, and over that the flowers' and leaves' outlines in
 // characters from its mask (red the flowers, green the leaves): | down a side, - along a top or bottom, / and \ round a
 // corner, now and then a heavier mark in their place; a leaf's fill thinning in from its edge; a slow wave of light along
-// them. Unseen until the pointer's on the button; then soft rounds of light (gaussian splats) come up about it, near
-// at first and further out the longer it stays, each lifting the dark a little where it falls, as a dark lifting; off
-// the button, the dark comes back over it.
+// them. Faint at rest, held still; with the pointer on the button soft rounds of light (gaussian splats) come up about
+// it, near at first and further out the longer it stays, each lifting the dark a little more where it falls; off the
+// button, the dark comes back to where it rests.
 // All of it drawn by the GPU in one pass: the marks laid out once (at load, and on a resize), the photo once; each frame
 // the CPU only spreads the light on a coarse grid (lightCell px a point), drawn smooth between its points. Nothing where
-// WebGL 2 can't be had, on a phone (no hover), nor with reduced motion; stopped whenever it's all dark.
+// WebGL 2 can't be had; at rest alone on a phone (no hover) and with reduced motion; stopped whenever it's back at rest.
 // ART as obArt's (spark: the heavier marks; heavy: their share of an edge; fill: a leaf's marks inward, depth cells deep;
 // change: how often an edge's mark is picked again, a second; wave: how fast the light runs along them; leaf: the
-// leaves' marks, quieter than the flowers'); fill: how much of the page's height the picture takes; most: how far the dark
+// leaves' marks, quieter than the flowers'); fill: how much of the page's height the picture takes; base: how far the dark's
+// lifted with the pointer nowhere near (faded up to over intro s once it's loaded, then held still); most: how far it
 // lifts at most; gap: between splats (ms); sigma: their size (px); lift: how much each lifts; rise: how long each takes to
 // come up (s); spread: how far out they land (of the page's shorter side) once the pointer's stayed grow s; back: how fast
 // the dark comes back off the button, creep: on it
 const ART = { cell: 8, spark: "@#%&$*+", heavy: 0.4, fill: "+=-::..", depth: 7, change: 0.36, wave: 0.6, leaf: 0.4 };
-const SCENE = { fill: 1.04, most: 0.8, lightCell: 16, gap: [60, 140], sigma: [50, 130], lift: [0.22, 0.42], rise: 0.7,
+const SCENE = { fill: 1.04, base: 0.2, intro: 1.4, most: 0.8, lightCell: 16, gap: [60, 140], sigma: [50, 130], lift: [0.22, 0.42], rise: 0.7,
   spread: [0.1, 0.4], grow: 2.6, back: 1.6, creep: 0.03 };
 const MARKS = [...new Set("/\\-|" + ART.spark + ART.fill + "@%")]; // the edges' marks, then the heavier ones (one run), then a leaf's fill
 const VS = `#version 300 es
@@ -152,14 +153,13 @@ uniform vec2 u_size; in vec2 a_pos; out vec2 v_px;
 void main() { v_px = vec2(a_pos.x + 1.0, 1.0 - a_pos.y) * 0.5 * u_size; gl_Position = vec4(a_pos, 0.0, 1.0); }`;
 const FS = `#version 300 es
 precision highp float;
-uniform vec2 u_size; uniform vec4 u_pic; uniform float u_cell, u_marks, u_time, u_spark0, u_sparkN, u_heavy, u_change, u_wave, u_leafA, u_depth, u_most;
+uniform vec2 u_size; uniform vec4 u_pic; uniform float u_cell, u_marks, u_time, u_spark0, u_sparkN, u_heavy, u_change, u_wave, u_leafA, u_depth, u_base, u_most;
 uniform ivec2 u_grid; uniform sampler2D u_cells, u_atlas, u_photo, u_light; uniform vec3 u_bg, u_ink, u_leaf;
 in vec2 v_px; out vec4 o;
 float hash(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
 void main() {
-  float light = texture(u_light, v_px / u_size).r; // how far the dark's lifted here
+  float light = u_base + (u_most - u_base) * smoothstep(0.0, 1.0, texture(u_light, v_px / u_size).r); // how far the dark's lifted here
   if (light < 0.004) { o = vec4(u_bg, 1.0); return; }
-  light = smoothstep(0.0, 1.0, light) * u_most;
   vec3 col = u_bg; float edge = 0.0;
   vec2 uv = (v_px - u_pic.xy) / u_pic.zw;
   if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) { // the photo: a little soft, a little less saturated, toward black
@@ -196,7 +196,7 @@ const cssRgb = (css) => {
 };
 
 (() => {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !matchMedia("(hover: hover)").matches) return; // (a phone: no hover, so not even the pictures)
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches; // with reduced motion: the scene at rest alone, the dark faded off it at once (a phone, with no hover, has only that too)
   const cv = document.getElementById("bloom"), gl = cv.getContext("webgl2", { antialias: false, alpha: true, premultipliedAlpha: true });
   if (!gl) return;
   const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return gl.getShaderParameter(x, gl.COMPILE_STATUS) ? x : null; };
@@ -273,14 +273,15 @@ const cssRgb = (css) => {
     const c = Object.assign(document.createElement("canvas"), { width: mw, height: mh }), x = c.getContext("2d", { willReadFrequently: true });
     x.drawImage(m, 0, 0); M = x.getImageData(0, 0, mw, mh).data;
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, photoT); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, photo);
-    (window.requestIdleCallback || setTimeout)(build); // laid out ahead of the first hover, while nothing else is going on
+    (window.requestIdleCallback || setTimeout)(() => { build(); introAt = performance.now(); wake(); }); // laid out while nothing else is going on, then the scene faded up to its rest
   }).catch(() => {}), { once: true });
-  addEventListener("resize", () => { built = false; });
+  addEventListener("resize", () => { if (!photo) return; built = false; wake(); }); // laid out again, and drawn again if it's at rest
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); };
   const ease = (t) => t * t * (3 - 2 * t);
-  let splats = [], on = false, since = 0, next = 0, last = 0, running = false;
+  let splats = [], on = false, since = 0, next = 0, last = 0, running = false, introAt = 0;
+  const wake = () => { if (!running) { running = true; requestAnimationFrame(frame); } };
   const spread = (sp, by) => { // a splat's share of light, coming up: the dark lifted most in its middle, less and less out from it
     const { x: cx, y: cy, sigma } = sp, L = SCENE.lightCell, r = sigma * 2.6, k = -1 / (2 * sigma * sigma);
     for (let y = Math.max(0, Math.floor((cy - r) / L)); y <= Math.min(lr - 1, Math.ceil((cy + r) / L)); y++)
@@ -304,15 +305,15 @@ const cssRgb = (css) => {
     let most = 0;
     for (let i = 0; i < light.length; i++) { const v = light[i]; if (v > most) most = v; bytes[i] = Math.round(v * 255); }
     gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, lightT); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, lc, lr, 0, gl.RED, gl.UNSIGNED_BYTE, bytes);
-    gl.uniform1f(U.u_time, now / 1000);
+    const intro = still ? 1 : ease(Math.min(1, (now - introAt) / 1000 / SCENE.intro));
+    gl.uniform1f(U.u_base, SCENE.base * intro); gl.uniform1f(U.u_time, now / 1000);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    if (!on && !splats.length && most < 0.01) { running = false; last = 0; light.fill(0); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); return; } // all dark again: stopped
+    if (!on && !splats.length && most < 0.01 && intro >= 1) { running = false; last = 0; light.fill(0); return; } // back at rest: held as it is, stopped
     requestAnimationFrame(frame);
   };
   const start = () => {
-    if (!photo) return; // (not loaded yet: nothing this time)
-    on = true; since = performance.now(); next = 0;
-    if (!running) { running = true; requestAnimationFrame(frame); }
+    if (!photo || still) return; // (not loaded yet: nothing this time)
+    on = true; since = performance.now(); next = 0; wake();
   };
   const stop = () => { on = false; };
   const get = document.getElementById("get");
