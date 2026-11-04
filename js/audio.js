@@ -137,6 +137,14 @@ function synthPiano(m, at, dur, dest, vel) {
 }
 function playKey(m) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.vol; g.connect(master); piano(m, ac.currentTime + 0.01, 1.2, g, 0.55); }
 
+// Where a refused mic is allowed again: the system's own settings in the desktop app (it can't be asked twice there),
+// the mic in the address bar in a browser. how: what to do, {link} where the settings' path goes (obMic makes it a link)
+function micBlocked() {
+  const d = window.pitchroom;
+  if (!d?.desktop) return { how: "Allow it from the mic icon in the address bar, then try again.", link: null };
+  return d.platform === "darwin" ? { how: "Allow Pitchroom in {link}, then try again.", link: "System Settings › Privacy & Security › Microphone" }
+    : { how: "Allow desktop apps in {link}, then try again.", link: "Windows Settings › Privacy › Microphone" };
+}
 async function startMic() {
   if (micOn) return true;
   if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -146,9 +154,7 @@ async function startMic() {
   try {
     micStream = await openMic();
   } catch (e) {
-    notice(tr(e && e.name === "NotAllowedError"
-      ? "Microphone access is blocked. Allow it from the mic icon in the address bar, then try again."
-      : "No microphone found. Check it’s connected, then try again."));
+    notice(e && e.name === "NotAllowedError" ? (() => { const b = micBlocked(); return `${tr("Microphone access is blocked.")} ${tr(b.how, { link: b.link ? tr(b.link) : "" })}`; })() : tr("No microphone found. Check it’s connected, then try again."));
     return false;
   }
   stopTest();

@@ -208,6 +208,22 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   ipcMain.on("relaunch", () => { quitting = true; app.relaunch(); app.quit(); });
+  // the system's own light or dark (the window's forced dark, so the page can't see it), for what's laid out as the
+  // system's own is (the mic's ask): macOS's appearance; Windows' apps' theme, light unless it's set dark
+  ipcMain.handle("system-theme", () => new Promise((ok) => {
+    if (process.platform === "darwin") return ok(systemPreferences.getUserDefault("AppleInterfaceStyle", "string") === "Dark" ? "dark" : "light");
+    if (process.platform !== "win32") return ok("dark");
+    execFile("reg", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme"], { windowsHide: true },
+      (e, out) => ok(!e && /AppsUseLightTheme\s+REG_DWORD\s+0x0\b/.test(out) ? "dark" : "light"));
+  }));
+  ipcMain.on("attention", (e) => { // not if you're looking already
+    const w = BrowserWindow.fromWebContents(e.sender);
+    if (!w || w.isFocused()) return;
+    if (process.platform === "darwin") app.dock?.bounce("informational"); else w.flashFrame(true);
+  });
+  ipcMain.handle("mic-access", () => (process.platform === "linux" ? "granted" : systemPreferences.getMediaAccessStatus("microphone"))); // (asked yet? allowed?)
+  ipcMain.on("mic-settings", () => shell.openExternal(process.platform === "darwin" // where the mic's allowed for apps, once refused
+    ? "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" : "ms-settings:privacy-microphone"));
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", (e) => { if (!quitting && win) { e.preventDefault(); requestQuit(); return; } quitting = true; stopServer(); });
   app.whenReady().then(async () => {

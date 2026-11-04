@@ -56,9 +56,39 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 MAX_SONG = 400 * 1024 * 1024
 HOSTS = ("localhost", "127.0.0.1", "[::1]")
 PAGE_FILES = {"/": "index.html", "/index.html": "index.html", "/favicon.svg": "favicon.svg", "/icons.local.js": "icons.local.js"}
-PAGE_CODE = re.compile(r"/(css/[a-z-]+\.css|js/[a-z-]+\.js)")  # the page's stylesheets and scripts
+PAGE_CODE = re.compile(r"/(css/[a-z-]+\.css|js/[a-z-]+\.js|img/[a-z-]+\.(jpg|png))")  # the page's stylesheets, scripts and pictures
 SONG_FILE = re.compile(r"/library/[0-9a-f]{12}/[^?#]*[^/]")  # a file in a song's folder, never the folder itself
 
+
+
+_YT = re.compile(r"^https?://([a-z]+\.)?(youtube\.com|youtu\.be)/", re.I)
+
+
+def _find(url: str):
+    """What a link is (stems.find: yt-dlp, then the record); without yt-dlp, what YouTube's oEmbed says (_peek)."""
+    if not _YT.match(url or ""):
+        return 400, {"error": "That isn’t a YouTube link."}
+    if stems.can_find():
+        try:
+            return 200, stems.find(url)
+        except ValueError as e:
+            return 404, {"error": str(e)}
+    return _peek(url)
+
+
+def _peek(url: str):
+    """What YouTube's own oEmbed says of a link (no key, no download, nothing installed): its title, its channel, its
+    picture. For the first song, added before the tools that split it are in (onboarding)."""
+    if not _YT.match(url or ""):
+        return 400, {"error": "That isn’t a YouTube link."}
+    import urllib.request
+    req = urllib.request.Request("https://www.youtube.com/oembed?format=json&url=" + quote(url, safe=""), headers={"User-Agent": "Pitchroom"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:  # noqa: S310 (https, YouTube's own)
+            d = json.loads(r.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001
+        return 404, {"error": "Couldn’t find that video."}
+    return 200, {"title": d.get("title") or "", "artist": d.get("author_name") or "", "art": d.get("thumbnail_url") or "", "square": False}
 
 class Handler(SimpleHTTPRequestHandler):
     # Keep-alive. With HTTP/1.0 the server closes the socket after every reply, and on Windows that
@@ -237,6 +267,26 @@ class Handler(SimpleHTTPRequestHandler):
             traceback.print_exc()
             return self._json(500, {"error": f"{e.__class__.__name__}: {e}"})
 
+    def _art(self, url: str):
+        host = (urlparse(url).hostname or "").lower()
+        if urlparse(url).scheme != "https" or not re.search(r"(^|\.)(mzstatic\.com|ytimg\.com|dzcdn\.net)$", host):
+            return self._json(400, {"error": "Not a cover's address."})
+        import urllib.request
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Pitchroom"}), timeout=8) as r:  # noqa: S310
+                kind, data = r.headers.get("Content-Type") or "image/jpeg", r.read(3_000_000)
+        except Exception:  # noqa: BLE001
+            return self._json(404, {"error": "Couldn’t get the picture."})
+        if not kind.startswith("image/"):
+            return self._json(404, {"error": "Not a picture."})
+        self.send_response(200)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "max-age=86400")
+        self.end_headers()
+        self.wfile.write(data)
+        return None
+
     def _page(self):
         """index.html with the settings in it, so the page starts as it was left, at any port and before first paint;
         and the library and the songs being added, so the list is there in the first paint too, not a moment after."""
@@ -259,6 +309,10 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/stems/status":
             return self._json(200, {"installed": stems.installed(), "models": stems.MODELS, **stems.gpu_status(),
                                     "install": stems.get_job(stems._install_job["id"]) if stems._install_job else None})
+        if path == "/api/art":  # a found song's art (album or video picture), from here so the page can read its colours
+            return self._art((parse_qs(urlparse(self.path).query).get("url") or [""])[0])
+        if path == "/api/yt/find":  # what a YouTube link is before it's added: its name, artist, art (stems.find)
+            return self._json(*_find((parse_qs(urlparse(self.path).query).get("url") or [""])[0]))
         if path == "/api/jobs":
             return self._json(200, stems.active_jobs())
         if path.startswith("/api/jobs/"):
@@ -305,9 +359,6 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, stems.set_settings(json.loads(self._body(600_000) or b"{}")))
         if url.path == "/api/stems/install":
             return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1")})
-        if url.path == "/api/stems/upload":
-            name = (q.get("name") or ["upload"])[0]
-            return self._json(200, {"job": stems.start_upload(self._body(MAX_SONG), name, model)})
         if url.path == "/api/stems/youtube":
             body = json.loads(self._body(10_000) or b"{}")
             return self._json(200, {"job": stems.start_youtube(str(body.get("url") or "").strip(), body.get("model", model), body.get("find"), bool(body.get("low")), body.get("name"))})
@@ -415,6 +466,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 def serve(port: int) -> ThreadingHTTPServer:
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    stems.freshen_finders()  # the desktop app's yt-dlp, a day old at most
     if not stems.update_offer():  # (with songs to time again, the page asks first: stems.answer_update)
         stems.start_upgrades()  # songs made by an older version, brought up to date in the background
     return httpd

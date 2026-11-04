@@ -100,7 +100,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   const list = el("div", "pick-list"), label = el("span");
   list.setAttribute("role", "listbox"); say(list, name, null, "aria-label"); list.hidden = true;
   btn.append(label); btn.setAttribute("aria-haspopup", "listbox"); btn.setAttribute("aria-expanded", "false");
-  (btn.closest(".pop") || document.body).append(list);
+  (btn.closest(".pop, #welcome") || document.body).append(list); // over the onboarding too
   let items = [], value = "";
   const options = () => [...list.querySelectorAll('[role="option"]')];
   function paint() {

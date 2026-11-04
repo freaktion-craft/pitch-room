@@ -26,9 +26,16 @@
      on a wide-gamut screen (below); all ≥ 6:1 on the surface, and dark text on them ≥ 6.6:1.
      Pink is the pale azalea asked for (hsl(337 92% 91%), oklch(0.9 0.054 353)), a touch deeper so it doesn't pass
      for the white ink; it's kept as it is on any screen. */
+  /* White, the first one and the one you start with: the ink's white (0.94) a little down, so where it's your colour (your
+     pitch, the playhead, a highlight) it isn't taken for a button or a label, and still far above the greys a thing
+     that's off is in (--muted) */
+  --voice-white: oklch(0.87 0 0);
   --voice-blue: oklch(0.68 0.166 262); --voice-violet: oklch(0.7 0.174 295); --voice-pink: oklch(0.86 0.08 353); --voice-coral: oklch(0.72 0.172 32);
   --voice-orange: oklch(0.75 0.175 58); --voice-amber: oklch(0.77 0.156 82); --voice-green: oklch(0.73 0.197 150); --voice-teal: oklch(0.74 0.124 195);
-  --voice: var(--voice-blue); --on-voice: oklch(0.165 0 0);
+  /* --voice-act: your colour on a button or what one's doing (pressed, a focus ring): --voice, but white at the ink's
+     full white, the toning down being for what isn't one (set with --voice, by setAccent) */
+  --voice-act: var(--ink);
+  --voice: var(--voice-white); --on-voice: oklch(0.165 0 0);
   --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --bad: oklch(0.66 0.2 25);
   --solo: oklch(0.84 0.14 85); --on-solo: oklch(0.3 0.06 85); /* a soloed track's S, lit */
   --note-bg: oklch(0.27 0.03 75); --note-ink: oklch(0.86 0.09 80); --warn-ink: oklch(0.8 0.13 80);

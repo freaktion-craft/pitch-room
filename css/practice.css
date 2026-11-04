@@ -135,7 +135,7 @@
 .ts-clip { position: absolute; inset: 0; padding: 0; border: 0; border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; text-align: left;
   background: var(--fill); box-shadow: inset 0 0 0 1px var(--ring); color: var(--muted); transition: background-color var(--duration-fast), box-shadow var(--duration-fast); }
 .ts-clip:hover { background: var(--fg-12); }
-.ts-clip[aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 20%, transparent); box-shadow: inset 0 0 0 1px var(--voice); color: var(--ink); }
+.ts-clip[aria-pressed="true"] { background: color-mix(in oklab, var(--voice-act) 20%, transparent); box-shadow: inset 0 0 0 1px var(--voice-act); color: var(--ink); }
 .ts-clip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .ts-clip canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ts-clip span { position: relative; display: block; padding: var(--space-1) 6px; font-size: var(--text-2xs); line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -147,7 +147,7 @@
 .ts-take:hover .ts-dl, .ts-take:focus-within .ts-dl { opacity: 1; pointer-events: auto; }
 @media (hover: none) { .ts-vol { opacity: 1; } .ts-dl { opacity: 1; pointer-events: auto; } }
 @container (max-width: 56px) { .ts-dl { right: auto; left: calc(100% + 2px); } } /* a clip too narrow for it: just past its right edge */
-.ts-clip[aria-pressed="true"] .ts-vol { border-top-color: var(--voice); }
+.ts-clip[aria-pressed="true"] .ts-vol { border-top-color: var(--voice-act); }
 .ts-clip.vol-hot, .ts-clip.vol-drag { cursor: ns-resize; }
 .ts-clip.vol-hot .ts-vol, .ts-clip.vol-drag .ts-vol { border-top-width: 2px; border-top-color: var(--ink); }
 .ts-line { position: absolute; top: 8px; bottom: 8px; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--ink); pointer-events: none; }
@@ -249,7 +249,7 @@
 .vc-cal-acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 /* an end that's been set gets a dot; one being set fills from the left as it listens */
 .vc-cal-acts .set::after { content: ""; width: 6px; height: 6px; margin-left: var(--space-1); border-radius: 50%; background: var(--voice); }
-.vc-cal-acts [aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 35%, var(--fill)); color: var(--ink); } /* being taught */
+.vc-cal-acts [aria-pressed="true"] { background: color-mix(in oklab, var(--voice-act) 35%, var(--fill)); color: var(--ink); } /* being taught */
 .vc-fit { font-variant-numeric: tabular-nums; }
 /* the spectrogram, in the pad's place when it's the view: always dark, whatever the theme, so its kHz marks are light */
 .vc-spec { position: relative; height: min(60vh, 520px); min-height: 280px; border-radius: var(--radius-card); overflow: hidden; background: rgb(6 6 24); }
@@ -335,4 +335,4 @@
 .vc-eq { position: relative; height: min(60vh, 520px); min-height: 280px; border-radius: var(--radius-card); overflow: hidden; background: var(--surface); }
 #vcEq { position: absolute; inset: 0; width: 100%; height: 100%; }
 .vc-freeze { position: absolute; top: var(--space-3); right: var(--space-3); }
-.vc-freeze[aria-pressed="true"] { background: color-mix(in oklab, var(--voice) 35%, var(--fill)); color: var(--ink); }
+.vc-freeze[aria-pressed="true"] { background: color-mix(in oklab, var(--voice-act) 35%, var(--fill)); color: var(--ink); }

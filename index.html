@@ -15,7 +15,7 @@
     try { again = sessionStorage.getItem("stem:opened") === "1"; sessionStorage.setItem("stem:opened", "1"); } catch (e) { again = false; }
     if (again || (nav && nav.type !== "navigate") || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     document.documentElement.classList.add("booting");
-    setTimeout(() => document.documentElement.classList.remove("booting"), 8000);
+    window.BOOT_TIMER = setTimeout(() => document.documentElement.classList.remove("booting"), 8000); // (the welcome stops it: its steps take longer)
   })();
 </script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
@@ -33,12 +33,23 @@ const SAVED_LIB = /*LIBRARY*/null;
 const SAVED_UPDATE = /*UPDATE*/null;
 if (SAVED_UPDATE) document.documentElement.classList.add("asking");
 /* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
-try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}
+try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) { document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-white))`); document.documentElement.style.setProperty("--voice-act", a === "white" ? "var(--ink)" : `var(--voice-${a}, var(--ink))`); } } catch (e) {}
 /* the welcome (welcome()): the first time Pitchroom opens, its pages riffle through the accent colours under the name, back
-   to black, and the name goes up to its place in the header. WELCOME_ALWAYS: on every load, reloads too, while it's
-   being made; false once it's done. Not with reduced motion. Never longer than 12 s, should the script fail. */
-const WELCOME_ALWAYS = false;
-/* the desktop app on macOS draws no title bar: its window's buttons sit in the header (desktop/main.js, base.css) */
+   to black, and the name goes to its place in the header; then the first steps there (onboard(): what it is, the mic, a
+   colour, a first song), and the page comes in round the name. WELCOME_ALWAYS: on every load, reloads too, while it's being made; false once it's done. With
+   reduced motion, the steps without the riffle. Ended after 12 s should the script fail to start it (welcome() stops that). */
+const WELCOME_ALWAYS = true;
+/* WELCOME_RIFFLE: the welcome's page riffle; false straight to the steps (and the name at once in its place), for
+   working on them without sitting through it every time. true for a release. */
+const WELCOME_RIFFLE = false;
+/* ONBOARD_EVERY_STEP: every step, the ones for what's done already too (the mic's ask though it's allowed, the song
+   tools' though they're in), for seeing them all while they're made. false for a release. */
+const ONBOARD_EVERY_STEP = true;
+/* ONBOARD_NO_TOOLS: the first steps as if the song tools weren't in (the song's offered them, their download shown
+   going), without touching what's installed: their download only pretended, about 20 s, after which they count as in
+   and the song's added for real. false for a release. */
+const ONBOARD_NO_TOOLS = true;
+/* the desktop app on macOS draws no title bar: its window's buttons sit alone in the corner (desktop/main.js, base.css) */
 if (window.pitchroom && window.pitchroom.platform === "darwin") document.documentElement.classList.add("desktop-mac");
 /* EMPTY_LIBRARY: the library drawn as if no song had been added (drawLibrary), so a first time can be seen; the songs
    stay as they are, and come back with false. While it's being made. */
@@ -46,9 +57,9 @@ const EMPTY_LIBRARY = false;
 (() => {
   let welcomed = false;
   try { welcomed = SAVED && SAVED.welcomed != null ? !!SAVED.welcomed : JSON.parse(localStorage.getItem("stem:welcomed")) === true; } catch (e) {}
-  if ((welcomed && !WELCOME_ALWAYS) || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (welcomed && !WELCOME_ALWAYS) return;
   document.documentElement.classList.add("booting", "welcome");
-  setTimeout(() => document.documentElement.classList.remove("booting", "welcome"), 12000);
+  window.WELCOME_TIMER = setTimeout(() => document.documentElement.classList.remove("booting", "welcome"), 12000);
 })();</script>
 </head>
 <body>
@@ -181,7 +192,8 @@ const EMPTY_LIBRARY = false;
     <div class="keys-wrap"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
   </main>
   <main id="vSettings" aria-label="Settings" hidden>
-    <div class="backbar"><nav class="crumbs" id="setCrumbs" aria-label="Where you are"></nav></div>
+    <!-- left from the onboarding's color step for here (welcome()): in the crumbs' place, the steps again from there -->
+    <div class="backbar"><nav class="crumbs" id="setCrumbs" aria-label="Where you are"></nav><section class="panel-card ob-back" id="obBack" hidden><div class="setup-line"><p class="muted">You have a few steps left.</p><button class="btn sm primary" id="obBackBtn" type="button">Back to onboarding</button></div></section></div>
     <div class="set-layout">
       <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Microphone</button><button type="button" data-to="setMore">Advanced</button></nav>
       <div class="settings" id="micSet">
@@ -190,7 +202,7 @@ const EMPTY_LIBRARY = false;
           <div class="set-list">
             <div class="set-row"><div class="set-what"><b>Language</b><small>The app’s words</small></div><button class="pick" id="lang" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Note names</b><small>On the stage and the keyboard</small></div><button class="pick" id="names" type="button"></button></div>
-            <div class="set-row"><div class="set-what"><b>Accent colour</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div></div>
+            <div class="set-row"><div class="set-what"><b>Accent color</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent color"></div></div>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMic">
@@ -242,7 +254,6 @@ const EMPTY_LIBRARY = false;
           <div class="pl-list" id="plList"></div>
           <div class="pl-acts"><button class="btn sm ghost" id="plBack" type="button">Cancel</button><button class="btn sm primary" id="plGo" type="button" title="Added one at a time, at low priority, so the PC stays free">Add</button></div>
         </div>
-        <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
         <div class="gpu-row" id="sGpu" hidden>
           <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
           <button class="btn sm primary" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
@@ -337,7 +348,74 @@ const EMPTY_LIBRARY = false;
 
 <div id="listFade" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
 <div id="boot" aria-hidden="true"><div class="bar"><i></i></div></div>
-<div id="welcome" aria-hidden="true"><div class="pages"><div class="book"></div></div><span class="word">Pitchroom</span></div>
+<div id="welcome"><div class="pages" aria-hidden="true"><div class="book"></div></div><span class="word" aria-hidden="true">Pitchroom</span>
+  <!-- the first steps (onboard()), once the pages are back to black and the name's gone to the header -->
+  <!-- the right half beside the steps: a photo of flowers, and over it in characters what its mask outlines (obArt) -->
+  <div class="ob-visual" id="obVisual" aria-hidden="true"><img src="img/onboard-flowers.jpg" alt="" decoding="async"><canvas id="obAscii"></canvas><canvas id="obScope"></canvas><div class="ob-hero" id="obHero" hidden><span class="cover"><img alt=""></span><b></b><small></small></div></div><!-- beside the mic's step: what the mic hears (obScope) -->
+  <div class="onboard" id="onboard" hidden>
+    <!-- the goo the link's field melts through into the found song's cover (obGoo): blurred, its edge drawn back hard, filled one colour -->
+    <svg class="ob-goo-def" width="0" height="0" aria-hidden="true"><filter id="ob-goo" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="7"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 24 -10" result="goo"/><feFlood class="ob-goo-ink"/><feComposite in2="goo" operator="in"/></filter></svg>
+    <nav class="ob-progress" aria-label="Steps"><button type="button" aria-label="About Pitchroom"></button><button type="button" aria-label="Allow your mic"></button><button type="button" aria-label="Select your mic"></button><button type="button" aria-label="Choose your color"></button><button type="button" aria-label="What song do you want to sing now?"></button><button type="button" aria-label="Getting your song tools"></button></nav>
+    <section class="ob-step" data-step="intro" aria-labelledby="obIntroT">
+      <h2 class="ob-title" id="obIntroT">Learn songs by singing them</h2>
+      <p class="ob-note" data-html>Sing any song from YouTube, one phrase at a time, with a few tools to help. Everything stays on your computer.</p>
+      <div class="ob-acts"><button class="btn primary" type="button" data-next>Get started</button></div>
+    </section>
+    <section class="ob-step" data-step="allow" aria-labelledby="obAllowT" hidden>
+      <h2 class="ob-title" id="obAllowT">Allow your mic</h2>
+      <p class="ob-note" id="obAllowNote">Pitchroom needs your microphone.</p>
+      <!-- before the system's own: Pitchroom asking, laid out as that system's are (data-os); Allow brings the system's up -->
+      <div class="ob-ask" id="obMicAsk" role="group" aria-labelledby="obAskT" hidden>
+        <img class="ob-ask-ico" src="favicon.svg" alt="" width="48" height="48">
+        <div class="ob-ask-text"><b id="obAskT">Pitchroom would like to use your microphone</b><p data-html>To hear you sing and show your pitch as you go. Nothing you sing leaves your computer.</p></div>
+        <div class="ob-ask-acts"><button class="btn" id="obAskNo" type="button">Not now</button><button class="btn primary" id="obAskYes" type="button">Allow</button></div>
+      </div>
+      <p class="ob-small" id="obAskNext" hidden></p>
+      <!-- refused: where to allow it (in the note's place, why), and to try again -->
+      <div class="ob-fix" id="obAllowFix" hidden><p class="ob-small" id="obAllowHow"></p></div>
+      <div class="ob-acts"><button class="btn primary" id="obAllowGo" type="button" data-next hidden>Continue</button><button class="btn primary" id="obAllowRetry" type="button" hidden>Try again</button><button class="btn ghost" id="obAllowSkip" type="button" data-skip="2">Skip for now</button></div>
+    </section>
+    <section class="ob-step" data-step="mic" aria-labelledby="obMicT" hidden>
+      <h2 class="ob-title" id="obMicT">Select your mic</h2>
+      <p class="ob-note" id="obMicNote">Choose the input your mic is plugged into.</p>
+      <!-- the inputs; beside them, allowed and open but nothing coming in a while, a tip asking (obMic) -->
+      <div class="ob-pick-at"><button class="pick" id="obInputs" type="button"></button><span class="ob-tip" id="obMicQuiet" role="status" hidden>Is your mic working?</span></div>
+      <!-- no mic to use: why (in the note's place), what to do, and to try again (it's tried again by itself when one's plugged in) -->
+      <div class="ob-fix" id="obMicFix" hidden><p class="ob-small" id="obMicHow"></p></div>
+      <div class="ob-acts"><button class="btn primary" id="obMicGo" type="button" data-next>Continue</button><button class="btn primary" id="obMicRetry" type="button" hidden>Try again</button><button class="btn ghost" type="button" data-next>Skip for now</button></div>
+    </section>
+    <section class="ob-step" data-step="colour" aria-labelledby="obColourT" hidden>
+      <h2 class="ob-title" id="obColourT">What color is closer to your fav?</h2>
+      <p class="ob-note" data-html>This color will be used as point color in your experience. Can be changed from <a href="#settings" data-ob-leave>Settings</a>.</p>
+      <!-- a book of the colours, open at yours: its pages turned to choose one, the bookmarks along its edges to go straight to one (obColour) -->
+      <div class="ob-book" id="obBook" role="group" aria-label="Accent color"><div class="ob-tabs" id="obTabs" role="radiogroup" aria-label="Accent color"></div><button class="pg l" type="button" aria-label="Previous color"></button><button class="pg r" type="button" aria-label="Next color"></button><span class="ob-book-name" aria-live="polite"></span></div>
+      <div class="ob-acts"><button class="btn primary" type="button" data-next>Continue</button></div>
+    </section>
+    <section class="ob-step" data-step="song" aria-labelledby="obSongT" hidden>
+      <h2 class="ob-title" id="obSongT">What song do you want to sing now?</h2>
+      <p class="ob-note" id="obSongNote">Paste a YouTube link to a song you’d like to sing.</p>
+      <form class="yt ob-link-form" id="obYt"><input id="obUrl" type="url" placeholder="Paste a YouTube link" aria-label="YouTube link" autocomplete="off" spellcheck="false"><button class="btn sm primary" id="obFindBtn" type="submit">Paste</button></form>
+      <!-- a YouTube link copied already (read as the step comes, and as it's come back to): under the field, to take -->
+      <button class="ob-clip" id="obClip" type="button" hidden><span class="ob-clip-k">Copied link</span><span class="ob-clip-v" id="obClipV"></span></button>
+      <!-- found: what YouTube says it is (its picture, title and channel: /api/yt/peek), and what adding it takes -->
+      <div class="ob-found" id="obFound" hidden><span class="cover"><img alt="" id="obFoundImg"></span><div><b id="obFoundT"></b><small id="obFoundBy"></small></div></div>
+      <p class="ob-small" id="obFoundWhat" hidden></p>
+      <!-- the song tools offered: what they are, and how big -->
+      <p class="ob-small" id="obGetsNote" hidden>The song tools split songs into voice and band and read their melody and lyrics.</p>
+      <p class="ob-small ob-err" id="obSongErr" hidden></p>
+      <div class="ob-acts"><button class="btn primary" id="obSongGo" type="button" hidden></button><button class="btn ghost" id="obSongAgain" type="button" hidden>Another link</button></div>
+    </section>
+    <section class="ob-step" data-step="tools" aria-labelledby="obDlT" hidden>
+      <h2 class="ob-title" id="obDlT">Getting your song tools</h2>
+      <p class="ob-note" id="obDlNote">Your song’s split as soon as they’re in. You can go on meanwhile.</p>
+      <div class="ob-found" id="obDlSong" hidden><span class="cover"><img alt=""></span><div><b></b><small></small></div></div>
+      <!-- what's coming, a box each (obTools): the tools, then the song split by them; and how far it's got in all -->
+      <div class="ob-boxes" id="obBoxes"></div>
+      <p class="ob-small" id="obDlState" role="status"></p>
+      <div class="ob-acts"><button class="btn primary" id="obDlGo" type="button" data-next hidden>Continue</button><button class="btn" id="obDlRetry" type="button" hidden>Try again</button></div>
+    </section>
+  </div>
+</div>
 <div class="boot-ask" id="bootAsk" role="dialog" aria-modal="true" aria-labelledby="bootAskT"><b id="bootAskT">Update your songs?</b><p class="muted" id="bootAskP"></p>
   <div class="acts"><button class="btn sm" id="bootLater" type="button" title="Each song updates when you open it">Later</button><button class="btn sm primary" id="bootNow" type="button">Update now</button></div></div>
 
@@ -358,6 +436,7 @@ const EMPTY_LIBRARY = false;
 <script src="js/takes-studio.js"></script>
 <script src="js/stage.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/onboard.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

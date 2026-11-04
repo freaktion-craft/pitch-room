@@ -1,3 +1,6 @@
 praat-parselmouth>=0.4.3
 numpy>=1.24
 imageio-ffmpeg>=0.5
+# finding a song before it's added (its name, length, channel; a playlist's songs): small, so in from the start
+yt-dlp[default]>=2025.11.12
+deno>=2.0

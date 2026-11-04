@@ -34,12 +34,14 @@ readColors();
 
 // accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked from the
 // swatches in the settings.
-const ACCENTS = { blue: "Blue", violet: "Violet", pink: "Pink", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal" };
-let accent = store.get("accent", "blue");
-if (!(accent in ACCENTS)) accent = "blue";
+// in the order of their hues round the wheel (coral's 32° to pink's 353°), white before them
+const ACCENTS = { white: "White", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal", blue: "Blue", violet: "Violet", pink: "Pink" };
+let accent = store.get("accent", "white");
+if (!(accent in ACCENTS)) accent = "white";
 function setAccent(k) {
   accent = k; store.set("accent", k);
   document.documentElement.style.setProperty("--voice", `var(--voice-${k})`);
+  document.documentElement.style.setProperty("--voice-act", k === "white" ? "var(--ink)" : `var(--voice-${k})`); // a button in it: white at full
   readColors(); // the canvas takes it from here
   for (const b of $("#swatches").children) b.setAttribute("aria-pressed", String(b.dataset.k === k));
 }

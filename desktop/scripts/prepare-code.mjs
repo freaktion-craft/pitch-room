@@ -22,6 +22,7 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, "js"), { recursive: true });
 fs.mkdirSync(path.join(out, "css"), { recursive: true });
 for (const f of COPY) fs.copyFileSync(path.join(repo, f), path.join(out, f));
+fs.cpSync(path.join(repo, "img"), path.join(out, "img"), { recursive: true }); // the onboarding's photo and its mask
 
 const js = async (code, name) => {
   const r = await minify(code, { ecma: 2022, compress: { passes: 2 }, mangle: true, toplevel: false, format: { comments: false } });

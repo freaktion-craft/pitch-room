@@ -117,13 +117,16 @@ async function drawLibrary() {
     head.append(b);
   }
   box.append(head);
+  // the first song, given in the first steps before the song tools were in: there at the top, waiting for them (obFirstCard)
+  const first = typeof obFirstCard === "function" ? obFirstCard() : null;
+  if (first) box.append(first);
   // nothing yet: a row in the list's place that opens Add song, or (one on its way) a word on where it's at
-  if (!lib.length && coming) box.append(el("p", "lib-none", tr("Your first song is on its way. How it’s going shows beside the mic.")));
-  else if (!lib.length) {
+  if (!lib.length && coming && !first) box.append(el("p", "lib-none", tr("Your first song is on its way. How it’s going shows beside the mic.")));
+  else if (!lib.length && !first) {
     const a = el("button", "row add-first"), plus = el("span", "plus"), text = el("span", "song");
     a.type = "button"; a.onclick = (e) => { e.stopPropagation(); showAdd(true); };
     plus.append(icon("plus"));
-    text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or drop an audio file.")));
+    text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or a playlist.")));
     a.append(plus, text); box.append(a);
   }
   if (!lib.length) { drawNew(lib); pinLibTop(); paintFade(true); return; } // the column heads are new: pinned where they stand
@@ -137,7 +140,8 @@ async function drawLibrary() {
     keyOf(m).then(() => { paintKeyCell(key, m.key); link.setAttribute("aria-label", libLine(m)); if (libSort.by === "key") arrangeRows(); });
     // a click that starts while the title is being renamed (in its field, or beside it to finish) doesn't open the song
     row.onpointerdown = () => { row.dataset.renaming = row.querySelector(".rename") ? "1" : ""; };
-    row.onclick = (e) => { if (!row.dataset.renaming && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
+    row.onclick = (e) => { if (!row.dataset.renaming && !row.classList.contains("pending") && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + m.id); };
+    link.addEventListener("click", (e) => { if (row.classList.contains("pending")) e.preventDefault(); }); // its update to come first
     const acts = el("div", "song-actions");
     const more = mkBtn("", () => songMenu(more, m));
     more.classList.add("icon", "ghost"); more.title = tr("More"); more.setAttribute("aria-label", tr("More for {title}", { title: m.title }));
@@ -145,6 +149,7 @@ async function drawLibrary() {
     acts.append(more);
     const tile = tiles.get(m.id);
     if (tile) { paintCover(tile, m); paintUpgrade(tile, m); }
+    requestAnimationFrame(() => paintPending(row, m));
     row.append(tile || coverTile(m), info, el("span", "c num wide", m.bpm ? String(Math.round(m.bpm)) : "–"), key,
       el("span", "c num", fmtTime(m.duration)), acts);
     box.append(row);
@@ -186,6 +191,7 @@ const newDay = (t) => { const d = new Date(t * 1000), n = Math.round((new Date()
 function newCard(m) {
   const a = el("a", "ln-card"), cv = el("span", "cover");
   a.href = "#stems/" + m.id; a.dataset.id = m.id; a.draggable = false;
+  a.addEventListener("click", (e) => { if (a.classList.contains("pending")) e.preventDefault(); }); // its update to come first (paintPending)
   a.append(cv, el("b"), el("small"));
   paintNewCard(a, m);
   return a;
@@ -439,16 +445,26 @@ function coverTile(m) {
   return tile;
 }
 // A song being brought up to date after an update of the app (stems.start_upgrades: its lyrics lined up again, its
-// bars read again): its cover dimmed under a ring of how far it's got, spinning until it's started
+// bars read again): its cover dimmed under a ring of how far it's got, spinning until it's started. One whose turn's
+// still to come (pending): dimmed under the ring, empty; it can't be opened till it's done (paintPending)
 function paintUpgrade(tile, m) {
-  const on = m.upgrade != null;
+  const on = m.upgrade != null || !!m.pending;
   let ring = tile.querySelector(".ring");
   tile.classList.toggle("upgrading", on);
   if (!on) { ring?.remove(); tile.removeAttribute("title"); return; }
   if (!ring) tile.append((ring = progRing(0)));
-  ring.classList.toggle("spin", !m.upgrade);
-  ring.lastChild.setAttribute("stroke-dasharray", `${Math.max(6, m.upgrade * 100)} 100`);
-  tile.title = tr("Updating for the new version…");
+  ring.classList.toggle("spin", !m.pending && !m.upgrade);
+  ring.lastChild.style.visibility = m.pending ? "hidden" : ""; // empty: only its track
+  ring.lastChild.setAttribute("stroke-dasharray", `${Math.max(6, (m.upgrade || 0) * 100)} 100`);
+  tile.title = tr(m.pending ? "Waiting for its update" : "Updating for the new version…");
+}
+// a song's row (and its card in New) while its update's to come: not to be opened meanwhile, the cursor says so
+function paintPending(row, m) {
+  const on = !!m.pending;
+  row.classList.toggle("pending", on);
+  if (on) row.title = tr("Waiting for its update"); else row.removeAttribute("title");
+  const card = document.querySelector(`#sNewTrack .ln-card[data-id="${m.id}"]`);
+  if (card) { card.classList.toggle("pending", on); if (on) card.title = tr("Waiting for its update"); }
 }
 // A cover into its box once it's decoded, so the box is never empty: meanwhile it's a blur of it (its BlurHash), or its
 // colour. One in sight then fades up out of the blur, later the lower and further right it is (REVEAL ms across the
@@ -633,7 +649,7 @@ function initCoverView() {
 let lookupTimer = 0;
 function awaitLookups(lib, tries = 0) {
   clearTimeout(lookupTimer);
-  const looking = tries < 20 && lib.some((m) => !("cover" in m) || !("artist" in m)), upgrading = lib.some((m) => m.upgrade != null);
+  const looking = tries < 20 && lib.some((m) => !("cover" in m) || !("artist" in m)), upgrading = lib.some((m) => m.upgrade != null || m.pending);
   if (!looking && !upgrading) return;
   lookupTimer = setTimeout(async () => {
     if (!(view === "stems" && stemsPage === "lib")) return; // the list asks again when it's shown again
@@ -645,8 +661,8 @@ function awaitLookups(lib, tries = 0) {
       const known = libCache.get(m.id), row = libRows.get(m.id);
       if (!known || !row) continue;
       if ("cover" in m) known.cover = m.cover;
-      known.upgrade = m.upgrade;
-      paintCover(row.querySelector(".cover"), m); paintUpgrade(row.querySelector(".cover"), m);
+      known.upgrade = m.upgrade; known.pending = m.pending;
+      paintCover(row.querySelector(".cover"), m); paintUpgrade(row.querySelector(".cover"), m); paintPending(row, m);
       const card = $(`#sNewTrack .ln-card[data-id="${m.id}"]`);
       if (card && !row.querySelector(".rename")) paintNewCard(card, { ...known, title: m.title, artist: m.artist });
       if ((known.title !== m.title || known.artist !== m.artist) && !row.querySelector(".rename")) { // not while it's being renamed

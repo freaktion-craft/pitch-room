@@ -187,7 +187,7 @@ async function postJob(url, body, headers) {
 }
 // 4 stems: vocals, drums, bass and the rest (the 6-stem model's piano track bleeds, so it isn't offered)
 const stemModel = () => "htdemucs";
-// Several at once: links a line each (or spaces between), files several at a time. Each is sent in the order given;
+// Several at once: links a line each (or spaces between). Each is sent in the order given;
 // the server takes them in that order, one at a time, the rest waiting with how many are ahead of them. Once one is
 // in, the library shows their progress; one that couldn't start says why here, the others going on.
 // A playlist link among them is read once the others are sent, its songs listed to pick from (readPlaylist).
@@ -210,20 +210,6 @@ async function submitYoutube(e) {
   if (list) { if (sent) landRing(); if (!failed.length) await readPlaylist(list); }
   else if (!failed.length) { addMsg(""); await tuckAway(); } // all sent: the panel goes into the ring
   else if (sent) landRing(); // some sent: the ring shows them; the panel stays, saying why the rest couldn't start
-}
-async function submitFiles(files) {
-  files = [...(files || [])]; if (!files.length) return;
-  let ok = 0;
-  for (const [i, file] of files.entries()) {
-    addMsg(files.length > 1 ? tr("Uploading {i} of {n}…", { i: i + 1, n: files.length }) : "Uploading…");
-    try {
-      const id = await postJob(`/api/stems/upload?name=${encodeURIComponent(file.name)}&model=${stemModel()}`, file);
-      if (!ok++) holdRing();
-      jobStarted(id, file.name.replace(/\.[^.]+$/, ""));
-    }
-    catch (err) { addMsg(files.length > 1 ? tr("{url}: {why}", { url: file.name, why: () => tr(err.message) }) : err.message, true); if (ok) landRing(); return; }
-  }
-  addMsg(""); await tuckAway();
 }
 // A playlist (YouTube's or Spotify's, or a Spotify album): its songs listed under the field first, to pick from, ticked
 // unless in the library already or gone from YouTube. Those picked are added as links are, waiting their turn one at a

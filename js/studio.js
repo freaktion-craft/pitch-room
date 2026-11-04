@@ -891,9 +891,6 @@ function initStems() {
   $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
   document.addEventListener("click", (e) => { if (!addPop.hidden && !e.composedPath().includes(addPop)) showAdd(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !addPop.hidden) { showAdd(false); if (!$("#sAddAt").hidden) $("#sAddBtn").focus(); } });
-  addEventListener("dragenter", (e) => {
-    if (view === "stems" && stemsPage === "lib" && addPop.hidden && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) showAdd(true);
-  });
   $("#pGetVideo").onclick = async () => {
     const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
     videoWait("Getting the video…");
@@ -921,13 +918,8 @@ function initStems() {
   v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
   v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));
   v.addEventListener("error", () => { if (!v.getAttribute("src")) return; $("#pVideoWait").classList.add("err"); say($("#pVideoWait"), "Couldn’t load the video."); });
-  $("#sFile").onchange = (e) => { submitFiles(e.target.files); e.target.value = ""; };
   $("#sYtUrl").addEventListener("input", fitLinks);
   $("#sYtUrl").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#sYtForm").requestSubmit(); } }); // Shift+Enter: another line
-  const drop = $("#sDrop");
-  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
-  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); submitFiles(e.dataTransfer.files); });
   $("#pPlay").onclick = () => (P.playing ? pauseSong() : playSong());
   $("#pBack").onclick = () => seekSong(songPos() - 5);
   $("#pFwd").onclick = () => seekSong(songPos() + 5);

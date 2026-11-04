@@ -2,8 +2,6 @@ torch>=2.2
 torchaudio>=2.2
 demucs>=4.0.1
 librosa>=0.10
-yt-dlp[default]>=2025.11.12
-deno>=2.0
 audio-separator[cpu]>=0.47; python_version >= "3.10"
 audioread>=3.0; python_version >= "3.10" # audio-separator imports it; librosa 1.0 no longer brings it
 openai-whisper>=20250625

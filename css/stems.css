@@ -1,12 +1,7 @@
 /* The library, a song's Studio and Info page, Add song and the songs being added. */
-/* Notices and the drop zone */
+/* Notices */
 .server-off { margin: 0 0 var(--space-6); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: var(--note-bg); color: var(--note-ink); font-size: var(--text-md); }
 .server-off code { font-family: var(--mono); font-size: var(--text-sm); background: var(--fill); padding: 0 var(--space-1); border-radius: var(--radius-xs); }
-.drop { position: relative; display: flex; align-items: center; justify-content: center; min-height: 72px; padding: var(--space-3); border-radius: var(--radius-lg);
-  border: 1px dashed var(--track); background: var(--bg); color: var(--muted); font-size: var(--text-sm); text-align: center; cursor: pointer; transition: background-color var(--duration-fast), border-color var(--duration-fast); }
-.drop:hover, .drop.over { border-color: var(--ink); color: var(--ink); }
-.drop:has(input:focus-visible) { outline: 2px solid var(--voice); outline-offset: 2px; } /* the file field in it is see-through */
-.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 /* Stems page */
 .panel-card { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
@@ -16,9 +11,12 @@
 .row-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .inline-field { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); }
 /* the one-time setup: a banner, its line and its button; once it's started, how it's going in the line's place */
-#sInstall { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
-#sInstall .setup-line { display: flex; align-items: center; gap: var(--space-4); }
-#sInstall .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
+#sInstall, #obBack { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
+/* Settings' one, the steps again (welcome()): in the crumbs' place while they're unfinished */
+#obBack { flex: 1; min-width: 0; margin: 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); } /* room round its button */
+.backbar:has(#obBack:not([hidden])) .crumbs { display: none; }
+#sInstall .setup-line, #obBack .setup-line { display: flex; align-items: center; gap: var(--space-4); }
+#sInstall .setup-line > :not(.btn), #obBack .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
 #sInstallState:empty, #sInstall .setup-line:has(#sInstallState:not(:empty)) p { display: none; }
 #sInstallState .ico { width: var(--icon-sm); height: var(--icon-sm); margin-right: 6px; vertical-align: -3px; color: var(--good); } /* Installed's tick */
 .gpu-row { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--note-bg); color: var(--note-ink); font-size: var(--text-sm); }
@@ -37,6 +35,12 @@
 .yt textarea::placeholder { color: var(--placeholder); }
 .yt textarea:hover { background: var(--hover-2); }
 .yt textarea:focus { outline: none; background: var(--surface); border-color: var(--ink); }
+/* the onboarding's one link (onboard()), a field like the panel's */
+.yt input { flex: 1 1 auto; min-width: 0; height: var(--control-md); border: 1px solid transparent; border-radius: var(--radius-md); background: var(--fill);
+  padding: 0 var(--space-3); font: var(--text-md)/20px var(--font); color: inherit; transition: border-color var(--duration-fast), background-color var(--duration-fast); }
+.yt input::placeholder { color: var(--placeholder); }
+.yt input:hover { background: var(--hover-2); }
+.yt input:focus { outline: none; background: var(--surface-2); border-color: var(--ink); }
 .yt .btn { align-self: flex-start; }
 .yt .btn { flex: none; }
 /* Songs being added: a ring beside the mic, always there, as full as they are together; pressed, a panel with each
@@ -242,10 +246,8 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
 .add-form { display: grid; gap: var(--space-3); }
 .add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0; } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
 .add-form p, #sAddSetup { margin: 0; }
-.add-form .drop { justify-content: center; } /* not the panel's label rows */
 /* a playlist's songs, to pick from before any is added: ticked unless in the library already (or gone from YouTube) */
 .pl { display: grid; gap: var(--space-2); }
-.add-form:has(#plPick:not([hidden])) .drop { display: none; } /* picking: the files' way steps aside */
 .pl input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--ink); flex: none; }
 .pl-head { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-2); min-width: 0; }
 .pl-head b { flex: 1; min-width: 0; font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -414,8 +416,13 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-slow); }
 #sLib .cover img.in { opacity: 1; }
 /* being brought up to date (paintUpgrade): the picture dimmed, a ring of how far it's got over its middle */
-#sLib .cover.upgrading img.in { opacity: 0.5; }
-#sLib .cover .ring { position: absolute; inset: 0; width: var(--icon-lg); height: var(--icon-lg); margin: auto; transform: rotate(-90deg); }
+#sLib .cover.upgrading img.in { filter: brightness(0.38) saturate(0.6); transition: filter var(--duration-slow); } /* dark enough, any cover, for the ring to show */
+#sLib .cover .ring { position: absolute; inset: 0; width: var(--icon-lg); height: var(--icon-lg); margin: auto; transform: rotate(-90deg); filter: drop-shadow(0 0 2px oklch(0 0 0 / 0.6)); }
+#sLib .cover .ring circle { stroke-width: 2.5; }
+/* its update's still to come (paintPending): not to be opened till it's done, the cursor saying so */
+#sLib .row.pending, #sLib .row.pending a, .ln-card.pending { cursor: not-allowed; }
+#sLib .row.pending:hover { background: none; }
+.ln-card.pending .cover img { filter: brightness(0.38) saturate(0.6); }
 #sLib .cover .ring circle:first-child { stroke: var(--fg-30); }
 #sLib .cover .ring circle + circle { stroke: var(--ink); transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #sLib .cover img.now { transition: none; }

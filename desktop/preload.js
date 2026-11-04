@@ -1,9 +1,13 @@
-// What the page may ask of the desktop app (window.pitchroom; absent in a browser): that it's there, and a restart
-// (the GPU's PyTorch, once installed, is only taken up by a new server).
+// What the page may ask of the desktop app (window.pitchroom; absent in a browser): that it's there, a restart
+// (the GPU's PyTorch, once installed, is only taken up by a new server), and the system's mic settings.
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("pitchroom", {
   desktop: true,
   platform: process.platform,
   restart: () => ipcRenderer.send("relaunch"),
+  systemTheme: () => ipcRenderer.invoke("system-theme"), // the system's own "light" or "dark" (the window's always dark)
+  micAccess: () => ipcRenderer.invoke("mic-access"), // what the system says of the mic: "not-determined", "granted", "denied" or "restricted"
+  micSettings: () => ipcRenderer.send("mic-settings"),
+  attention: () => ipcRenderer.send("attention"), // something done meanwhile: the Dock icon bounces once, the taskbar's flashes // the system's own Microphone privacy page, where a refused mic is allowed again
 });

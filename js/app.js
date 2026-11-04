@@ -268,8 +268,16 @@ function reveal(at, nameThere = false) {
 const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06, -0.04, 0.05, -0.06, 0.03, -0.05, 0.04],
   pageEase: "cubic-bezier(0.38, 0, 0.12, 1)", rest: 200, last: 700, lastEase: "cubic-bezier(0.55, 0, 0.2, 1)",
   slide: 760, slideEase: "cubic-bezier(0.65, 0, 0.2, 1)", shade: 0.32 };
-async function welcome() {
+// Settings' banner, or its button in the header meanwhile (the header's only that and the mic's then: html.ob-left):
+// the steps again, where they were left
+const obResume = () => { $("#obBack").hidden = true; document.documentElement.classList.remove("ob-left"); welcome(OB.left); };
+$("#obBackBtn").onclick = obResume;
+$("#micSetBtn").addEventListener("click", (e) => { if (OB.left == null) return; e.preventDefault(); obResume(); });
+async function welcome(resume) { // resume: a step to come back to (Settings' banner), without the riffle
   const root = document.documentElement, w = $("#welcome"), pages = w.querySelector(".pages"), book = w.querySelector(".book"), word = w.querySelector(".word");
+  clearTimeout(window.WELCOME_TIMER); clearTimeout(window.BOOT_TIMER); // (there for a script that never got here; the steps take longer)
+  const still = resume != null || !WELCOME_RIFFLE || matchMedia("(prefers-reduced-motion: reduce)").matches; // the steps, without the riffle or the name's moves
+  if (resume != null) { root.classList.add("welcome"); w.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" }); } // over the page as it is
   const R = RIFFLE, colours = ["var(--bg)", ...Object.keys(ACCENTS).map((k) => `var(--voice-${k})`), "var(--bg)"], n = colours.length - 1;
   await Promise.race([document.fonts.load(`400 44px ${getComputedStyle(root).getPropertyValue("--font-brand")}`), sleep(1500)]);
   const place = (x, y, s = 1) => `translate(${x}px, ${y}px) scale(${s})`;
@@ -294,22 +302,34 @@ async function welcome() {
     return back.lastChild.animate([{ opacity: R.shade }, { opacity: R.shade, offset: 0.5 }, { opacity: 0 }], o).finished;
   };
   const onset = (k) => { const x = k / (n - 2); return R.start + R.span * (x + R.bunch * Math.sin(2 * Math.PI * x) / (2 * Math.PI)); };
-  for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase);
-  const lastAt = onset(n - 2) + R.page / 2 + R.rest, landed = turn(n - 1, lastAt, R.last, R.lastEase).then(() => {
+  if (!still) for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase);
+  const lastAt = still ? 0 : onset(n - 2) + R.page / 2 + R.rest, landed = turn(n - 1, lastAt, still ? 1 : R.last, R.lastEase).then(() => {
     [book.firstChild, ...[...book.querySelectorAll(".leaf")].slice(0, -1)].forEach((p) => (p.style.visibility = "hidden")); // black over all: the rest go
   });
   // the black page a touch bigger than the rest, so it covers their edges as it comes down over them (none shows round it)
   Object.assign(book.lastChild.querySelector(".verso").style, { top: "-2px", bottom: "-2px", left: "-2px", width: "calc(100% + 4px)" });
   await Promise.all([landed, Promise.race([libDrawn, sleep(5000)])]);
-  store.set("welcomed", true);
-  // the name to the header's: the page shows under the black (its parts held back by the rises), which then goes
-  root.classList.remove("booting");
+  // the name to its place in the header, where it stays through the first steps (onboard(), their column from its left edge)
   const brand = $("#app > header .brand").getBoundingClientRect(), from = word.getBoundingClientRect();
-  const slid = word.animate([{ transform: place(...mid()) }, { transform: place(brand.left, brand.top, brand.width / from.width) }],
-    { duration: R.slide, easing: R.slideEase, fill: "forwards" });
-  pages.animate([{ opacity: 1 }, { opacity: 0 }], { duration: R.slide * 0.6, delay: R.slide * 0.2, easing: "ease-out", fill: "forwards" });
-  reveal(R.slide * 0.55, true);
-  await slid.finished;
+  w.style.setProperty("--ob-left", Math.round(brand.left) + "px");
+  await word.animate([{ transform: place(...mid()) }, { transform: place(brand.left, brand.top, brand.width / from.width) }],
+    { duration: still ? 1 : R.slide, easing: R.slideEase, fill: "forwards" }).finished;
+  w.classList.add("onboarding");
+  const left = await onboard(resume ?? 0);
+  w.classList.remove("onboarding");
+  OB.left = left ? left.at : null; $("#obBack").hidden = !left; root.classList.toggle("ob-left", !!left); // left for Settings: its banner brings the steps back
+  if (left) { location.hash = "#settings"; route(); } // the page comes in as Settings
+  else {
+    store.set("welcomed", true); // only once they're through: a first time left half-way is a first time again
+    if (resume != null && view === "settings") { location.hash = "#stems"; route(); } // through from Settings: to the library, the first song in it
+  }
+  // then the page round the name: it shows under the black (its parts held back by the rises), which goes
+  root.classList.remove("booting");
+  obFirstShow(); // a first song given in the steps, waiting for the song tools: in the library as it comes in
+  const gone = pages.animate([{ opacity: 1 }, { opacity: 0 }], { duration: still ? 1 : R.slide * 0.6, easing: "ease-out", fill: "forwards" });
+  reveal(still ? 0 : 120, true);
+  await gone.finished;
+  obMicBack(!left); // the mic button, out over the black since the mic's step, back in the header (through: the mic off, and a tip saying so)
   root.classList.remove("welcome");
   book.replaceChildren(); w.getAnimations({ subtree: true }).forEach((a) => a.cancel()); word.style.transform = ""; w.classList.remove("ready");
 }

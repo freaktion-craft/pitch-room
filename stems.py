@@ -1,7 +1,7 @@
 """Stem separation, beat tracking and export for the Stems page.
 
 Songs live in ./library/<id>/ :
-    source.*        the original audio (upload or YouTube download)
+    source.*        the original audio (the YouTube download; a file, for a song added from one by an older version)
     video.*         the picture of a YouTube video, no sound (shown above the player to follow lyrics)
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
@@ -49,7 +49,7 @@ DATA = os.path.abspath(os.environ.get("PITCHROOM_DATA") or ROOT)
 LIB = os.path.join(DATA, "library")
 SR = 44100
 MODELS = {"htdemucs": "4 stems", "htdemucs_6s": "6 stems (+ guitar, piano)"}
-HEAVY = ["torch", "demucs", "librosa", "yt_dlp", "whisper", "stable_whisper"]
+HEAVY = ["torch", "demucs", "librosa", "whisper", "stable_whisper"]  # (yt-dlp: a base package, for finding a song before these are in)
 # Lead-vocal separation (audio-separator) is optional: without it the bars come from the whole vocal stem.
 # BS-Roformer karaoke by frazer & becruily (195 MB, ~60 s for a 4-minute song on an RTX 4070 Ti). On a song with
 # vocal chops, the bars it took out were the stretches a search for exact bar-to-bar loops had flagged. Two other
@@ -202,6 +202,34 @@ def installed() -> bool:
     return all(importlib.util.find_spec(m) is not None for m in HEAVY)
 
 
+def freshen_finders():
+    """yt-dlp kept up to date in the desktop app (it breaks as YouTube changes, and has a new version every few weeks):
+    at most once a day, in the background, into the app's environment in your folder (the copy that came with the app
+    can't be changed; the new one's found first). Nothing in a run from the source (no PITCHROOM_DATA), where it's yours."""
+    if not os.environ.get("PITCHROOM_DATA") or sys.prefix == sys.base_prefix:
+        return
+    stamp = os.path.join(DATA, ".yt-dlp-checked")
+    with contextlib.suppress(OSError):
+        if time.time() - os.path.getmtime(stamp) < 86400:
+            return
+
+    def run():
+        r = subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-warn-script-location", "-q", "-U", "yt-dlp[default]"],
+                           capture_output=True, text=True, timeout=600, **({"creationflags": 0x08000000} if os.name == "nt" else {}))
+        if r.returncode == 0:
+            with contextlib.suppress(OSError), open(stamp, "w") as f:
+                f.write(str(round(time.time())))
+        else:
+            print("yt-dlp update:", (r.stderr or r.stdout).strip()[-400:], file=sys.stderr)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def can_find() -> bool:
+    """Whether a link can be looked up before it's added (yt-dlp, a base package): its name, length and channel."""
+    return importlib.util.find_spec("yt_dlp") is not None
+
+
 def device() -> str:
     if not installed():
         return "unknown"
@@ -307,7 +335,7 @@ def _install(job, gpu_only: bool = False):
             if gpu_only:
                 raise RuntimeError("No CUDA build of PyTorch matched this system. Separation will keep using the CPU.")
     if not gpu_only:
-        _set(job, stage="Installing Demucs, librosa, yt-dlp and Whisper…")
+        _set(job, stage="Installing Demucs, librosa and Whisper…")
         if _pip(job, ["install", "-r", os.path.join(ROOT, "requirements-stems.txt")], (0.6, 0.9)) != 0:
             raise RuntimeError("Installing failed. The last lines of the log above say why.")
     importlib.invalidate_caches()
@@ -440,6 +468,8 @@ def library() -> list[dict]:
             if _upgrading["id"] == d:  # being brought up to date (start_upgrades): how far it's got
                 up = get_job(_upgrading["job"]) or {"status": "queued"}  # (no job yet: it's next, giving way)
                 meta["upgrade"] = 1.0 if up.get("status") not in ("queued", "running") else round(up.get("progress") or 0, 3)
+            elif _timing_run and _outdated_seen(folder):  # its turn still to come in the update going through them
+                meta["pending"] = True
             if not meta["split"] and os.path.isfile(os.path.join(folder, "lead.mp3")) and d not in _backfilled:
                 _backfilled.add(d)
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
@@ -564,6 +594,39 @@ def _channel(url: str) -> str:
     return info.get("channel") or info.get("uploader") or ""
 
 
+def find(url: str) -> dict:
+    """What a YouTube link is, before it's added (onboarding's first song) and with nothing but the base packages: its
+    video's title, length, channel and picture (yt-dlp, nothing downloaded), then the record it most likely is
+    (covers.online, as _look_up names a song once it's in): {title, artist, art (the album's, or the video's picture),
+    square (art is an album's), video (its own title), duration}."""
+    import covers
+    import lyrics
+    import yt_dlp
+    os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")  # its deno, beside this Python
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}) as ydl:
+            info = ydl.extract_info(url, download=False, process=False)
+    except Exception as e:  # noqa: BLE001
+        raise ValueError("Couldn’t find that video.") from e
+    own, dur = info.get("title") or "", float(info.get("duration") or 0)
+    channel, thumb = info.get("channel") or info.get("uploader") or "", covers.youtube(url) or info.get("thumbnail") or ""
+    cover = covers.is_cover(own)
+    record = None
+    with contextlib.suppress(RuntimeError):
+        record = covers.online(own, dur, "", cover=cover, channel="" if cover else channel)
+    if cover:  # a cover: the song it covers, sung by whoever the title says, or the channel
+        song = lyrics.split_title(covers.COVER.sub(" ", covers.COVER_BY.sub(" ", own)))[1] or own
+        name = (f"{(record or {}).get('track') or song} (Cover)", covers.cover_by(own) or channel)
+    elif record:
+        name = (covers.own_name(own, record["track"]) or record["track"], record["artist"])
+    else:
+        artist, song = lyrics.split_title(own)
+        name = (song or own, artist or channel)
+    square = bool(record and record.get("art") and not cover)
+    return {"title": name[0][:TITLE_MAX], "artist": name[1][:TITLE_MAX], "art": record["art"] if square else thumb, "square": square,
+            "video": own, "duration": round(dur)}
+
+
 def _look_up(song_id: str):
     import covers
     import lyrics
@@ -653,11 +716,6 @@ def rename_song(song_id: str, title) -> str:
 
 
 # ---------- separation pipeline ----------
-def start_upload(data: bytes, filename: str, model: str) -> str:
-    job = _new_job("separate", os.path.splitext(os.path.basename(filename or ""))[0])
-    return _run(job, _pipeline, {"kind": "upload", "data": data, "filename": filename}, model)
-
-
 def start_youtube(url: str, model: str, find=None, low: bool = False, name=None) -> str:
     """A song from a link. find: {artist, title, duration} for a playlist's song from Spotify, looked for on YouTube once
     its turn comes (playlists.match) rather than linked. low: a playlist's, worked on at low priority (_low_priority).
@@ -932,34 +990,27 @@ def _pipeline(job, src: dict, model_name: str):
         with _turn(job):
             _set(job, status="running", stage="Getting the audio", progress=0.02)
             video, channel = None, ""
-            if src["kind"] == "url":
-                if src.get("find"):  # a Spotify playlist's song: the likeliest video of it
-                    import playlists
-                    _set(job, stage="Finding it on YouTube")
-                    f = src["find"]
-                    try:
-                        src["url"] = playlists.match(f["artist"], f["title"], f["duration"])
-                    except Exception:  # noqa: BLE001
-                        raise ValueError("Couldn’t search YouTube. Is this computer online?") from None
-                    if not src["url"]:
-                        raise ValueError("Not found on YouTube.")
-                    _set(job, link=src["url"])
-                    _check(job)
-                path, title, channel = _download(job, src["url"], folder)
-                _set(job, name=title)
-                source = src["url"]
-                _stage(job, "Getting the video", 0.12)
+            # from a link (YouTube, or a Spotify playlist's song looked for there): the only way a song comes in
+            if src.get("find"):  # a Spotify playlist's song: the likeliest video of it
+                import playlists
+                _set(job, stage="Finding it on YouTube")
+                f = src["find"]
                 try:
-                    video = _download_video(job, src["url"], folder, 0.12, 0.2)
-                except Exception:  # noqa: BLE001  (the song still works without a picture)
-                    video = None
-            else:
-                ext = os.path.splitext(src["filename"] or "")[1].lower()[:6] or ".audio"
-                path = os.path.join(folder, "source" + ext)
-                with open(path, "wb") as f:
-                    f.write(src["data"])
-                title = os.path.splitext(os.path.basename(src["filename"] or "Upload"))[0]
-                source = src["filename"]
+                    src["url"] = playlists.match(f["artist"], f["title"], f["duration"])
+                except Exception:  # noqa: BLE001
+                    raise ValueError("Couldn’t search YouTube. Is this computer online?") from None
+                if not src["url"]:
+                    raise ValueError("Not found on YouTube.")
+                _set(job, link=src["url"])
+                _check(job)
+            path, title, channel = _download(job, src["url"], folder)
+            _set(job, name=title)
+            source = src["url"]
+            _stage(job, "Getting the video", 0.12)
+            try:
+                video = _download_video(job, src["url"], folder, 0.12, 0.2)
+            except Exception:  # noqa: BLE001  (the song still works without a picture)
+                video = None
             _stage(job, "Reading the audio", 0.2)
             wav = _decode_stereo(path)
             dur = wav.shape[1] / SR
@@ -2338,6 +2389,19 @@ def _give_way(song_id: str):
     _upgrading.update(id=song_id, job=None)  # library(): spinning until it's started
     while time.monotonic() < _singing_until or _work_lock.locked() or _line or _melody_lock.locked():
         time.sleep(1)
+
+
+_outdated_at: dict = {}
+
+
+def _outdated_seen(folder: str) -> bool:
+    """_outdated, kept for as long as its lyrics, melody and meta haven't changed (the library's asked for every second
+    or so while an update's going)."""
+    key = tuple(os.path.getmtime(p) if os.path.isfile(p) else 0 for p in (os.path.join(folder, f) for f in ("lyrics.json", "melody.json", "meta.json")))
+    hit = _outdated_at.get(folder)
+    if not hit or hit[0] != key:
+        hit = _outdated_at[folder] = (key, _outdated(folder))
+    return hit[1]
 
 
 def _outdated(folder: str) -> bool:

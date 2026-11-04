@@ -1,7 +1,9 @@
 // The desktop app's own Python: a standalone CPython (Astral's python-build-standalone, the builds uv uses) for this
 // OS and processor, into desktop/runtime, with the base packages (../requirements.txt) put in it, all but
-// praat-parselmouth (GPL-3.0, so not shipped in the app; melody.py only falls back to it without librosa). The heavy tools
-// (requirements-stems.txt) aren't: the app installs those on first use, into an environment in the user's folder.
+// praat-parselmouth (GPL-3.0, so not shipped in the app; melody.py only falls back to it without librosa). Those include
+// yt-dlp and deno (~50 MB), so a song's found (its name, artist, art; a playlist's songs) from the start; the app keeps
+// yt-dlp current itself (stems.freshen_finders). The heavy tools (requirements-stems.txt) aren't: the app installs those
+// when the first song's added, into an environment in the user's folder.
 //
 //     node scripts/fetch-python.mjs [--arch arm64|x64]
 //
