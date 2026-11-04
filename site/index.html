@@ -17,8 +17,9 @@
   --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: dark;
 }
-html, body { height: 100%; margin: 0; }
-body { display: grid; place-items: center; background: var(--bg); -webkit-font-smoothing: antialiased;
+/* one screen, held still: no scrolling and no rubber-band pull past its edges (a trackpad's, a touch screen's) */
+html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+body { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); -webkit-font-smoothing: antialiased;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } /* nothing here worth copying */
 a { -webkit-user-drag: none; }
 /* the top bar: the app's (.app and header in css/base.css), one 1440 px column with 24 px at its sides and above, the
