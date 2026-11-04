@@ -36,6 +36,7 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: node scripts/fetch-python.mjs   # the app's own Python, with the base packages
+      - run: node scripts/prepare-code.mjs   # the code it ships: minified, the Python as bytecode
       - name: Build (and add to the tag's draft release)
         run: npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
         env:

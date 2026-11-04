@@ -1,3 +1,5 @@
 node_modules/
 runtime/
 dist/
+build-code/
+.python-*/

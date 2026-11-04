@@ -5,17 +5,20 @@
   "private": true,
   "description": "Sing along to any song: its stems, your pitch on the melody, takes to listen back to.",
   "author": "freaktion",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "main": "main.js",
   "scripts": {
     "python": "node scripts/fetch-python.mjs",
+    "code": "node scripts/prepare-code.mjs",
     "start": "electron .",
-    "dist": "electron-builder --publish never",
-    "release": "electron-builder --publish always"
+    "dist": "node scripts/prepare-code.mjs && electron-builder --publish never",
+    "release": "node scripts/prepare-code.mjs && electron-builder --publish always"
   },
   "devDependencies": {
     "electron": "45.2.2",
-    "electron-builder": "26.18.0"
+    "electron-builder": "26.18.0",
+    "lightningcss": "1.33.0",
+    "terser": "5.51.2"
   },
   "build": {
     "appId": "com.freaktion.pitchroom",
@@ -36,23 +39,12 @@
         "to": "runtime"
       },
       {
-        "from": "..",
-        "to": "app-code",
-        "filter": [
-          "server.py",
-          "stems.py",
-          "melody.py",
-          "syllables.py",
-          "lyrics.py",
-          "covers.py",
-          "playlists.py",
-          "index.html",
-          "favicon.svg",
-          "requirements-stems.txt",
-          "LICENSE",
-          "css/**",
-          "js/**"
-        ]
+        "from": "build-code",
+        "to": "app-code"
+      },
+      {
+        "from": "THIRD-PARTY-NOTICES.md",
+        "to": "THIRD-PARTY-NOTICES.md"
       }
     ],
     "mac": {

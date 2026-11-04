@@ -1,5 +1,6 @@
 // The desktop app's own Python: a standalone CPython (Astral's python-build-standalone, the builds uv uses) for this
-// OS and processor, into desktop/runtime, with the base packages (../requirements.txt) put in it. The heavy tools
+// OS and processor, into desktop/runtime, with the base packages (../requirements.txt) put in it, all but
+// praat-parselmouth (GPL-3.0, so not shipped in the app; melody.py only falls back to it without librosa). The heavy tools
 // (requirements-stems.txt) aren't: the app installs those on first use, into an environment in the user's folder.
 //
 //     node scripts/fetch-python.mjs [--arch arm64|x64]
@@ -8,7 +9,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,7 +35,7 @@ const tgz = await get(`${base}/${name}`);
 const got = createHash("sha256").update(tgz).digest("hex");
 if (got !== want) throw new Error(`${name}: SHA-256 ${got}, expected ${want}`);
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pitchroom-python-"));
+const tmp = fs.mkdtempSync(path.join(desktop, ".python-")); // beside runtime/, not in the temp folder: on another drive (Windows CI) it can't be moved
 fs.writeFileSync(path.join(tmp, name), tgz);
 execFileSync("tar", ["-xzf", name], { cwd: tmp, stdio: "inherit" }); // the archive holds python/
 fs.rmSync(out, { recursive: true, force: true });
@@ -46,5 +46,6 @@ const py = process.platform === "win32" ? path.join(out, "python.exe") : path.jo
 const lib = process.platform === "win32" ? path.join(out, "Lib") : path.join(out, "lib", `python${VERSION.split(".").slice(0, 2).join(".")}`);
 for (const d of ["test", "idlelib", "tkinter", "turtledemo"]) fs.rmSync(path.join(lib, d), { recursive: true, force: true }); // unused, ~40 MB
 console.log("Base packages…");
-execFileSync(py, ["-m", "pip", "install", "--disable-pip-version-check", "--no-warn-script-location", "-q", "-r", path.join(repo, "requirements.txt")], { stdio: "inherit" });
+const packages = fs.readFileSync(path.join(repo, "requirements.txt"), "utf8").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#") && !/^praat-parselmouth\b/.test(l));
+execFileSync(py, ["-m", "pip", "install", "--disable-pip-version-check", "--no-warn-script-location", "-q", ...packages], { stdio: "inherit" });
 console.log(`Done: ${path.relative(repo, py)}`);

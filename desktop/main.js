@@ -70,7 +70,8 @@ async function startServer() {
   fs.mkdirSync(LOGS, { recursive: true });
   try { fs.renameSync(LOG, path.join(LOGS, "server.previous.log")); } catch {}
   const log = fs.openSync(LOG, "a");
-  server = spawn(ENV_PY, [path.join(CODE, "server.py"), String(port)], {
+  const entry = fs.existsSync(path.join(CODE, "server.pyc")) ? "server.pyc" : "server.py"; // a release ships bytecode only (scripts/prepare-code.mjs)
+  server = spawn(ENV_PY, [path.join(CODE, entry), String(port)], {
     cwd: CODE, windowsHide: true, detached: !win32, stdio: ["ignore", log, log],
     env: { ...process.env, PITCHROOM_DATA: DATA, PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONIOENCODING: "utf-8" },
   });
@@ -105,7 +106,10 @@ function createWindow() {
   win = new BrowserWindow({
     width: b.width || 1280, height: b.height || 860, x: b.x, y: b.y, minWidth: 720, minHeight: 560,
     title: "Pitchroom", backgroundColor: BG, show: false, autoHideMenuBar: true,
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
+    // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
+    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" } : {}),
+    // DevTools in development only: a released app has no way into its page
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });
   if (b.maximized) win.maximize();
   const ours = (url) => { try { const u = new URL(url); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
@@ -183,6 +187,7 @@ function menu() {
   const mac = process.platform === "darwin";
   const help = [
     { label: "Show Log", click: () => shell.showItemInFolder(LOG) },
+    { label: "Third-Party Notices", click: () => shell.openPath(app.isPackaged ? path.join(process.resourcesPath, "THIRD-PARTY-NOTICES.md") : path.join(__dirname, "THIRD-PARTY-NOTICES.md")) },
     { label: "Open Data Folder", click: () => shell.openPath(DATA) },
     { type: "separator" },
     { label: "Pitchroom Releases", click: () => shell.openExternal(`https://github.com/${RELEASES}/releases`) },
@@ -192,7 +197,7 @@ function menu() {
       { role: "services" }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, { type: "separator" }, { role: "quit" }] }] : []),
     ...(mac ? [] : [{ label: "File", submenu: [{ label: "Check for Updates…", click: () => checkUpdates(true) }, { type: "separator" }, { role: "quit" }] }]),
     { role: "editMenu" },
-    { label: "View", submenu: [{ role: "reload" }, { role: "toggleDevTools" }, { type: "separator" }, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { type: "separator" }, { role: "togglefullscreen" }] },
+    { label: "View", submenu: [{ role: "reload" }, ...(app.isPackaged ? [] : [{ role: "toggleDevTools" }]), { type: "separator" }, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { type: "separator" }, { role: "togglefullscreen" }] },
     { role: "windowMenu" },
     { role: "help", submenu: help },
   ]));

@@ -1,6 +1,6 @@
 # Pitchroom
 
-Open-source personal singing practice software. A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
+Personal singing practice software. A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
 
 > **For personal practice only.** Use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service. Songs, lyrics and models stay on your computer and are never part of this repository.
 
@@ -115,4 +115,4 @@ Run the server directly with `.venv/bin/python server.py` (port 5178) if you pre
 
 ## License
 
-[MIT](LICENSE). The libraries and models it installs keep their own licenses (Praat through parselmouth is GPL-3.0; it's installed from PyPI, not shipped here).
+All rights reserved ([LICENSE](LICENSE)), for Pitchroom's own code, design and name only. The libraries and models it uses keep their own licences (above; Praat through parselmouth is GPL-3.0: the start scripts install it from PyPI, and the desktop app leaves it out). The songs and recordings you add, and what's made from them, are yours. Versions released earlier under the MIT License stay so.

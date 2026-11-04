@@ -38,6 +38,8 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
    to black, and the name goes up to its place in the header. WELCOME_ALWAYS: on every load, reloads too, while it's
    being made; false once it's done. Not with reduced motion. Never longer than 12 s, should the script fail. */
 const WELCOME_ALWAYS = false;
+/* the desktop app on macOS draws no title bar: its window's buttons sit in the header (desktop/main.js, base.css) */
+if (window.pitchroom && window.pitchroom.platform === "darwin") document.documentElement.classList.add("desktop-mac");
 /* EMPTY_LIBRARY: the library drawn as if no song had been added (drawLibrary), so a first time can be seen; the songs
    stay as they are, and come back with false. While it's being made. */
 const EMPTY_LIBRARY = false;
