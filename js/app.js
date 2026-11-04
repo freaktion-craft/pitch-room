@@ -434,7 +434,7 @@ function initLang() {
       }
     }
   })(document.body);
-  setLang(store.get("lang", /^ko\b/i.test(navigator.language || "") ? "ko" : "en"));
+  setLang(store.get("lang", "en")); // English till Korean is picked in Settings, whatever the system says
 }
 // Everything said, again in the language now chosen, where it still shows what was said (else something has put
 // other text there since, and says that again itself)
