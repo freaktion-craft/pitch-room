@@ -28,7 +28,7 @@ a { -webkit-user-drag: none; }
   padding: 24px max(24px, env(safe-area-inset-right, 0px)) 0 max(24px, env(safe-area-inset-left, 0px)); pointer-events: none; }
 .logo { color: var(--ink); text-decoration: none; font: 400 18px/1 var(--font-brand); letter-spacing: -0.01em; pointer-events: auto; }
 /* the button: the app's own primary one (.btn.primary, in css/base.css): 40 px high, 8 px corners, 14 px type, an 18 px icon */
-.get { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 8px; background: var(--ink); color: var(--on-ink);
+.get { position: relative; display: inline-flex; /* (positioned, so over the water) */ align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 8px; background: var(--ink); color: var(--on-ink);
   font: 500 14px/1 var(--font); text-decoration: none; -webkit-tap-highlight-color: transparent;
   transition: transform 0.2s var(--ease), background 0.2s, box-shadow 0.2s var(--ease); }
 /* hover: where it is, at the full white, a glow round it; pressed: a little smaller, a shade darker */
@@ -46,9 +46,12 @@ a { -webkit-user-drag: none; }
   opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); } /* it fades in and out, and stays still */
 .tip.on { opacity: 1; pointer-events: auto; }
 .tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
+/* the water behind it all (rain()): first in the page, so everything after it is drawn over it */
+.water { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 </style>
 </head>
 <body>
+<canvas class="water" id="water" aria-hidden="true"></canvas>
 <header class="bar"><a class="logo" href="/">Pitchroom</a></header>
 <a class="get" id="get" href="https://github.com/freaktion-craft/pitchroom-releases/releases/latest">
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
@@ -120,6 +123,154 @@ document.getElementById("get").addEventListener("click", (e) => {
   tipTimer = setTimeout(() => tip.classList.remove("on"), 12000);
 });
 tip.addEventListener("click", () => tip.classList.remove("on"));
+</script>
+
+<script>
+// ---------- rain on the page, while the button's hovered ----------
+// The welcome's water (js/onboard.js, obScope and obGrid), as rain on a puddle: the page's a surface of water on a grid
+// coarser than its marks (scale of them a side), each point moving from its neighbours as a wave goes; drops pushed into
+// it at random while the pointer's on the button, rings going out from each and settling once it's off. Lit from the top
+// left by its slope, drawn as characters (.:-=+*#%@, the lit faces heavier) by the GPU in one draw. Nothing where WebGL 2
+// can't be had, nor with reduced motion; stopped whenever the water's still.
+// rate: its steps a second; damp: what a wave keeps a step (less than the welcome's, so rings don't pile up in the rain);
+// edge: its points by the sides that take a wave in; light: how much a slope catches it; drops: the rain's gap between
+// drops (ms, at least and at most); wet: how fast the surface comes in and goes (a second's share)
+const RAIN = { cell: 10, scale: 2, rate: 20, damp: 0.95, edge: 3, light: 1.5, drops: [70, 220], wet: 2.5, ink: [0.87, 0.87, 0.87] };
+const RAMP = ".:-=+*#%@";
+const VS = `#version 300 es
+uniform vec2 u_size; in vec2 a_pos; out vec2 v_px;
+void main() { v_px = vec2(a_pos.x + 1.0, 1.0 - a_pos.y) * 0.5 * u_size; gl_Position = vec4(a_pos, 0.0, 1.0); }`;
+const FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_cells, u_atlas; uniform vec2 u_origin; uniform float u_cell, u_marks; uniform ivec2 u_grid; uniform vec3 u_ink;
+in vec2 v_px; out vec4 o;
+void main() {
+  vec2 g = (v_px - u_origin) / u_cell; ivec2 c = ivec2(floor(g));
+  if (c.x < 0 || c.y < 0 || c.x >= u_grid.x || c.y >= u_grid.y) discard;
+  vec4 d = texelFetch(u_cells, c, 0);
+  float m = floor(d.r * 255.0 + 0.5);
+  if (m < 0.5) discard;
+  float a = d.g * texture(u_atlas, vec2((m - 1.0 + fract(g.x)) / u_marks, fract(g.y))).a;
+  o = vec4(u_ink * a, a);
+}`;
+// the GPU grid (obGrid's, without the cover's colours): each cell a mark and its alpha, the marks drawn once into an atlas
+function grid(canvas) {
+  const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, alpha: true });
+  if (!gl) return null;
+  const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return gl.getShaderParameter(x, gl.COMPILE_STATUS) ? x : null; };
+  const vs = sh(gl.VERTEX_SHADER, VS), fs = sh(gl.FRAGMENT_SHADER, FS);
+  if (!vs || !fs) return null;
+  const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
+  gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); // one triangle over it all
+  const loc = gl.getAttribLocation(prog, "a_pos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = {}; for (const n of ["u_size", "u_cells", "u_atlas", "u_origin", "u_cell", "u_marks", "u_grid", "u_ink"]) U[n] = gl.getUniformLocation(prog, n);
+  const tex = (unit, filter) => { const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, filter], [gl.TEXTURE_MAG_FILTER, filter], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    return t; };
+  const cellsT = tex(0, gl.NEAREST), atlasT = tex(1, gl.LINEAR);
+  gl.uniform1i(U.u_cells, 0); gl.uniform1i(U.u_atlas, 1);
+  let atlasKey = "", gridKey = "", css = [0, 0];
+  const atlas = (cell, dpr) => { // the marks, white, each centred in a cell's square
+    const key = `${cell}/${dpr}`;
+    if (key === atlasKey) return;
+    atlasKey = key;
+    const w = Math.ceil(cell * dpr), c = Object.assign(document.createElement("canvas"), { width: w * RAMP.length, height: w }), x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.font = `${cell * dpr}px ui-monospace, SFMono-Regular, Menlo, monospace`; x.textAlign = "center"; x.textBaseline = "middle";
+    [...RAMP].forEach((ch, i) => x.fillText(ch, i * w + w / 2, w / 2));
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, atlasT);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+  };
+  return {
+    resize(W, H, dpr, cell) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); gl.viewport(0, 0, canvas.width, canvas.height); css = [W, H]; atlas(cell, dpr); },
+    draw({ cols, rows, ox, oy, cell, cells }) {
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, cellsT);
+      const key = `${cols}x${rows}`;
+      if (key !== gridKey) { gridKey = key; gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, cols, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, cells); }
+      else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RGBA, gl.UNSIGNED_BYTE, cells);
+      gl.uniform2f(U.u_size, css[0], css[1]); gl.uniform2f(U.u_origin, ox, oy); gl.uniform1f(U.u_cell, cell); gl.uniform1f(U.u_marks, RAMP.length);
+      gl.uniform2i(U.u_grid, cols, rows); gl.uniform3fv(U.u_ink, RAIN.ink);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    },
+    clear() { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); },
+  };
+}
+
+(() => {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const cv = document.getElementById("water"), glr = grid(cv);
+  if (!glr) return;
+  const { cell, scale: S } = RAIN;
+  let W = 0, H = 0, cols = 0, rows = 0, sc = 0, sr = 0, cells = null, cur = null, prev = null, keep = null, shade = null;
+  let raining = false, wet = 0, last = 0, acc = 0, next = 0, running = false;
+  const size = () => {
+    W = innerWidth; H = innerHeight;
+    glr.resize(W, H, devicePixelRatio || 1, cell);
+    cols = Math.ceil(W / cell); rows = Math.ceil(H / cell); sc = Math.ceil(cols / S) + 3; sr = Math.ceil(rows / S) + 3;
+    cells = new Uint8Array(cols * rows * 4);
+    cur = new Float32Array(sc * sr); prev = new Float32Array(sc * sr); keep = new Float32Array(sc * sr); shade = new Float32Array(sc * sr);
+    for (let y = 0; y < sr; y++) for (let x = 0; x < sc; x++) { // less by the sides, so a wave goes into them rather than back
+      const e = Math.min(1, Math.min(x, y, sc - 1 - x, sr - 1 - y) / RAIN.edge);
+      keep[y * sc + x] = RAIN.damp * (0.8 + 0.2 * e);
+    }
+  };
+  const drop = (x0, y0, rad, amp) => { // a drop: the water pushed down in a round, smooth, no edge to it
+    for (let y = Math.max(1, Math.floor(y0 - rad)); y <= Math.min(sr - 2, Math.ceil(y0 + rad)); y++)
+      for (let x = Math.max(1, Math.floor(x0 - rad)); x <= Math.min(sc - 2, Math.ceil(x0 + rad)); x++) {
+        const k = 1 - Math.hypot(x - x0, y - y0) / rad;
+        if (k > 0) cur[y * sc + x] -= amp * (0.5 - 0.5 * Math.cos(Math.PI * k));
+      }
+  };
+  const step = () => { // the water a step on: each point from its neighbours, a little lost each time
+    for (let y = 1; y < sr - 1; y++) for (let x = 1, i = y * sc + 1; x < sc - 1; x++, i++)
+      prev[i] = ((cur[i - 1] + cur[i + 1] + cur[i - sc] + cur[i + sc]) / 2 - prev[i]) * keep[i];
+    [cur, prev] = [prev, cur];
+  };
+  const frame = (now) => {
+    if (!cur || innerWidth !== W || innerHeight !== H) size();
+    const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+    wet = Math.max(0, Math.min(1, wet + (raining ? 1 : -1) * dt * RAIN.wet));
+    if (raining && now >= next) { // a drop somewhere, now and then: some small, a few heavier
+      const big = Math.random() < 0.15;
+      drop(1 + Math.random() * (sc - 2), 1 + Math.random() * (sr - 2), big ? 1.6 + Math.random() * 0.6 : 0.9 + Math.random() * 0.5, (big ? 3.2 : 1.8) * (0.7 + 0.3 * wet));
+      next = now + RAIN.drops[0] + Math.random() * (RAIN.drops[1] - RAIN.drops[0]);
+    }
+    for (acc += dt * RAIN.rate; acc >= 1; acc--) step();
+    // the light on it at each point, between its last two steps (so it moves smoothly though it steps 20 times a second)
+    const f = acc, L = RAIN.light, h = (i) => prev[i] + (cur[i] - prev[i]) * f;
+    let moving = 0;
+    for (let y = 1; y < sr - 1; y++) for (let x = 1, i = y * sc + 1; x < sc - 1; x++, i++) {
+      shade[i] = (h(i - 1) - h(i + 1) + h(i - sc) - h(i + sc)) * L + Math.abs(h(i)) * 0.2; // from the top left; a crest or trough a little lit
+      if (Math.abs(cur[i]) > moving) moving = Math.abs(cur[i]);
+    }
+    // still water a faint field of dots while it's wet; a ring's lit side in heavier marks over it
+    cells.fill(0);
+    const ox = (W - cols * cell) / 2, oy = (H - rows * cell) / 2;
+    for (let y = 0; y < rows; y++) {
+      const v0 = 1 + (y + 0.5) / S, yi = Math.floor(v0), ty = v0 - yi;
+      for (let x = 0; x < cols; x++) {
+        const u0 = 1 + (x + 0.5) / S, xi = Math.floor(u0), tx = u0 - xi, i = yi * sc + xi; // the light between the four points round it
+        if (xi >= sc - 1 || yi >= sr - 1) continue;
+        const s = (shade[i] * (1 - tx) + shade[i + 1] * tx) * (1 - ty) + (shade[i + sc] * (1 - tx) + shade[i + sc + 1] * tx) * ty;
+        const v = Math.min(1, Math.max(0, s)), j = (y * cols + x) * 4;
+        if (v < 0.06) { if (wet > 0) { cells[j] = 1; cells[j + 1] = Math.round(0.1 * wet * 255); } continue; }
+        cells[j] = Math.min(RAMP.length - 1, Math.floor(v * RAMP.length)) + 1;
+        cells[j + 1] = Math.round(Math.min(1, 0.12 * wet + 0.18 + 0.6 * v) * 255);
+      }
+    }
+    glr.draw({ cols, rows, ox, oy, cell, cells });
+    if (!raining && wet <= 0 && moving < 0.004) { running = false; last = 0; acc = 0; cur.fill(0); prev.fill(0); glr.clear(); return; } // still: stopped
+    requestAnimationFrame(frame);
+  };
+  const start = () => { raining = true; next = 0; if (!running) { running = true; requestAnimationFrame(frame); } };
+  const stop = () => { raining = false; };
+  const get = document.getElementById("get");
+  get.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" || e.pointerType === "pen") start(); });
+  get.addEventListener("pointerleave", stop);
+  get.addEventListener("focus", () => { if (get.matches(":focus-visible")) start(); });
+  get.addEventListener("blur", stop);
+})();
 </script>
 </body>
 </html>
