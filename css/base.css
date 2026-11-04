@@ -99,10 +99,11 @@ header { position: relative; }
    left, its control at the right) with hairlines between; as wide as reads well */
 /* …beside a list of the groups that stays in view, the one being read lit (initSetNav); a narrow window has the groups alone */
 .set-layout { display: grid; grid-template-columns: 180px minmax(0, 760px); gap: var(--space-8); align-items: start; }
-.set-nav { position: sticky; top: var(--space-6); display: grid; gap: 2px; }
+/* as the library's rows: the names in line with the page, their hover a little out past them */
+.set-nav { position: sticky; top: var(--space-6); display: grid; gap: 2px; margin-inline-start: calc(var(--space-3) * -1); }
 .set-nav button { height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: none; color: var(--muted);
   font: var(--text-md)/20px var(--font); text-align: left; cursor: pointer; transition: background-color var(--duration-fast), color var(--duration-fast); }
-.set-nav button:hover { color: var(--ink); }
+.set-nav button:hover { background: var(--fill); color: var(--ink); }
 .set-nav button[aria-current="true"] { background: var(--fill); color: var(--ink); }
 .set-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 @media (max-width: 720px) { .set-layout { grid-template-columns: minmax(0, 1fr); } .set-nav { display: none; } }
