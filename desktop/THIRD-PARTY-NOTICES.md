@@ -16,7 +16,6 @@ other people's work, each under its own licence:
   Its source: https://ffmpeg.org/download.html
 - **Hugeicons** (the icons) — MIT. https://hugeicons.com
 - **electron-updater** (the updates on Windows and Linux) — MIT. https://github.com/electron-userland/electron-builder
-- **Geist Serif** (the name on the splash) — SIL OFL 1.1. https://vercel.com/font
 
 ## Loaded or installed when it's used
 

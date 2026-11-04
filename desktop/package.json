@@ -32,7 +32,6 @@
       "main.js",
       "preload.js",
       "splash.html",
-      "GeistSerif-Regular.woff2",
       "package.json"
     ],
     "extraResources": [
