@@ -88,6 +88,7 @@ async function drawLibrary() {
   let lib = [], jobs = [];
   if (libSent) { ({ lib, jobs } = libSent); libSent = null; }
   else [lib, jobs] = await Promise.all(["/api/library", "/api/jobs"].map((u) => fetch(u, { cache: "no-store" }).then((r) => r.json()).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])));
+  if (EMPTY_LIBRARY) { lib = []; jobs = []; } // shown as a first time (the page's head): the songs are only not drawn
   libCache = new Map(lib.map((m) => [m.id, m]));
   // the covers drawn already go into the new rows as they are (a reload draws the list twice), so none goes blank
   const tiles = new Map([...libRows].map(([id, row]) => [id, row.querySelector(".cover")]));

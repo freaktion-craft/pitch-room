@@ -154,6 +154,23 @@ html.booting #app { visibility: hidden; }
 html.asking .boot-ask { display: grid; }
 html.asking #app { visibility: hidden; }
 html.asking #boot { display: none; }
+/* The welcome (welcome()), in the bar's place: the name in the middle, large, and under it a book (the screen less 20 % each side): its right half turned
+   over to the left like a book's page, again and again, each one showing an accent colour, the last one black. The pages
+   are built by welcome(); a page's shade (black) is drawing, the light on it going as it stands up. */
+#welcome { position: fixed; inset: 0; z-index: var(--z-boot); display: none; pointer-events: none; }
+html.welcome #welcome { display: block; }
+html.welcome #boot, html.asking #welcome { display: none; }
+#welcome .pages { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: var(--bg); } /* its own stack, under the name */
+#welcome .book { position: absolute; inset: 20%; } /* the pages, black bars round them; a page lifting off stands out over them */
+#welcome .half { position: absolute; top: 0; bottom: 0; width: 50%; }
+#welcome .leaf { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: 0 50%; transform-style: preserve-3d; } /* its faces turn with it, so the back shows once it's over */
+#welcome .leaf > .half { left: 0; width: 100%; backface-visibility: hidden; }
+#welcome .leaf > .verso { transform: rotateY(180deg); } /* a page's back (its front, .recto); not .back, the back link's */
+#welcome .shade { position: absolute; inset: 0; background: #000; opacity: 0; }
+#welcome .word { position: absolute; z-index: 1; left: 0; top: 0; transform-origin: 0 0; white-space: nowrap; color: var(--ink); visibility: hidden;
+  font: 400 44px/1 var(--font-brand); letter-spacing: -0.01em; } /* the header's .brand, large: it's drawn down to it */
+#welcome.ready .word { visibility: visible; } /* once its font is in and it's in the middle */
+html.welcome .brand { visibility: hidden; } /* till the name gets there */
 /* Page intro: the title, set apart from what follows */
 .group { display: grid; gap: var(--space-3); }
 /* Section titles: they head the content, so they read stronger than it */

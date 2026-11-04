@@ -882,6 +882,12 @@ function initStems() {
   $("#sYtForm").onsubmit = submitYoutube;
   // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it
   const addPop = $("#addPop");
+  // the close by the title: whichever panel the form is in (the ring's has it too), the focus back to what opened it
+  $("#sAddClose").append(icon("close"));
+  $("#sAddClose").onclick = (e) => {
+    e.stopPropagation();
+    if (addPop.contains($("#sAdd"))) { showAdd(false); $("#sAddBtn").focus(); } else showJobsAdd(false);
+  };
   $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
   document.addEventListener("click", (e) => { if (!addPop.hidden && !e.composedPath().includes(addPop)) showAdd(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !addPop.hidden) { showAdd(false); if (!$("#sAddAt").hidden) $("#sAddBtn").focus(); } });

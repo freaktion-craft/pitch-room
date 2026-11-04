@@ -233,10 +233,14 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
    typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
    to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. At the
    right, just before Add song. */
-/* Add song: a panel under its button (links, files, the options), not a page of its own */
+/* Add song: a panel in the middle of the window (links, files, the options), the page dimmed behind it; not a page of its own */
 .add-at { position: relative; display: inline-flex; }
-.add-at .pop { width: min(520px, calc(100vw - 32px)); }
+#addPop { position: fixed; inset: 0; margin: auto; width: min(520px, calc(100vw - 32px)); height: fit-content;
+  max-height: calc(100dvh - 2 * var(--space-4)); overflow-y: auto; animation: add-in var(--duration-slow) var(--ease); }
+@keyframes add-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { #addPop { animation: none; } }
 .add-form { display: grid; gap: var(--space-3); }
+.add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0; } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
 .add-form p, #sAddSetup { margin: 0; }
 .add-form .drop { justify-content: center; } /* not the panel's label rows */
 /* a playlist's songs, to pick from before any is added: ticked unless in the library already (or gone from YouTube) */
@@ -257,12 +261,9 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
 .pl-row.gone { cursor: default; opacity: 0.55; }
 .pl-row.gone:hover { background: none; }
 .pl-acts { display: flex; justify-content: flex-end; gap: var(--space-2); }
-/* while it's up, a clear layer over the page behind (as it is, not blurred): a click on it closes */
-#addVeil { position: fixed; inset: 0; z-index: var(--z-veil); pointer-events: none; }
-#addVeil.on { pointer-events: auto; }
-/* above it while it's open, so the panel and its button take clicks */
-.add-at { z-index: 0; transition: z-index 0s linear var(--duration-base); }
-.add-at.open { z-index: calc(var(--z-veil) + 1); transition: none; }
+/* while it's up, a layer over the page behind, dimmed (not blurred): a click on it closes */
+#addVeil { position: fixed; inset: 0; z-index: var(--z-veil); pointer-events: none; background: transparent; transition: background-color var(--duration-slow) var(--ease); }
+#addVeil.on { pointer-events: auto; background: var(--scrim); }
 .search { position: relative; display: flex; align-items: center; width: 240px; flex: 0 1 auto; min-width: 120px; }
 /* the glyph (2 px in from its box each way) 10 px from the field's left, top and bottom, and from the text */
 .search .ico { position: absolute; left: 8px; width: var(--icon-sm); height: var(--icon-sm); color: var(--faint); pointer-events: none; }
@@ -299,7 +300,6 @@ html.lib-top { scroll-padding-top: var(--mast); } /* a row reached with Tab isn'
 html.lib-top body::-webkit-scrollbar-track { margin-top: var(--mast); }
 html.lib-top #app > header { position: sticky; top: var(--top-header); z-index: 6; }
 html.lib-top #sLibPage .lib-head { position: sticky; top: var(--top-head); z-index: 4; transition: z-index 0s linear var(--duration-base); }
-html.lib-top #sLibPage .lib-head:has(.add-at.open) { z-index: calc(var(--z-veil) + 1); transition: none; } /* the Add song panel over its click layer */
 html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 4; }
 :is(#listFade, #listFadeTop) > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(var(--dir), transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
 :is(#listFade, #listFadeTop) > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(var(--dir), transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }

@@ -232,14 +232,21 @@ async function boot() {
   let from = 0; // the bar's sweep is timed from when it shows
   if (root.classList.contains("asking")) { await askUpdate(); from = performance.now(); }
   if (!root.classList.contains("booting")) return;
+  if (root.classList.contains("welcome")) return welcome();
   await Promise.race([Promise.all([libDrawn, document.fonts.ready]), sleep(5000)]);
   await sleep(BOOT_MIN - (performance.now() - from));
   await $("#boot").animate([{ opacity: 1, filter: "blur(0)" }, { opacity: 0, filter: "blur(4px)" }], { duration: 240, easing: "ease-out", fill: "forwards" }).finished;
   root.classList.remove("booting");
   $("#boot").getAnimations().forEach((a) => a.cancel());
-  rise($("#app > header"), 0, 0, 6);
-  if (!(view === "stems" && stemsPage === "lib")) { rise($("#app main:not([hidden])"), 60, 4, 6); return; }
-  let t = 80;
+  reveal(0);
+}
+// The page coming in, at ms from now. nameThere: the name is already on its way to the header (the welcome's), so the
+// header's chips rise without it.
+function reveal(at, nameThere = false) {
+  if (nameThere) [...$("#app > header").children].filter((n) => !n.matches(".brand")).forEach((n) => rise(n, at, 0, 6));
+  else rise($("#app > header"), at, 0, 6);
+  if (!(view === "stems" && stemsPage === "lib")) { rise($("#app main:not([hidden])"), at + 60, 4, 6); return; }
+  let t = at + 80;
   for (const node of [$("#sLibPage .lib-head")]) {
     if (node) { rise(node, t); t += 90; }
   }
@@ -248,10 +255,63 @@ async function boot() {
     $("#sNew").querySelectorAll(".ln-card").forEach((c, i) => rise(c, t + 60 + Math.min(i, 8) * 50, 6, 6));
     t += 90;
   }
-  rise($("#sLib"), t);
+  rise($("#sLib .lib-cols"), t); // the column heads on their own: they're sticky, and one in a rising list isn't drawn till it's risen, then shows at once
   [...$("#sLib").querySelectorAll(".row")].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6));
   const rising = document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity);
   Promise.all(rising.map((a) => a.finished)).then(pinLibTop, pinLibTop); // measured where it rose to
+}
+// The welcome (html.welcome, set in the page's head): the name in the middle, and the screen's right half turned over
+// to the left like a book's page, one after another, each showing an accent colour: slow off the thumb, then a rush,
+// then slow again (the onsets bunched in the middle by RIFFLE.bunch), the pages in the air together. A beat, and the
+// last page, black, turns on its own. Then the name goes to its place in the header, and the page rises in under it.
+// Waits for the library as the bar does, the riffle meanwhile.
+const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06, -0.04, 0.05, -0.06, 0.03, -0.05, 0.04],
+  pageEase: "cubic-bezier(0.38, 0, 0.12, 1)", rest: 200, last: 700, lastEase: "cubic-bezier(0.55, 0, 0.2, 1)",
+  slide: 760, slideEase: "cubic-bezier(0.65, 0, 0.2, 1)", shade: 0.32 };
+async function welcome() {
+  const root = document.documentElement, w = $("#welcome"), pages = w.querySelector(".pages"), book = w.querySelector(".book"), word = w.querySelector(".word");
+  const R = RIFFLE, colours = ["var(--bg)", ...Object.keys(ACCENTS).map((k) => `var(--voice-${k})`), "var(--bg)"], n = colours.length - 1;
+  await Promise.race([document.fonts.load(`400 44px ${getComputedStyle(root).getPropertyValue("--font-brand")}`), sleep(1500)]);
+  const place = (x, y, s = 1) => `translate(${x}px, ${y}px) scale(${s})`;
+  const mid = () => { const r = word.getBoundingClientRect(); return [(innerWidth - r.width) / 2, (innerHeight - r.height) / 2]; };
+  word.style.transform = place(...mid()); w.classList.add("ready");
+  const half = (i, cls, left) => {
+    const h = document.createElement("div"); h.className = "half " + cls; h.style.background = colours[i];
+    if (left != null) h.style.left = left;
+    h.append(Object.assign(document.createElement("i"), { className: "shade" }));
+    return h;
+  };
+  book.replaceChildren(half(0, "", "0"), half(n, "", "50%"));
+  const depth = `perspective(${Math.round(book.clientWidth * 2)}px)`; // a page's depth as it turns, for its size
+  const turn = (k, delay, duration, easing) => { // page k: colour k on its front (the right), k + 1 on its back
+    const leaf = document.createElement("div"); leaf.className = "leaf"; leaf.style.zIndex = 100 - k;
+    const front = half(k, "recto"), back = half(k + 1, "verso");
+    leaf.append(front, back); book.append(leaf);
+    const o = { duration, delay, easing, fill: "both" };
+    leaf.animate([{ transform: `${depth} rotateY(0deg)`, zIndex: 100 - k }, { transform: `${depth} rotateY(-90deg)`, zIndex: 100 - k, offset: 0.5 },
+      { transform: `${depth} rotateY(-90deg)`, zIndex: 200 + k, offset: 0.5 }, { transform: `${depth} rotateY(-180deg)`, zIndex: 200 + k }], o); // over the spine, it lies on those turned before it
+    front.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], o);
+    return back.lastChild.animate([{ opacity: R.shade }, { opacity: R.shade, offset: 0.5 }, { opacity: 0 }], o).finished;
+  };
+  const onset = (k) => { const x = k / (n - 2); return R.start + R.span * (x + R.bunch * Math.sin(2 * Math.PI * x) / (2 * Math.PI)); };
+  for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase);
+  const lastAt = onset(n - 2) + R.page / 2 + R.rest, landed = turn(n - 1, lastAt, R.last, R.lastEase).then(() => {
+    [book.firstChild, ...[...book.querySelectorAll(".leaf")].slice(0, -1)].forEach((p) => (p.style.visibility = "hidden")); // black over all: the rest go
+  });
+  // the black page a touch bigger than the rest, so it covers their edges as it comes down over them (none shows round it)
+  Object.assign(book.lastChild.querySelector(".verso").style, { top: "-2px", bottom: "-2px", left: "-2px", width: "calc(100% + 4px)" });
+  await Promise.all([landed, Promise.race([libDrawn, sleep(5000)])]);
+  store.set("welcomed", true);
+  // the name to the header's: the page shows under the black (its parts held back by the rises), which then goes
+  root.classList.remove("booting");
+  const brand = $("#app > header .brand").getBoundingClientRect(), from = word.getBoundingClientRect();
+  const slid = word.animate([{ transform: place(...mid()) }, { transform: place(brand.left, brand.top, brand.width / from.width) }],
+    { duration: R.slide, easing: R.slideEase, fill: "forwards" });
+  pages.animate([{ opacity: 1 }, { opacity: 0 }], { duration: R.slide * 0.6, delay: R.slide * 0.2, easing: "ease-out", fill: "forwards" });
+  reveal(R.slide * 0.55, true);
+  await slid.finished;
+  root.classList.remove("welcome");
+  book.replaceChildren(); w.getAnimations({ subtree: true }).forEach((a) => a.cancel()); word.style.transform = ""; w.classList.remove("ready");
 }
 $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());

@@ -33,7 +33,21 @@ const SAVED_LIB = /*LIBRARY*/null;
 const SAVED_UPDATE = /*UPDATE*/null;
 if (SAVED_UPDATE) document.documentElement.classList.add("asking");
 /* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
-try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}</script>
+try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-blue))`); } catch (e) {}
+/* the welcome (welcome()): the first time Pitchroom opens, its pages riffle through the accent colours under the name, back
+   to black, and the name goes up to its place in the header. WELCOME_ALWAYS: on every load, reloads too, while it's
+   being made; false once it's done. Not with reduced motion. Never longer than 12 s, should the script fail. */
+const WELCOME_ALWAYS = false;
+/* EMPTY_LIBRARY: the library drawn as if no song had been added (drawLibrary), so a first time can be seen; the songs
+   stay as they are, and come back with false. While it's being made. */
+const EMPTY_LIBRARY = false;
+(() => {
+  let welcomed = false;
+  try { welcomed = SAVED && SAVED.welcomed != null ? !!SAVED.welcomed : JSON.parse(localStorage.getItem("stem:welcomed")) === true; } catch (e) {}
+  if ((welcomed && !WELCOME_ALWAYS) || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.documentElement.classList.add("booting", "welcome");
+  setTimeout(() => document.documentElement.classList.remove("booting", "welcome"), 12000);
+})();</script>
 </head>
 <body>
 <canvas id="aurora" width="64" height="40" aria-hidden="true"></canvas>
@@ -213,36 +227,37 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
     <div id="libMast" aria-hidden="true"></div>
     <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
     <div id="addVeil" aria-hidden="true"></div>
+    <!-- Add song's panel (#sAddBtn opens it): in the middle of the window, over the veil, so it's here, not by its button -->
+    <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
+      <div class="add-form" id="sAdd" hidden>
+        <div class="add-title"><b class="pop-title">Add a song</b><button class="btn sm icon ghost" id="sAddClose" type="button" aria-label="Close" title="Close"></button></div>
+        <form class="yt" id="sYtForm">
+          <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links or a playlist" title="YouTube links, one per line, or a YouTube or Spotify playlist link" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
+          <button class="btn sm primary" type="submit">Add</button>
+        </form>
+        <div class="pl" id="plPick" hidden>
+          <div class="pl-head"><input type="checkbox" id="plAll" title="All or none" aria-label="All or none"><b id="plName"></b><span id="plCount"></span></div>
+          <div class="pl-list" id="plList"></div>
+          <div class="pl-acts"><button class="btn sm ghost" id="plBack" type="button">Cancel</button><button class="btn sm primary" id="plGo" type="button" title="Added one at a time, at low priority, so the PC stays free">Add</button></div>
+        </div>
+        <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
+        <div class="gpu-row" id="sGpu" hidden>
+          <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
+          <button class="btn sm primary" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
+          <div class="bar" hidden id="sGpuBar"><i></i></div>
+          <span class="muted" id="sGpuState"></span>
+        </div>
+        <p class="muted" id="sAddMsg" hidden></p>
+      </div>
+      <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
+    </div>
     <section class="group" id="sLibPage" aria-labelledby="sLibTitle">
       <div class="lib-head">
         <span class="ln-pull" id="sNewPull" aria-hidden="true"></span>
         <h2 class="group-label lib-title" id="sLibTitle">Library</h2>
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
         <button class="btn sm" id="sUpdate" type="button" hidden>Update</button>
-        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button>
-        <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
-          <div class="add-form" id="sAdd" hidden>
-            <b class="pop-title">Add a song</b>
-            <form class="yt" id="sYtForm">
-              <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links or a playlist" title="YouTube links, one per line, or a YouTube or Spotify playlist link" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
-              <button class="btn sm primary" type="submit">Add</button>
-            </form>
-            <div class="pl" id="plPick" hidden>
-              <div class="pl-head"><input type="checkbox" id="plAll" title="All or none" aria-label="All or none"><b id="plName"></b><span id="plCount"></span></div>
-              <div class="pl-list" id="plList"></div>
-              <div class="pl-acts"><button class="btn sm ghost" id="plBack" type="button">Cancel</button><button class="btn sm primary" id="plGo" type="button" title="Added one at a time, at low priority, so the PC stays free">Add</button></div>
-            </div>
-            <label class="drop" id="sDrop"><input type="file" id="sFile" accept="audio/*,video/*" multiple><span>or choose audio files · drop them here</span></label>
-            <div class="gpu-row" id="sGpu" hidden>
-              <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
-              <button class="btn sm primary" id="sGpuBtn" type="button">Use my NVIDIA GPU</button>
-              <div class="bar" hidden id="sGpuBar"><i></i></div>
-              <span class="muted" id="sGpuState"></span>
-            </div>
-            <p class="muted" id="sAddMsg" hidden></p>
-          </div>
-          <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
-        </div></span></div>
+        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button></span></div>
       <section class="lib-new" id="sNew" aria-labelledby="sNewTitle" hidden>
         <div class="ln-head"><h2 class="group-label" id="sNewTitle">New <span class="ln-n" id="sNewCount"></span></h2><span class="ln-arrows"><button class="btn sm icon ghost" id="sNewPrev" type="button" aria-label="Back" title="Back"></button><button class="btn sm icon ghost" id="sNewNext" type="button" aria-label="More" title="More"></button></span></div>
         <div class="ln-track" id="sNewTrack"></div>
@@ -320,6 +335,7 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
 
 <div id="listFade" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
 <div id="boot" aria-hidden="true"><div class="bar"><i></i></div></div>
+<div id="welcome" aria-hidden="true"><div class="pages"><div class="book"></div></div><span class="word">Pitchroom</span></div>
 <div class="boot-ask" id="bootAsk" role="dialog" aria-modal="true" aria-labelledby="bootAskT"><b id="bootAskT">Update your songs?</b><p class="muted" id="bootAskP"></p>
   <div class="acts"><button class="btn sm" id="bootLater" type="button" title="Each song updates when you open it">Later</button><button class="btn sm primary" id="bootNow" type="button">Update now</button></div></div>
 
