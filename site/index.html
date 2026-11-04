@@ -31,9 +31,9 @@ body { display: grid; place-items: center; background: var(--bg); -webkit-font-s
 .get:active { background: oklch(0.82 0 0); transform: translateY(0) scale(0.97); box-shadow: none; transition-duration: 0.06s; }
 .get:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .get svg { width: 18px; height: 18px; }
-/* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (Chrome's
-   sits about 110 px in from the window's edge, past the profile and the menu) */
-.tip { position: fixed; top: 14px; right: 72px; padding: 10px 14px; border-radius: 10px; background: var(--ink); color: var(--on-ink);
+/* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (how far
+   in, set by tipAt(); its arrow 38 px in from its right) */
+.tip { position: fixed; top: 14px; right: 58px; padding: 10px 14px; border-radius: 10px; background: var(--ink); color: var(--on-ink);
   font: 500 14px/1.3 var(--font); white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
   opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 0.3s var(--ease), transform 0.3s var(--ease); }
 .tip.on { opacity: 1; transform: none; pointer-events: auto; animation: nudge 1.2s var(--ease) 0.3s 3; }
@@ -95,8 +95,17 @@ async function detectMacArch() {
 // the tip, only when the button downloads the file itself (not when it opens the releases page)
 const tip = document.getElementById("tip");
 let tipTimer;
+// how far in from the page's right edge Chrome's downloads icon is: past the profile and the menu (about 96 px); with
+// vertical tabs, the window's own buttons are in that row too (about 268 px). Those are told apart by the frame round
+// the page: vertical tabs have no tab strip above it (49 px of frame there, against 85 or more) and one at its side
+function tipAt() {
+  const frameH = outerHeight - innerHeight, frameW = outerWidth - innerWidth;
+  const vertical = !/Mac/i.test(navigator.platform) && frameW >= 40 && frameH < 82; // a Mac's window buttons are at the left
+  return vertical ? 268 : 96;
+}
 document.getElementById("get").addEventListener("click", (e) => {
   if (!/\/releases\/download\//.test(e.currentTarget.href)) return;
+  tip.style.right = `${tipAt() - 38}px`;
   tip.textContent = ko ? "다운로드 중이에요. 여기서 열 수 있어요" : "Downloading. Open it from here";
   tip.classList.add("on");
   clearTimeout(tipTimer);
