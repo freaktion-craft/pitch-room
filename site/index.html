@@ -36,9 +36,8 @@ a { -webkit-user-drag: none; }
 .get:active { background: oklch(0.82 0 0); transform: scale(0.97); box-shadow: none; transition-duration: 0.06s; }
 .get:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .get svg { width: 18px; height: 18px; }
-/* the line under it: hung below, so the button stays at the page's dead centre */
-.hold { position: relative; }
-.note { position: absolute; top: calc(100% + 14px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
+/* the line at the page's foot, 24 px up as the app's column is in from its sides */
+.note { position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
   margin: 0; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 13px/1.45 var(--font); }
 /* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (how far
    in, set by tipAt(); its arrow 38 px in from its right) */
@@ -51,13 +50,11 @@ a { -webkit-user-drag: none; }
 </head>
 <body>
 <header class="bar"><a class="logo" href="/">Pitchroom</a></header>
-<div class="hold">
 <a class="get" id="get" href="https://github.com/freaktion-craft/pitchroom-releases/releases/latest">
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
   <span id="getLabel">Download</span>
 </a>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
-</div>
 <div class="tip" id="tip" role="status"></div>
 
 <script>
