@@ -276,6 +276,12 @@ else {
   ipcMain.handle("mic-access", () => (process.platform === "linux" ? "granted" : systemPreferences.getMediaAccessStatus("microphone"))); // (asked yet? allowed?)
   ipcMain.on("mic-settings", () => shell.openExternal(process.platform === "darwin" // where the mic's allowed for apps, once refused
     ? "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" : "ms-settings:privacy-microphone"));
+  ipcMain.handle("pick-folder", async (e) => {
+    const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
+      title: "The Pitchroom beta folder", buttonLabel: "Import", defaultPath: app.getPath("downloads"), properties: ["openDirectory"],
+    });
+    return r.canceled ? null : r.filePaths[0] || null;
+  });
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", (e) => { if (!quitting && win) { e.preventDefault(); requestQuit(); return; } quitting = true; stopServer(); });
   app.whenReady().then(async () => {

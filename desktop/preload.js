@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld("pitchroom", {
   systemTheme: () => ipcRenderer.invoke("system-theme"), // the system's own "light" or "dark" (the window's always dark)
   micAccess: () => ipcRenderer.invoke("mic-access"), // what the system says of the mic: "not-determined", "granted", "denied" or "restricted"
   micSettings: () => ipcRenderer.send("mic-settings"),
+  pickFolder: () => ipcRenderer.invoke("pick-folder"), // the beta's folder, for Import beta library: its path, or null
   attention: () => ipcRenderer.send("attention"), // something done meanwhile: the Dock icon bounces once, the taskbar's flashes // the system's own Microphone privacy page, where a refused mic is allowed again
 });

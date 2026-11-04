@@ -445,6 +445,87 @@ def set_settings(changes) -> dict:
         return data
 
 
+# ---------- a beta's songs, brought in ----------
+# The desktop app keeps what's yours in its own folder; a copy run from its files (the beta) kept it beside them. Picked
+# in Settings (Import beta library), that folder's are copied in: the songs not here yet (their rendered keys left
+# behind, made again when asked for), the settings not set here yet, the models not downloaded here yet. The beta's
+# folder stays as it was.
+_import: dict = {"status": "idle"}  # running: {done, total}; done: {songs, settings}; error: {error}
+_import_lock = threading.Lock()
+
+
+def _beta_folders(path) -> tuple[str, str]:
+    """(its library, the folder its settings and models are in) from the folder picked: the beta's own, or its library."""
+    path = os.path.abspath(str(path or "")) if path else ""
+    if path and os.path.isdir(os.path.join(path, "library")):
+        return os.path.join(path, "library"), path
+    if path and os.path.isdir(path) and any(os.path.isfile(os.path.join(path, d, "meta.json")) for d in os.listdir(path)):
+        return path, os.path.dirname(path)
+    raise ValueError("No Pitchroom songs in that folder.")
+
+
+def import_state() -> dict:
+    with _import_lock:
+        return dict(_import)
+
+
+def start_import(path) -> dict:
+    src_lib, src = _beta_folders(path)
+    if os.path.normcase(src_lib) == os.path.normcase(LIB):
+        raise ValueError("That’s this app’s own library.")
+    songs = [d for d in sorted(os.listdir(src_lib)) if re.fullmatch(r"[0-9a-f]{12}", d)
+             and os.path.isfile(os.path.join(src_lib, d, "meta.json")) and not os.path.exists(os.path.join(LIB, d))]
+    models = os.path.join(src, "models")
+    models = [n for n in sorted(os.listdir(models)) if not os.path.exists(os.path.join(MODEL_DIR, n))] if os.path.isdir(models) else []
+    with _import_lock:
+        if _import["status"] == "running":
+            raise ValueError("Already importing.")
+        _import.clear()
+        _import.update(status="running", done=0, total=len(songs) + len(models))
+    threading.Thread(target=_import_run, args=(src_lib, src, songs, models), daemon=True).start()
+    return import_state()
+
+
+def _import_run(src_lib: str, src: str, songs: list[str], models: list[str]):
+    stage = os.path.join(DATA, ".import")  # each copied whole here, then moved in: one half copied is never taken for one
+
+    def bring(a: str, to: str):
+        b = os.path.join(stage, os.path.basename(a))
+        if os.path.isdir(a):
+            shutil.copytree(a, b, ignore=shutil.ignore_patterns("keys", "*.part"))
+        else:
+            shutil.copy2(a, b)
+        os.replace(b, os.path.join(to, os.path.basename(a)))
+        with _import_lock:
+            _import["done"] += 1
+
+    try:
+        shutil.rmtree(stage, ignore_errors=True)
+        for d in (stage, LIB, MODEL_DIR):
+            os.makedirs(d, exist_ok=True)
+        for d in songs:
+            bring(os.path.join(src_lib, d), LIB)
+        for n in models:
+            bring(os.path.join(src, "models", n), MODEL_DIR)
+        old = os.path.join(src, "settings.json")
+        old = _load_json(old) if os.path.isfile(old) else {}
+        here, add = get_settings(), {}
+        for k, v in (old.items() if isinstance(old, dict) else ()):
+            if k not in here:
+                add[k] = v
+            elif isinstance(v, dict) and isinstance(here[k], dict) and v.keys() - here[k].keys():  # each song's key and tempo…
+                add[k] = {**v, **here[k]}
+        if add:
+            set_settings(add)
+        with _import_lock:
+            _import.update(status="done", songs=len(songs), settings=len(add))
+    except Exception as e:  # noqa: BLE001  (what's in is in; the rest can be tried again)
+        with _import_lock:
+            _import.update(status="error", error=f"Couldn’t copy: {e}")
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
 _backfilled: set[str] = set()
 
 

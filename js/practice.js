@@ -1038,7 +1038,34 @@ async function singSong(m, btn) {
 }
 // Settings: a page of their own (#settings, route): going out, their lists closed and Hear yourself off
 function showMicSet(on) {
-  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); hearMe(false); } else { showJobs(false); paintSetNav(); openSync(); }
+  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); hearMe(false); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
+}
+// Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
+// and models beside them, copied in by the server (stems.start_import). Its line says how it's going, then how it went;
+// once new songs or settings are in, the page starts again with them.
+let importPoll = 0, importing = false;
+async function paintImport(st) {
+  if (!window.pitchroom?.pickFolder) return;
+  $("#setImport").hidden = false;
+  st ??= await fetch("/api/import", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+  const go = $("#setImportGo"), why = $("#setImportWhy"), on = st.status === "running";
+  go.disabled = on;
+  why.classList.toggle("err", st.status === "error");
+  if (on) say(why, "Copying… {d} of {n}", { d: st.done, n: st.total });
+  else if (st.status === "error") say(why, st.error);
+  else if (st.status === "done") say(why, !st.songs ? "Nothing new to copy" : st.songs === 1 ? "1 song copied" : "{n} songs copied", { n: st.songs });
+  else say(why, "Copy songs and settings from the beta folder");
+  clearTimeout(importPoll);
+  if (on) importPoll = setTimeout(() => paintImport(), 700);
+  else if (importing) { importing = false; if (st.status === "done" && (st.songs || st.settings)) location.reload(); }
+}
+async function runImport() {
+  const path = await window.pitchroom.pickFolder();
+  if (!path) return;
+  const r = await fetch("/api/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }).catch(() => null);
+  const st = r ? await r.json().catch(() => ({})) : {};
+  importing = true;
+  paintImport(r?.ok ? st : { status: "error", error: st.error || "The server didn’t answer properly." });
 }
 // The list beside them: a group's name goes to it; lit, the group being read (the first still reaching past a line
 // 40 % down the window, so a short page lights each in turn; the last once the page is scrolled to its end), or the one
@@ -1231,6 +1258,7 @@ function initSing() {
   $("#gate").oninput = (e) => { S.gate = 10 ** (+e.target.value / 20); save(); };
   resetOnDblClick($("#gate"), -40);
   $("#hearMe").onclick = () => hearMe(!monitorOn);
+  $("#setImportGo").onclick = runImport;
   $("#devTools").checked = S.dev;
   $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); };
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
