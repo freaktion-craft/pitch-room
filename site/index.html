@@ -27,8 +27,8 @@ a { -webkit-user-drag: none; }
 .bar { position: fixed; top: 0; left: 0; right: 0; max-width: 1440px; margin: 0 auto; display: flex; align-items: center; height: 56px; box-sizing: border-box; /* its padding inside the 1440, as the app's * rule has it */
   padding: 24px max(24px, env(safe-area-inset-right, 0px)) 0 max(24px, env(safe-area-inset-left, 0px)); pointer-events: none; }
 .logo { color: var(--ink); text-decoration: none; font: 400 18px/1 var(--font-brand); letter-spacing: -0.01em; pointer-events: auto; }
-/* the button: the app's own primary one (.btn.primary, in css/base.css): 40 px high, 8 px corners, 14 px type, an 18 px icon */
-.get { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 8px; background: var(--ink); color: var(--on-ink);
+/* the button: the app's own primary one (.btn.primary, in css/base.css): 40 px high, 14 px type, an 18 px icon; round at its ends (a pill: a little more room inside them) */
+.get { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 18px 0 14px; border-radius: 999px; background: var(--ink); color: var(--on-ink);
   font: 500 14px/1 var(--font); text-decoration: none; -webkit-tap-highlight-color: transparent;
   transition: transform 0.2s var(--ease), background 0.2s, box-shadow 0.2s var(--ease); }
 /* hover: where it is, at the full white, a glow round it; pressed: a little smaller, a shade darker */
