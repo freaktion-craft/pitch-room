@@ -21,7 +21,7 @@ Python comes inside it, so there's nothing else to install. The first time a son
 - **macOS:** open it, then **System Settings → Privacy & Security → Open Anyway**.
 - **Windows:** at "Windows protected your PC", **More info → Run anyway**.
 
-**Your songs** are kept in the app's own folder, not next to it, so updates never touch them: `~/Library/Application Support/Pitchroom` on macOS, `%APPDATA%\Pitchroom` on Windows (**Help → Open Data Folder**). It doesn't share them with a copy started from the files below.
+**Your songs** are kept in the app's own folder, not next to it, so updates never touch them: `~/Library/Application Support/Pitchroom` on macOS, `%APPDATA%\Pitchroom` on Windows (**Help → Open Data Folder**). It doesn't share them with a copy started from the files below: to bring those over, **Settings → Advanced → Import beta library** and pick that copy's folder (it's copied, not moved).
 
 **Updates:** it checks GitHub once it opens and offers a newer version as a download (also **Check for Updates…** in the menu).
 

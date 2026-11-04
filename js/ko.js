@@ -8,6 +8,8 @@
 // What the server says (stems.py, server.py): job stages and errors. {x} in these stands for anything, matched by pattern.
 const KO_SERVER = {
   "Waiting": "대기 중", "Done": "완료", "Cancelled": "취소됨",
+  "No Pitchroom songs in that folder.": "그 폴더에는 Pitchroom 노래가 없어요.", "That’s this app’s own library.": "이 앱의 라이브러리예요.",
+  "Already importing.": "이미 가져오는 중이에요.", "Couldn’t copy: {why}": "복사하지 못했어요: {why}",
   "Unknown job.": "없는 작업이에요.", "Unknown song.": "없는 곡이에요.", "Unknown take.": "없는 테이크예요.", "Not found.": "찾을 수 없어요.",
   "Something went wrong. Check the terminal window for details.": "문제가 생겼어요. 자세한 내용은 터미널 창을 확인하세요.",
   "Please send a file under {n} MB.": "{n} MB보다 작은 파일을 보내 주세요.",
@@ -316,6 +318,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Click a phrase to go to it · drag across phrases (or Shift+click another) to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined":
     "소절을 누르면 그리로 가요 · 여러 소절을 드래그하면(또는 다른 소절을 Shift+클릭) 그 사이를 묶어 반복해요 · Alt+클릭(Mac은 Option), 또는 재생 중 M으로 소절을 나눌 곳이나 합칠 곳을 표시해요",
   "Developer tools": "개발자 도구",
+  "Import beta library": "베타 라이브러리 가져오기", "Copy songs and settings from the beta folder": "베타 폴더의 노래와 설정 복사",
+  "Choose folder": "폴더 선택", "The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own": "압축을 푼 Pitchroom 폴더나 그 안의 library 폴더. 복사만 하니 베타는 그대로예요",
+  "Copying… {d} of {n}": "복사하는 중… {d}/{n}", "Nothing new to copy": "새로 복사할 게 없어요", "1 song copied": "노래 1곡을 복사했어요", "{n} songs copied": "노래 {n}곡을 복사했어요",
   "{n} marked · next: {line}": "{n}줄 표시 · 다음: {line}", "{n} marked": "{n}줄 표시",
   "T: this line starts now, as you hear it, not as it lights · Shift+T: back a line, its mark off · Y: skip one · click a phrase to start from its line. Saved in truth.json. Your reaction time (150–250 ms, steady) is fine: scoring takes off the median offset": "T: 이 줄이 지금 시작해요, 불이 켜질 때가 아니라 들리는 대로 · Shift+T: 한 줄 뒤로, 표시도 지워요 · Y: 한 줄 건너뛰기 · 소절을 누르면 그 줄부터 시작해요. truth.json에 저장돼요. 반응 시간(150–250 ms, 일정함)은 괜찮아요: 채점할 때 중앙값만큼 빼요",
   "Copy phrase marks": "소절 표시 복사", "Updating for the new version…": "새 버전에 맞게 다시 만드는 중…", "Copied": "복사했어요", "Couldn’t copy: {why}": "복사하지 못했어요: {why}",

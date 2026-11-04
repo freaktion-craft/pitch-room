@@ -322,6 +322,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, stems.library())
         if path == "/api/settings":
             return self._json(200, stems.get_settings())
+        if path == "/api/import":  # how Import beta library is going (stems.import_state)
+            return self._json(200, stems.import_state())
         if path == "/api/upgrades":  # the library's Update button: songs waiting to be timed again (stems.update_state)
             return self._json(200, stems.update_state())
         if path.startswith("/api/library/") and path.endswith(("/info", "/takes", "/lyrics", "/truth", "/notes")):
@@ -357,6 +359,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"running": stems.answer_update(bool(isinstance(body, dict) and body.get("now")))})
         if url.path == "/api/settings":
             return self._json(200, stems.set_settings(json.loads(self._body(600_000) or b"{}")))
+        if url.path == "/api/import":  # {path}: a beta's folder, its songs, settings and models copied in (stems.start_import)
+            body = json.loads(self._body(10_000) or b"{}")
+            return self._json(200, stems.start_import(body.get("path") if isinstance(body, dict) else None))
         if url.path == "/api/stems/install":
             return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1")})
         if url.path == "/api/stems/youtube":
@@ -448,7 +453,7 @@ class Handler(SimpleHTTPRequestHandler):
         self._unread = int(self.headers.get("Content-Length") or 0)
         if not self._ours():
             return self._refuse()
-        if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")) or url.path in ("/api/settings", "/api/upgrades"):
+        if url.path.startswith(("/api/stems/", "/api/library/", "/api/jobs/")) or url.path in ("/api/settings", "/api/upgrades", "/api/import"):
             try:
                 return self._stems_post(url)
             except ValueError as e:
