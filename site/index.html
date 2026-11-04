@@ -126,144 +126,191 @@ tip.addEventListener("click", () => tip.classList.remove("on"));
 </script>
 
 <script>
-// ---------- the flowers, out of the dark, while the button's hovered ----------
-// The welcome's picture (img/onboard-flowers.jpg, its flowers in img/onboard-flowers-mask.png: red the flowers) in
-// characters behind the button, as tall as the page: the flowers alone, each cell's mark as bright as the photo is
-// there (.:-=+*#%@). Unseen until the pointer's on the button; then soft rounds of light (gaussian splats) land about
-// it, nearer at first and further out the longer it stays, each lifting the dark a little where it falls, so the
-// flowers come up faintly in patches, as a dark lifting. Off the button, the dark comes back over them. Drawn by the
-// GPU in one draw (js/onboard.js's obGrid, without the cover's colours); nothing where WebGL 2 can't be had, nor with
-// reduced motion; stopped whenever it's all dark.
-// cell: a mark's square (px); fill: how much of the page's height the picture takes; most: the brightest a mark gets
-// (the dark only partly lifted); splats: the gap between them (ms, at least and at most), their size (px, sigma) and
-// how much each lifts; spread: how far out they land (of the page's shorter side) once the pointer's stayed `grow` s;
-// back: how fast the dark comes back off the button (a second's share), and how slowly it creeps back on it
-const BLOOM = { cell: 8, fill: 1.04, most: 0.48, gap: [45, 110], sigma: [40, 120], lift: [0.16, 0.34], spread: [0.12, 0.42], grow: 2.4, back: 1.8, creep: 0.04, ink: [0.87, 0.87, 0.87] };
-const RAMP = ".:-=+*#%@";
+// ---------- the welcome's picture, out of the dark, while the button's hovered ----------
+// The welcome's scene (js/onboard.js, obArt, and its look in css/base.css, .ob-visual) behind the button, as tall as
+// the page: the photo dimmed and a little soft, grain over it, and over that the flowers' and leaves' outlines in
+// characters from its mask (red the flowers, green the leaves): | down a side, - along a top or bottom, / and \ round a
+// corner, now and then a heavier mark in their place; a leaf's fill thinning in from its edge; a slow wave of light along
+// them. Unseen until the pointer's on the button; then soft rounds of light (gaussian splats) come up about it, near
+// at first and further out the longer it stays, each lifting the dark a little where it falls, as a dark lifting; off
+// the button, the dark comes back over it.
+// All of it drawn by the GPU in one pass: the marks laid out once (at load, and on a resize), the photo once; each frame
+// the CPU only spreads the light on a coarse grid (lightCell px a point), drawn smooth between its points. Nothing where
+// WebGL 2 can't be had, on a phone (no hover), nor with reduced motion; stopped whenever it's all dark.
+// ART as obArt's (spark: the heavier marks; heavy: their share of an edge; fill: a leaf's marks inward, depth cells deep;
+// change: how often an edge's mark is picked again, a second; wave: how fast the light runs along them; leaf: the
+// leaves' marks, quieter than the flowers'); fill: how much of the page's height the picture takes; most: how far the dark
+// lifts at most; gap: between splats (ms); sigma: their size (px); lift: how much each lifts; rise: how long each takes to
+// come up (s); spread: how far out they land (of the page's shorter side) once the pointer's stayed grow s; back: how fast
+// the dark comes back off the button, creep: on it
+const ART = { cell: 8, spark: "@#%&$*+", heavy: 0.4, fill: "+=-::..", depth: 7, change: 0.36, wave: 0.6, leaf: 0.4 };
+const SCENE = { fill: 1.04, most: 0.8, lightCell: 16, gap: [60, 140], sigma: [50, 130], lift: [0.22, 0.42], rise: 0.7,
+  spread: [0.1, 0.4], grow: 2.6, back: 1.6, creep: 0.03 };
+const MARKS = [...new Set("/\\-|" + ART.spark + ART.fill + "@%")]; // the edges' marks, then the heavier ones (one run), then a leaf's fill
 const VS = `#version 300 es
 uniform vec2 u_size; in vec2 a_pos; out vec2 v_px;
 void main() { v_px = vec2(a_pos.x + 1.0, 1.0 - a_pos.y) * 0.5 * u_size; gl_Position = vec4(a_pos, 0.0, 1.0); }`;
 const FS = `#version 300 es
 precision highp float;
-uniform sampler2D u_cells, u_atlas; uniform vec2 u_origin; uniform float u_cell, u_marks; uniform ivec2 u_grid; uniform vec3 u_ink;
+uniform vec2 u_size; uniform vec4 u_pic; uniform float u_cell, u_marks, u_time, u_spark0, u_sparkN, u_heavy, u_change, u_wave, u_leafA, u_depth, u_most;
+uniform ivec2 u_grid; uniform sampler2D u_cells, u_atlas, u_photo, u_light; uniform vec3 u_bg, u_ink, u_leaf;
 in vec2 v_px; out vec4 o;
+float hash(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
 void main() {
-  vec2 g = (v_px - u_origin) / u_cell; ivec2 c = ivec2(floor(g));
-  if (c.x < 0 || c.y < 0 || c.x >= u_grid.x || c.y >= u_grid.y) discard;
-  vec4 d = texelFetch(u_cells, c, 0);
-  float m = floor(d.r * 255.0 + 0.5);
-  if (m < 0.5) discard;
-  float a = d.g * texture(u_atlas, vec2((m - 1.0 + fract(g.x)) / u_marks, fract(g.y))).a;
-  o = vec4(u_ink * a, a);
+  float light = texture(u_light, v_px / u_size).r; // how far the dark's lifted here
+  if (light < 0.004) { o = vec4(u_bg, 1.0); return; }
+  light = smoothstep(0.0, 1.0, light) * u_most;
+  vec3 col = u_bg; float edge = 0.0;
+  vec2 uv = (v_px - u_pic.xy) / u_pic.zw;
+  if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) { // the photo: a little soft, a little less saturated, toward black
+    vec2 t = 1.5 / u_pic.zw;
+    vec3 p = (texture(u_photo, uv + t).rgb + texture(u_photo, uv - t).rgb + texture(u_photo, uv + vec2(t.x, -t.y)).rgb + texture(u_photo, uv + vec2(-t.x, t.y)).rgb) * 0.25;
+    p = mix(vec3(dot(p, vec3(0.299, 0.587, 0.114))), p, 0.85) * 0.45;
+    edge = smoothstep(0.0, 0.14, uv.x) * smoothstep(0.0, 0.14, 1.0 - uv.x) * smoothstep(0.0, 0.05, uv.y) * smoothstep(0.0, 0.05, 1.0 - uv.y); // its sides into the dark
+    col = mix(u_bg, p, edge);
+  }
+  vec2 g = v_px / u_cell; ivec2 c = ivec2(floor(g));
+  if (edge > 0.0 && c.x < u_grid.x && c.y < u_grid.y) {
+    vec4 d = texelFetch(u_cells, c, 0);
+    float kind = floor(d.g * 255.0 + 0.5); // 1 a flower's edge, 2 a leaf's, 3 a leaf's fill
+    if (kind > 0.5) {
+      float m = floor(d.r * 255.0 + 0.5), deep = floor(d.b * 255.0 + 0.5), cell = float(c.x) * 131.0 + float(c.y);
+      if (kind < 2.5) { // an edge: its own mark, or a heavier one, each picked again now and then
+        float k = floor(u_time * u_change + hash(vec3(cell, 1.0, 7.0)) * 64.0);
+        if (hash(vec3(cell, k, 3.0)) < u_heavy) m = u_spark0 + floor(hash(vec3(cell, k, 5.0)) * u_sparkN);
+      }
+      float wave = 0.6 + 0.4 * sin(u_time * u_wave - float(c.x) * 0.12 + float(c.y) * 0.07);
+      float a = wave * (kind > 2.5 ? 0.85 * (1.0 - deep / (u_depth + 1.0)) : 1.0) * (kind < 1.5 ? 1.0 : u_leafA) * edge;
+      float cov = texture(u_atlas, vec2((m + fract(g.x)) / u_marks, fract(g.y))).a;
+      col = mix(col, kind < 1.5 ? u_ink : u_leaf, clamp(a * cov, 0.0, 1.0));
+    }
+  }
+  col *= 1.0 + (hash(vec3(floor(v_px), floor(u_time / 0.15))) - 0.5) * 0.16; // grain, a few times a second as film's
+  o = vec4(mix(u_bg, col, light), 1.0);
 }`;
-// the GPU grid (obGrid's, without the cover's colours): each cell a mark and its alpha, the marks drawn once into an atlas
-function grid(canvas) {
-  const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, alpha: true });
-  if (!gl) return null;
-  const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return gl.getShaderParameter(x, gl.COMPILE_STATUS) ? x : null; };
-  const vs = sh(gl.VERTEX_SHADER, VS), fs = sh(gl.FRAGMENT_SHADER, FS);
-  if (!vs || !fs) return null;
-  const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
-  gl.useProgram(prog);
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); // one triangle over it all
-  const loc = gl.getAttribLocation(prog, "a_pos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = {}; for (const n of ["u_size", "u_cells", "u_atlas", "u_origin", "u_cell", "u_marks", "u_grid", "u_ink"]) U[n] = gl.getUniformLocation(prog, n);
-  const tex = (unit, filter) => { const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
-    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, filter], [gl.TEXTURE_MAG_FILTER, filter], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
-    return t; };
-  const cellsT = tex(0, gl.NEAREST), atlasT = tex(1, gl.LINEAR);
-  gl.uniform1i(U.u_cells, 0); gl.uniform1i(U.u_atlas, 1);
-  let atlasKey = "", gridKey = "", css = [0, 0];
-  const atlas = (cell, dpr) => { // the marks, white, each centred in a cell's square
-    const key = `${cell}/${dpr}`;
-    if (key === atlasKey) return;
-    atlasKey = key;
-    const w = Math.ceil(cell * dpr), c = Object.assign(document.createElement("canvas"), { width: w * RAMP.length, height: w }), x = c.getContext("2d");
-    x.fillStyle = "#fff"; x.font = `${cell * dpr}px ui-monospace, SFMono-Regular, Menlo, monospace`; x.textAlign = "center"; x.textBaseline = "middle";
-    [...RAMP].forEach((ch, i) => x.fillText(ch, i * w + w / 2, w / 2));
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, atlasT);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
-  };
-  return {
-    resize(W, H, dpr, cell) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); gl.viewport(0, 0, canvas.width, canvas.height); css = [W, H]; atlas(cell, dpr); },
-    draw({ cols, rows, ox, oy, cell, cells }) {
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, cellsT);
-      const key = `${cols}x${rows}`;
-      if (key !== gridKey) { gridKey = key; gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, cols, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, cells); }
-      else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RGBA, gl.UNSIGNED_BYTE, cells);
-      gl.uniform2f(U.u_size, css[0], css[1]); gl.uniform2f(U.u_origin, ox, oy); gl.uniform1f(U.u_cell, cell); gl.uniform1f(U.u_marks, RAMP.length);
-      gl.uniform2i(U.u_grid, cols, rows); gl.uniform3fv(U.u_ink, BLOOM.ink);
-      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
-    },
-    clear() { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); },
-  };
-}
+// a CSS colour (oklch and all) as 0–1 RGB, as the canvas makes it (onboard.js's cssRgb)
+const cssRgb = (css) => {
+  const x = Object.assign(document.createElement("canvas"), { width: 1, height: 1 }).getContext("2d", { willReadFrequently: true });
+  x.fillStyle = "#000"; x.fillStyle = css; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data;
+  return [d[0] / 255, d[1] / 255, d[2] / 255];
+};
 
 (() => {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches || !matchMedia("(hover: hover)").matches) return; // (a phone: no hover, so not even the pictures)
-  const cv = document.getElementById("bloom"), glr = grid(cv);
-  if (!glr) return;
-  const { cell } = BLOOM, rand = (a, b) => a + Math.random() * (b - a);
-  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  // the photo and its flowers, loaded once the page is in, so they're there by the first hover
-  const load = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
-  let pics = null;
-  addEventListener("load", () => Promise.all([load("img/onboard-flowers.jpg"), load("img/onboard-flowers-mask.png")]).then((p) => { pics = p; }).catch(() => {}), { once: true });
-  let W = 0, H = 0, cols = 0, rows = 0, ox = 0, oy = 0, bright = null, lift = null, cells = null;
-  const size = () => { // the picture on the grid, as tall as the page (fill), in its middle: each cell's brightness, 0 off the flowers
+  const cv = document.getElementById("bloom"), gl = cv.getContext("webgl2", { antialias: false, alpha: true, premultipliedAlpha: true });
+  if (!gl) return;
+  const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return gl.getShaderParameter(x, gl.COMPILE_STATUS) ? x : null; };
+  const vs = sh(gl.VERTEX_SHADER, VS), fs = sh(gl.FRAGMENT_SHADER, FS);
+  if (!vs || !fs) return;
+  const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+  gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); // one triangle over it all
+  const loc = gl.getAttribLocation(prog, "a_pos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = new Proxy({}, { get: (m, n) => (n in m ? m[n] : (m[n] = gl.getUniformLocation(prog, n))) });
+  const tex = (unit, filter) => { const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, filter], [gl.TEXTURE_MAG_FILTER, filter], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    return t; };
+  const cellsT = tex(0, gl.NEAREST), atlasT = tex(1, gl.LINEAR), photoT = tex(2, gl.LINEAR), lightT = tex(3, gl.LINEAR);
+  gl.uniform1i(U.u_cells, 0); gl.uniform1i(U.u_atlas, 1); gl.uniform1i(U.u_photo, 2); gl.uniform1i(U.u_light, 3);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  const css = getComputedStyle(document.documentElement);
+  gl.uniform3fv(U.u_bg, cssRgb(css.getPropertyValue("--bg").trim())); gl.uniform3fv(U.u_ink, cssRgb(css.getPropertyValue("--ink").trim()));
+  gl.uniform3fv(U.u_leaf, cssRgb("oklch(0.87 0 0)")); // the leaves in your colour, as the welcome has them: its first, white, here
+  gl.uniform1f(U.u_marks, MARKS.length); gl.uniform1f(U.u_spark0, MARKS.indexOf(ART.spark[0])); gl.uniform1f(U.u_sparkN, ART.spark.length);
+  gl.uniform1f(U.u_heavy, ART.heavy); gl.uniform1f(U.u_change, ART.change); gl.uniform1f(U.u_wave, ART.wave); gl.uniform1f(U.u_leafA, ART.leaf);
+  gl.uniform1f(U.u_depth, ART.depth); gl.uniform1f(U.u_most, SCENE.most); gl.uniform1f(U.u_cell, ART.cell);
+
+  let photo = null, M = null, mw = 0, mh = 0, W = 0, H = 0, lc = 0, lr = 0, light = null, bytes = null, built = false;
+  // the scene laid out for the page: its size, the photo's place, the marks (obArt's build), the marks' atlas
+  const build = () => {
     W = innerWidth; H = innerHeight;
-    glr.resize(W, H, devicePixelRatio || 1, cell);
-    cols = Math.ceil(W / cell); rows = Math.ceil(H / cell); ox = (W - cols * cell) / 2; oy = (H - rows * cell) / 2;
-    const [photo, mask] = pics, s = (H * BLOOM.fill) / photo.naturalHeight, pw = photo.naturalWidth * s, ph = photo.naturalHeight * s;
-    const read = (im) => { // the picture at one pixel a cell, where it falls on the page
-      const c = Object.assign(document.createElement("canvas"), { width: cols, height: rows }), x = c.getContext("2d", { willReadFrequently: true });
-      x.drawImage(im, ((W - pw) / 2 - ox) / cell, ((H - ph) / 2 - oy) / cell, pw / cell, ph / cell);
-      return x.getImageData(0, 0, cols, rows).data;
-    };
-    const P = read(photo), M = read(mask);
-    bright = new Float32Array(cols * rows); lift = new Float32Array(cols * rows); cells = new Uint8Array(cols * rows * 4);
-    for (let i = 0; i < cols * rows; i++) {
-      const k = i * 4, flower = M[k] > 110 && M[k] > M[k + 1] + 40; // red, and not a leaf's green
-      bright[i] = flower ? Math.pow((0.299 * P[k] + 0.587 * P[k + 1] + 0.114 * P[k + 2]) / 255, 1.4) : 0; // the petals' white heavy, their shade light
+    const dpr = Math.min(2, devicePixelRatio || 1), cell = ART.cell;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); gl.viewport(0, 0, cv.width, cv.height);
+    const s = (H * SCENE.fill) / photo.naturalHeight, pw = photo.naturalWidth * s, ph = photo.naturalHeight * s, px = (W - pw) / 2, py = (H - ph) / 2;
+    gl.uniform2f(U.u_size, W, H); gl.uniform4f(U.u_pic, px, py, pw, ph);
+    const cols = Math.ceil(W / cell), rows = Math.ceil(H / cell), n = cols * rows, lab = new Uint8Array(n), kind = new Uint8Array(n), deep = new Uint8Array(n), mark = new Uint8Array(n);
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) { // each cell: a flower, a leaf, or neither (off the picture, neither)
+      const u = (x * cell + cell / 2 - px) / pw, v = (y * cell + cell / 2 - py) / ph;
+      if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+      const k = (Math.floor(v * mh) * mw + Math.floor(u * mw)) * 4;
+      lab[y * cols + x] = M[k] > 128 ? 1 : M[k + 1] > 128 ? 2 : 0; // red: a flower; green: a leaf
     }
-  };
-  const splat = (cx, cy, sigma, amp) => { // a soft round of light: the dark lifted most in its middle, less and less out from it
-    const r = sigma * 2.6, x0 = Math.max(0, Math.floor((cx - r - ox) / cell)), x1 = Math.min(cols - 1, Math.ceil((cx + r - ox) / cell));
-    const y0 = Math.max(0, Math.floor((cy - r - oy) / cell)), y1 = Math.min(rows - 1, Math.ceil((cy + r - oy) / cell)), k = -1 / (2 * sigma * sigma);
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const dx = ox + (x + 0.5) * cell - cx, dy = oy + (y + 0.5) * cell - cy, i = y * cols + x;
-      lift[i] = Math.min(1, lift[i] + amp * Math.exp((dx * dx + dy * dy) * k));
+    // a cell with something else beside it is on its edge; which sides are out says which way the edge runs
+    const inside = (X, Y, l) => X >= 0 && Y >= 0 && X < cols && Y < rows && lab[Y * cols + X] === l;
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+      const i = y * cols + x, l = lab[i];
+      if (!l) continue;
+      const L = !inside(x - 1, y, l), R = !inside(x + 1, y, l), T = !inside(x, y - 1, l), D = !inside(x, y + 1, l);
+      if (!(L || R || T || D)) continue;
+      kind[i] = l; mark[i] = MARKS.indexOf((T && L) || (D && R) ? "/" : (T && R) || (D && L) ? "\\" : T || D ? "-" : "|");
     }
+    // inside a leaf, a fill thinning in from its edge (a breadth-first walk in from it)
+    const walk = []; for (let i = 0; i < n; i++) if (kind[i] === 2) walk.push(i);
+    for (let h = 0; h < walk.length; h++) {
+      const i = walk[h], x = i % cols, y = (i / cols) | 0, d = deep[i] + 1;
+      if (d > ART.depth) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const X = x + dx, Y = y + dy, j = Y * cols + X;
+        if (X < 0 || Y < 0 || X >= cols || Y >= rows || lab[j] !== 2 || kind[j]) continue;
+        kind[j] = 3; deep[j] = d; mark[j] = MARKS.indexOf(ART.fill[Math.min(ART.fill.length - 1, d - 1)]); walk.push(j);
+      }
+    }
+    const cells = new Uint8Array(n * 4);
+    for (let i = 0; i < n; i++) { cells[i * 4] = mark[i]; cells[i * 4 + 1] = kind[i]; cells[i * 4 + 2] = deep[i]; }
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, cellsT); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, cols, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, cells);
+    gl.uniform2i(U.u_grid, cols, rows);
+    const w = Math.ceil(cell * dpr), a = Object.assign(document.createElement("canvas"), { width: w * MARKS.length, height: w }), x = a.getContext("2d");
+    x.fillStyle = "#fff"; x.font = `${cell * dpr}px ui-monospace, SFMono-Regular, Menlo, monospace`; x.textBaseline = "top";
+    MARKS.forEach((ch, i) => x.fillText(ch, i * w, 0)); // the marks, white, one to a cell's square, as the welcome sets them
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, atlasT); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, a);
+    lc = Math.ceil(W / SCENE.lightCell) + 1; lr = Math.ceil(H / SCENE.lightCell) + 1; light = new Float32Array(lc * lr); bytes = new Uint8Array(lc * lr);
+    built = true;
   };
-  let on = false, since = 0, next = 0, last = 0, running = false;
+  const load = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
+  addEventListener("load", () => Promise.all([load("img/onboard-flowers.jpg"), load("img/onboard-flowers-mask.png")]).then(([p, m]) => {
+    photo = p; mw = m.naturalWidth; mh = m.naturalHeight;
+    const c = Object.assign(document.createElement("canvas"), { width: mw, height: mh }), x = c.getContext("2d", { willReadFrequently: true });
+    x.drawImage(m, 0, 0); M = x.getImageData(0, 0, mw, mh).data;
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, photoT); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, photo);
+    (window.requestIdleCallback || setTimeout)(build); // laid out ahead of the first hover, while nothing else is going on
+  }).catch(() => {}), { once: true });
+  addEventListener("resize", () => { built = false; });
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); };
+  const ease = (t) => t * t * (3 - 2 * t);
+  let splats = [], on = false, since = 0, next = 0, last = 0, running = false;
+  const spread = (sp, by) => { // a splat's share of light, coming up: the dark lifted most in its middle, less and less out from it
+    const { x: cx, y: cy, sigma } = sp, L = SCENE.lightCell, r = sigma * 2.6, k = -1 / (2 * sigma * sigma);
+    for (let y = Math.max(0, Math.floor((cy - r) / L)); y <= Math.min(lr - 1, Math.ceil((cy + r) / L)); y++)
+      for (let x = Math.max(0, Math.floor((cx - r) / L)); x <= Math.min(lc - 1, Math.ceil((cx + r) / L)); x++) {
+        const dx = x * L - cx, dy = y * L - cy, i = y * lc + x;
+        light[i] = Math.min(1, light[i] + by * Math.exp((dx * dx + dy * dy) * k));
+      }
+  };
   const frame = (now) => {
-    if (!bright || innerWidth !== W || innerHeight !== H) size();
+    if (!built) build();
     const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
     if (on && now >= next) { // a round of light about the button: close at first, further out the longer the pointer stays
-      const b = document.getElementById("get").getBoundingClientRect(), t = Math.min(1, (now - since) / 1000 / BLOOM.grow);
-      const far = Math.min(W, H) * (BLOOM.spread[0] + (BLOOM.spread[1] - BLOOM.spread[0]) * t);
-      splat(b.left + b.width / 2 + gauss() * far * 1.2, b.top + b.height / 2 + gauss() * far, rand(...BLOOM.sigma), rand(...BLOOM.lift));
-      next = now + rand(...BLOOM.gap);
+      const b = document.getElementById("get").getBoundingClientRect(), t = Math.min(1, (now - since) / 1000 / SCENE.grow);
+      const far = Math.min(W, H) * (SCENE.spread[0] + (SCENE.spread[1] - SCENE.spread[0]) * t);
+      splats.push({ x: b.left + b.width / 2 + gauss() * far * 1.3, y: b.top + b.height / 2 + gauss() * far, sigma: rand(...SCENE.sigma), lift: rand(...SCENE.lift), t0: now, done: 0 });
+      next = now + rand(...SCENE.gap);
     }
-    const keep = Math.exp(-dt * (on ? BLOOM.creep : BLOOM.back)); // the dark coming back: slowly while it's on the button, quickly off it
+    const keep = Math.exp(-dt * (on ? SCENE.creep : SCENE.back)); // the dark coming back: slowly while it's on the button, quickly off it
+    for (let i = 0; i < light.length; i++) light[i] *= keep;
+    splats = splats.filter((sp) => { const e = ease(Math.min(1, (now - sp.t0) / 1000 / SCENE.rise)); spread(sp, sp.lift * (e - sp.done)); sp.done = e; return e < 1; }); // each coming up over rise s, not at once
     let most = 0;
-    cells.fill(0);
-    for (let i = 0; i < cols * rows; i++) {
-      const l = (lift[i] *= keep);
-      if (l > most) most = l;
-      const v = bright[i];
-      if (v < 0.02 || l < 0.01) continue;
-      const e = l * l * (3 - 2 * l), j = i * 4; // eased, so a splat's edge melts into the dark
-      cells[j] = Math.min(RAMP.length - 1, Math.floor(v * (0.35 + 0.65 * e) * RAMP.length)) + 1; // more of its detail as more of the dark lifts
-      cells[j + 1] = Math.round(Math.min(1, v * e * BLOOM.most) * 255);
-    }
-    glr.draw({ cols, rows, ox, oy, cell, cells });
-    if (!on && most < 0.01) { running = false; last = 0; lift.fill(0); glr.clear(); return; } // all dark again: stopped
+    for (let i = 0; i < light.length; i++) { const v = light[i]; if (v > most) most = v; bytes[i] = Math.round(v * 255); }
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, lightT); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, lc, lr, 0, gl.RED, gl.UNSIGNED_BYTE, bytes);
+    gl.uniform1f(U.u_time, now / 1000);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (!on && !splats.length && most < 0.01) { running = false; last = 0; light.fill(0); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); return; } // all dark again: stopped
     requestAnimationFrame(frame);
   };
   const start = () => {
-    if (!pics) return; // (not loaded yet: nothing this time)
+    if (!photo) return; // (not loaded yet: nothing this time)
     on = true; since = performance.now(); next = 0;
     if (!running) { running = true; requestAnimationFrame(frame); }
   };
