@@ -10,13 +10,19 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 /* the app's own tokens (css/tokens.css), the few this page uses: dark only, as the app is */
+@font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 :root {
+  --font-brand: "Geist Serif", var(--font);
   --bg: oklch(0.165 0 0); --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0);
   --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; }
 body { display: grid; place-items: center; background: var(--bg); -webkit-font-smoothing: antialiased; }
+/* the logo: the app's icon (favicon.svg, in its dark-screen colours) and its name */
+.logo { position: fixed; top: 24px; left: 24px; display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font: 400 20px/1 var(--font-brand); letter-spacing: -0.01em; }
+.logo svg { width: 28px; height: 28px; }
+@media (max-width: 600px) { .logo { top: 16px; left: 16px; } }
 .get { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 22px 0 18px; border-radius: 12px; background: var(--ink); color: var(--on-ink);
   font: 600 15px/1 var(--font); text-decoration: none; transition: transform 0.2s var(--ease), background 0.2s; }
 .get:hover { background: var(--ink-strong); transform: translateY(-1px); }
@@ -24,6 +30,10 @@ body { display: grid; place-items: center; background: var(--bg); -webkit-font-s
 </style>
 </head>
 <body>
+<a class="logo" href="/" aria-label="Pitchroom">
+  <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#ECECEC"/><path fill="#202020" stroke="#202020" stroke-width="0.8" stroke-linejoin="round" d="M8.74 25.34 10.43 24.38Q10.75 24.19 10.87 24.01Q10.99 23.84 10.99 23.49V8.51Q10.99 8.16 10.87 7.99Q10.75 7.81 10.43 7.62L8.74 6.66V6.5H16.23Q19.9 6.5 21.88 7.88Q23.86 9.26 23.86 11.96Q23.86 14.37 22.2 15.99Q20.54 17.61 16.85 17.61H13.5V23.49Q13.5 23.84 13.62 24.01Q13.74 24.19 14.07 24.38L15.75 25.34V25.5H8.74ZM15.89 16.67Q21.18 16.67 21.18 12.01Q21.18 9.79 20.01 8.61Q18.83 7.44 16.47 7.44H13.5V16.67Z"/></svg>
+  <span>Pitchroom</span>
+</a>
 <a class="get" id="get" href="https://github.com/freaktion-craft/pitchroom-releases/releases/latest">
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
   <span id="getLabel">Download</span>
