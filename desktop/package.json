@@ -31,6 +31,8 @@
     "files": [
       "main.js",
       "preload.js",
+      "splash.html",
+      "GeistSerif-Regular.woff2",
       "package.json"
     ],
     "extraResources": [
@@ -68,9 +70,9 @@
       ]
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true,
       "createDesktopShortcut": true,
       "shortcutName": "Pitchroom"
     },
@@ -88,5 +90,8 @@
         "releaseType": "draft"
       }
     ]
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
   }
 }

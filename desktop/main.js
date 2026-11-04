@@ -11,6 +11,7 @@ const { spawn, execFile } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
+const { autoUpdater } = require("electron-updater");
 
 const RELEASES = "freaktion-craft/pitchroom-releases"; // public, the installers only (the code's repo is private)
 const PORTS = [5278, 5298]; // a range of its own, so a copy started from the repo (5178…) is never taken for this one
@@ -26,7 +27,26 @@ const ENV_PY = win32 ? path.join(ENV, "Scripts", "python.exe") : path.join(ENV, 
 const LOGS = path.join(DATA, "logs"), LOG = path.join(LOGS, "server.log");
 const STATE = path.join(DATA, "window.json");
 
-let win = null, server = null, port = 0, quitting = false;
+let win = null, splash = null, server = null, port = 0, quitting = false;
+
+// ---------- the splash: the name, a bar and a line, while an update comes in and the engine starts ----------
+let shown = { text: "Starting…" };
+function showSplash() {
+  splash = new BrowserWindow({
+    width: 360, height: 220, frame: false, resizable: false, maximizable: false, minimizable: false, fullscreenable: false,
+    center: true, show: false, title: "Pitchroom", backgroundColor: BG,
+    webPreferences: { contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
+  });
+  splash.webContents.on("did-finish-load", () => status(shown.text, shown.percent));
+  splash.once("ready-to-show", () => splash?.show());
+  splash.on("closed", () => { splash = null; });
+  splash.loadFile(path.join(__dirname, "splash.html"));
+}
+function status(text, percent) {
+  shown = { text, percent };
+  splash?.webContents.executeJavaScript(`set(${JSON.stringify(shown)})`).catch(() => {});
+}
+function closeSplash() { if (splash && !splash.isDestroyed()) splash.destroy(); splash = null; }
 
 // ---------- the Python environment, in the user's folder ----------
 // Made from the app's Python the first time (a fraction of a second: it sees the app's own packages, adds none). After
@@ -115,7 +135,7 @@ function createWindow() {
   const ours = (url) => { try { const u = new URL(url); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
   win.webContents.on("will-navigate", (e, url) => { if (!ours(url)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => { win.show(); closeSplash(); });
   win.on("close", async (e) => {
     try { fs.writeFileSync(STATE, JSON.stringify({ ...win.getNormalBounds(), maximized: win.isMaximized() })); } catch {}
     if (quitting) return;
@@ -163,7 +183,39 @@ function permissions() {
 }
 
 // ---------- updates ----------
-// Unsigned for now, so no silent update: the latest release on GitHub is looked up, and a newer one offered as a download.
+// Windows and the Linux AppImage update themselves, in the splash before the engine starts: the latest release's
+// latest.yml looked up (≤ 5 s, or it's skipped this time), a newer version downloaded, installed silently and opened.
+// macOS can't till the app's signed (Squirrel.Mac checks the signature): a newer release is offered as a download.
+const SELF_UPDATES = app.isPackaged && (win32 || (process.platform === "linux" && !!process.env.APPIMAGE));
+const within = (ms, p) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(`no answer in ${ms / 1000} s`)), ms))]);
+async function updateFirst() { // true: it's installing, the app's about to quit
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.logger = null;
+  try {
+    status("Checking for updates…");
+    const r = await within(5000, autoUpdater.checkForUpdates());
+    const v = r?.updateInfo?.version;
+    if (!v || !newer(v, app.getVersion())) return false;
+    let stalled = null;
+    const stall = new Promise((_, no) => { stalled = no; });
+    let idle = setTimeout(() => stalled(new Error("the download stopped")), 30000);
+    autoUpdater.on("download-progress", (p) => {
+      clearTimeout(idle); idle = setTimeout(() => stalled(new Error("the download stopped")), 30000);
+      status(`Updating to ${v} · ${Math.floor(p.percent)}%`, p.percent);
+    });
+    status(`Updating to ${v}`, 0);
+    await Promise.race([autoUpdater.downloadUpdate(), stall]);
+    clearTimeout(idle);
+    status("Restarting…", 100);
+    quitting = true;
+    setImmediate(() => autoUpdater.quitAndInstall(true, true)); // silent, then the new one opens
+    return true;
+  } catch (e) {
+    console.error("update skipped:", e.message); // and the app starts as it is
+    return false;
+  }
+}
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 async function checkUpdates(asked) {
   try {
@@ -230,12 +282,16 @@ else {
     nativeTheme.themeSource = "dark"; // the title bar with the page, which is dark only
     app.setAboutPanelOptions({ applicationName: "Pitchroom", applicationVersion: app.getVersion(), copyright: "© freaktion" });
     menu();
+    showSplash();
+    if (SELF_UPDATES && (await updateFirst())) return;
+    status("Starting…");
     try { await startServer(); } catch (e) {
+      closeSplash();
       dialog.showErrorBox("Pitchroom couldn't start", `${e.message}\n\nThe log: ${LOG}`);
       quitting = true; stopServer(); return app.quit();
     }
     permissions();
     createWindow();
-    setTimeout(() => checkUpdates(false), 8000);
+    if (!SELF_UPDATES) setTimeout(() => checkUpdates(false), 8000);
   });
 }
