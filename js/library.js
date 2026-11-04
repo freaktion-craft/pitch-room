@@ -20,7 +20,8 @@ async function stemsRefresh(list = true, got = null) {
   stemsStatus = st;
   $("#sServer").hidden = !!st || !!err;
   $("#sErr").hidden = !err;
-  if (err) say($("#sErr"), "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err: () => tr(err) });
+  if (err) say($("#sErr"), window.pitchroom ? "The server is running, but checking the stem tools failed: {err}. Help → Show Log has the details." // the desktop app (desktop/preload.js): no terminal
+    : "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err: () => tr(err) });
   $("#sInstall").hidden = !st || st.installed || stemsPage !== "lib";
   $("#sAdd").hidden = !st || !st.installed;
   $("#sAddSetup").hidden = !st || st.installed; // the Add song panel points at the setup until the tools are in

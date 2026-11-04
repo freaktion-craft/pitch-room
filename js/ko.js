@@ -144,6 +144,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":
     "Python 서버가 필요해요. OS에 맞는 <code>start-…</code> 파일로 앱을 시작한 뒤 <b>http://localhost:5178</b>에서 다시 여세요.",
   "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
+  "The server is running, but checking the stem tools failed: {err}. Help → Show Log has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 Help → Show Log에 있어요.",
   "First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.":
     "처음 한 번, 곡을 나누고 멜로디와 가사를 읽는 도구를 받아요 (3–4 GB).",
   "Install": "설치", "Installed": "설치 완료", "Install the tools first, from the banner above.": "먼저 위 배너에서 도구를 설치하세요.", "Add a song": "새 곡 추가", "Add": "추가",

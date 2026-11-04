@@ -32,7 +32,7 @@ STEP = 0.01  # 10 ms frames
 VERSION = 8  # bump when the output changes so cached melody.json files are rebuilt (stems.start_upgrades)
 
 # 1. RMVPE (Wei et al. 2023): note F1 0.615 with pYIN and v6's segmenter, 0.733 with RMVPE and the segmenter below.
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.environ.get("PITCHROOM_DATA") or os.path.dirname(os.path.abspath(__file__))  # where models/ is (stems.DATA)
 RMVPE_PATHS = [p for p in (os.environ.get("STEM_RMVPE_PT"), os.path.join(_HERE, "models", "rmvpe.pt")) if p]
 RMVPE_URL = "https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/rmvpe.pt"  # MIT
 RMVPE_BYTES, RMVPE_SHA256 = 181184272, "6d62215f4306e3ca278246188607209f09af3dc77ed4232efdd069798c4ec193"

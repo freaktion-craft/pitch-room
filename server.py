@@ -73,6 +73,14 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
 
+    def translate_path(self, path):
+        """A song's files from the library (stems.LIB, in $PITCHROOM_DATA when that's set), the page's from the code."""
+        p = super().translate_path(path)
+        rel = os.path.relpath(p, ROOT)
+        if rel == "library" or rel.startswith("library" + os.sep):
+            return os.path.join(stems.LIB, rel[len("library") + 1:])
+        return p
+
     def handle(self):
         try:
             super().handle()

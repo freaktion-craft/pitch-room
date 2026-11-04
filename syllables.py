@@ -44,7 +44,7 @@ SR = 44100
 VERSION = 7  # bump when the onsets or the lines as sung change (syllables.json keeps both): it's worked out again for every song (stems.start_upgrades)
 FRAME = 0.02  # wav2vec2 frame hop (320 samples at 16 kHz)
 FRAME_CENTER = 0.0125  # frame k covers samples [320k, 320k + 400): centre 12.5 ms after k * 20 ms
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.environ.get("PITCHROOM_DATA") or os.path.dirname(os.path.abspath(__file__))  # where models/ is (stems.DATA)
 PATHS = {
     "ko": [p for p in (os.environ.get("STEM_W2V_KO"), os.path.join(_HERE, "models", "w2v_ko")) if p],
     "en": [p for p in (os.environ.get("STEM_W2V_EN"), os.path.join(_HERE, "models", "w2v_en")) if p],

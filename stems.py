@@ -43,7 +43,10 @@ from functools import lru_cache
 import numpy as np
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-LIB = os.path.join(ROOT, "library")
+# what's yours (the library, the models, the settings, ffmpeg's link): beside the code, or where $PITCHROOM_DATA says
+# (the desktop app's own folder, as its code is read-only and replaced by each update)
+DATA = os.path.abspath(os.environ.get("PITCHROOM_DATA") or ROOT)
+LIB = os.path.join(DATA, "library")
 SR = 44100
 MODELS = {"htdemucs": "4 stems", "htdemucs_6s": "6 stems (+ guitar, piano)"}
 HEAVY = ["torch", "demucs", "librosa", "yt_dlp", "whisper", "stable_whisper"]
@@ -52,7 +55,7 @@ HEAVY = ["torch", "demucs", "librosa", "yt_dlp", "whisper", "stable_whisper"]
 # vocal chops, the bars it took out were the stretches a search for exact bar-to-bar loops had flagged. Two other
 # karaoke models (Mel-Roformer by becruily, 1.6 GB; by aufr33 & viperx, 871 MB) put backing in the same places.
 LEAD_MODEL = "bs_roformer_karaoke_frazer_becruily.ckpt"
-MODEL_DIR = os.path.join(ROOT, "models")
+MODEL_DIR = os.path.join(DATA, "models")
 
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
@@ -385,7 +388,7 @@ def _update_meta(folder: str, **kw):
 # The page's settings (language, colour, mic, each song's key and tempo…), kept beside the app in settings.json so
 # they're the same in every tab and browser, at whatever port the app runs. A change is sent as the keys it touches,
 # merged here, so two tabs changing different settings don't undo each other.
-SETTINGS = os.path.join(ROOT, "settings.json")
+SETTINGS = os.path.join(DATA, "settings.json")
 _settings_lock = threading.Lock()
 
 
@@ -1746,7 +1749,7 @@ def _ffmpeg_on_path():
     """audio-separator runs plain "ffmpeg"; when none is installed, expose the bundled binary under that name."""
     if shutil.which("ffmpeg"):
         return
-    d = os.path.join(ROOT, ".ffmpeg")
+    d = os.path.join(DATA, ".ffmpeg")
     exe = os.path.join(d, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
     if not os.path.isfile(exe):
         os.makedirs(d, exist_ok=True)
