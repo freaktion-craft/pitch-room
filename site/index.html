@@ -31,9 +31,9 @@ a { -webkit-user-drag: none; }
 .get { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 8px; background: var(--ink); color: var(--on-ink);
   font: 500 14px/1 var(--font); text-decoration: none; -webkit-tap-highlight-color: transparent;
   transition: transform 0.2s var(--ease), background 0.2s, box-shadow 0.2s var(--ease); }
-/* hover: up a little, at the full white, a glow under it; pressed: down past where it rests, a shade darker */
-.get:hover { background: var(--ink-strong); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(255, 255, 255, 0.1); }
-.get:active { background: oklch(0.82 0 0); transform: translateY(0) scale(0.97); box-shadow: none; transition-duration: 0.06s; }
+/* hover: where it is, at the full white, a glow round it; pressed: a little smaller, a shade darker */
+.get:hover { background: var(--ink-strong); box-shadow: 0 6px 18px rgba(255, 255, 255, 0.1); }
+.get:active { background: oklch(0.82 0 0); transform: scale(0.97); box-shadow: none; transition-duration: 0.06s; }
 .get:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .get svg { width: 18px; height: 18px; }
 /* the line under it: hung below, so the button stays at the page's dead centre */
