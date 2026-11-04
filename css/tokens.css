@@ -22,11 +22,12 @@
   --scrim: rgba(0, 0, 0, 0.3); --scrim-strong: rgba(0, 0, 0, 0.55); /* behind a panel, behind a cover held up */
   /* --voice, your colour (your pitch, the playhead, focus rings): one of these, picked in the header and set on <html>
      before first paint. Matched for the dark surface: L 0.68–0.77 (blue and violet lowest, as they look brighter),
-     C 0.15–0.17 (teal 0.12, the most sRGB has at that lightness); all ≥ 6:1 on the surface. Text on it is dark.
+     each as vivid as sRGB has at its lightness and hue (about 98 % of the most it has, so none is clipped), and more
+     on a wide-gamut screen (below); all ≥ 6:1 on the surface, and dark text on them ≥ 6.6:1.
      Pink is the pale azalea asked for (hsl(337 92% 91%), oklch(0.9 0.054 353)), a touch deeper so it doesn't pass
-     for the white ink. */
-  --voice-blue: oklch(0.68 0.17 262); --voice-violet: oklch(0.7 0.16 295); --voice-pink: oklch(0.86 0.08 353); --voice-coral: oklch(0.72 0.16 32);
-  --voice-orange: oklch(0.75 0.15 58); --voice-amber: oklch(0.77 0.15 82); --voice-green: oklch(0.73 0.16 150); --voice-teal: oklch(0.74 0.12 195);
+     for the white ink; it's kept as it is on any screen. */
+  --voice-blue: oklch(0.68 0.166 262); --voice-violet: oklch(0.7 0.174 295); --voice-pink: oklch(0.86 0.08 353); --voice-coral: oklch(0.72 0.172 32);
+  --voice-orange: oklch(0.75 0.175 58); --voice-amber: oklch(0.77 0.156 82); --voice-green: oklch(0.73 0.197 150); --voice-teal: oklch(0.74 0.124 195);
   --voice: var(--voice-blue); --on-voice: oklch(0.165 0 0);
   --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --bad: oklch(0.66 0.2 25);
   --solo: oklch(0.84 0.14 85); --on-solo: oklch(0.3 0.06 85); /* a soloed track's S, lit */
@@ -70,4 +71,12 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 0.15s; --duration-base: 0.2s; --duration-slow: 0.3s; --duration-slower: 0.4s; --duration-slowest: 0.6s;
   color-scheme: dark;
+}
+/* the accents on a wide-gamut screen (Display P3: Macs, most phones): about 95 % of the most it has at each one's
+   lightness and hue, the same lightness, so the same contrast; pink as it is */
+@media (color-gamut: p3) {
+  :root {
+    --voice-blue: oklch(0.68 0.173 262); --voice-violet: oklch(0.7 0.182 295); --voice-coral: oklch(0.72 0.212 32);
+    --voice-orange: oklch(0.75 0.195 58); --voice-amber: oklch(0.77 0.174 82); --voice-green: oklch(0.73 0.266 150); --voice-teal: oklch(0.74 0.162 195);
+  }
 }
