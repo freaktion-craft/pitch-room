@@ -19,9 +19,11 @@
 }
 html, body { height: 100%; margin: 0; }
 body { display: grid; place-items: center; background: var(--bg); -webkit-font-smoothing: antialiased; }
-/* the logo: the app's name, in its typeface */
-.logo { position: fixed; top: 24px; left: 24px; color: var(--ink); text-decoration: none; font: 400 20px/1 var(--font-brand); letter-spacing: -0.01em; }
-@media (max-width: 600px) { .logo { top: 16px; left: 16px; } }
+/* the top bar: the app's (.app and header in css/base.css), one 1440 px column with 24 px at its sides and above, the
+   name in it as the app has it (.brand) */
+.bar { position: fixed; top: 0; left: 0; right: 0; max-width: 1440px; margin: 0 auto; display: flex; align-items: center; height: 56px; box-sizing: border-box; /* its padding inside the 1440, as the app's * rule has it */
+  padding: 24px max(24px, env(safe-area-inset-right, 0px)) 0 max(24px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.logo { color: var(--ink); text-decoration: none; font: 400 18px/1 var(--font-brand); letter-spacing: -0.01em; pointer-events: auto; }
 /* the button: the app's own primary one (.btn.primary, in css/base.css): 40 px high, 8 px corners, 14 px type, an 18 px icon */
 .get { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 8px; background: var(--ink); color: var(--on-ink);
   font: 500 14px/1 var(--font); text-decoration: none; -webkit-tap-highlight-color: transparent;
@@ -41,7 +43,7 @@ body { display: grid; place-items: center; background: var(--bg); -webkit-font-s
 </style>
 </head>
 <body>
-<a class="logo" href="/">Pitchroom</a>
+<header class="bar"><a class="logo" href="/">Pitchroom</a></header>
 <a class="get" id="get" href="https://github.com/freaktion-craft/pitchroom-releases/releases/latest">
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
   <span id="getLabel">Download</span>
