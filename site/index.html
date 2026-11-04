@@ -18,7 +18,9 @@
   color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; }
-body { display: grid; place-items: center; background: var(--bg); -webkit-font-smoothing: antialiased; }
+body { display: grid; place-items: center; background: var(--bg); -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } /* nothing here worth copying */
+a { -webkit-user-drag: none; }
 /* the top bar: the app's (.app and header in css/base.css), one 1440 px column with 24 px at its sides and above, the
    name in it as the app has it (.brand) */
 .bar { position: fixed; top: 0; left: 0; right: 0; max-width: 1440px; margin: 0 auto; display: flex; align-items: center; height: 56px; box-sizing: border-box; /* its padding inside the 1440, as the app's * rule has it */
