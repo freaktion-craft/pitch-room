@@ -38,17 +38,17 @@ try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localS
    to black, and the name goes to its place in the header; then the first steps there (onboard(): what it is, the mic, a
    colour, a first song), and the page comes in round the name. WELCOME_ALWAYS: on every load, reloads too, while it's being made; false once it's done. With
    reduced motion, the steps without the riffle. Ended after 12 s should the script fail to start it (welcome() stops that). */
-const WELCOME_ALWAYS = true;
+const WELCOME_ALWAYS = false;
 /* WELCOME_RIFFLE: the welcome's page riffle; false straight to the steps (and the name at once in its place), for
    working on them without sitting through it every time. true for a release. */
 const WELCOME_RIFFLE = false;
 /* ONBOARD_EVERY_STEP: every step, the ones for what's done already too (the mic's ask though it's allowed, the song
    tools' though they're in), for seeing them all while they're made. false for a release. */
-const ONBOARD_EVERY_STEP = true;
+const ONBOARD_EVERY_STEP = false;
 /* ONBOARD_NO_TOOLS: the first steps as if the song tools weren't in (the song's offered them, their download shown
    going), without touching what's installed: their download only pretended, about 20 s, after which they count as in
    and the song's added for real. false for a release. */
-const ONBOARD_NO_TOOLS = true;
+const ONBOARD_NO_TOOLS = false;
 /* the desktop app on macOS draws no title bar: its window's buttons sit alone in the corner (desktop/main.js, base.css) */
 if (window.pitchroom && window.pitchroom.platform === "darwin") document.documentElement.classList.add("desktop-mac");
 /* EMPTY_LIBRARY: the library drawn as if no song had been added (drawLibrary), so a first time can be seen; the songs
