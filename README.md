@@ -4,9 +4,32 @@ Open-source personal singing practice software. A local app for learning songs b
 
 > **For personal practice only.** Use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service. Songs, lyrics and models stay on your computer and are never part of this repository.
 
+## The desktop app
+
+Pitchroom as an app of its own: an installer, a window with its own icon, no terminal. Download it from [Releases](https://github.com/freaktion-craft/pitchroom-releases/releases/latest):
+
+| OS | File |
+|---|---|
+| macOS (Apple silicon) | `Pitchroom-…-mac-arm64.dmg` |
+| macOS (Intel) | `Pitchroom-…-mac-x64.dmg` |
+| Windows | `Pitchroom-…-win-x64.exe` |
+| Linux | `Pitchroom-…-linux-….AppImage` |
+
+Python comes inside it, so there's nothing else to install. The first time a song is added, it downloads the tools that split songs and read their melody and lyrics (3–4 GB, once), as the web version does.
+
+**Opening it the first time.** The app isn't signed yet, so the system asks once:
+- **macOS:** open it, then **System Settings → Privacy & Security → Open Anyway**.
+- **Windows:** at "Windows protected your PC", **More info → Run anyway**.
+
+**Your songs** are kept in the app's own folder, not next to it, so updates never touch them: `~/Library/Application Support/Pitchroom` on macOS, `%APPDATA%\Pitchroom` on Windows (**Help → Open Data Folder**). It doesn't share them with a copy started from the files below.
+
+**Updates:** it checks GitHub once it opens and offers a newer version as a download (also **Check for Updates…** in the menu).
+
+**Building it** (in `desktop/`, Node 20 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. To release a version, set `"version"` in `desktop/package.json`, then push a matching tag (`git tag v1.0.1 && git push origin v1.0.1`): the **Desktop app** workflow builds macOS, Windows and Linux into a draft release in [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (public, the installers only), published from its Releases page. It needs a `RELEASES_TOKEN` secret here: a fine-grained token with Contents read and write on that repo alone.
+
 ## Get it
 
-No GitHub account needed. Either download it — **Code → Download ZIP** on this page, then unzip it anywhere — or, with git:
+To run it from its files instead (for working on it, or without an installer). No GitHub account needed. Either download it — **Code → Download ZIP** on this page, then unzip it anywhere — or, with git:
 
 ```bash
 git clone https://github.com/freaktion-craft/pitch-room.git
