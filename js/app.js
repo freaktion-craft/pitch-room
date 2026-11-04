@@ -313,6 +313,62 @@ async function welcome() {
   root.classList.remove("welcome");
   book.replaceChildren(); w.getAnimations({ subtree: true }).forEach((a) => a.cancel()); word.style.transform = ""; w.classList.remove("ready");
 }
+// The name's easter egg: clicked on the library, the welcome's riffle in small and flat, behind it (.brand .egg): the
+// right half, a colour, shrinks into the middle, then the left grows out of it in the next, each a little after the
+// one before, so several are on the move at once; black at both ends, the box fading in and out round them. Elsewhere
+// the name is the way back to the library, as before. Not with reduced motion; a click while it runs does nothing.
+const EGG = { span: 560, half: 190, bunch: 0.6, fade: 140, in: "cubic-bezier(0.55, 0, 0.75, 0.2)", out: "cubic-bezier(0.2, 0.7, 0.35, 1)" };
+let egging = false;
+$("#app > header .brand").addEventListener("click", (e) => {
+  if (!(view === "stems" && stemsPage === "lib")) return;
+  e.preventDefault();
+  if (!egging && !matchMedia("(prefers-reduced-motion: reduce)").matches) riffleName(e.currentTarget);
+});
+async function riffleName(brand) {
+  egging = true;
+  const E = EGG, colours = ["var(--bg)", ...Object.keys(ACCENTS).map((k) => `var(--voice-${k})`), "var(--bg)"], n = colours.length - 1;
+  const box = Object.assign(document.createElement("span"), { className: "egg" }); box.setAttribute("aria-hidden", "true");
+  const half = (i, side, z = 0) => {
+    const h = document.createElement("i"); h.className = side; h.style.background = colours[i]; h.style.zIndex = z;
+    if (i > 0 && i < n) h.dataset.dark = ""; // every accent is light (L 0.68 and up): black on it, white on the page's black
+    return h;
+  };
+  box.append(half(0, "l"), half(n, "r"));
+  // the name in black over the colours and in white over the black, split where a colour's edge crosses it (a letter
+  // can be half and half): two copies, each masked to its bands, the masks drawn again every frame
+  const word = brand.textContent, light = document.createElement("span"), dark = document.createElement("span");
+  light.textContent = dark.textContent = word; dark.className = "egg-ink"; dark.setAttribute("aria-hidden", "true");
+  brand.replaceChildren(light, dark, box);
+  const ink = () => {
+    const o = brand.getBoundingClientRect().left, under = [...box.children].filter((p) => getComputedStyle(p).visibility !== "hidden")
+      .map((p) => ({ r: p.getBoundingClientRect(), z: +p.style.zIndex, dark: "dark" in p.dataset })).filter((p) => p.r.width > 0.1);
+    const xs = [...new Set(under.flatMap((p) => [p.r.left, p.r.right]))].sort((a, b) => a - b), stops = [];
+    for (let i = 0; i + 1 < xs.length; i++) { // each stretch between two edges: dark if the top band there is a colour
+      const mid = (xs[i] + xs[i + 1]) / 2; let top = null;
+      for (const p of under) if (mid >= p.r.left && mid < p.r.right && (!top || p.z > top.z)) top = p;
+      if (top && top.dark) stops.push(`transparent ${xs[i] - o}px, #000 ${xs[i] - o}px, #000 ${xs[i + 1] - o}px, transparent ${xs[i + 1] - o}px`);
+    }
+    const m = stops.length ? `linear-gradient(to right, transparent 0, ${stops.join(", ")}, transparent 100%)` : "linear-gradient(transparent, transparent)";
+    dark.style.maskImage = dark.style.webkitMaskImage = m;
+    light.style.maskImage = light.style.webkitMaskImage = stops.length ? `${m}, linear-gradient(#000, #000)` : "";
+    light.style.maskComposite = "exclude"; light.style.webkitMaskComposite = "xor"; // the white where the black isn't
+    if (egging) requestAnimationFrame(ink);
+  };
+  requestAnimationFrame(ink);
+  const onset = (k) => { const x = k / (n - 1); return E.fade + E.span * (x + E.bunch * Math.sin(2 * Math.PI * x) / (2 * Math.PI)); };
+  let last;
+  for (let k = 0; k < n; k++) { // colour k goes from the right, k + 1 comes on the left (the later ones over the earlier)
+    const go = half(k, "r", 100 - k), come = half(k + 1, "l", 200 + k);
+    box.append(go, come);
+    go.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], { duration: E.half, delay: onset(k), easing: E.in, fill: "forwards" });
+    if (k) go.animate([{ visibility: "hidden" }, { visibility: "visible" }], { duration: 1, delay: onset(k - 1), fill: "both" }); // under the one going, not before: its edges would show round the one over it
+    last = come.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: E.half, delay: onset(k) + E.half, easing: E.out, fill: "both" });
+  }
+  box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: E.fade, easing: "ease-out", fill: "backwards" });
+  await last.finished;
+  await box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: E.fade, easing: "ease-in", fill: "forwards" }).finished;
+  egging = false; brand.textContent = word; // the box and the copies go
+}
 $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
 // Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest
