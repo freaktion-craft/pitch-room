@@ -140,8 +140,11 @@ const tip = document.getElementById("tip");
 let tipTimer;
 // how far in from the page's right edge Chrome's downloads icon is: past the profile and the menu (about 96 px); with
 // vertical tabs, the window's own buttons are in that row too (about 268 px). Those are told apart by the frame round
-// the page: vertical tabs have no tab strip above it (49 px of frame there, against 85 or more) and one at its side
+// the page: vertical tabs have no tab strip above it (49 px of frame there, against 85 or more) and one at its side.
+// Naver Whale (Whale/ in its name) has its own toolbar: its downloads icon 70 px in, past its profile and menu
+const WHALE = /Whale\//.test(navigator.userAgent);
 function tipAt() {
+  if (WHALE) return 70;
   const frameH = outerHeight - innerHeight, frameW = outerWidth - innerWidth;
   const vertical = !/Mac/i.test(navigator.platform) && frameW >= 40 && frameH < 82; // a Mac's window buttons are at the left
   return vertical ? 268 : 96;
@@ -176,7 +179,7 @@ async function fly(get) {
   svg.animate([{ opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(6px)" }], { ...shrink, easing: "ease-in" });
   // and into the blue of the browser's downloads (Chrome's, #A8C7FA), the colour of where it's going
   await ghost.animate([{ left: `${r.left}px`, width: `${r.width}px`, backgroundColor: getComputedStyle(get).backgroundColor },
-    { left: `${r.left + (r.width - D) / 2}px`, width: `${D}px`, backgroundColor: FLY.blue }], shrink).finished;
+    { left: `${r.left + (r.width - D) / 2}px`, width: `${D}px`, backgroundColor: WHALE ? getComputedStyle(get).backgroundColor : FLY.blue }], shrink).finished; // (Whale's icon is the toolbar's grey, not a blue: there it stays white)
   // off up to the downloads icon: its middle to the top edge, under it, getting smaller, gone as it gets there
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2, tx = innerWidth - tipAt(), ty = 0;
   // along an arc: out to the right first, then sweeping up into the toolbar (a curve bent toward a point level with where
