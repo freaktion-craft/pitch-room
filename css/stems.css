@@ -47,9 +47,6 @@
    song, which opens the Add song form in the panel, from any page */
 #jobsBtn .ring { width: var(--icon-sm); height: var(--icon-sm); transform: rotate(-90deg); }
 #jobsBtn.idle .ring, #jobsBtn:not(.idle) > .ico { display: none; } /* idle, a + in the ring's place */
-/* beside Add song in the library, always: the ring, empty while nothing's being added (not a second +) */
-.lib-head #jobsBtn.idle .ring { display: block; }
-.lib-head #jobsBtn.idle > .ico { display: none; }
 #jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
 #jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */

@@ -71,8 +71,8 @@ const EMPTY_LIBRARY = false;
     <a class="brand" href="#stems">Pitchroom</a>
     <!-- the sections, right of the name, the one you're in lit (route()) -->
     <nav class="tabs" aria-label="Sections"><a class="btn sm tab" id="tabLib" href="#stems">Library</a><a class="btn sm tab" id="tabLab" href="#voice" title="Lab: chest and head voice, the spectrum, formants">Lab</a><a class="btn sm tab" id="micSetBtn" href="#settings">Settings</a></nav>
-    <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+    <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
     <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b class="pop-title">Adding songs</b><button class="btn sm" id="jobsAddBtn" type="button">Add song</button></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div>
       <div class="menu" id="ytMenu" role="menu" aria-label="Add song" hidden><button id="ytImport" type="button" role="menuitem"><span class="yt-what"><span>Import from YouTube</span><small id="ytTitle"></small></span></button><button id="ytOther" type="button" role="menuitem"><span>Another link or a file…</span></button></div></div>
