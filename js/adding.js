@@ -27,7 +27,8 @@ function paintPix(bar, p, going) {
 // The drawer's songs in sections, each shown only while it has any: Pending (waiting their turn), Processing,
 // Stopped (wanting their lyrics pasted, or failed), Done; in each, in the order they were sent.
 const JOB_SECS = [["pending", "Pending"], ["processing", "Processing"], ["stopped", "Stopped"], ["done", "Done"]];
-function jobSec(j) { return j.done ? "done" : j.needLyrics || j.status === "error" ? "stopped" : j.status === "queued" ? "pending" : "processing"; }
+// (Pending: waiting behind another song still going; the first, with none before it, is Processing from the start)
+function jobSec(j, behind) { return j.done ? "done" : j.needLyrics || j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
 function jobSection(key, name) {
   const list = $("#jobsList");
   let sec = list.querySelector(`:scope > .jobs-sec[data-sec="${key}"]`);
@@ -63,6 +64,9 @@ function paintJobs() {
   // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
   const rowOf = new Map(); // (one just made isn't in the page yet)
+  const secOf = new Map();
+  let going = 0; // songs before this one still going
+  for (const [id, j] of adding) { secOf.set(id, jobSec(j, going > 0)); if (!j.done && !j.needLyrics && j.status !== "error") going++; }
   for (const [id, j] of adding) {
     if (j.done && open) j.seen = true; // in while the panel's open: shown
     let row = document.getElementById("job-" + id);
@@ -83,6 +87,7 @@ function paintJobs() {
     else if (need) say(state, j.lyricsError ? "Manual lyrics needed · {why}" : "Manual lyrics needed", { why: () => tr(j.lyricsError || "") });
     else if (err) say(state, j.error || "That didn’t work.");
     else if (stopping) say(state, "Cancelling…");
+    else if (j.status === "queued" && secOf.get(id) === "processing") say(state, "Starting…"); // (the first: none before it)
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
     else say(state, "{stage} · {pct}%", { stage: () => tr(j.stage || ""), pct: at });
     paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, !j.done && !need && !err && !stopping && !stillMotion());
@@ -96,7 +101,7 @@ function paintJobs() {
   // into their sections (made in their order, the first time), in order; a row moved only when it's out of place (one moved loses its hover and focus)
   for (const [key, name] of JOB_SECS) {
     const sec = jobSection(key, name), rows = sec.querySelector(".jobs-rows");
-    const want = [...adding].filter(([, j]) => jobSec(j) === key).map(([id]) => rowOf.get(id));
+    const want = [...adding].filter(([id]) => secOf.get(id) === key).map(([id]) => rowOf.get(id));
     if (want.length !== rows.children.length || want.some((r, i) => rows.children[i] !== r)) want.forEach((r) => rows.append(r));
     sec.hidden = !want.length; sec.querySelector(".n").textContent = want.length;
   }
