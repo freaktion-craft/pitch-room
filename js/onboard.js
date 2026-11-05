@@ -17,7 +17,7 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
     const drop = (name) => { const i = steps.findIndex((s) => s.dataset.step === name); bars[i].hidden = true; steps.splice(i, 1); bars.splice(i, 1); };
     const [mic, tools] = await Promise.all([obMicAccess(), obStatus()]);
     if (mic === "granted" && !ONBOARD_EVERY_STEP) drop("allow");
-    if (tools?.installed && !ONBOARD_EVERY_STEP) drop("tools");
+    if (obToolsIn(tools) && !ONBOARD_EVERY_STEP) drop("tools"); // (kept while its models are still coming)
     if (typeof start === "string") start = Math.max(0, steps.findIndex((s) => s.dataset.step === start));
     let at = -1, moving = false;
     const seen = new Set(); // the steps been to: the bars go back to those only, never on ahead
@@ -397,8 +397,11 @@ const TOOL_BOXES = [
 // each box: waiting | getting | got (down, waiting to be put in) | setting (being set up) | done | later (a model left
 // for the first song). From the install's own account of each (stems.py, job.pkgs), so each says done as it is; a
 // server from before that kept, read off the log's last lines and the progress as it was
+// The tools in: the packages there and their install over, its two models and all (installed alone is true as soon as
+// the packages import, with the models still coming)
+const obToolsIn = (st) => st?.install?.status === "done" || (!!st?.installed && st?.install?.status !== "running");
 function obToolStates(st) {
-  const job = st?.install, all = !!st?.installed || job?.status === "done", p = job?.progress || 0, log = (job?.log || []).join("\n").toLowerCase();
+  const job = st?.install, all = obToolsIn(st), p = job?.progress || 0, log = (job?.log || []).join("\n").toLowerCase();
   if (job?.pkgs) return TOOL_BOXES.map((b) => job.pkgs[b.pkg || b.key] || (all ? "done" : "waiting"));
   const setup = /installing collected packages/.test(log);
   return TOOL_BOXES.map((b, i) => {
@@ -431,7 +434,7 @@ async function obTools() {
     if (!OB.toolsStep) return;
     obToolStates(st).forEach((k, i) => { tb[i].dataset.st = k; say(tb[i].querySelector(".st"), word[k]); });
     retry.hidden = true;
-    let done = !!st?.installed;
+    let done = obToolsIn(st);
     if (job?.status === "error") { say(state, "The download stopped: {err}", { err: () => tr(job.error || "") }); retry.hidden = false; return; }
     say(state, ""); // (the boxes say how it's going; this line only why it stopped)
     if (sb) { // the song: waiting for them, then split by them
@@ -445,12 +448,12 @@ async function obTools() {
       else if (j?.status === "done") { say(line, "In your library"); say(sst, "✓"); }
       else if (j) { say(line, "{stage} · {p}%", { stage: () => tr(j.stage || "Waiting"), p }); say(sst, ""); done = false; }
       else { say(line, "Split once the tools are in"); say(sst, word.waiting); done = done && !OB.pending ? done : false; }
-      if (st?.installed && !j && !OB.pending && !OB.firstErr) done = false; // sent, its job not seen yet
+      if (obToolsIn(st) && !j && !OB.pending && !OB.firstErr) done = false; // sent, its job not seen yet
     }
     // a library still coming in (chosen after, from the song's step): not done till it's in, so its covers go down with the end
     const copying = OB.lib?.st?.status === "running";
     if (copying) done = false;
-    say(title, done ? "Job done" : copying && st?.installed ? "Bringing in your library" : "Getting your song tools");
+    say(title, done ? "Job done" : copying && obToolsIn(st) ? "Bringing in your library" : "Getting your song tools");
     go.hidden = !done;
     if (done) { say(state, ""); if (!OB.doneSaid) { OB.doneSaid = true; window.pitchroom?.attention?.(); } return; } // looked for, should you be away
     OB.dlT = setTimeout(paint, 1000);
@@ -682,7 +685,7 @@ async function obLibPoll(paint, st) {
   fresh.forEach((id, k) => setTimeout(() => OB.lib === lib && obFloatAdd(id), k * FLOAT.every));
   if (st.status === "done") { // (the tools known before it's taken as done, so it's never painted done without them)
     if (st.songs || st.settings) obLibIn();
-    lib.tools = !!(await obStatus())?.installed; // not in: on to their download, as with a first song (obSong)
+    lib.tools = obToolsIn(await obStatus()); // not in: on to their download, as with a first song (obSong)
     if (OB.lib !== lib) return;
     await new Promise((ok) => setTimeout(ok, fresh.length * FLOAT.every)); // (the last ones in; they go on turning till Continue)
     if (OB.lib !== lib) return;
@@ -756,7 +759,7 @@ function obSong(next, back, end) {
     const shown = sleep(700); // the skeleton a moment at least, so it doesn't flash
     try { const r2 = await fetch("/api/yt/find?url=" + encodeURIComponent(link)); info = await r2.json(); if (!r2.ok) throw new Error(info.error); }
     catch (e2) { return fail(e2.message || "Couldn’t find that video."); }
-    const tools = (await obStatus())?.installed;
+    const tools = obToolsIn(await obStatus());
     await Promise.all([obFoundPaint(found, info), shown]);
     obTint(info.art);
     state("found");
@@ -828,7 +831,7 @@ function obSong(next, back, end) {
   if (OB.lib) { // come back to with a library coming in, or in: the tools asked after again (in since, from their step: Continue, not Download)
     libPaint();
     const lib = OB.lib;
-    if (lib.st?.status === "done") obStatus().then((s) => { if (OB.lib === lib && OB.songStep) { lib.tools = !!s?.installed; libPaint(); } });
+    if (lib.st?.status === "done") obStatus().then((s) => { if (OB.lib === lib && OB.songStep) { lib.tools = obToolsIn(s); libPaint(); } });
   }
   else { state("ask"); OB.songClip(); }
 }
@@ -847,7 +850,7 @@ async function obSendLater() {
   const st = await obStatus();
   if (!OB.pending) return;
   OB.firstAt = st; obFirstPaint();
-  if (!st?.installed) { if (st?.install?.status !== "error") OB.laterT = setTimeout(obSendLater, 2000); return; }
+  if (!obToolsIn(st)) { if (st?.install?.status !== "error") OB.laterT = setTimeout(obSendLater, 2000); return; }
   const what = OB.pending; OB.pending = null;
   if (ONBOARD_NO_TOOLS) { OB.firstJob = "fake"; OB.fakeJobAt = performance.now(); OB.first = null; $("#obFirstCard")?.remove(); return; } // (its splitting pretended too: nothing added)
   try { OB.firstJob = await obSend(what); } catch (e) { OB.firstErr = e.message; notice(e.message); }
