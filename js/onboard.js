@@ -599,11 +599,12 @@ function obFinaleCovers(step) {
 // the covers sinking into the water as a first song's does (obFinale). Its songs and settings are in the page then:
 // the settings not set here yet, and the library drawn again under the black.
 // The covers on rings round the middle of the right half, the water gone from under them: RING.first on the inner,
-// RING.grow more on each one out, as many rings as fit; each cover blurring in as its song's copied, the rings turning,
-// each its own way (one, then the other) and the outer ones slower, as long as it goes on. More songs than places: the
+// RING.grow more on each one out, as many rings as fit, evenly round each and lined up from one ring to the next (5,
+// 10, 15: every other one, every third, on the inner's spokes), upright; each blurring in as its song's copied, and
+// the whole turning slowly as one, as long as it goes on. More songs than places: the
 // oldest blurs out for the next. All in: they blur out, one after another, and the step says so (obRingsOut).
-// size: a cover's side; r0: the inner ring's radius; step: from a ring to the next; spin: the inner's turn, rad/s
-const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 118, spin: 0.16 };
+// size: a cover's side; r0: the inner ring's radius; step: from a ring to the next; spin: the turn, rad/s
+const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 118, spin: 0.1 };
 const FLOAT = { every: 140 }; // ms between several coming in at once
 function obRingOf(k) { // slot k: its ring, and its place round it
   let r = 0, cap = RING.first;
@@ -625,7 +626,7 @@ function obFloatAdd(id) {
   const { r, j, cap } = obRingOf(slot);
   const el = Object.assign(document.createElement("span"), { className: "ob-float" }), i = el.appendChild(document.createElement("i")), img = i.appendChild(new Image());
   img.alt = ""; img.src = `/library/${id}/cover.jpg`;
-  const f = { el, src: img.src, slot, ring: r, rad: RING.r0 + r * RING.step, ang: (j / cap) * Math.PI * 2 + r * 0.6, tilt: (Math.random() - 0.5) * 6 };
+  const f = { el, src: img.src, slot, ring: r, rad: RING.r0 + r * RING.step, ang: (j / cap) * Math.PI * 2 - Math.PI / 2 }; // (from the top)
   OB.floats.push(f);
   img.decode().catch(() => {}).then(() => {
     if (!el.isConnected && !OB.floats.includes(f)) return;
@@ -644,7 +645,7 @@ function obRingsOut() {
   const all = [...OB.floats].sort((a, b) => a.slot - b.slot), step = Math.min(60, 900 / Math.max(1, all.length));
   return Promise.all(all.map((f, k) => new Promise((ok) => setTimeout(() => { const p = obFloatOut(f); (p || Promise.resolve()).then(ok, ok); }, stillMotion() ? 0 : k * step))));
 }
-// the rings turning: each cover where its ring has got to round the middle, a little tipped
+// the rings turning, as one: each cover where it's got to round the middle, upright
 function obFloatRun() {
   if (OB.floatRaf) return;
   const box = $("#obFloats"), t0 = performance.now();
@@ -652,8 +653,8 @@ function obFloatRun() {
     if (!OB.floats.length) { OB.floatRaf = 0; return; }
     const t = stillMotion() ? 0 : (now - t0) / 1000;
     for (const f of OB.floats) {
-      const w = (f.ring % 2 ? -1 : 1) * RING.spin / (1 + f.ring * 0.45), a = f.ang + w * t;
-      f.el.style.transform = `translate(${(Math.cos(a) * f.rad).toFixed(2)}px, ${(Math.sin(a) * f.rad).toFixed(2)}px) rotate(${f.tilt.toFixed(2)}deg)`;
+      const a = f.ang + RING.spin * t;
+      f.el.style.transform = `translate(${(Math.cos(a) * f.rad).toFixed(2)}px, ${(Math.sin(a) * f.rad).toFixed(2)}px)`;
     }
     OB.floatRaf = requestAnimationFrame(frame);
   };
