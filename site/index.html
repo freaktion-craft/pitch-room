@@ -172,10 +172,11 @@ async function fly(get) {
   const shrink = { duration: FLY.shrink, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" };
   label.animate([{ opacity: 1 }, { opacity: 0 }], { ...shrink, duration: FLY.shrink * 0.6 });
   svg.animate([{ left: `${s.left - r.left}px` }, { left: `${(D - s.width) / 2}px` }], shrink);
+  // its logo going as it draws in, blurring away as it fades: a plain dot by the time it sets off
+  svg.animate([{ opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(6px)" }], { ...shrink, easing: "ease-in" });
   await ghost.animate([{ left: `${r.left}px`, width: `${r.width}px` }, { left: `${r.left + (r.width - D) / 2}px`, width: `${D}px` }], shrink).finished;
   // off up to the downloads icon: its middle to the top edge, under it, getting smaller, gone as it gets there
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2, tx = innerWidth - tipAt(), ty = 0;
-  svg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FLY.fly * 0.4, easing: "ease-out", fill: "forwards" }); // its logo going as it sets off: a plain dot goes up
   // along an arc: out to the right first, then sweeping up into the toolbar (a curve bent toward a point level with where
   // it starts, under the icon: its control), not straight across; eased along it, smaller as it goes, gone as it gets there
   const dx = tx - cx, dy = ty - cy - 8, c = { x: dx * FLY.bend[0], y: dy * FLY.bend[1] }, ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
