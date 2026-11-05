@@ -9,14 +9,14 @@
 // t0, span: the track's view (s); undo: the edits as they were before each change; sel: the line last touched; drag: what a
 // held pointer is doing; pick: a run of one line's words picked (a click picks a word, Shift+click runs to another) to split
 // off as a line of its own or make backing vocals; busy: the song being timed again after that
-const ED = { on: false, t0: 0, span: 12, undo: [], sel: null, drag: null, pick: null, busy: false };
+const ED = { on: false, t0: 0, span: 12, undo: [], sel: null, drag: null, pick: null, busy: false, navDrag: false, nodes: new Map() };
 const ED_MIN = 0.05, ED_JOIN = 0.03; // a word's shortest (s); a word's end this close to the next one's start runs up to it
 const ED_ROWS = [[28, 48], [92, 112]], ED_WAVE = 156; // [line bar, words] y (px) for even and odd lines; where the waveform starts
 const r3 = (t) => Math.round(t * 1000) / 1000;
 
 function edOpen(on) {
   if (on && (!K.lyrics || !K.song)) return;
-  ED.on = on; ED.drag = null; edExportMenu(false);
+  ED.on = on; ED.drag = null; ED.navDrag = false; dropPaint(); edExportMenu(false);
   $("#lyEdit").hidden = !on; $("#kEdit").setAttribute("aria-pressed", String(on));
   for (const n of [$(".tl-row"), $("#keysWrap"), $("#vPractice .credit")]) n.hidden = on; // (the song's timeline and the keyboard: no use while editing, the editor has its own navigator)
   const b = $("#kEdit"); // Edit, and Done while it's open
@@ -62,44 +62,59 @@ function edDone() {
 }
 const edX = (t, W) => ((t - ED.t0) / ED.span) * W;
 
-// The clips (and with wave, the ruler and the waveform, which only change with the view)
+// The clips (and with wave, the ruler and the waveform, which only change with the view). The same nodes stay put and are
+// moved: building them anew on every move of the window threw away the whole track before the browser could paint.
+function edNode(key, tag, cls) {
+  let n = ED.nodes.get(key);
+  if (!n) { n = el(tag); ED.nodes.set(key, n); }
+  if (n.className !== cls) n.className = cls;
+  return n;
+}
+function edText(n, text) { if (n._tx !== text) { n._tx = text; n.textContent = text; } }
 function edPaint(wave) {
   const view = $("#lyView"), W = view.clientWidth, H = view.clientHeight;
   if (!W || !K.lyrics) return;
-  const out = [], edited = K.song?.lyricEdits?.lines || {};
+  const edited = K.song?.lyricEdits?.lines || {}, order = [], seen = new Set();
+  const take = (key, tag, cls) => { const n = edNode(key, tag, cls); seen.add(key); order.push(n); return n; };
   ED.clips = []; // (each word's clip and its times, for the fill: edHead)
   K.lyrics.forEach((l, i) => {
     if (l.t0 == null || l.t1 < ED.t0 - 1 || l.t0 > ED.t0 + ED.span + 1) return;
     const [yb, yc] = ED_ROWS[i % 2], sel = ED.sel === i ? " sel" : "";
-    const bar = el("div", "lbar" + sel + (edited[i] && edited[i].text === K.lyRaw[i]?.text ? " edited" : ""), l.text);
+    const bar = take("b" + i, "div", "lbar" + sel + (edited[i] && edited[i].text === K.lyRaw[i]?.text ? " edited" : ""));
+    edText(bar, l.text);
     Object.assign(bar.style, { left: edX(l.t0, W) + "px", width: Math.max(10, edX(l.t1, W) - edX(l.t0, W)) + "px", top: yb + "px" });
-    bar.dataset.i = i; out.push(bar);
+    bar.dataset.i = i;
     const timed = (l.words || []).map((w, k) => [w, k]).filter(([w]) => w[0] != null), lastMain = timed.filter(([w]) => !w[4]).pop() || timed[timed.length - 1];
     for (const [w, k] of timed) {
-      const c = el("div", "clip" + (w[4] ? " bg" : "") + sel + (ED.pick && ED.pick.i === i && k >= ED.pick.a && k <= ED.pick.b ? " pick" : ""), w[2].trim()), x = edX(w[0], W);
+      const c = take("c" + i + ":" + k, "div", "clip" + (w[4] ? " bg" : "") + sel + (ED.pick && ED.pick.i === i && k >= ED.pick.a && k <= ED.pick.b ? " pick" : "")), x = edX(w[0], W);
+      edText(c, w[2].trim());
       Object.assign(c.style, { left: x + "px", width: Math.max(3, edX(w[1], W) - x) + "px", top: yc + "px" });
-      c.dataset.i = i; c.dataset.k = k; out.push(c); ED.clips.push({ c, a: w[0], b: w[1], f: -1 });
-      const g = el("i", "guide"); // the start, down through the waveform
+      c.dataset.i = i; c.dataset.k = k; ED.clips.push({ c, a: w[0], b: w[1], f: c._f ?? -1 });
+      const g = take("g" + i + ":" + k, "i", "guide"); // the start, down through the waveform
       Object.assign(g.style, { left: x + "px", top: yc + 34 + "px", height: Math.max(0, H - yc - 34) + "px" });
-      out.push(g);
     }
     if (lastMain) { // where the line ends
-      const [w, k] = lastMain, e = el("div", "endh" + sel);
+      const [w, k] = lastMain, e = take("e" + i, "div", "endh" + sel);
       Object.assign(e.style, { left: edX(w[1], W) + "px", top: yc + "px" });
-      e.dataset.i = i; e.dataset.k = k; e.title = tr("Where the line ends"); out.push(e);
+      e.dataset.i = i; e.dataset.k = k; e.title = tr("Where the line ends");
     }
   });
-  $("#lyClips").replaceChildren(...out);
+  for (const k of [...ED.nodes.keys()]) if (!seen.has(k)) { ED.nodes.get(k).remove(); ED.nodes.delete(k); }
+  const box = $("#lyClips");
+  let same = box.childNodes.length === order.length;
+  if (same) for (let i = 0; i < order.length; i++) if (box.childNodes[i] !== order[i]) { same = false; break; }
+  if (!same) box.replaceChildren(...order);
   if (wave) edWave(W, H);
-  navPaint(); edHead();
+  navPaint(); edHead(W);
 }
 function edWave(W, H) {
-  const cv = $("#lyWave"), d = Math.min(2, devicePixelRatio || 1);
-  cv.width = Math.round(W * d); cv.height = Math.round(H * d);
+  const cv = $("#lyWave"), d = Math.min(2, devicePixelRatio || 1), dw = Math.round(W * d), dh = Math.round(H * d);
+  if (cv.width !== dw || cv.height !== dh) { cv.width = dw; cv.height = dh; } // setting it clears the canvas, even to the same size
   const g = cv.getContext("2d");
   g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, W, H);
   const step = ED.span > 40 ? 10 : ED.span > 16 ? 2 : 1;
-  g.font = `11px ${getComputedStyle(cv).fontFamily}`; g.lineWidth = 1;
+  if (!ED.waveFont) ED.waveFont = `11px ${getComputedStyle(cv).fontFamily}`;
+  g.font = ED.waveFont; g.lineWidth = 1;
   for (let t = Math.ceil(ED.t0 / step) * step; t < ED.t0 + ED.span; t += step) {
     const x = Math.round(edX(t, W)) + 0.5;
     g.strokeStyle = C.muted; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 4); g.stroke(); // (a tick at the ruler only: the lines down the track are the words' starts)
@@ -108,29 +123,50 @@ function edWave(W, H) {
   const buf = P.buffers.lead || P.buffers.vocals;
   if (!buf) return;
   const ch = buf.getChannelData(0), sr = buf.sampleRate, r = buf.duration / (songDur() || buf.duration); // (a slowed or sped-up song's tracks run longer or shorter)
-  if (ED.peakOf !== ch) { let p = 0; for (let i = 0; i < ch.length; i += 64) { const v = Math.abs(ch[i]); if (v > p) p = v; } ED.peakOf = ch; ED.peak = p || 1; } // (the song's loudest: drawn to fit)
-  const h = Math.max(20, H - ED_WAVE - 8), mid = ED_WAVE + h / 2;
-  g.fillStyle = C.voice; g.globalAlpha = 0.5;
+  edPeaks(ch); // (the song's loudest, and one column a bucket: drawn to fit, and the same columns at any zoom)
+  const h = Math.max(20, H - ED_WAVE - 8), mid = ED_WAVE + h / 2, peaks = ED.peaks, n = peaks.length, buck = ED_BUCKET;
+  g.fillStyle = C.voice; g.globalAlpha = 0.5; g.beginPath();
   for (let x = 0; x < W; x++) {
-    const a = Math.floor((ED.t0 + (x / W) * ED.span) * r * sr), b = Math.floor((ED.t0 + ((x + 1) / W) * ED.span) * r * sr), by = Math.max(1, (b - a) >> 7);
+    const s0 = (ED.t0 + (x / W) * ED.span) * r * sr, s1 = (ED.t0 + ((x + 1) / W) * ED.span) * r * sr;
+    let i0 = s0 / buck | 0, i1 = Math.ceil(s1 / buck);
+    if (i0 < 0) i0 = 0;
+    if (i1 > n) i1 = n;
+    if (i1 <= i0) i1 = Math.min(n, i0 + 1);
     let mx = 0;
-    for (let i = Math.max(0, a); i < Math.min(ch.length, b); i += by) { const v = Math.abs(ch[i]); if (v > mx) mx = v; }
+    for (let i = i0; i < i1; i++) if (peaks[i] > mx) mx = peaks[i];
     const y = Math.min(1, mx / ED.peak) * (h / 2);
-    g.fillRect(x, mid - y, 1, Math.max(1, 2 * y));
+    g.rect(x, mid - y, 1, Math.max(1, y + y));
   }
-  g.globalAlpha = 1;
+  g.fill(); g.globalAlpha = 1;
+}
+// The lead's envelope, once per buffer: the loudest sample in each ED_BUCKET. Read back in full for whatever the view
+// shows, so resizing the window doesn't pick a new subset of samples and the peaks don't shimmer as it zooms.
+const ED_BUCKET = 64;
+function edPeaks(ch) {
+  if (ED.peakOf === ch && ED.peaks) return;
+  const n = Math.ceil(ch.length / ED_BUCKET), peaks = new Float32Array(n);
+  let p = 0;
+  for (let b = 0; b < n; b++) {
+    const a = b * ED_BUCKET, e = Math.min(ch.length, a + ED_BUCKET);
+    let mx = 0;
+    for (let i = a; i < e; i++) { const v = ch[i] < 0 ? -ch[i] : ch[i]; if (v > mx) mx = v; }
+    peaks[b] = mx; if (mx > p) p = mx;
+  }
+  ED.peakOf = ch; ED.peaks = peaks; ED.peak = p || 1;
 }
 // Every frame while it's open (practiceFrame): the playhead, the view following it as the song plays, and each word filling as
 // it's sung, as karaoke does, so it's plain when a word lights before or after its voice
-function edHead() {
-  const W = $("#lyView").clientWidth, t = heardStage();
-  if (P.playing && !ED.drag && (t > ED.t0 + ED.span * 0.92 || t < ED.t0)) { ED.t0 = Math.max(0, t - ED.span * 0.1); edPaint(true); return; }
+function edHead(W) {
+  if (!(W > 0)) W = $("#lyView").clientWidth;
+  const t = heardStage();
+  // not while the window or the track is held: that drag is where the view is, and following the playhead would pull it back each frame
+  if (P.playing && !ED.drag && !ED.navDrag && (t > ED.t0 + ED.span * 0.92 || t < ED.t0)) { ED.t0 = Math.max(0, t - ED.span * 0.1); edPaint(true); return; }
   $("#lyHead").style.left = edX(t, W) + "px";
   $("#lyNavHead").style.left = (t / (songDur() || 1)) * 100 + "%";
   const fill = (a, b) => Math.round(Math.min(1, Math.max(0, (t - a) / Math.max(1e-3, b - a))) * 100);
   for (const x of ED.clips || []) {
     const f = fill(x.a, x.b);
-    if (f !== x.f) { x.f = f; x.c.style.setProperty("--f", f + "%"); }
+    if (f !== x.f) { x.f = x.c._f = f; x.c.style.setProperty("--f", f + "%"); }
   }
   // above the track, the line being sung (or the next) as a subtitle, filling word by word
   const i = K.lyrics.findIndex((l) => l.t0 != null && t < l.t1 + 0.3), l = K.lyrics[i];
@@ -258,11 +294,41 @@ function edImportText(text) {
 }
 // The view: ED.span s from ED.t0, at least ED_CLOSE s and at most the whole song, kept inside the song
 const ED_CLOSE = 3;
+// A drag, a resize or the wheel can ask many times a frame. The window moves at once; the track is drawn once, on the
+// frame, at wherever the pointer is by then. A paint per event ran them one after another and the window stepped.
+let paintRaf = 0, paintWave = false;
+function dropPaint() {
+  if (!paintRaf) return;
+  cancelAnimationFrame(paintRaf); paintRaf = 0; paintWave = false;
+}
+function edApplyDrag() {
+  const D = ED.drag;
+  if (!D || D.mode === "pan" || !D.moved || D.dt == null) return;
+  const dt = D.dt; D.dt = null;
+  edApply(D, dt);
+}
+function runPaint() {
+  paintRaf = 0;
+  const wave = paintWave; paintWave = false;
+  edApplyDrag();
+  edPaint(wave);
+}
+function edPaintSoon(wave) {
+  if (wave) paintWave = true;
+  if (paintRaf) return;
+  paintRaf = requestAnimationFrame(runPaint);
+}
+function edPaintNow(wave) {
+  if (paintRaf) { cancelAnimationFrame(paintRaf); paintRaf = 0; if (paintWave) wave = true; paintWave = false; }
+  edApplyDrag();
+  edPaint(wave);
+}
 function edView(t0, span) {
   const dur = songDur() || 1;
   ED.span = Math.min(dur, Math.max(ED_CLOSE, span));
   ED.t0 = Math.min(Math.max(0, t0), Math.max(0, dur - ED.span));
-  edPaint(true);
+  navBox();
+  edPaintSoon(true);
 }
 function edZoom(f, at) { // by f, about the time at (default: the middle)
   const c = at ?? ED.t0 + ED.span / 2, span = Math.min(songDur() || 1, Math.max(ED_CLOSE, ED.span * f));
@@ -270,9 +336,13 @@ function edZoom(f, at) { // by f, about the time at (default: the middle)
 }
 // The navigator, over the track: the whole song, its lines as marks, the playhead, and the view as a box. The box drags to move
 // through the song, its edges to zoom (the other edge stays); a click elsewhere puts the view's middle there, and holding on drags it.
-function navPaint() {
+function navBox() {
   const dur = songDur() || 1, win = $("#lyNavWin");
   win.style.left = (ED.t0 / dur) * 100 + "%"; win.style.width = (ED.span / dur) * 100 + "%";
+}
+function navPaint() {
+  const dur = songDur() || 1;
+  navBox();
   const key = K.lyrics && K.song ? K.song.id + "|" + K.lyrics.length + "|" + K.lyrics.map((l) => l.t0).join() : "";
   if (ED.navKey === key) return;
   ED.navKey = key;
@@ -288,6 +358,7 @@ function initNav() {
     const r = nav.getBoundingClientRect(), dur = songDur() || 1, at = ((e.clientX - r.left) / r.width) * dur;
     const h = e.target.closest(".h"), inWin = e.target.closest(".nav-win");
     drag = { x: e.clientX, W: r.width, t0: ED.t0, span: ED.span, mode: h ? (h.classList.contains("l") ? "l" : "r") : "move", moved: false };
+    ED.navDrag = true;
     if (!h && !inWin) { edView(at - ED.span / 2, ED.span); drag.t0 = ED.t0; } // (then held, it drags from there)
     nav.setPointerCapture(e.pointerId); e.preventDefault();
   });
@@ -299,7 +370,7 @@ function initNav() {
     else if (drag.mode === "l") { const end = drag.t0 + drag.span, t0 = Math.min(Math.max(0, drag.t0 + dt), end - ED_CLOSE); edView(t0, end - t0); }
     else edView(drag.t0, Math.max(ED_CLOSE, drag.span + dt));
   });
-  const end = () => { drag = null; };
+  const end = () => { if (!drag) return; drag = null; ED.navDrag = false; if (paintRaf) edPaintNow(true); };
   nav.addEventListener("pointerup", end); nav.addEventListener("pointercancel", end);
 }
 
@@ -348,13 +419,20 @@ function initLyEdit() {
     if (!D.moved) return;
     const dt = (dx / D.W) * ED.span;
     if (D.mode === "pan") { edView(D.t0 - dt, ED.span); return; }
-    edApply(D, dt); edPaint(false);
+    D.dt = dt; edPaintSoon(false); // the latest place, drawn once this frame (edApply from the words as they were held)
   });
   const end = (e, cancel) => {
     const D = ED.drag;
     if (!D) return;
+    if (D.mode === "pan") {
+      ED.drag = null; view.classList.remove("panning");
+      if (D.moved) { if (paintRaf) edPaintNow(true); } else dropPaint();
+      if (!D.moved && !cancel) seekWithin(ED.t0 + ((e.clientX - view.getBoundingClientRect().left) / D.W) * ED.span);
+      return;
+    }
+    if (D.moved && !cancel) edApplyDrag(); else D.dt = null;
+    dropPaint();
     ED.drag = null; view.classList.remove("panning");
-    if (D.mode === "pan") { if (!D.moved && !cancel) seekWithin(ED.t0 + ((e.clientX - view.getBoundingClientRect().left) / D.W) * ED.span); return; }
     if (D.moved && !cancel) edCommit(D.i, D.before);
     else { // a click: that line picked, and the song to that word (or the line, from its bar)
       K.lyrics[D.i].words = D.orig; edLine(K.lyrics[D.i]);
