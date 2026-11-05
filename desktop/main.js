@@ -185,7 +185,7 @@ async function requestQuit() {
 async function busy() { // a song being added, or the tools being installed
   try {
     const [jobs, st] = await Promise.all(["/api/jobs", "/api/stems/status"].map((p) => fetch(`http://127.0.0.1:${port}${p}`).then((r) => r.json())));
-    return jobs.length > 0 || st?.install?.status === "running";
+    return jobs.some((j) => j.status === "queued" || j.status === "running") || st?.install?.status === "running"; // (not one only waiting for its lyrics pasted)
   } catch { return false; }
 }
 

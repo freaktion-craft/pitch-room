@@ -97,10 +97,12 @@ async function drawLibrary() {
   const tiles = new Map([...libRows].map(([id, row]) => [id, row.querySelector(".cover")]));
   libRows = new Map();
   // songs still being added (this page was reloaded, or opened in a second tab meanwhile) are shown by the mic again
+  for (const [id, a] of adding) if (a.needLyrics && !jobs.some((j) => j.id === id)) { adding.delete(id); document.getElementById("job-" + id)?.remove(); } // settled elsewhere
+  if (adding.size) paintJobs();
   for (const j of jobs) {
     if (pollers[j.id] || adding.has(j.id)) continue;
-    addingJob(j.id, j);
-    watchJob(j.id, "separate");
+    addingJob(j.id, { ...j, arrived: !!j.songId, done: j.status === "done" && !j.needLyrics }); // (one in already is in this list)
+    if (j.status !== "done") watchJob(j.id, "separate");
   }
   box.innerHTML = "";
   const coming = [...adding.values()].some((j) => j.status !== "error");

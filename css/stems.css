@@ -66,7 +66,8 @@
 .yt-what small { color: var(--muted); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .yt-what small:empty { display: none; }
 .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-2); align-items: center; }
-.job > .top, .job > .bar { grid-column: 1; }
+.job > .top, .job > .px { grid-column: 1; }
+.job > .lyr-ask { grid-column: 1 / -1; }
 .job .top { display: grid; min-width: 0; }
 .job .top b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .job .top span { color: var(--muted); font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -74,9 +75,27 @@
 .job .x { grid-column: 2; grid-row: 1 / span 2; }
 .job .x > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .job.err .top span { color: var(--bad); white-space: normal; }
-.job.err .bar, .job.done .bar { display: none; }
+.job.err .px { display: none; }
 .job.err .x, .job.done .x { grid-row: 1; }
 #jobsBtn.ready .ring circle + circle { stroke: var(--ink); } /* all in */
+#jobsBtn.warn .ring circle + circle { stroke: var(--orange); } /* one stopped, wanting its lyrics */
+/* a song's progress in pixels (pixBar): 3 rows, filled a column at a time from the left; the next one blinking while it goes */
+.px { display: grid; grid-template-rows: repeat(3, auto); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+.px i { aspect-ratio: 1; border-radius: 1px; background: var(--fill); transition: background-color var(--duration-base); }
+.px i.on { background: var(--ink); }
+.px i.next { animation: px-blink 1s steps(1, end) infinite; }
+@keyframes px-blink { 50% { background: var(--fg-30); } }
+/* stopped for its lyrics (none found, or finding them failed): orange where it stopped, and the way to paste them */
+.job.need .px i.on { background: var(--orange); }
+.job.need .top span { color: var(--orange); white-space: normal; }
+.lyr-ask { display: grid; gap: var(--space-2); justify-items: start; }
+.lyr-form { display: grid; gap: var(--space-2); justify-self: stretch; }
+.lyr-form textarea { min-height: 120px; max-height: 280px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--fill); padding: var(--space-2) var(--space-3);
+  font: var(--text-md)/20px var(--font); color: inherit; resize: vertical; transition: border-color var(--duration-fast), background-color var(--duration-fast); }
+.lyr-form textarea::placeholder { color: var(--placeholder); }
+.lyr-form textarea:hover { background: var(--hover-2); }
+.lyr-form textarea:focus { outline: none; background: var(--surface-2); border-color: var(--ink); }
+.lyr-acts { display: flex; justify-content: flex-end; }
 
 .player { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */

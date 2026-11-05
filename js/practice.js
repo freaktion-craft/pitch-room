@@ -552,7 +552,8 @@ function lyricsFor(m, lyr) {
   say($("#stage .plot"), K.lyrics ? "Lyrics off? , . move this line, [ ] all of them, 50 ms a press\nShift+, Shift+. put its start on the voice" : "", null, "title");
   K.lyrNone = !!data && !data.lines && !data.dropped; // none on LRCLIB: looking again finds none again, so they're pasted in
   K.tick = null; K.lyrOff = (data && data.offLines) || 0; // a good share of them not sung here (stems._off_lines): said, nothing moved
-  K.lyricMsg = null;
+  // none (not found, or never looked for), and none on the way: said, with where they're found (no Find button here)
+  K.lyricMsg = lyr && !K.lyrics && !(data && data.dropped) && !lyr.job ? { t: K.lyrNone ? "No lyrics found for this song." : "No lyrics for this song yet.", find: true } : null;
   if (lyr && lyr.job) { if (!lyricJobs.has(m.id)) lyricJobs.set(m.id, { t: "Looking for the lyrics…" }); watchJob(lyr.job, "lyrics", m.id); } // being found from the Info page
 }
 async function startLyrics(id, how) {
@@ -753,7 +754,7 @@ function paintLyrBtn() {
   $("#kEdit").disabled = !K.lyrics; if (!K.lyrics && ED.on) edOpen(false); // (Edit: the lyrics' timing)
   b.dataset.key = key;
   const w0 = b.hidden ? 0 : b.offsetWidth;
-  b.hidden = !id || !!K.lyrics;
+  b.hidden = true; // (gone: finding them is part of adding a song now, its drawer asking for them pasted where none are found; or on its Info page)
   if (b.hidden) return;
   b.classList.toggle("busy", busy); b.setAttribute("aria-busy", String(busy));
   b.replaceChildren(...(busy ? [progRing(0), tr("Finding lyrics…")] : [tr(K.lyrNone ? "Paste lyrics" : "Find lyrics")]));

@@ -375,6 +375,9 @@ class Handler(SimpleHTTPRequestHandler):
         parts = url.path.strip("/").split("/")  # api/library/<id>/<action>, api/jobs/<id>/cancel
         if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "cancel":
             return self._json(200, {"status": stems.cancel_job(parts[2])})
+        if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "lyrics":  # {text}: a song added wanting its lyrics, them pasted (stems.resume_lyrics)
+            body = json.loads(self._body(60_000) or b"{}")
+            return self._json(200, {"status": stems.resume_lyrics(parts[2], body.get("text") if isinstance(body, dict) else None)})
         if len(parts) == 4 and parts[1] == "library":
             if parts[3] == "delete":
                 stems.delete_song(parts[2])

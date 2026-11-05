@@ -1,16 +1,32 @@
 "use strict";
 // Adding songs: the Add song panel (links, files) and the songs being added (the ring by the mic, its panel).
 
-// Songs being added, by job: {name, status, stage, progress, ahead, cancel, error, stopping, done, songId, seen}, in
-// the order they were started. The ring beside the mic is always there, empty while there are none: as full as they are
+// Songs being added, by job: {name, status, stage, progress, ahead, cancel, error, stopping, done, songId, seen, phase,
+// needLyrics, lyricsError, arrived}, in the order they were started. Adding one takes its lyrics too (the server's
+// _lyrics_phase): its progress is the whole of it; once it's in the library (arrived) its lyrics are found, and where
+// none are (needLyrics) it stops there in orange, for them to be pasted (or let go). The ring beside the mic is always there, empty while there are none: as full as they are
 // together, each counted whole once it's in; spinning while none has started; full and bright once all are in. Pressed, its
 // panel lists each one: its name (a link's video title once it's known, the song's own once it's in), what it's doing
 // or how many are ahead of it, and a button to stop it. One that's in has a button to open it instead, and stays until
 // it's opened or the panel is closed having shown it (seen); one that failed stays, saying why, until it's cleared.
 const adding = new Map();
 function addingJob(id, j) { adding.set(id, { ...(adding.get(id) || {}), ...j }); paintJobs(); }
+// A song's progress in pixels: PX_ROWS rows of PX_COLS, filled a column at a time from the left (the CSS's grid fills
+// down each column); the next one blinks while it's going.
+const PX_COLS = 36, PX_ROWS = 3;
+function pixBar() {
+  const bar = el("div", "px"); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
+  for (let k = 0; k < PX_COLS * PX_ROWS; k++) bar.append(el("i"));
+  return bar;
+}
+function paintPix(bar, p, going) {
+  const n = Math.round(Math.max(0, Math.min(1, p)) * PX_COLS * PX_ROWS);
+  [...bar.children].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", going && k === n); });
+  bar.setAttribute("aria-valuenow", Math.round(p * 100));
+}
 function paintJobs() {
-  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && j.status !== "error"), ready = jobs.filter((j) => j.done);
+  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !j.needLyrics && j.status !== "error"), ready = jobs.filter((j) => j.done);
+  const need = jobs.filter((j) => j.needLyrics);
   const counted = jobs.filter((j) => j.status !== "error"), failed = jobs.length > counted.length;
   const p = counted.length ? counted.reduce((s, j) => s + (j.done ? 1 : j.progress || 0), 0) / counted.length : 1;
   const btn = $("#jobsBtn"), open = !$("#jobsPop").hidden;
@@ -19,13 +35,14 @@ function paintJobs() {
   const waiting = live.length > 0 && !live.some((j) => j.status === "running") && p === 0;
   ring.classList.toggle("spin", waiting && !stillMotion());
   btn.classList.toggle("err", failed && !live.length && !ready.length);
-  btn.classList.toggle("ready", !live.length && ready.length > 0);
+  btn.classList.toggle("ready", !live.length && !need.length && ready.length > 0);
+  btn.classList.toggle("warn", !live.length && need.length > 0); // stopped for lyrics: orange
   arc.style.strokeDasharray = `${!jobs.length ? 0 : btn.classList.contains("err") ? 100 : Math.max(6, waiting ? 25 : p * 100)} 100`;
   arc.style.visibility = jobs.length ? "" : "hidden"; // empty: just the track, no dot of a round end
   if (!btn.querySelector(":scope > .ico")) btn.append(icon("plus"));
   btn.classList.toggle("idle", !jobs.length); // nothing being added: a + (the panel adds a song) in the ring's place
   const pct = Math.round(p * 100);
-  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : ready.length > 1 ? "{n} songs added"
+  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : need.length ? "Lyrics needed" : ready.length > 1 ? "{n} songs added"
     : ready.length ? "Song added" : failed ? "Couldn’t add a song" : "Add songs", { n: live.length || ready.length, pct }, "title");
   // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
@@ -38,27 +55,56 @@ function paintJobs() {
     if (!row) {
       row = el("div", "job"); row.id = "job-" + id;
       const top = el("div", "top"); top.append(el("b"), el("span"));
-      const bar = el("div", "bar"); bar.append(el("i")); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
       const x = el("button", "btn sm icon ghost x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
-      row.append(top, bar, x); list.append(row);
+      row.append(top, pixBar(), x, lyricsAsk(id)); list.append(row);
     }
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err, at = Math.round((j.progress || 0) * 100);
-    row.classList.toggle("err", err); row.classList.toggle("done", !!j.done);
-    const name = (j.done && libCache.get(j.songId)?.title) || j.name;
+    const need = !!j.needLyrics, lyr = j.phase === "lyrics" && !need && !j.done; // (its lyrics' part can't be stopped: the song's in)
+    row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need);
+    const name = ((j.arrived || j.done) && libCache.get(j.songId)?.title) || j.name;
     row.querySelector("b").textContent = name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song");
     const state = row.querySelector(".top span");
     if (j.done) say(state, "Added");
+    else if (need) say(state, j.lyricsError ? "Manual lyrics needed · {why}" : "Manual lyrics needed", { why: () => tr(j.lyricsError || "") });
     else if (err) say(state, j.error || "That didn’t work.");
     else if (stopping) say(state, "Cancelling…");
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
     else say(state, "{stage} · {pct}%", { stage: () => tr(j.stage || ""), pct: at });
-    row.querySelector(".bar i").style.width = at + "%"; row.querySelector(".bar").setAttribute("aria-valuenow", at);
-    // cancel, or clear one that failed; once it's in, open it
+    paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, !j.done && !need && !err && !stopping && !stillMotion());
+    row.querySelector(".lyr-ask").hidden = !need;
+    // cancel, or clear one that failed; once it's in, open it; one wanting its lyrics, let go without them
     const x = row.querySelector(".x"), kind = j.done ? "goTo" : "close";
     if (x.dataset.icon !== kind) { x.replaceChildren(icon(kind)); x.dataset.icon = kind; }
     x.classList.toggle("ghost", !j.done); x.classList.toggle("primary", !!j.done); // in: the way to it, the panel's one strong button
-    say(x, j.done ? "Open song" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping;
+    say(x, j.done ? "Open song" : need ? "Skip lyrics" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping || lyr; x.style.visibility = lyr ? "hidden" : ""; // (its room kept: the pixels as wide as the others')
   }
+}
+// Under a song stopped for its lyrics: Paste lyrics, which opens a box for them (a line of the song to each line) and
+// Add lyrics, that sends them; the song goes on from where it stopped, its lyrics timed to it (stems.resume_lyrics).
+function lyricsAsk(id) {
+  const box = el("div", "lyr-ask"), open = el("button", "btn sm"), form = el("div", "lyr-form"), text = el("textarea"), acts = el("div", "lyr-acts"), go = el("button", "btn sm primary");
+  box.hidden = true; form.hidden = true;
+  open.type = go.type = "button"; say(open, "Paste lyrics"); say(go, "Add lyrics");
+  text.rows = 6; text.spellcheck = false; say(text, "A line of the song to each line", null, "placeholder"); say(text, "Lyrics", null, "aria-label");
+  open.onclick = () => { open.hidden = true; form.hidden = false; text.focus({ preventScroll: true }); };
+  text.oninput = () => { go.disabled = !text.value.trim(); };
+  go.onclick = async () => {
+    go.disabled = true;
+    try {
+      const r = await fetch(`/api/jobs/${id}/lyrics`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: text.value }) });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(b.error || "That didn’t work.");
+    } catch (e) {
+      addingJob(id, { lyricsError: e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message }); go.disabled = false;
+      renderLibrary(); // (as the server has it now: given them in another tab, or let go)
+      return;
+    }
+    text.value = ""; form.hidden = true; open.hidden = false;
+    addingJob(id, { needLyrics: false, lyricsError: null, done: false, status: "running", stage: "Lining the lyrics up with the voice" });
+    watchJob(id, "separate");
+  };
+  go.disabled = true; acts.append(go); form.append(text, acts); box.append(open, form);
+  return box;
 }
 // An added song, opened from the panel: it leaves the panel, which closes.
 function openAdded(id) {
@@ -101,6 +147,7 @@ async function cancelJob(id) {
   const j = adding.get(id);
   if (!j) return;
   if (j.status === "error") return dropJob(id);
+  if (j.needLyrics) { await fetch(`/api/jobs/${id}/cancel`, { method: "POST" }).catch(() => {}); return dropJob(id); } // in without them (told first: the list read again after it)
   addingJob(id, { stopping: true });
   try {
     const r = await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
@@ -163,9 +210,12 @@ function watchJob(id, kind, forSong) {
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
     } else if (j.status !== "cancelled") {
-      const { name, status, stage, progress, ahead, cancel, error, songId } = j;
+      const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError } = j;
       skip = status === "queued" && ahead > 1 ? 4 : 0;
-      addingJob(id, { ...(name ? { name } : {}), status, stage, progress, ahead, cancel, error, songId, done: status === "done" });
+      const arrive = songId && !adding.get(id)?.arrived; // in the library (meta written): unfolds there, its lyrics still coming
+      addingJob(id, { ...(name ? { name } : {}), status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
+        done: status === "done" && !needLyrics, ...(arrive ? { arrived: true } : {}) });
+      if (arrive) songArrived(songId);
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
@@ -185,7 +235,9 @@ function watchJob(id, kind, forSong) {
           }
         }
       }
-      if (kind === "separate" && j.status === "done") songArrived(j.songId);
+      if (kind === "separate" && j.status === "done" && j.songId) { // its lyrics: in Practice or Info, if it's open there
+        if ((typeof K !== "undefined" && K.song?.id === j.songId) || (typeof infoShown !== "undefined" && infoShown?.id === j.songId)) lyricsDone(j.songId, !j.lyricsError);
+      }
     }
   }, 700);
 }

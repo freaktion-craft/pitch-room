@@ -76,11 +76,49 @@ def _new_job(kind: str, name: str = "") -> dict:
     return job
 
 
+# A song being added: its stems and the rest (SPLIT_SHARE of its progress), then its lyrics found and timed (the rest;
+# _lyrics_phase). Their progress is shown as one (_shown).
+SPLIT_SHARE = 0.8
+
+
+def _shown(job: dict) -> float:
+    """How far a job is, for the page: a song being added's as a whole (its lyrics' part after its stems'); stopped
+    where its lyrics were while they're wanted (needLyrics)."""
+    if job["kind"] != "separate":
+        return job["progress"]
+    if job.get("needLyrics"):
+        return SPLIT_SHARE + (1 - SPLIT_SHARE) * job.get("stoppedAt", 0.0)
+    if job["status"] == "done":
+        return 1.0
+    if job.get("phase") == "lyrics":  # (pasted after it stopped: on from there, not back)
+        base = job.get("lyricsFrom", 0.0)
+        return SPLIT_SHARE + (1 - SPLIT_SHARE) * (base + (1 - base) * job["progress"])
+    return SPLIT_SHARE * job["progress"]
+
+
+def _settled(job: dict):
+    """A song stopped wanting its lyrics (needLyrics) that doesn't any more: deleted, or given them another way (its
+    Info page, or Practice without them). Under _jobs_lock."""
+    if not job.get("needLyrics") or not job.get("songId"):
+        return
+    folder = os.path.join(LIB, job["songId"])
+    try:
+        data = _load_json(os.path.join(folder, "lyrics.json")) if os.path.isfile(os.path.join(folder, "lyrics.json")) else None
+    except ValueError:
+        data = None
+    if not os.path.isfile(os.path.join(folder, "meta.json")) or (data and (data.get("lines") or data.get("dropped"))):
+        job["needLyrics"] = False
+
+
 def active_jobs() -> list[dict]:
-    """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress."""
+    """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress;
+    and those stopped wanting their lyrics pasted (needLyrics), till they are or that's let go."""
     with _jobs_lock:
-        jobs = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
-        return [{k: j[k] for k in ("id", "kind", "status", "stage", "progress", "cancel", "name", "link")} for j in sorted(jobs, key=lambda j: j["started"])]
+        for j in _jobs.values():
+            _settled(j)
+        jobs = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics"))]
+        return [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError")}
+                | {"progress": _shown(j)} for j in sorted(jobs, key=lambda j: j["started"])]
 
 
 def get_job(job_id: str) -> dict | None:
@@ -89,11 +127,12 @@ def get_job(job_id: str) -> dict | None:
         job = _jobs.get(job_id)
         if job is None:
             return None
-        out = {k: v for k, v in job.items() if k != "log"} | {"log": job["log"][-6:]}
+        _settled(job)
+        out = {k: v for k, v in job.items() if k != "log"} | {"log": job["log"][-6:], "progress": _shown(job)}
         if "pkgs" in job:
             out["pkgs"] = dict(job["pkgs"])  # (a copy: the install's thread goes on changing it)
         if job["kind"] == "separate" and job["status"] == "queued" and job_id in _line:
-            out["ahead"] = sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate")
+            out["ahead"] = sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate" or _jobs.get(j, {}).get("front"))
         return out
 
 
@@ -114,6 +153,9 @@ def cancel_job(job_id: str) -> str:
         job = _jobs.get(job_id)
         if job is None or job["kind"] not in ("separate", "key"):
             raise ValueError("Unknown job.")
+        if job.get("phase") == "lyrics":  # the song's in: its lyrics' part isn't stopped, and one wanting them is let go
+            job["needLyrics"] = False
+            return job["status"]
         if job["status"] in ("queued", "running"):
             job["cancel"] = True
         return job["status"]
@@ -135,7 +177,13 @@ def _turn(job):
     """Hold _work_lock for a job, once the jobs that asked before it have had theirs (a lock alone would let any of the
     waiting ones in next), waiting in short steps so a job cancelled while queued stops at once."""
     with _jobs_lock:
-        _line.append(job["id"])
+        if job.get("front"):  # a song just added's lyrics (_lyrics_phase): next, after the one working and the others of theirs
+            at = 1
+            while at < len(_line) and _jobs.get(_line[at], {}).get("front"):
+                at += 1
+            _line.insert(min(at, len(_line)), job["id"])
+        else:
+            _line.append(job["id"])
     try:
         while True:
             _check(job)
@@ -1395,10 +1443,59 @@ def _pipeline(job, src: dict, model_name: str):
         shutil.rmtree(folder, ignore_errors=True)
         raise
     _want_lookup(song_id)
+    _lyrics_phase(job, song_id, None)
+
+
+def _lyrics_phase(job, song_id: str, how):
+    """A song being added's last part, once it's in the library: its lyrics found and timed (start_lyrics, how as
+    there), that job's steps shown as this one's (phase "lyrics"). None found, or it failed: this one stops there
+    (needLyrics, with why in lyricsError when it failed), for them to be pasted (resume_lyrics) or let go (cancel_job)."""
+    _set(job, phase="lyrics", stage="Finding the lyrics" if how is None else "Lining the lyrics up with the voice", progress=0.0, needLyrics=False, lyricsError=None)
     try:
-        start_lyrics(song_id, None, low=bool(job.get("low")))
-    except Exception as e:  # noqa: BLE001  (the song is in; its lyrics can be found from Practice)
-        print(f"Couldn't start finding library/{song_id}'s lyrics: {e}", file=sys.stderr)
+        lid = start_lyrics(song_id, how, low=bool(job.get("low")), front=True)
+    except Exception as e:  # noqa: BLE001  (pasted ones that can't be used, a job already running: said, and pasted again)
+        _set(job, needLyrics=True, lyricsError=str(e) or e.__class__.__name__, stoppedAt=job.get("lyricsFrom", 0.0))
+        return
+    seen = 0.0
+    while True:
+        lj = get_job(lid)
+        if lj is None or lj["status"] not in ("queued", "running"):
+            break
+        seen = lj["progress"]
+        with _jobs_lock:
+            waiting = lid in _line and _line[0] != lid
+        _set(job, stage="Waiting to find the lyrics" if waiting else lj["stage"], progress=seen)
+        time.sleep(0.4)
+    base = job.get("lyricsFrom", 0.0)
+    held = base + (1 - base) * seen  # where it stopped, of its lyrics' part
+    if not os.path.isfile(os.path.join(LIB, song_id, "meta.json")):
+        return  # deleted meanwhile: nothing to ask for
+    if lj is None or lj["status"] != "done":
+        _set(job, needLyrics=True, lyricsError=(lj or {}).get("error") or "That didn’t work.", stoppedAt=held)
+    elif not _lyrics_data(_song_dir(song_id)):
+        _set(job, needLyrics=True, lyricsError=None, stoppedAt=held)  # none found that's sung in it
+
+
+def resume_lyrics(job_id: str, text) -> str:
+    """A song added whose lyrics weren't found (needLyrics): them pasted in, timed as the rest of its adding. Returns
+    its status (running again)."""
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("Paste the lyrics, a line of the song to each line.")
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is not None:
+            _settled(job)
+        if job is None or job["kind"] != "separate" or not job.get("needLyrics") or job["status"] != "done":
+            raise ValueError("Unknown job.")
+        job.update(status="running", needLyrics=False, lyricsError=None, lyricsFrom=job.get("stoppedAt", 0.0))
+
+    def body():
+        try:
+            _lyrics_phase(job, job["songId"], {"text": text})
+        finally:
+            _set(job, status="done", progress=1.0, stage="Done")
+    threading.Thread(target=body, daemon=True).start()
+    return "running"
 
 
 # ---------- lyrics ----------
@@ -1860,7 +1957,7 @@ def get_lyrics(song_id: str) -> dict:
     return {"lyrics": data, "job": running["id"] if running and running["status"] in ("queued", "running") else None}
 
 
-def start_lyrics(song_id: str, how, again: bool = False, low: bool = False) -> str:
+def start_lyrics(song_id: str, how, again: bool = False, low: bool = False, front: bool = False) -> str:
     """Find a song's lyrics and line them up with its voice, in the background (half a minute at most on a GPU; the
     first time, Whisper's model is downloaded too). how: None to look on LRCLIB by the title, {"id": n} for an entry
     picked from search_lyrics, {"text": …} for lyrics pasted in. again: the lines the song has, lined up again as the
@@ -1918,6 +2015,7 @@ def start_lyrics(song_id: str, how, again: bool = False, low: bool = False) -> s
     job["songId"] = song_id
     job["upgrade"] = again
     job["low"] = low  # a playlist's song's: at low priority too
+    job["front"] = front  # a song just added's: next in line (_turn)
     _lyrics_jobs[song_id] = _run(job, work)
     return _lyrics_jobs[song_id]
 
