@@ -296,7 +296,7 @@ const specLevel = new Float32Array(SPEC.n);
 function drawSpectrum() {
   const bars = $("#spec").children;
   if (!ac || !micOn) {
-    if (specOn) { for (const b of bars) b.style.transform = ""; specLevel.fill(0); specOn = false; }
+    if (specOn) { for (const b of bars) b.style.height = ""; specLevel.fill(0); specOn = false; }
     return;
   }
   if (!specBins) {
@@ -310,7 +310,7 @@ function drawSpectrum() {
     for (let i = specBins[k]; i < Math.max(specBins[k] + 1, specBins[k + 1]); i++) mx = Math.max(mx, specData[i]);
     const v = Math.min(1, Math.max(0, (mx - SPEC.floor) / SPEC.span));
     specLevel[k] = v > specLevel[k] ? v : specLevel[k] * 0.85 + v * 0.15;
-    bars[k].style.transform = `scaleY(${(0.15 + 0.85 * specLevel[k]).toFixed(3)})`;
+    bars[k].style.height = `${(4 + 12 * specLevel[k]).toFixed(1)}px`; // its height, not a scale, so its ends stay round
   }
   specOn = true;
 }

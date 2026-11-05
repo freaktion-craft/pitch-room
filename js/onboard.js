@@ -82,7 +82,6 @@ const OB_SCOPED = new Set(["allow", "mic", "colour", "song", "tools"]); // the s
 function obLeave(step, next) {
   if (step === "allow") OB.allowStep = false;
   if (step === "tools") { OB.toolsStep = false; clearTimeout(OB.dlT); }
-  if (step === "colour") clearInterval(OB.artT);
   if (step === "song") OB.songStep = false;
   if (step === "mic") { OB.pick?.close(); OB.micStep = false; clearInterval(OB.quietT); $("#obMicQuiet").hidden = true; }
   if (OB_SCOPED.has(step) && !OB_SCOPED.has(next)) { obMicOff(); OB.scope = false; } // the mic on from one to the other
@@ -301,107 +300,9 @@ async function obMic(next, back) {
 // A colour: a book of them (as the intro's pages were), open at yours, both pages in it. The right page turned on to
 // the next one, the left back to the one before (or the arrow keys); a bookmark at its edge riffles there, a page at a
 // time, quicker. The page it's open at is your colour, from as it starts to turn. A click while it's turning is let be,
-// so the pages never pile up.
-// each colour's spread, as a magazine's: the left page its number, big, in Geist Serif; the right a famous painting
-// (all old enough to be anyone's) drawn small in characters, singing, and under it its name and the joke. Only for the
-// look of it (a screen reader's told the colour's name instead)
-const MAG = {
-  white: ["Mona Lisa", "humming, probably", String.raw`
-   .-"""-.
-  / .---. \
- | ( - - ) |
- |  \ ~ /  | ♪
-  \ /'-'\ /
-  /_______\
-`],
-  coral: ["The Scream", "hitting the high C", String.raw`
-    .---.
-   ( o o )
-  /|  O  |\
- | |     | |  AAA
-  \ \___/ /
-    |   |
- ~~~~~~~~~~~~
-`],
-  orange: ["Sunflowers", "the backing vocals", String.raw`
- \|/  \|/  \|/
--(@)--(@)--(@)-
- /|\  /|\  /|\
-   \   |   /
-    \  |  /
-   .-------.
-   |_______|
-`],
-  amber: ["Girl with a Pearl Earring", "in-ear monitor", String.raw`
-    .----.
-   /  __  \_
-  | (o)    _)
-  |   <   |
-   \  ~  o  <
-    '---'
-    /   \
-`],
-  green: ["The Creation of Adam", "passing the mic", String.raw`
-
- __             __
-(__\_____ _____/__)
-    \____) (____/
-         ·  ·
-
-`],
-  teal: ["The Great Wave", "a big crescendo", String.raw`
-       _.-~~-._
-     .'  .-.   '.
-    /  .'   '.   \
- ~~~/ ~~~~~~~ \~~~~
- ~~~~~~~~~~~~~~~~~~
-   __    ^    __
- ~~~~~~~~~~~~~~~~~~
-`],
-  blue: ["The Starry Night", "all vibrato", String.raw`
- *  .  @@@  .  *
-   ~~~~@@@~~~~
- .  ~~~~~~~~~  *
-  A   ~~~~~~   .
- /|\    .  *
-/_|_\_^_^_^_^_^_
-`],
-  violet: ["American Gothic", "the duet", String.raw`
-  .----.  .----.
- ( o  o )( o  o )
- |  --  ||  __  |
-  \____/  \____/
- Ψ |  |    |  |
- | |  |    |  |
-`],
-  pink: ["The Birth of Venus", "enters on cue", String.raw`
-      .-.
-     (o o)
-     /|~|\
-    / | | \
-  .--'---'--.
- (___________)
- ~~~~~~~~~~~~~~
-`],
-};
-// and each one moving a little, a frame at a time (t), on the page it's open at: from its drawing, frame t of it
-const roll = (a, t) => a.split("\n").map((l) => (/^[ ~]+$/.test(l) && l.includes("~~") ? l.slice(t % l.length) + l.slice(0, t % l.length) : l)).join("\n"); // the sea along
-const MAG_MOVE = {
-  white: (a, t) => a.replace("♪", t % 2 ? "♫" : " ♪").replace("( - - )", t % 7 === 6 ? "( o o )" : "( - - )"), // humming; a look now and then
-  coral: (a, t) => a.replace("AAA", ["AAA ", "AAAA", "AAAAA"][t % 3]).replace("|  O  |", t % 2 ? "|  o  |" : "|  O  |"),
-  orange: (a, t) => (t % 2 ? a.replace(/\\\|\//g, "-|-").replace(/\/\|\\/g, "-|-") : a), // the petals going round
-  amber: (a, t) => a.replace("o  <", t % 3 === 2 ? "*  <" : "o  <").replace("(o)", t % 8 === 7 ? "(-)" : "(o)"),
-  green: (a, t) => a.replace("·  ·", ["·  ·", " ·· ", " ** "][t % 3]), // nearly
-  teal: roll,
-  blue: (a, t) => a.replace(/[*+]/g, (c, i) => ((i + t) % 3 === 0 ? "+" : "*")).replace(/[.']/g, (c, i) => ((i + t) % 2 ? "'" : ".")),
-  violet: (a, t) => (t % 9 === 8 ? a.replace("( o  o )(", "( -  - )(") : t % 9 === 4 ? a.replace(")( o  o )", ")( -  - )") : a),
-  pink: (a, t) => roll(a, t).replace("|~|", t % 2 ? "|-|" : "|~|"),
-};
-function obMag(k, side) { // a page of the spread of colour k: "l" or "r"
-  const [title, joke, art] = MAG[k] || ["", "", ""];
+// so the pages never pile up. The pages bare: their colour alone (a screen reader's told the colour's name).
+function obMag(k, side) { // a page of the spread of colour k: "l" or "r" (empty: what's on a page as it turns)
   const m = el("span", "mag " + side); m.setAttribute("aria-hidden", "true");
-  if (side === "l") return m; // the left page: its colour alone
-  else m.append(el("span", "mag-art", art.replace(/^\n|\n$/g, "")), el("span", "mag-title", tr(title)), el("span", "mag-joke", tr(joke)));
   return m;
 }
 const BOOK = { page: 460, riffle: 420, gap: 110, span: 760 }; // a page's turn alone, and each of several; the starts of several about gap apart, over span at most (ms)
@@ -465,12 +366,6 @@ function obColour() {
     if (d) { e.preventDefault(); go(at + d); }
   };
   paint();
-  clearInterval(OB.artT); let t = 0; // the open page's drawing moving, while the step's up
-  OB.artT = setInterval(() => {
-    const k = keys[at], art = R.querySelector(".mag-art"), base = MAG[k]?.[2];
-    if (!art || !base || turning) return; // still while a page turns over it
-    t++; art.textContent = (MAG_MOVE[k] || ((a) => a))(base.replace(/^\n|\n$/g, ""), t);
-  }, 420);
 }
 
 // The song tools, coming: a box each for what's being got (its name, what it's for, how it's going: from the install's
@@ -633,7 +528,7 @@ async function obSink(cover, art, panel) {
   }
   const dpr = devicePixelRatio || 1, cv = Object.assign(document.createElement("canvas"), { className: "ob-dust" });
   cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; $("#welcome").append(cv);
-  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.font = `${c + 1}px ui-monospace, SFMono-Regular, Menlo, monospace`; g.textAlign = "center"; g.textBaseline = "middle";
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.font = `${c + 1}px ${MONO}`; g.textAlign = "center"; g.textBaseline = "middle";
   const t0 = performance.now();
   cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FIN.toChars, easing: "ease-in", fill: "forwards" }); // the picture going under its characters
   let splashed = false;
@@ -804,6 +699,9 @@ function obFirstPaint() {
 }
 
 // ---------- characters on the GPU ----------
+// the characters' typeface: a monospace one by name on each system before the generic one, which on Windows in Korean
+// (or Japanese) draws \ as a currency sign (₩, ¥)
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace';
 // A grid of characters drawn by the GPU (WebGL 2), for the picture's outlines and the water: thousands of marks in one
 // draw, the CPU only saying for each cell what's in it (a small texture, cols × rows, RGBA: the mark, its alpha, its
 // alpha in the song's cover's colour, and which of two colours), the marks drawn once into an atlas. null where WebGL 2
@@ -858,7 +756,7 @@ function obGrid(canvas, marks, { center = false } = {}) {
     if (key === atlasKey) return;
     atlasKey = key;
     const w = Math.ceil(cell * dpr), c = Object.assign(document.createElement("canvas"), { width: w * list.length, height: w }), x = c.getContext("2d");
-    x.fillStyle = "#fff"; x.font = `${cell * dpr}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+    x.fillStyle = "#fff"; x.font = `${cell * dpr}px ${MONO}`;
     x.textAlign = center ? "center" : "left"; x.textBaseline = center ? "middle" : "top";
     list.forEach((ch, i) => x.fillText(ch, i * w + (center ? w / 2 : 0), center ? w / 2 : 0));
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, atlasT);
@@ -890,7 +788,7 @@ const obGridOf = (canvas, marks, opts) => (canvas._grid !== undefined ? canvas._
 // steps, stopped as they end; still with reduced motion; not at all in a narrow window, which has no picture.
 // spark: the heavier marks mixed into the edges (share of them: heavy); fill: a leaf's marks from its edge inward
 // change: the share of edge marks picked again each frame; wave: how fast the light runs along them (radians a second)
-const ART = { cell: 8, spark: "@#%&$*+", heavy: 0.4, fill: "+=-::..", depth: 7, change: 0.006, wave: 0.6, leaf: 0.4, run: false, gen: 0 }; // leaf: the leaves' marks, quieter than the flowers'
+const ART = { cell: 12, spark: "@#%&$*+", heavy: 0.4, fill: "+=-::..", depth: 7, change: 0.006, wave: 0.6, leaf: 0.4, run: false, gen: 0 }; // leaf: the leaves' marks, quieter than the flowers'
 async function obArt() {
   const box = $("#obVisual"), cv = $("#obAscii"), img = box.querySelector("img");
   if (getComputedStyle(box).display === "none") return;
@@ -953,7 +851,7 @@ async function obArt() {
     const { g, glr, cols, rows, kind, ch, line, deep, cells } = grid, t = (now - t0) / 1000, css = getComputedStyle(root);
     const ink = css.getPropertyValue("--ink").trim(), voice = css.getPropertyValue("--voice").trim(); // the colour as it's chosen meanwhile
     if (glr) cells.fill(0);
-    else { g.clearRect(0, 0, W, H); g.font = `${ART.cell}px ui-monospace, SFMono-Regular, Menlo, monospace`; g.textBaseline = "top"; }
+    else { g.clearRect(0, 0, W, H); g.font = `${ART.cell}px ${MONO}`; g.textBaseline = "top"; }
     const wash = OB.wash, band = WASH_BAND * 0.6; // washing away: how far behind the front a mark lasts
     if (wash) { // the photo going under: as it was below the front, fading out over the band behind it
       const y = obWashY(W / 2, now);
@@ -1015,13 +913,14 @@ function obWashEnd() {
 // How loud it is now, as water in characters (as the intro's picture is drawn): a still surface, faint, and drops
 // falling in its middle while there's sound, bigger and harder the louder, their waves going out over it, crossing,
 // fading out toward the sides and settling. Each cell's mark is how the light catches the water there (its slope), so
-// crests and troughs both show, not only a ring's edge. Too loud (the input clipping), the water goes red a moment. Not
+// crests and troughs both show, not only a ring's edge. Not
 // what's in the sound, only that it's coming and how much. Muted, not allowed, or not on yet: the water still.
 // Started as the mic's step comes, on through the colour's, stopped after; one at a time (OB.scopeGen).
 // The water's on a grid coarser than the characters' (scale of them a side), so its waves are broad swells rather than
 // fine rings; it's drawn smooth between its points and between its steps. rate: its steps a second; damp: what a wave
-// keeps a step; edge: its points by the sides that take a wave in; light: how much a slope catches it
-const RIPPLE = { cell: 10, scale: 3, rate: 20, damp: 0.961, edge: 3, light: 1.5 };
+// keeps a step; edge: its points by the sides that take a wave in; light: how much a slope catches it. Its marks (and
+// the picture's, ART.cell) 12 px: smaller, they're specks, not characters; its points as far apart as they were (30 px)
+const RIPPLE = { cell: 12, scale: 2.5, rate: 20, damp: 0.961, edge: 3, light: 1.5 };
 // the cover's colour at each of the water's marks (cols × rows), from its small grid (obTint), smooth between its points
 function tintMap(t, cols, rows) {
   const out = new Array(cols * rows), bytes = new Uint8Array(cols * rows * 4), q = (v) => Math.round(v / 6) * 6; // (a few colours, many times each)
@@ -1034,13 +933,23 @@ function tintMap(t, cols, rows) {
   }
   return { id: t.id, n: cols, m: rows, colours: out, bytes };
 }
+// a mark of the water, as the picture's edges are drawn (obArt): still water and the faintest light on it in dots (. :),
+// a wave lit in a line along it, the way it runs there (- | / \: across its slope, gx, gy), a crest catching more of the
+// light in ~ where it runs across; how bright, by its alpha alone (a heavier mark for the brightest filled a lit band in)
+function waterMark(v, gx, gy, ramp) {
+  if (v < 0.22) return ramp[v < 0.11 ? 0 : 1];
+  const ax = Math.abs(gx), ay = Math.abs(gy);
+  if (ay > 2.2 * ax) return v > 0.5 ? "~" : "-"; // the slope down the page: the wave runs across it
+  if (ax > 2.2 * ay) return "|"; // across the page: down it
+  return gx * gy > 0 ? "/" : "\\"; // (down the page is +y: a slope down and to the right runs up to the right)
+}
 function obScope() {
   const box = $("#obVisual"), cv = $("#obScope"), run = ++OB.scopeGen, { cell, scale: S } = RIPPLE, ramp = ".:-=+*#%@", root = document.documentElement;
   OB.scope = true;
-  let g = null, W = 0, H = 0, cols = 0, rows = 0, sc = 0, sr = 0, buf = null, level = 0, last = 0, since = 9, acc = 0, hotUntil = 0;
+  let g = null, W = 0, H = 0, cols = 0, rows = 0, sc = 0, sr = 0, buf = null, level = 0, last = 0, since = 9, acc = 0;
   let tintAt = null; // the cover's colour at each mark, for the cover there now (tintMap)
-  let cur = null, prev = null, keep = null, shade = null; // the water's height now and a step before; what a wave keeps a step; the light on it
-  const glr = obGridOf(cv, ramp + "~", { center: true }); // on the GPU if it can be, else the 2D canvas
+  let cur = null, prev = null, keep = null, shade = null, gxs = null, gys = null; // the water's height now and a step before; what a wave keeps a step; the light on it; its slope across and down
+  const glr = obGridOf(cv, ramp + "~|/\\", { center: true }); // on the GPU if it can be, else the 2D canvas
   let cells = null;
   const size = () => {
     const r = box.getBoundingClientRect(), d = devicePixelRatio || 1;
@@ -1049,6 +958,7 @@ function obScope() {
     cols = Math.floor(W / cell); rows = Math.floor(H / cell); sc = Math.ceil(cols / S) + 3; sr = Math.ceil(rows / S) + 3;
     cells = new Uint8Array(cols * rows * 4);
     cur = new Float32Array(sc * sr); prev = new Float32Array(sc * sr); keep = new Float32Array(sc * sr); shade = new Float32Array(sc * sr);
+    gxs = new Float32Array(sc * sr); gys = new Float32Array(sc * sr);
     for (let y = 0; y < sr; y++) for (let x = 0; x < sc; x++) { // less by the sides, so a wave goes into them rather than back
       const e = Math.min(1, Math.min(x, y, sc - 1 - x, sr - 1 - y) / RIPPLE.edge);
       keep[y * sc + x] = RIPPLE.damp * (0.8 + 0.2 * e);
@@ -1075,10 +985,9 @@ function obScope() {
     if (an) {
       if (!buf || buf.length !== an.fftSize) buf = new Float32Array(an.fftSize);
       an.getFloatTimeDomainData(buf);
-      let sum = 0, peak = 0;
-      for (const v of buf) { sum += v * v; const m = Math.abs(v); if (m > peak) peak = m; }
+      let sum = 0;
+      for (const v of buf) sum += v * v;
       lv = Math.max(0, Math.min(1, (20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9) + 58) / 48)); // −58 dB nothing, −10 dB all
-      if (peak > 0.97) hotUntil = now + 900;
     }
     level += (lv - level) * (lv > level ? 0.45 : 0.07); // up at once, down slowly
     OB.level = an ? level : 0; // for the mic's step: nothing heard a while (obMic)
@@ -1099,17 +1008,19 @@ function obScope() {
     for (acc += dt * RIPPLE.rate; acc >= 1; acc--) step();
     // the light on it, at each point, between the last two steps (so it moves smoothly though it steps 20 times a second)
     const f = acc, L = RIPPLE.light, h = (i) => prev[i] + (cur[i] - prev[i]) * f;
-    for (let y = 1; y < sr - 1; y++) for (let x = 1, i = y * sc + 1; x < sc - 1; x++, i++)
-      shade[i] = (h(i - 1) - h(i + 1) + h(i - sc) - h(i + sc)) * L + Math.abs(h(i)) * 0.2; // from the top left; a crest or trough a little lit
+    for (let y = 1; y < sr - 1; y++) for (let x = 1, i = y * sc + 1; x < sc - 1; x++, i++) {
+      const gx = h(i - 1) - h(i + 1), gy = h(i - sc) - h(i + sc);
+      shade[i] = (gx + gy) * L + Math.abs(h(i)) * 0.2; gxs[i] = gx; gys[i] = gy; // from the top left; a crest or trough a little lit
+    }
     const css = getComputedStyle(root);
     if (glr) cells.fill(0);
-    else { g.clearRect(0, 0, W, H); g.font = `${cell}px ui-monospace, SFMono-Regular, Menlo, monospace`; g.textBaseline = "middle"; g.textAlign = "center"; }
+    else { g.clearRect(0, 0, W, H); g.font = `${cell}px ${MONO}`; g.textBaseline = "middle"; g.textAlign = "center"; }
     // coming in from the picture (obWash): none below the wave's front, and above it more of it the further behind
     // the front, so the water comes over the picture rather than a curtain coming down
     const washed = OB.wash, fronts = washed ? Array.from({ length: cols }, (_, x) => obWashY(x * cell + cell / 2, now)) : null;
     // going (obFinale's drain): none above the wave's front coming down, coming back below it over a band
     const drain = OB.drain, drains = drain ? Array.from({ length: cols }, (_, x) => obDrainY(x * cell + cell / 2, now)) : null;
-    const ink = now < hotUntil ? css.getPropertyValue("--bad").trim() : css.getPropertyValue("--voice").trim();
+    const ink = css.getPropertyValue("--voice").trim();
     if (!glr) g.fillStyle = ink;
     // the song's cover over it (obTint), each mark the colour of the cover where it is; how much of it, as it comes and goes
     const tint = OB.tint;
@@ -1119,26 +1030,26 @@ function obScope() {
       if (tint.off && tk <= 0) OB.tint = null;
       if (!tintAt || tintAt.id !== tint.id || tintAt.n !== cols || tintAt.m !== rows) tintAt = tintMap(tint, cols, rows);
     }
-    const hot = now < hotUntil;
     const ox = (W - cols * cell) / 2 + cell / 2, oy = (H - rows * cell) / 2 + cell / 2;
+    const at = (f, i, tx, ty) => (f[i] * (1 - tx) + f[i + 1] * tx) * (1 - ty) + (f[i + sc] * (1 - tx) + f[i + sc + 1] * tx) * ty; // between the four points round a mark
     for (let y = 0; y < rows; y++) {
       const v0 = 1 + y / S, yi = Math.floor(v0), ty = v0 - yi;
       for (let x = 0; x < cols; x++) {
         const u0 = 1 + x / S, xi = Math.floor(u0), tx = u0 - xi, i = yi * sc + xi; // the light between the four points round it
-        const s = (shade[i] * (1 - tx) + shade[i + 1] * tx) * (1 - ty) + (shade[i + sc] * (1 - tx) + shade[i + sc + 1] * tx) * ty;
+        const s = at(shade, i, tx, ty);
         const v = Math.min(1, Math.max(0, 0.1 + s));
         if (v < 0.04) continue; // a slope turned from the light: nothing
         let cover = fronts ? Math.min(1, (fronts[x] - (oy + y * cell)) / WASH_BAND) : 1;
         if (drains) cover *= Math.min(1, Math.max(0, (oy + y * cell - drains[x]) / 60));
         if (cover <= 0) continue;
-        const a = (v < 0.12 ? 0.14 : 0.2 + 0.8 * v) * cover, mark = ramp[Math.min(ramp.length - 1, Math.floor(v * ramp.length))];
+        const a = (v < 0.12 ? 0.14 : 0.2 + 0.8 * v) * cover, mark = waterMark(v, at(gxs, i, tx, ty), at(gys, i, tx, ty), ramp);
         if (glr) { // its mark, its alpha, and its alpha in the cover's colour (the still water clearer: the cover shows on it)
           const j = (y * cols + x) * 4;
-          cells[j] = Math.min(ramp.length - 1, Math.floor(v * ramp.length)) + 1; cells[j + 1] = Math.round(a * 255);
+          cells[j] = glr.index.get(mark); cells[j + 1] = Math.round(a * 255);
           cells[j + 2] = Math.round(Math.min(1, Math.max(a, 0.2 + 0.8 * Math.min(1, v * 1.6)) * cover) * 255);
           continue;
         }
-        if (tk > 0 && !hot) { // the cover's colour, over the colour it had while it comes in (or goes)
+        if (tk > 0) { // the cover's colour, over the colour it had while it comes in (or goes)
           if (tk < 1) { g.fillStyle = ink; g.globalAlpha = a * (1 - tk); g.fillText(mark, ox + x * cell, oy + y * cell); }
           g.fillStyle = tintAt.colours[y * cols + x]; g.globalAlpha = Math.max(a, 0.2 + 0.8 * Math.min(1, v * 1.6)) * cover * tk; // the still water clearer: the cover shows on it
         } else { if (tk > 0) g.fillStyle = ink; g.globalAlpha = a; }
@@ -1151,7 +1062,7 @@ function obScope() {
         const put = (yy, m, al) => { const r = Math.floor((yy - (oy - cell / 2)) / cell); if (r < 0 || r >= rows) return; const j = (r * cols + x) * 4; if (cells[j + 1] < al) { cells[j] = m; cells[j + 1] = al; cells[j + 2] = al; } };
         put(crest[x] - 4, Math.sin((x * cell + cell / 2) * 0.7 + now / 90) > 0.3 ? ramp.length + 1 : 4, 191); put(crest[x] - 15, 3, 77);
       }
-      glr.draw({ cols, rows, ox: ox - cell / 2, oy: oy - cell / 2, cell, cells, tint: tk > 0 ? tintAt.bytes : null, tintKey: tintAt?.id, c0: cssRgb(ink), tk: hot ? 0 : tk });
+      glr.draw({ cols, rows, ox: ox - cell / 2, oy: oy - cell / 2, cell, cells, tint: tk > 0 ? tintAt.bytes : null, tintKey: tintAt?.id, c0: cssRgb(ink), tk });
       requestAnimationFrame(frame);
       return;
     }

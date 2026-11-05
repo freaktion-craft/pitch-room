@@ -83,9 +83,11 @@ html.desktop-mac::before { content: ""; position: fixed; top: 0; left: 0; right:
 /* the mic's spectrum: one bar per band of the voice range, as tall as that band is loud */
 .spec { display: inline-flex; align-items: center; gap: var(--space-half); height: 16px; overflow: hidden; width: 0; margin-left: calc(var(--space-2) * -1); opacity: 0;
   transition: width var(--duration-slow) var(--ease), margin-left var(--duration-slow) var(--ease), opacity var(--duration-base); }
-.mic.on .spec { width: 33px; margin-left: 0; opacity: 1; } /* 7 bars of 3 px, 2 px apart */
+.mic.on .spec { width: 26px; margin-left: 0; opacity: 1; } /* 7 bars of 2 px, 2 px apart */
 .spec i { flex: none; }
-.spec i { width: 3px; height: 16px; border-radius: var(--radius-pill); background: var(--dim); transform: scaleY(0.15); }
+/* each a tick, 4 px quiet up to 16 px loud (drawSpectrum sets its height: a bar scaled down instead squashed its round
+   ends into a dot) */
+.spec i { width: 2px; height: 4px; border-radius: var(--radius-pill); background: var(--dim); }
 .mic.on .spec i { background: var(--voice); } /* what it hears, in your accent colour */
 /* a panel under the button in the bar that opened it (the songs being added, why the mic didn't start) */
 header { position: relative; }
@@ -187,6 +189,12 @@ html.welcome #boot, html.asking #welcome { display: none; }
 #welcome .leaf { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: 0 50%; transform-style: preserve-3d; } /* its faces turn with it, so the back shows once it's over */
 #welcome .leaf > .half { left: 0; width: 100%; backface-visibility: hidden; }
 #welcome .leaf > .verso { transform: rotateY(180deg); } /* a page's back (its front, .recto); not .back, the back link's */
+/* each page a pixel over the spine, so a turning one's soft edge (antialiased, as it's in 3D) lies over the page beside it,
+   not over the black under the book: no line down the middle. A recto's spine side is its left; a verso's, turned over,
+   its right */
+#welcome .leaf > .recto { left: -1px; width: calc(100% + 1px); }
+#welcome .leaf > .verso { width: calc(100% + 1px); }
+#welcome .book > .half:first-child { width: calc(50% + 1px); }
 #welcome .shade { position: absolute; inset: 0; background: #000; opacity: 0; }
 #welcome .word { position: absolute; z-index: 1; left: 0; top: 0; transform-origin: 0 0; white-space: nowrap; color: var(--ink); visibility: hidden;
   font: 400 44px/1 var(--font-brand); letter-spacing: -0.01em; } /* the header's .brand, large: it's drawn down to it */
@@ -194,10 +202,9 @@ html.welcome #boot, html.asking #welcome { display: none; }
 /* The first steps (onboard()): one at a time in a column in the middle of the black, the name already at its place in
    the header; each rises in as the one before fades. The overlay takes the clicks meanwhile (the page under it is out of reach). */
 #welcome.onboarding { pointer-events: auto; }
-/* Beside the intro (html… #welcome.ob-pic, onboard()), the page's column's right half (.app's 1440 px, so it ends where
-   the page does on a wide screen), to the window's top and bottom: the picture. It goes once the intro's left, the steps
-   after it on their own. Narrow windows have none. */
-.ob-visual { position: absolute; z-index: 2; top: 0; right: calc(100% - 100vw + max(0px, (100vw - 1440px) / 2)); bottom: 0; left: 50%; background: var(--bg); overflow: hidden; display: none; } /* over the scrollbar's kept room too */
+/* Beside the intro (html… #welcome.ob-pic, onboard()), the window's right half to its top, right and bottom edges: the
+   picture. It goes once the intro's left, the steps after it on their own. Narrow windows have none. */
+.ob-visual { position: absolute; z-index: 2; top: 0; right: calc(100% - 100vw); bottom: 0; left: 50%; background: var(--bg); overflow: hidden; display: none; } /* over the scrollbar's kept room too */
 .ob-visual > img, .ob-visual > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* the photo, a little soft under its characters (a touch larger, so the blur's edge stays outside); grain over it all,
    a noise drawn by the browser (feTurbulence), moved a few times a second as film's is */
@@ -295,7 +302,7 @@ html.welcome #boot, html.asking #welcome { display: none; }
 .ob-meter i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--voice); }
 /* the colours as a book (obColour), open at yours: both its pages in it, its name in the corner, a page turned over the
    spine as the intro's are (a leaf, its faces the colours either side, darker as it stands up); tabs under it, a colour each */
-.ob-book { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(320px, 100%); aspect-ratio: 16 / 9; margin-top: var(--space-2); perspective: 1100px; }
+.ob-book { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(380px, 100%); aspect-ratio: 16 / 9; margin-top: var(--space-2); perspective: 1100px; }
 .ob-book .pg { padding: 0; border: 0; background: var(--c); cursor: pointer; }
 .ob-book .pg.l { border-radius: 6px 0 0 6px; }
 .ob-book .pg.r { border-radius: 0 6px 6px 0; }
@@ -315,13 +322,6 @@ html.welcome #boot, html.asking #welcome { display: none; }
 /* its bookmarks, as a dictionary's: a colour each, down the book's edges from under its pages (--i of --n), those still to
    come out at the right, those turned past at the left, the one it's open at the furthest out; out a little more under the
    pointer. Going over with the page as it turns */
-/* a page's type (obMag): a magazine's, in Geist Serif (mag-: .word's the welcome's) */
-.mag { position: absolute; inset: 0; display: grid; padding: 10px 12px 11px; color: oklch(0.18 0 0 / 0.82); text-align: left; pointer-events: none; overflow: hidden; }
-.mag.l { padding-right: 20px; padding-left: 19px; } /* clear of the spine's shade; the number's ink 20 px in from the side and the top */
-.mag.r { grid-template-rows: 1fr auto auto; padding-left: 18px; }
-.mag-art { align-self: center; justify-self: center; white-space: pre; font: 8px/1.05 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0; }
-.mag-title { font: 400 11px/1.15 var(--font-brand); margin-top: var(--space-1); }
-.mag-joke { font: 400 8.5px/1.3 var(--font-brand); opacity: 0.72; }
 .ob-tabs { position: absolute; inset: 0; pointer-events: none; }
 .ob-tabs button { --out: 9px; position: absolute; top: calc(var(--i) * 100% / var(--n) + 1px); height: calc(100% / var(--n) - 2px); width: 24px; left: calc(100% - 24px + var(--out));
   padding: 0; border: 0; border-radius: 0 3px 3px 0; background: var(--c); pointer-events: auto; cursor: pointer; transition: left 280ms var(--ease), --out 0s; }
