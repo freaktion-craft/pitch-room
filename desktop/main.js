@@ -17,6 +17,7 @@ const RELEASES = "freaktion-craft/pitchroom-releases"; // public, the installers
 const PORTS = [5278, 5298]; // a range of its own, so a copy started from the repo (5178…) is never taken for this one
 const BG = "#0e0e0e"; // --bg, oklch(0.165 0 0): the window before the page paints
 const win32 = process.platform === "win32";
+const TITLEBAR = 32; // Windows: the window's buttons' strip over the page, px (--titlebar, base.css)
 
 // Pitchroom WIP: run from the repo with --wip (npm run wip, or the "Pitchroom WIP" shortcut, scripts/wip-shortcut.ps1):
 // the window on the copy run from the repo, as in a browser (launch.py with the project's .venv: localhost 5178 on, the
@@ -166,7 +167,10 @@ function createWindow() {
     title: app.name, backgroundColor: BG, show: false, autoHideMenuBar: true,
     ...(WIP ? { icon: path.join(__dirname, "build", "icon-win.png") } : {}), // (a release has its own, in the exe)
     // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
-    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" } : {}),
+    // Windows: no title bar of the system's either, its three buttons drawn over the page's top right corner, on the
+    // page's black, as tall as the strip along the top that moves the window (html.desktop-win, base.css)
+    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" }
+      : win32 ? { titleBarStyle: "hidden", titleBarOverlay: { color: "#00000000", symbolColor: "#ebebeb", height: TITLEBAR } } : {}), // (clear: on what's there, the first steps' picture too)
     // DevTools in development only: a released app has no way into its page
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });

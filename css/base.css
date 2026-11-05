@@ -55,6 +55,15 @@ html.desktop-mac #app > header .brand { margin-left: -15px; } /* its left edge u
 html.desktop-mac .brand .egg { left: -9px; right: -9px; } /* the egg's box, kept inside the window */
 html.desktop-mac #app > header > * { -webkit-app-region: no-drag; }
 html.desktop-mac::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--space-6); z-index: 100; -webkit-app-region: drag; }
+/* On Windows (html.desktop-win): no title bar of the system's either; its three buttons over the page's top right
+   corner (titleBarOverlay, desktop/main.js), on a strip along the top as tall (--titlebar) that moves the window, as
+   the header's empty part does, the page starting under it. */
+html.desktop-win { --titlebar: 32px; }
+html.desktop-win .app { padding-top: calc(var(--titlebar) + var(--space-3)); }
+html.desktop-win #app > header { -webkit-app-region: drag; }
+html.desktop-win #app > header > * { -webkit-app-region: no-drag; }
+html.desktop-win::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--titlebar); z-index: 100; -webkit-app-region: drag;
+  background: color-mix(in oklab, var(--bg) 45%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); } /* frosted, so the buttons read on anything under it (a picture, the page scrolled up) */
 .brand .egg { position: absolute; inset: calc(-1 * var(--space-2)) calc(-1 * var(--space-3)); z-index: -1; overflow: hidden;
   pointer-events: none; } /* square: a page's edge */
 .brand .egg > i { position: absolute; top: 0; bottom: 0; width: 50%; }
@@ -358,7 +367,8 @@ html.welcome #boot, html.asking #welcome { display: none; }
 .ob-float { position: absolute; width: 88px; height: 88px; margin: -44px 0 0 -44px; will-change: transform; }
 .ob-float i { display: block; width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: var(--surface); box-shadow: 0 14px 34px oklch(0 0 0 / 0.5), 0 0 0 0.5px var(--fg-12); }
 .ob-float img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.ob-lib { margin-top: var(--space-2); }
+.ob-lib { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); } /* the question, then the button Settings has for it */
+.ob-lib[hidden] { display: none; }
 #obLibState { font-variant-numeric: tabular-nums; }
 /* what the tools' download is bringing, a box each (obTools): its name, what it's for, how it's going; waiting dim,
    coming (in or being set up) a light running under it, in with a tick; the song being split by them last, the width of two */

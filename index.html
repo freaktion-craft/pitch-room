@@ -49,8 +49,10 @@ const ONBOARD_EVERY_STEP = false;
    going), without touching what's installed: their download only pretended, about 20 s, after which they count as in
    and the song's added for real. false for a release. */
 const ONBOARD_NO_TOOLS = false;
-/* the desktop app on macOS draws no title bar: its window's buttons sit alone in the corner (desktop/main.js, base.css) */
+/* the desktop app on macOS draws no title bar: its window's buttons sit alone in the corner; on Windows they're over
+   the page's top right corner, on a strip of its own (desktop/main.js, base.css) */
 if (window.pitchroom && window.pitchroom.platform === "darwin") document.documentElement.classList.add("desktop-mac");
+if (window.pitchroom && window.pitchroom.platform === "win32") document.documentElement.classList.add("desktop-win");
 /* EMPTY_LIBRARY: the library drawn as if no song had been added (drawLibrary), so a first time can be seen; the songs
    stay as they are, and come back with false. While it's being made. */
 const EMPTY_LIBRARY = false;
@@ -407,7 +409,7 @@ const EMPTY_LIBRARY = false;
       <p class="ob-small" id="obGetsNote" hidden>The song tools split songs into voice and band and read their melody and lyrics.</p>
       <p class="ob-small ob-err" id="obSongErr" hidden></p>
       <!-- or a library from the beta, in the desktop app (it picks the folder): its covers float on the water as they come in (obLib) -->
-      <p class="ob-small ob-lib" id="obLib" hidden><span id="obLibWhy">Have a library already?</span> <button class="ob-link" id="obLibGo" type="button" title="The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own">Choose folder</button></p>
+      <p class="ob-small ob-lib" id="obLib" hidden><span id="obLibWhy">Have a library already?</span><button class="btn sm" id="obLibGo" type="button" title="The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own">Choose folder</button></p>
       <p class="ob-small" id="obLibState" role="status" hidden></p>
       <div class="ob-acts"><button class="btn primary" id="obSongGo" type="button" hidden></button><button class="btn ghost" id="obSongAgain" type="button" hidden>Another link</button></div>
     </section>
