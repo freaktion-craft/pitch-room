@@ -147,7 +147,7 @@ function tipAt() {
   return vertical ? 268 : 96;
 }
 const showTip = () => {
-  document.getElementById("tipText").textContent = ko ? "다운로드 중이에요. 여기서 열 수 있어요" : "Downloading. Open it from here";
+  document.getElementById("tipText").textContent = ko ? "다운로드 중…" : "Downloading…";
   tip.classList.add("on");
   clearTimeout(tipTimer);
   tipTimer = setTimeout(() => tip.classList.remove("on"), 12000);
