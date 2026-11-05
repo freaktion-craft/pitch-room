@@ -46,7 +46,7 @@
    one's name, how it's going (or how many are ahead of it in line), and a button to stop it; at its top right, Add
    song, which opens the Add song form in the panel, from any page */
 #jobsBtn .ring { width: var(--icon-sm); height: var(--icon-sm); transform: rotate(-90deg); }
-#jobsBtn.idle .ring, #jobsBtn:not(.idle) > .ico { display: none; } /* idle, a + in the ring's place */
+#jobsBtn.idle, #jobsBtn > .ico { display: none; } /* there only while songs are being added, or are in (till they're seen): the ring */
 #jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
 #jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */

@@ -54,7 +54,9 @@ function paintJobs() {
   arc.style.strokeDasharray = `${!jobs.length ? 0 : btn.classList.contains("err") ? 100 : Math.max(6, waiting ? 25 : p * 100)} 100`;
   arc.style.visibility = jobs.length ? "" : "hidden"; // empty: just the track, no dot of a round end
   if (!btn.querySelector(":scope > .ico")) btn.append(icon("plus"));
-  btn.classList.toggle("idle", !jobs.length); // nothing being added: a + (the panel adds a song) in the ring's place
+  const wasIdle = btn.classList.contains("idle");
+  btn.classList.toggle("idle", !jobs.length); // nothing added: not there (CSS); one sent, it comes in
+  if (wasIdle && jobs.length && !stillMotion()) btn.animate([{ transform: "scale(0.5)", opacity: 0 }, { transform: "scale(1.12)", opacity: 1, offset: 0.55 }, { transform: "none", opacity: 1 }], { duration: 380, easing: "ease-out" });
   const pct = Math.round(p * 100);
   say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : need.length ? "Lyrics needed" : ready.length > 1 ? "{n} songs added"
     : ready.length ? "Song added" : failed ? "Couldn’t add a song" : "Add songs", { n: live.length || ready.length, pct }, "title");
