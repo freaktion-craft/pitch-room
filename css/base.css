@@ -44,15 +44,16 @@ a { color: inherit; text-decoration: none; }
 header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-18); } /* the chips 8 px apart, as buttons side by side are elsewhere */
 .brand { font: 400 var(--text-xl)/1 var(--font-brand); letter-spacing: -0.01em; }
 /* The sections, right of the name: Library (its song pages and Practice in it too) and Lab, the one you're in lit (route()) */
-/* words, a size up from the buttons', no fill; the one you're in in ink with a stroke under it, drawn out from its
-   middle as you come to it */
-.tabs { display: flex; gap: var(--space-2); margin: 0 auto 0 var(--space-5); }
-.tab.btn { position: relative; padding: 0 var(--space-2); background: transparent; color: var(--muted); font-size: var(--text-lg); transition: color var(--duration-fast); }
+/* words, a size up from the buttons', no fill; the one you're in in ink, and one stroke under it that slides over to
+   the other as you go there (paintTabLine), fading where it is while you're in neither (Settings) */
+.tabs { position: relative; display: flex; gap: var(--space-2); margin: 0 auto 0 var(--space-5); }
+.tab.btn { background: transparent; color: var(--muted); font-size: var(--text-lg); transition: color var(--duration-fast); }
 .tab.btn:hover { background: transparent; color: var(--ink); }
-.tab.btn::after { content: ""; position: absolute; left: var(--space-2); right: var(--space-2); bottom: 2px; height: 2px; border-radius: var(--radius-pill);
-  background: var(--ink); transform: scaleX(0); transition: transform var(--duration-base) var(--ease); }
 .tab.btn.on { color: var(--ink); }
-.tab.btn.on::after { transform: none; }
+.tab-line { position: absolute; left: 0; bottom: 2px; width: 0; height: 2px; border-radius: var(--radius-pill); background: var(--ink); opacity: 0; pointer-events: none;
+  transition: transform 0.36s var(--ease), width 0.36s var(--ease), opacity var(--duration-fast); }
+.tab-line.on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .tab-line { transition: opacity var(--duration-fast); } }
 /* The name's easter egg (riffleName): clicked on the library, a box of colour behind it, its halves shrinking into the
    middle and growing out of it, one colour after another like pages flicked, back to black; the name doesn't move */
 .brand { position: relative; isolation: isolate; }

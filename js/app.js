@@ -149,6 +149,22 @@ async function openSongById(id) {
 }
 // #stems… for the library and its pages, #practice for Practice, which needs its song open, so a reload there (or
 // an old link to a page that's gone) lands in the library; #voice for Chest & head voice.
+// The stroke under the section you're in: one for both tabs, sliding from one to the other (its place and width, the
+// lit tab's word's); in neither, it fades where it is, and comes back in place, not sliding in from there. Placed again
+// as the tabs' size changes (the font in, the other language).
+const tabLine = el("i", "tab-line");
+$("#app > header .tabs").append(tabLine);
+function paintTabLine() {
+  const on = $("#app > header .tab.on");
+  if (!on) { tabLine.classList.remove("on"); return; }
+  const pad = parseFloat(getComputedStyle(on).paddingLeft) || 0, was = tabLine.classList.contains("on");
+  if (!was) tabLine.style.transition = "none"; // (appearing: where it's going, at once, then faded in)
+  tabLine.style.transform = `translateX(${on.offsetLeft + pad}px)`; tabLine.style.width = on.offsetWidth - pad * 2 + "px";
+  if (!was) { void tabLine.offsetWidth; tabLine.style.transition = ""; }
+  tabLine.classList.add("on");
+}
+new ResizeObserver(() => { const t = tabLine.style.transition; tabLine.style.transition = "none"; paintTabLine(); void tabLine.offsetWidth; tabLine.style.transition = t; })
+  .observe($("#app > header .tabs"));
 function route() {
   const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
   const singing = v === "practice" && K.on && P.song && K.song.id === P.song.id;
@@ -166,6 +182,7 @@ function route() {
   for (const [t, on] of [[$("#tabLib"), view === "stems" || view === "practice"], [$("#tabLab"), view === "voice"]]) { // the section you're in
     t.classList.toggle("on", on); if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
   }
+  paintTabLine();
   showMicSet(view === "settings"); showEars(false);
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
