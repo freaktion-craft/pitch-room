@@ -155,7 +155,7 @@ const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06
   shade: 0.32,
   open: 520, openEase: "cubic-bezier(0.45, 0, 0.2, 1)", close: 640, closeEase: "cubic-bezier(0.65, 0, 0.25, 1)", // open: the closed book over to the right as its cover starts to lift; close: the right page back to the middle at the end
   back: 620, backEase: "cubic-bezier(0.45, 0, 0.2, 1)", // back: the last page turned back over, behind the right one
-  melt: 700 }; // melt: the plain page fading into the black, the button left
+  melt: 800, meltBlur: 40 }; // melt: the plain page blurring and fading into the black, the button left
 const CLOSED = "translateX(-25%)"; // the book with its right half (its cover, then its right page) in the middle
 const ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "blue", "violet", "pink"]; // as the app has them (js/stage.js)
 async function riffle() {
@@ -224,8 +224,9 @@ async function riffle() {
   verso.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], b); // darker as it stands up
   await book.animate([{ transform: still ? CLOSED : "none" }, { transform: CLOSED }],
     { delay: still ? 0 : R.back * 0.3, duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" }).finished;
-  // and then the page itself into the page's black: the button on its own
-  book.children[1].animate([{ opacity: 1 }, { opacity: 0 }], { duration: still ? 1 : R.melt, easing: "ease-in-out", fill: "forwards" });
+  // and then the page itself into the page's black, blurring away as it goes: the button on its own
+  book.children[1].animate([{ opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: `blur(${R.meltBlur}px)` }],
+    { duration: still ? 1 : R.melt, easing: "ease-in-out", fill: "forwards" });
 }
 riffle();
 </script>
