@@ -598,63 +598,69 @@ function obFinaleCovers(step) {
 // dropped on the water beside as it's copied (a drop where it lands), riding its waves; in, Continue ends the steps,
 // the covers sinking into the water as a first song's does (obFinale). Its songs and settings are in the page then:
 // the settings not set here yet, and the library drawn again under the black.
-// size: a cover's side; gap: the spiral's spacing (√k × gap from the middle, a golden angle round: ~1.8 × gap apart);
-// max: covers at once (more, and the oldest goes under for the next); every: ms between several come in at once
-const FLOAT = { size: 88, gap: 62, max: 14, every: 140 };
-const obFloatAt = (k) => { const r = FLOAT.gap * Math.sqrt(k), a = k * 2.39996; return [r * Math.cos(a), r * Math.sin(a) * 0.85]; }; // (a little flat: a surface)
-function obFloatSlots() { // as many as fit in the panel, kept off its edges
-  const box = $("#obFloats"), hw = box.clientWidth / 2 - FLOAT.size * 0.7, hh = box.clientHeight / 2 - FLOAT.size * 0.7;
-  let n = 0;
-  while (n < FLOAT.max) { const [x, y] = obFloatAt(n); if (Math.abs(x) > hw || Math.abs(y) > hh) break; n++; }
-  return Math.max(1, n);
+// The covers on rings round the middle of the right half, the water gone from under them: RING.first on the inner,
+// RING.grow more on each one out, as many rings as fit; each cover blurring in as its song's copied, the rings turning,
+// each its own way (one, then the other) and the outer ones slower, as long as it goes on. More songs than places: the
+// oldest blurs out for the next. All in: they blur out, one after another, and the step says so (obRingsOut).
+// size: a cover's side; r0: the inner ring's radius; step: from a ring to the next; spin: the inner's turn, rad/s
+const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 92, spin: 0.16 };
+const FLOAT = { every: 140 }; // ms between several coming in at once
+function obRingOf(k) { // slot k: its ring, and its place round it
+  let r = 0, cap = RING.first;
+  while (k >= cap) { k -= cap; r++; cap += RING.grow; }
+  return { r, j: k, cap };
+}
+function obFloatSlots() { // the places on the rings that fit in the panel, kept off its edges
+  const box = $("#obFloats"), room = Math.min(box.clientWidth, box.clientHeight) / 2 - RING.size * 0.6;
+  let n = 0, r = 0, cap = RING.first;
+  while (RING.r0 + r * RING.step <= room) { n += cap; r++; cap += RING.grow; }
+  return Math.max(RING.first, n);
 }
 function obFloatAdd(id) {
   const box = $("#obFloats");
-  if (!OB.floatSlots && box.clientWidth) OB.floatSlots = obFloatSlots(); // (counted once the panel's there: none shown, any number)
-  const slot = OB.floatN++ % (OB.floatSlots || FLOAT.max);
+  if (!OB.floatSlots && box.clientWidth) OB.floatSlots = obFloatSlots(); // (counted once the panel's there)
+  const slot = OB.floatN++ % (OB.floatSlots || RING.first);
   const old = OB.floats.find((f) => f.slot === slot);
   if (old) obFloatOut(old);
-  const [x0, y0] = obFloatAt(slot), x = x0 + (Math.random() - 0.5) * 10, y = y0 + (Math.random() - 0.5) * 10;
+  const { r, j, cap } = obRingOf(slot);
   const el = Object.assign(document.createElement("span"), { className: "ob-float" }), i = el.appendChild(document.createElement("i")), img = i.appendChild(new Image());
   img.alt = ""; img.src = `/library/${id}/cover.jpg`;
-  Object.assign(el.style, { left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }); // (from the middle: with it as the panel opens, as the hero is)
-  const f = { el, src: img.src, x, y, slot, phase: Math.random() * 9, tilt: (Math.random() - 0.5) * 8, dy: 0, rot: 0 };
+  const f = { el, src: img.src, slot, ring: r, rad: RING.r0 + r * RING.step, ang: (j / cap) * Math.PI * 2 + r * 0.6, tilt: (Math.random() - 0.5) * 6 };
   OB.floats.push(f);
   img.decode().catch(() => {}).then(() => {
     if (!el.isConnected && !OB.floats.includes(f)) return;
     box.append(el); obFloatRun();
-    // dropped: from a little above, quicker as it comes, a drop in the water where it lands
-    i.animate([{ opacity: 0, transform: "translateY(-30px) scale(1.14)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: "cubic-bezier(0.5, 0, 0.75, 0.35)", fill: "backwards" })
-      .finished.then(() => OB.splashes.push({ x: box.clientWidth / 2 + x, y: box.clientHeight / 2 + y, rad: FLOAT.size / 2, amp: 2.4 }), () => {});
+    i.animate([{ opacity: 0, filter: "blur(14px)", transform: "scale(0.7)" }, { opacity: 1, filter: "blur(0)", transform: "none" }], { duration: 640, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "backwards" });
   });
 }
-function obFloatOut(f, now = false) { // under the water: down a little, fading, a small drop where it was
+function obFloatOut(f, now = false) { // blurred away where it is
   OB.floats = OB.floats.filter((g) => g !== f);
   if (now || !f.el.isConnected) return f.el.remove();
-  const box = $("#obFloats");
-  OB.splashes.push({ x: box.clientWidth / 2 + f.x, y: box.clientHeight / 2 + f.y, rad: FLOAT.size / 3, amp: 1.2 });
-  f.el.firstChild.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(10px) scale(0.94)" }], { duration: 520, easing: "ease-in", fill: "forwards" })
+  return f.el.firstChild.animate([{ opacity: 1, filter: "blur(0)", transform: "none" }, { opacity: 0, filter: "blur(14px)", transform: "scale(1.08)" }], { duration: 520, easing: "ease-in", fill: "forwards" })
     .finished.then(() => f.el.remove(), () => f.el.remove());
 }
-// riding the water: up and down with its height there, tipped with its slope, and a slow bob of its own
+// all in: the covers blur out, one after another round the rings, then the step says so
+function obRingsOut() {
+  const all = [...OB.floats].sort((a, b) => a.slot - b.slot), step = Math.min(60, 900 / Math.max(1, all.length));
+  return Promise.all(all.map((f, k) => new Promise((ok) => setTimeout(() => { const p = obFloatOut(f); (p || Promise.resolve()).then(ok, ok); }, stillMotion() ? 0 : k * step))));
+}
+// the rings turning: each cover where its ring has got to round the middle, a little tipped
 function obFloatRun() {
   if (OB.floatRaf) return;
-  const box = $("#obFloats");
+  const box = $("#obFloats"), t0 = performance.now();
   const frame = (now) => {
     if (!OB.floats.length) { OB.floatRaf = 0; return; }
-    const W = box.clientWidth, H = box.clientHeight, t = now / 1000;
+    const t = stillMotion() ? 0 : (now - t0) / 1000;
     for (const f of OB.floats) {
-      const w = OB.scope ? OB.waterAt?.(W / 2 + f.x, H / 2 + f.y) : null;
-      f.dy += ((w ? -w.h * 3 : 0) - f.dy) * 0.2;
-      f.rot += ((w ? Math.max(-6, Math.min(6, (w.gx - w.gy) * 9)) : 0) - f.rot) * 0.15;
-      f.el.style.transform = `translateY(${(f.dy + Math.sin(t * 1.4 + f.phase) * 1.6).toFixed(2)}px) rotate(${(f.tilt + f.rot + Math.sin(t * 0.9 + f.phase) * 1.2).toFixed(2)}deg)`;
+      const w = (f.ring % 2 ? -1 : 1) * RING.spin / (1 + f.ring * 0.45), a = f.ang + w * t;
+      f.el.style.transform = `translate(${(Math.cos(a) * f.rad).toFixed(2)}px, ${(Math.sin(a) * f.rad).toFixed(2)}px) rotate(${f.tilt.toFixed(2)}deg)`;
     }
     OB.floatRaf = requestAnimationFrame(frame);
   };
   OB.floatRaf = requestAnimationFrame(frame);
 }
-function obLibEnd() { // the steps over (or the library put back): its covers off, its following stopped
-  clearTimeout(OB.libT); OB.lib = null;
+function obLibEnd() { // the steps over (or the library put back): its covers off, its following stopped, the water back
+  clearTimeout(OB.libT); OB.lib = null; $("#welcome").classList.remove("ob-lib");
   for (const f of [...OB.floats]) obFloatOut(f, true);
   OB.floatN = 0; OB.floatSlots = 0;
 }
@@ -665,6 +671,7 @@ async function obLibGo(paint) {
   const st = r ? await r.json().catch(() => ({})) : {};
   obLibEnd();
   OB.lib = { seen: 0, st: r?.ok ? st : { status: "error", error: st.error || "The server didn’t answer properly." } };
+  if (r?.ok) $("#welcome").classList.add("ob-lib"); // (the water goes: the covers on their rings in its place)
   if (r?.ok) obLibPoll(paint, st); else paint();
 }
 async function obLibPoll(paint, st) {
@@ -678,6 +685,10 @@ async function obLibPoll(paint, st) {
   if (st.status === "done") { // (the tools known before it's taken as done, so it's never painted done without them)
     if (st.songs || st.settings) obLibIn();
     lib.tools = !!(await obStatus())?.installed; // not in: on to their download, as with a first song (obSong)
+    if (OB.lib !== lib) return;
+    await new Promise((ok) => setTimeout(ok, fresh.length * FLOAT.every + 700)); // (the last ones in, and seen a moment)
+    if (OB.lib !== lib) return;
+    await obRingsOut(); // blurred away, then the step says it's in
     if (OB.lib !== lib) return;
   }
   lib.st = st;
