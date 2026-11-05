@@ -34,9 +34,9 @@ function paintPix(bar, p, going) {
   bar.setAttribute("aria-valuenow", Math.round(p * 100));
 }
 // The drawer's songs in sections, each shown only while it has any: Pending (waiting their turn, or stopped wanting
-// their lyrics pasted: orange, the next going on meanwhile), Processing, Stopped (failed), Done; in each, in the order
-// they were sent.
-const JOB_SECS = [["pending", "Pending"], ["processing", "Processing"], ["stopped", "Stopped"], ["done", "Done"]];
+// their lyrics pasted: orange, the next going on meanwhile), Processing, Stopped (failed); in each, in the order they
+// were sent. One that's in leaves the drawer for the library (leaveDrawer, songArrived).
+const JOB_SECS = [["pending", "Pending"], ["processing", "Processing"], ["stopped", "Stopped"]]; // (one in leaves the drawer: leaveDrawer)
 // (Pending: waiting behind another song still going; the first, with none before it, is Processing from the start)
 function jobSec(j, behind) { return j.done ? "done" : j.needLyrics ? "pending" : j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
 function jobSection(key, name) {
@@ -130,7 +130,7 @@ function paintJobs() {
     const sec = jobSection(key, name), rows = sec.querySelector(".jobs-rows");
     const want = [...adding].filter(([id]) => secOf.get(id) === key).map(([id]) => rowOf.get(id));
     if (want.length !== rows.children.length || want.some((r, i) => rows.children[i] !== r)) want.forEach((r) => rows.append(r));
-    sec.hidden = !want.length; sec.querySelector(".n").textContent = want.length;
+    sec.hidden = !want.length && !rows.querySelector(".leaving"); sec.querySelector(".n").textContent = want.length; // (kept while one goes out of it)
   }
 }
 // A row's name changed (the link, its video's title, the record's): the new one wiped in from the left over the old,
@@ -262,23 +262,38 @@ function dropJob(id) {
 }
 // A song that's been added unfolds into the list where it sorts, fading in; the page stays where it is (it opens from
 // the list). The first one unfolds the whole list from the note that stood in for it.
+// A song in, lyrics and all: its row goes out of the drawer, blurring away as its place closes; then the song comes
+// into the library (songArrived)
+function leaveDrawer(id) {
+  const row = document.getElementById("job-" + id);
+  clearInterval(pollers[id]); delete pollers[id];
+  adding.delete(id);
+  if (!row || stillMotion() || !row.getClientRects().length) { row?.remove(); paintJobs(); return Promise.resolve(); }
+  row.classList.add("leaving"); paintJobs();
+  row.style.overflow = "hidden";
+  return row.animate([{ opacity: 1, filter: "blur(0)", height: row.offsetHeight + "px" }, { opacity: 0, filter: "blur(8px)", offset: 0.6 }, { opacity: 0, filter: "blur(8px)", height: "0px" }],
+    { duration: 520, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" }).finished.catch(() => {}).then(() => { row.remove(); paintJobs(); });
+}
+// ...in New first, its card blurring in, then its row in the list unfolding, a beat after
 async function songArrived(songId) {
   const box = $("#sLib"), had = !!box.querySelector(".row"), from = box.offsetHeight, searchHidden = $("#sSearchBox").hidden;
   await renderLibrary();
   paintJobs(); // the panel names it as the library does
   if (!(view === "stems" && stemsPage === "lib") || stillMotion()) return;
-  const node = had ? libRows.get(songId) : box;
-  if (node?.isConnected) unfold(node, had ? 0 : from);
+  const card = $("#sNewTrack").querySelector(`[data-id="${songId}"]`), node = had ? libRows.get(songId) : box;
+  if (card?.getClientRects().length) card.animate([{ opacity: 0, filter: "blur(10px)", transform: "scale(0.92)" }, { opacity: 1, filter: "blur(0)", transform: "none" }],
+    { duration: 600, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "backwards" });
+  if (node?.isConnected) unfold(node, had ? 0 : from, card ? 260 : 0);
   if (searchHidden && !$("#sSearchBox").hidden) $("#sSearchBox").animate([{ opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0)" }], { duration: 480, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
 }
-function unfold(node, from = 0) {
+function unfold(node, from = 0, delay = 0) {
   const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)", cs = getComputedStyle(node), h = node.offsetHeight;
   const pad = from ? [cs.paddingTop, cs.paddingBottom] : ["0px", "0px"];
   node.style.overflow = "hidden";
   node.animate([{ height: from + "px", minHeight: "0px", paddingTop: pad[0], paddingBottom: pad[1] },
-    { height: h + "px", minHeight: "0px", paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom }], { duration: 400, easing: ease })
+    { height: h + "px", minHeight: "0px", paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom }], { duration: 400, delay, easing: ease, fill: "backwards" })
     .finished.then(() => { node.style.overflow = ""; paintFade(); }).catch(() => {});
-  node.animate([{ opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0)" }], { duration: 560, delay: 80, easing: ease, fill: "backwards" });
+  node.animate([{ opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0)" }], { duration: 560, delay: delay + 80, easing: ease, fill: "backwards" });
 }
 function watchJob(id, kind, forSong) {
   if (pollers[id]) return;
@@ -318,7 +333,7 @@ function watchJob(id, kind, forSong) {
       const arrive = status === "done" && !needLyrics && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
       addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), etaAt, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
         done: status === "done" && !needLyrics, ...(arrive ? { arrived: true } : {}) });
-      if (arrive) songArrived(songId);
+      if (arrive) leaveDrawer(id).then(() => songArrived(songId));
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
