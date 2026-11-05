@@ -184,7 +184,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Import timing from a file (or paste it: Ctrl+V)": "파일에서 타이밍 불러오기 (또는 Ctrl+V로 붙여넣기)", "This song’s edited lines, to the clipboard or a file": "이 곡에서 고친 줄을 클립보드나 파일로",
   "Zoom": "확대/축소", "Zoom (Ctrl+wheel)": "확대/축소 (Ctrl+휠)",
   "Zoom in": "확대", "Zoom out": "축소", "Undo": "되돌리기", "Undo (Ctrl+Z)": "되돌리기 (Ctrl+Z)", "Reset line": "줄 되돌리기", "Put the selected line back as it was timed": "고른 줄을 원래 타이밍으로", "Done": "완료",
-  "Timeline": "타임라인", "Click or drag to move through the song · T leaves a note here": "누르거나 끌어서 곡을 옮겨 다녀요 · T를 누르면 여기에 메모를 남겨요",
+  "Timeline": "타임라인", "Click or drag to move through the song · T leaves a note here": "누르거나 끌어서 곡을 옮겨 다녀요 · T를 누르면 여기에 메모를 남겨요", "Click or drag to move through the song": "누르거나 끌어서 곡을 옮겨 다녀요",
   "What’s off here?": "여기 뭐가 이상해요?", "Copy notes": "메모 복사", "Clear notes": "메모 지우기", "Clear this song’s notes": "이 곡의 메모 지우기", "Click again to clear": "한 번 더 누르면 지워요", "Note": "메모", "Delete note": "메모 삭제",
   "Turn one on and sing in it. A few notes and vowels of each, the same notes in both.": "하나를 켜고 그 소리로 불러요. 각각 음 몇 개, 모음 몇 개씩, 두 쪽 다 같은 음으로.",
   "While it’s on, what you sing is learned as chest voice": "켜 있는 동안 부르는 소리를 진성으로 배워요", "While it’s on, what you sing is learned as head voice": "켜 있는 동안 부르는 소리를 가성으로 배워요",

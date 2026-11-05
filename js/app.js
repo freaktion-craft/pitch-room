@@ -441,7 +441,7 @@ document.addEventListener("keydown", (e) => {
   if (view === "practice" && K.on) {
     if (e.repeat && /^(Space|KeyL|KeyR|KeyM)$/.test(e.code)) { e.preventDefault(); return; }
     const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
-      Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: !e.repeat ? () => dropNote(e) : null,
+      Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: S.dev && !e.repeat ? () => dropNote(e) : null,
       BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }
   }

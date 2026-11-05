@@ -405,7 +405,13 @@ function notesText() {
   return [`Notes from Pitchroom's Practice: ${[m.artist, m.title].filter(Boolean).join(" – ")} · id ${m.id}`,
     ...NOTE.list.map((n) => `${tc(n.t)} · ${n.text || "(no words)"}${n.line ? ` · line showing: "${n.line}"` : ""}`)].join("\n");
 }
-function paintCopy() { $("#kMarks").disabled = !NOTE.list.length && !(S.dev && K.marks.length); $("#kNotesClear").disabled = !NOTE.list.length; }
+// The notes (T, the pins, copying and clearing them) are a developer's, there with Developer tools on (S.dev) only:
+// off, they're kept, out of sight, and back as they were once it's on again
+function paintCopy() {
+  $("#kMarks").hidden = $("#kNotesClear").hidden = $("#kPins").hidden = !S.dev;
+  say($("#kTl"), S.dev ? "Click or drag to move through the song · T leaves a note here" : "Click or drag to move through the song", null, "title");
+  $("#kMarks").disabled = !NOTE.list.length && !(S.dev && K.marks.length); $("#kNotesClear").disabled = !NOTE.list.length;
+}
 // Clear: the song's notes off, for a new round (asked twice; the server keeps the old round beside them, set_notes)
 function clearNotes() {
   const b = $("#kNotesClear"), calm = () => { b.classList.remove("arm"); say(b, "Clear this song’s notes", null, "title"); };
@@ -1264,7 +1270,8 @@ function initSing() {
   $("#auroraOn").checked = S.aurora;
   $("#auroraOn").onchange = (e) => { S.aurora = e.target.checked; save(); };
   $("#devTools").checked = S.dev;
-  $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); };
+  $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); if (!S.dev) showNote(null); paintCopy(); };
+  paintCopy(); // (as they're set from the start, before any song)
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
   micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); syncErr = ""; paintSync(); }); // Sync's is the new input's
   micPick.set([{ v: "", t: "System default" }], "");
