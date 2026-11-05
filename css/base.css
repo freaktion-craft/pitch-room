@@ -160,6 +160,9 @@ label.set-row { cursor: pointer; }
 /* Opening the page: the bar of a job in progress, in the middle, its white part sweeping from side to side while the
    library loads; the page meanwhile hidden, so nothing shows half-made. Then boot() brings the page in. */
 #boot { position: fixed; inset: 0; z-index: var(--z-boot); display: none; place-items: center; pointer-events: none; }
+/* a new key or tempo being made (paintBusy): the song's controls dimmed and out of reach (inert), the key's and tempo's not */
+:is(#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl) { transition: opacity var(--duration-base); }
+html.song-busy :is(#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl) { opacity: 0.4; cursor: default; }
 html.booting #boot { display: grid; }
 html.booting #app { visibility: hidden; }
 #boot .bar { width: 160px; }
@@ -349,6 +352,14 @@ html.welcome #boot, html.asking #welcome { display: none; }
 .ob-hero b, .ob-hero small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ob-hero b { font-weight: var(--weight-medium); font-size: var(--text-lg); line-height: 24px; color: var(--ink); }
 .ob-hero small { color: var(--muted); font-size: var(--text-sm); line-height: 18px; }
+/* a library brought in (obLib): each song's cover dropped on the water as it's copied, riding its waves */
+.ob-floats { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.ob-floats[hidden] { display: none; }
+.ob-float { position: absolute; width: 88px; height: 88px; margin: -44px 0 0 -44px; will-change: transform; }
+.ob-float i { display: block; width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: var(--surface); box-shadow: 0 14px 34px oklch(0 0 0 / 0.5), 0 0 0 0.5px var(--fg-12); }
+.ob-float img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ob-lib { margin-top: var(--space-2); }
+#obLibState { font-variant-numeric: tabular-nums; }
 /* what the tools' download is bringing, a box each (obTools): its name, what it's for, how it's going; waiting dim,
    coming (in or being set up) a light running under it, in with a tick; the song being split by them last, the width of two */
 .ob-boxes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; width: 100%; max-width: 480px; margin-top: var(--space-2); }

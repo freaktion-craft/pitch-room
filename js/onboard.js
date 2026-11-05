@@ -5,7 +5,8 @@
 // Then the page comes in. Each can be passed over ("Skip for now", "Later"), and all of it is in the settings after.
 // What's chosen is kept as the settings keep it (S.mic, S.echo, the accent). The song tools (≈3–4 GB) start
 // downloading at "Get started" unless they're in: a song given before they're ready waits, and starts once they are.
-const OB = { stream: null, src: null, an: null, pending: null, scope: false, scopeGen: 0, level: 0, micState: "", micStep: false, quietT: 0, wash: null, washT: 0, left: null, mic: null, tip: null, tipT: 0 };
+const OB = { stream: null, src: null, an: null, pending: null, scope: false, scopeGen: 0, level: 0, micState: "", micStep: false, quietT: 0, wash: null, washT: 0, left: null, mic: null, tip: null, tipT: 0,
+  splashes: [], floats: [], floatN: 0, lib: null }; // splashes: drops for the water to take (obScope); floats: a library's covers on it (obFloatAdd)
 const $$ = (s) => [...document.querySelectorAll(s)];
 
 function onboard(start = 0) { // start: a step's name (data-step) or place; resolves with { at } (a step's name) if left for Settings from it, else once through
@@ -24,9 +25,10 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
     const go = async (i, out) => {
       if (moving || i === at) return;
       moving = true;
-      // through, from the song's tools with its cover out in the right half: the steps' end played first (obFinale)
-      const finale = i >= steps.length && steps[at]?.dataset.step === "tools" && !$("#obHero").hidden;
-      if (finale) await obFinale();
+      // through, from the song's tools with its cover out in the right half (or from the song's step with a library
+      // brought in, its covers on the water): the steps' end played first (obFinale)
+      const finale = i >= steps.length && obFinaleCovers(steps[at]?.dataset.step);
+      if (finale) await obFinale(finale);
       // going on to allowing the mic when it's allowed already (asked here before, or in the browser): on past it
       if (steps[i]?.dataset.step === "allow" && i > at && at >= 0 && !ONBOARD_EVERY_STEP && (await obMicAccess()) === "granted") i++;
       const was = steps[at], pic = $("#obVisual"), w = $("#welcome");
@@ -44,10 +46,11 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
         was.hidden = true;
       }
       at = i; moving = false;
-      if (i >= steps.length) { box.hidden = true; OB.tint = null; OB.drain = null; w.classList.remove("ob-finale"); obHeroOut(); obWashEnd(); obArtStop(); obMicTipOff(); return done(out); }
+      if (i >= steps.length) { box.hidden = true; OB.tint = null; OB.drain = null; w.classList.remove("ob-finale"); obHeroOut(); obLibEnd(); obWashEnd(); obArtStop(); obMicTipOff(); return done(out); }
       const s = steps[i];
       s.hidden = false;
       if (s.dataset.step !== "song" && s.dataset.step !== "tools") obHeroOut(); // the found song's cover: beside its steps only
+      $("#obFloats").hidden = s.dataset.step !== "song"; // a library's covers: beside the song's step only
       if (i === 0) { obWashEnd(); w.classList.add("ob-pic"); obArt(); } // the picture beside the intro, and only there
       if (OB_SCOPED.has(s.dataset.step) && !OB.scope) { w.classList.add("ob-scope"); obScope(); } // beside the mic's step and the colour's, what it hears
       if (s.dataset.step !== "mic" && OB_SCOPED.has(s.dataset.step) && !OB.an && OB.open && OB.micState === "live") OB.open(); // come back to: the mic on again for it, if it was
@@ -57,7 +60,7 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
         if (k === i) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
       });
       [...s.children].forEach((c, k) => rise(c, k * 70, 8, 6)); // its parts in turn, top to bottom, as the library's do
-      enter[s.dataset.step](() => go(i + 1), () => go(i - 1));
+      enter[s.dataset.step](() => go(i + 1), () => go(i - 1), () => go(steps.length)); // (and through: a library brought in needs no tools)
       // the link field's caret ready; no button focused for you (Chrome would ring it as if Tab had got there)
       requestAnimationFrame(() => s.querySelector("input[type=url]")?.focus({ preventScroll: true }));
     };
@@ -495,13 +498,14 @@ async function obTint(art) {
 // it to the middle; the cover turned to characters (its colours, its light as their weight), which sink into the water,
 // a drop where it was; the water going straight after as it came, a wave down it; then the page comes in (welcome()).
 const FIN = { open: 720, toChars: 320, sink: 900, drainAfter: 420, drain: 640, cell: 6 }; // drain: the water's going, quicker than its coming in
-async function obFinale() {
-  const w = $("#welcome"), panel = $("#obVisual"), hero = $("#obHero"), cover = hero.querySelector(".cover"), ease = "cubic-bezier(0.65, 0, 0.2, 1)";
+// covers: what sinks ([{el, art}]: obFinaleCovers)
+async function obFinale(covers) {
+  const w = $("#welcome"), panel = $("#obVisual"), hero = $("#obHero"), ease = "cubic-bezier(0.65, 0, 0.2, 1)";
   w.classList.add("ob-finale");
   $("#onboard").animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: "ease-in", fill: "forwards" });
   await panel.animate([{ left: "50%" }, { left: "0%" }], { duration: FIN.open, easing: ease, fill: "forwards" }).finished.catch(() => {});
-  for (const n of hero.querySelectorAll("b, small")) n.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" });
-  const sunk = obSink(cover, OB.first?.art || hero.querySelector("img").src, panel);
+  if (!hero.hidden) for (const n of hero.querySelectorAll("b, small")) n.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" });
+  const sunk = obSink(covers, panel);
   await new Promise((r) => setTimeout(r, FIN.toChars + FIN.drainAfter)); // sinking a moment, then the water going at once
   OB.drain = { t0: performance.now(), H: panel.getBoundingClientRect().height };
   await new Promise((r) => setTimeout(r, FIN.drain)); // the page in as soon as it's gone (the last of the sinking under it)
@@ -511,30 +515,38 @@ function obDrainY(x, now) { // the front of the water's going: as its coming in'
   const { t0, H } = OB.drain, p = Math.min(1, (now - t0) / FIN.drain), e = 1 - (1 - p) * (1 - p), A = 16; // off at once, easing to the bottom
   return -3 * A + (H + 6 * A + 60) * e + A * Math.sin(x / 70 + p * 7) + 0.4 * A * Math.sin(x / 23 - p * 11);
 }
-// the cover as characters, then sunk into the water: each a mark of the picture there (its colour; brighter, a heavier
-// mark), going down a little and fading, each at its own moment, as a drop falls in the water where the cover was
-async function obSink(cover, art, panel) {
-  const r = cover.getBoundingClientRect(), c = FIN.cell, n = Math.floor(r.width / c), ramp = " .:-=+*#%@";
-  const img = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = art?.startsWith("/") || !art ? art : "/api/art?url=" + encodeURIComponent(art); });
-  const pr = panel.getBoundingClientRect();
-  const splash = () => { OB.splash = { x: r.left + r.width / 2 - pr.left, y: r.top + r.height / 2 - pr.top, rad: r.width / 2 }; }; // (obScope drops it in)
-  if (!img) { cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, fill: "forwards" }); splash(); return; }
-  const sm = Object.assign(document.createElement("canvas"), { width: n, height: n }).getContext("2d", { willReadFrequently: true });
-  sm.drawImage(img, 0, 0, n, n);
-  const d = sm.getImageData(0, 0, n, n).data, bits = [];
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const i = (y * n + x) * 4, lum = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
-    const top = Math.max(d[i], d[i + 1], d[i + 2]), k = top < 60 ? 150 / Math.max(top, 1) : 1; // dark: lifted to show on the black
-    const out = Math.hypot(x / n - 0.5, y / n - 0.5) * 2; // 0 in the middle, 1 at the sides
-    bits.push({ x: r.left + x * c + c / 2, y: r.top + y * c + c / 2, ch: ramp[Math.max(1, Math.round(lum * (ramp.length - 1)))],
-      col: `rgb(${Math.min(255, d[i] * k)} ${Math.min(255, d[i + 1] * k)} ${Math.min(255, d[i + 2] * k)})`,
-      at: (1 - Math.min(1, out)) * 0.35 + Math.random() * 0.45 }); // the sides first, a little chance in it
-  }
+// the covers as characters, then sunk into the water: each a mark of the picture there (its colour; brighter, a heavier
+// mark), going down a little and fading, each at its own moment, as a drop falls in the water where each cover was
+// (as hard as it's big). list: [{el, art}]
+async function obSink(list, panel) {
+  const c = FIN.cell, ramp = " .:-=+*#%@", pr = panel.getBoundingClientRect(), bits = [];
+  const load = (art) => new Promise((ok) => { if (!art) return ok(null); const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = art.startsWith("/") ? art : "/api/art?url=" + encodeURIComponent(art); });
+  const imgs = await Promise.all(list.map((x) => load(x.art)));
+  // each one's square: its own size, about its middle as it is now (a float tipped on the water a little)
+  const boxes = list.map(({ el }) => { const r = el.getBoundingClientRect(), s = el.offsetWidth; return { left: r.left + r.width / 2 - s / 2, top: r.top + r.height / 2 - s / 2, s }; });
+  const splash = () => boxes.forEach((b) => OB.splashes.push({ x: b.left + b.s / 2 - pr.left, y: b.top + b.s / 2 - pr.top, rad: b.s / 2, amp: 5.5 * Math.sqrt(Math.min(1, b.s / 240)) })); // (obScope drops them in)
+  list.forEach(({ el }, k) => { if (!imgs[k]) el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, fill: "forwards" }); });
+  list.forEach(({ el }, k) => {
+    const img = imgs[k], { left, top, s } = boxes[k], n = Math.floor(s / c);
+    if (!img || !n) return;
+    const sm = Object.assign(document.createElement("canvas"), { width: n, height: n }).getContext("2d", { willReadFrequently: true });
+    sm.drawImage(img, 0, 0, n, n);
+    const d = sm.getImageData(0, 0, n, n).data;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const i = (y * n + x) * 4, lum = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+      const top2 = Math.max(d[i], d[i + 1], d[i + 2]), f = top2 < 60 ? 150 / Math.max(top2, 1) : 1; // dark: lifted to show on the black
+      const out = Math.hypot(x / n - 0.5, y / n - 0.5) * 2; // 0 in the middle, 1 at the sides
+      bits.push({ x: left + x * c + c / 2, y: top + y * c + c / 2, ch: ramp[Math.max(1, Math.round(lum * (ramp.length - 1)))],
+        col: `rgb(${Math.min(255, d[i] * f)} ${Math.min(255, d[i + 1] * f)} ${Math.min(255, d[i + 2] * f)})`,
+        at: (1 - Math.min(1, out)) * 0.35 + Math.random() * 0.45 }); // the sides first, a little chance in it
+    }
+    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FIN.toChars, easing: "ease-in", fill: "forwards" }); // the picture going under its characters
+  });
+  if (!bits.length) { splash(); return; }
   const dpr = devicePixelRatio || 1, cv = Object.assign(document.createElement("canvas"), { className: "ob-dust" });
   cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; $("#welcome").append(cv);
   const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.font = `${c + 1}px ${MONO}`; g.textAlign = "center"; g.textBaseline = "middle";
   const t0 = performance.now();
-  cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FIN.toChars, easing: "ease-in", fill: "forwards" }); // the picture going under its characters
   let splashed = false;
   await new Promise((done) => {
     const frame = (now) => {
@@ -556,6 +568,112 @@ async function obSink(cover, art, panel) {
     requestAnimationFrame(frame);
   });
 }
+// what goes into the water at the steps' end: the song's cover, through from its tools; a library's, brought in on the
+// song's step (none: no end played, as with no right half)
+function obFinaleCovers(step) {
+  if (getComputedStyle($("#obVisual")).display === "none") return null;
+  const hero = $("#obHero");
+  if (step === "tools" && !hero.hidden) return [{ el: hero.querySelector(".cover"), art: OB.first?.art || hero.querySelector("img").src }];
+  if (step === "song" && OB.lib?.st?.status === "done" && OB.floats.length) return OB.floats.map((f) => ({ el: f.el.firstChild, art: f.src }));
+  return null;
+}
+
+// ---------- a library brought in, on the song's step ----------
+// In the desktop app (it picks the folder), as Import beta library in Settings (stems.start_import): each song's cover
+// dropped on the water beside as it's copied (a drop where it lands), riding its waves; in, Continue ends the steps,
+// the covers sinking into the water as a first song's does (obFinale). Its songs and settings are in the page then:
+// the settings not set here yet, and the library drawn again under the black.
+// size: a cover's side; gap: the spiral's spacing (√k × gap from the middle, a golden angle round: ~1.8 × gap apart);
+// max: covers at once (more, and the oldest goes under for the next); every: ms between several come in at once
+const FLOAT = { size: 88, gap: 62, max: 14, every: 140 };
+const obFloatAt = (k) => { const r = FLOAT.gap * Math.sqrt(k), a = k * 2.39996; return [r * Math.cos(a), r * Math.sin(a) * 0.85]; }; // (a little flat: a surface)
+function obFloatSlots() { // as many as fit in the panel, kept off its edges
+  const box = $("#obFloats"), hw = box.clientWidth / 2 - FLOAT.size * 0.7, hh = box.clientHeight / 2 - FLOAT.size * 0.7;
+  let n = 0;
+  while (n < FLOAT.max) { const [x, y] = obFloatAt(n); if (Math.abs(x) > hw || Math.abs(y) > hh) break; n++; }
+  return Math.max(1, n);
+}
+function obFloatAdd(id) {
+  const box = $("#obFloats");
+  if (!OB.floatSlots && box.clientWidth) OB.floatSlots = obFloatSlots(); // (counted once the panel's there: none shown, any number)
+  const slot = OB.floatN++ % (OB.floatSlots || FLOAT.max);
+  const old = OB.floats.find((f) => f.slot === slot);
+  if (old) obFloatOut(old);
+  const [x0, y0] = obFloatAt(slot), x = x0 + (Math.random() - 0.5) * 10, y = y0 + (Math.random() - 0.5) * 10;
+  const el = Object.assign(document.createElement("span"), { className: "ob-float" }), i = el.appendChild(document.createElement("i")), img = i.appendChild(new Image());
+  img.alt = ""; img.src = `/library/${id}/cover.jpg`;
+  Object.assign(el.style, { left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }); // (from the middle: with it as the panel opens, as the hero is)
+  const f = { el, src: img.src, x, y, slot, phase: Math.random() * 9, tilt: (Math.random() - 0.5) * 8, dy: 0, rot: 0 };
+  OB.floats.push(f);
+  img.decode().catch(() => {}).then(() => {
+    if (!el.isConnected && !OB.floats.includes(f)) return;
+    box.append(el); obFloatRun();
+    // dropped: from a little above, quicker as it comes, a drop in the water where it lands
+    i.animate([{ opacity: 0, transform: "translateY(-30px) scale(1.14)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: "cubic-bezier(0.5, 0, 0.75, 0.35)", fill: "backwards" })
+      .finished.then(() => OB.splashes.push({ x: box.clientWidth / 2 + x, y: box.clientHeight / 2 + y, rad: FLOAT.size / 2, amp: 2.4 }), () => {});
+  });
+}
+function obFloatOut(f, now = false) { // under the water: down a little, fading, a small drop where it was
+  OB.floats = OB.floats.filter((g) => g !== f);
+  if (now || !f.el.isConnected) return f.el.remove();
+  const box = $("#obFloats");
+  OB.splashes.push({ x: box.clientWidth / 2 + f.x, y: box.clientHeight / 2 + f.y, rad: FLOAT.size / 3, amp: 1.2 });
+  f.el.firstChild.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(10px) scale(0.94)" }], { duration: 520, easing: "ease-in", fill: "forwards" })
+    .finished.then(() => f.el.remove(), () => f.el.remove());
+}
+// riding the water: up and down with its height there, tipped with its slope, and a slow bob of its own
+function obFloatRun() {
+  if (OB.floatRaf) return;
+  const box = $("#obFloats");
+  const frame = (now) => {
+    if (!OB.floats.length) { OB.floatRaf = 0; return; }
+    const W = box.clientWidth, H = box.clientHeight, t = now / 1000;
+    for (const f of OB.floats) {
+      const w = OB.scope ? OB.waterAt?.(W / 2 + f.x, H / 2 + f.y) : null;
+      f.dy += ((w ? -w.h * 3 : 0) - f.dy) * 0.2;
+      f.rot += ((w ? Math.max(-6, Math.min(6, (w.gx - w.gy) * 9)) : 0) - f.rot) * 0.15;
+      f.el.style.transform = `translateY(${(f.dy + Math.sin(t * 1.4 + f.phase) * 1.6).toFixed(2)}px) rotate(${(f.tilt + f.rot + Math.sin(t * 0.9 + f.phase) * 1.2).toFixed(2)}deg)`;
+    }
+    OB.floatRaf = requestAnimationFrame(frame);
+  };
+  OB.floatRaf = requestAnimationFrame(frame);
+}
+function obLibEnd() { // the steps over (or the library put back): its covers off, its following stopped
+  clearTimeout(OB.libT); OB.lib = null;
+  for (const f of [...OB.floats]) obFloatOut(f, true);
+  OB.floatN = 0; OB.floatSlots = 0;
+}
+async function obLibGo(paint) {
+  const path = await window.pitchroom.pickFolder();
+  if (!path) return;
+  const r = await fetch("/api/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }).catch(() => null);
+  const st = r ? await r.json().catch(() => ({})) : {};
+  obLibEnd();
+  OB.lib = { seen: 0, st: r?.ok ? st : { status: "error", error: st.error || "The server didn’t answer properly." } };
+  if (r?.ok) obLibPoll(paint, st); else paint();
+}
+async function obLibPoll(paint, st) {
+  clearTimeout(OB.libT);
+  st ??= await fetch("/api/import", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+  const lib = OB.lib;
+  if (!lib) return;
+  if (!st) { OB.libT = setTimeout(() => obLibPoll(paint), 700); return; }
+  const fresh = (st.covers || []).slice(lib.seen); lib.seen += fresh.length;
+  fresh.forEach((id, k) => setTimeout(() => OB.lib === lib && obFloatAdd(id), k * FLOAT.every));
+  lib.st = st;
+  if (st.status === "running") OB.libT = setTimeout(() => obLibPoll(paint), 400);
+  else if (st.status === "done" && (st.songs || st.settings)) obLibIn();
+  paint();
+}
+async function obLibIn() { // what came in, in the page: the settings not here yet (as the server merged them), the library drawn again
+  const got = await fetch("/api/settings", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+  const obj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  if (obj(got) && obj(SAVED)) for (const [k, v] of Object.entries(got)) {
+    if (!(k in SAVED)) SAVED[k] = v; else if (obj(v) && obj(SAVED[k])) SAVED[k] = { ...v, ...SAVED[k] };
+  }
+  drawLibrary();
+}
+
 // The found song off to the middle of the right half, big (#obHero): its cover from where it was on the left, growing
 // there, its name and artist coming in under it. false with no right half (a narrow window): it stays on the left.
 function obHeroIn(card, info) {
@@ -582,11 +700,13 @@ function obFoundPaint(card, info) { // resolves once its picture's in (or not, a
   card.title = info.video || info.title || "";
   return new Promise((ok) => { if (!info.art || img.complete) return ok(); img.onload = img.onerror = () => ok(); setTimeout(ok, 3000); });
 }
-function obSong(next) {
+function obSong(next, back, end) {
   const form = $("#obYt"), url = $("#obUrl"), err = $("#obSongErr"), found = $("#obFound"), what = $("#obFoundWhat");
   const go = $("#obSongGo"), again = $("#obSongAgain"), note = $("#obSongNote"); // (no Later: a first song's what the steps end with)
-  const state = (st) => { // ask (the link) | looking (for the song, the card a skeleton) | found
-    form.hidden = st !== "ask"; found.hidden = what.hidden = st === "ask"; if (st !== "ask") $("#obClip").hidden = true; go.hidden = again.hidden = st !== "found";
+  const libBox = $("#obLib"), libLine = $("#obLibState");
+  const state = (st) => { // ask (the link) | looking (for the song, the card a skeleton) | found | lib (a library coming in: obLib)
+    form.hidden = st !== "ask"; found.hidden = what.hidden = st === "ask" || st === "lib"; if (st !== "ask") $("#obClip").hidden = true; go.hidden = again.hidden = st !== "found";
+    libBox.hidden = st !== "ask" || !window.pitchroom?.pickFolder; libLine.hidden = st !== "lib";
     found.classList.toggle("loading", st === "looking"); what.classList.toggle("ob-looking", st === "looking");
     if (st !== "found") { found.classList.remove("in"); $("#obGetsNote").hidden = true; }
     note.hidden = st !== "ask"; // the card answers the question from then on
@@ -652,9 +772,30 @@ function obSong(next) {
     if (link) { $("#obClipV").textContent = link.replace(/^https?:\/\/(www\.)?/, ""); clip.onclick = () => { url.value = link; label(); clip.hidden = true; form.requestSubmit(); }; }
   };
   if (!obSong.on) { obSong.on = true; addEventListener("focus", () => OB.songClip?.()); }
+  // a library chosen instead (obLib): how far it's got, then how it went and Continue, through to the end (no tools
+  // needed); stopped, or nothing new in it, back to the link with why
+  const libPaint = () => {
+    if (!OB.songStep || !OB.lib) return;
+    const st = OB.lib.st || {};
+    if (st.status === "error" || (st.status === "done" && !st.songs)) {
+      const why = st.status === "error" ? st.error || "" : "Nothing new to copy";
+      obLibEnd(); label(); state("ask"); OB.songClip(); err.hidden = false; say(err, why);
+      return;
+    }
+    const on = st.status !== "done";
+    err.hidden = true; state("lib");
+    say($("#obSongT"), on ? "Bringing in your library" : "Your library’s in");
+    if (on) say(libLine, "Copying… {d} of {n}", { d: st.done || 0, n: st.total || 0 });
+    else say(libLine, st.songs === 1 ? "1 song copied" : "{n} songs copied", { n: st.songs });
+    go.hidden = on;
+    if (!on) { say(go, "Continue"); go.onclick = end; }
+  };
+  $("#obLibGo").onclick = () => obLibGo(libPaint);
   OB.songStep = true;
   again.onclick = () => { url.value = ""; label(); state("ask"); obTint(null); OB.songClip(); };
-  label(); state("ask"); OB.songClip();
+  label();
+  if (OB.lib) libPaint(); // come back to with a library coming in
+  else { state("ask"); OB.songClip(); }
 }
 async function obSend({ url }) {
   if (PLAYLIST.test(url)) { // a playlist: its songs listed to pick from in Add song, as there (readPlaylist), over the page once it's in
@@ -975,6 +1116,13 @@ function obScope() {
         if (k > 0) cur[y * sc + x] -= amp * (0.5 - 0.5 * Math.cos(Math.PI * k)); // a smooth round, no edge to it
       }
   };
+  // the water's height and slope at a place in the panel (px), for what floats on it (obFloatRun)
+  OB.waterAt = (px, py) => {
+    if (!cur) return null;
+    const u = Math.max(1, Math.min(sc - 2.001, 1 + px / (S * cell))), v = Math.max(1, Math.min(sr - 2.001, 1 + py / (S * cell)));
+    const x = Math.floor(u), y = Math.floor(v), tx = u - x, ty = v - y, i = y * sc + x;
+    return { h: (cur[i] * (1 - tx) + cur[i + 1] * tx) * (1 - ty) + (cur[i + sc] * (1 - tx) + cur[i + sc + 1] * tx) * ty, gx: cur[i + 1] - cur[i], gy: cur[i + sc] - cur[i] };
+  };
   const step = () => { // the water a step on: each point from its neighbours, as a wave goes, a little lost each time
     for (let y = 1; y < sr - 1; y++) for (let x = 1, i = y * sc + 1; x < sc - 1; x++, i++)
       prev[i] = ((cur[i - 1] + cur[i + 1] + cur[i - sc] + cur[i + sc]) / 2 - prev[i]) * keep[i];
@@ -1001,10 +1149,8 @@ function obScope() {
     if (level > 0.04 && since > 0.42) {
       drop(1 + cols / S / 2 + (Math.random() - 0.5) * 0.6, 1 + (rows * 0.46) / S + (Math.random() - 0.5) * 0.6, 1.1 + 2.2 * level, 4.8 * Math.pow(level, 1.8)); since = 0; // a curve, so loud and louder look apart
     }
-    if (OB.splash && cur) { // the cover sinking into it (obSink): a drop as wide as it, hard
-      const sp = OB.splash; OB.splash = null;
-      drop(1 + sp.x / (S * cell), 1 + sp.y / (S * cell), Math.max(2, sp.rad / (S * cell)), 5.5);
-    }
+    if (OB.splashes.length && cur) for (const sp of OB.splashes.splice(0)) // a cover sinking into it (obSink), or dropped on it (obFloatAdd): a drop as wide as it
+      drop(1 + sp.x / (S * cell), 1 + sp.y / (S * cell), Math.max(2, sp.rad / (S * cell)), sp.amp);
     if (OB.wash && cur) for (let x = 1; x < sc - 1; x++) { // coming in from the top (obWash): stirred just behind its front
       const y = Math.floor(1 + (obWashY((x - 1) * S * cell, now) - 6) / (S * cell));
       if (y > 0 && y < sr - 1) cur[y * sc + x] -= 0.07 * (0.6 + 0.8 * Math.random()); // a light touch, unevenly: a swell, not a churn

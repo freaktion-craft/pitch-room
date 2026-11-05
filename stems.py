@@ -500,7 +500,7 @@ def set_settings(changes) -> dict:
 # in Settings (Import beta library), that folder's are copied in: the songs not here yet (their rendered keys left
 # behind, made again when asked for), the settings not set here yet, the models not downloaded here yet. The beta's
 # folder stays as it was.
-_import: dict = {"status": "idle"}  # running: {done, total}; done: {songs, settings}; error: {error}
+_import: dict = {"status": "idle"}  # running: {done, total}; done: {songs, settings}; error: {error}; covers: the songs in so far with one
 _import_lock = threading.Lock()
 
 
@@ -516,7 +516,7 @@ def _beta_folders(path) -> tuple[str, str]:
 
 def import_state() -> dict:
     with _import_lock:
-        return dict(_import)
+        return {k: list(v) if isinstance(v, list) else v for k, v in _import.items()}
 
 
 def start_import(path) -> dict:
@@ -531,7 +531,7 @@ def start_import(path) -> dict:
         if _import["status"] == "running":
             raise ValueError("Already importing.")
         _import.clear()
-        _import.update(status="running", done=0, total=len(songs) + len(models))
+        _import.update(status="running", done=0, total=len(songs) + len(models), covers=[])
     threading.Thread(target=_import_run, args=(src_lib, src, songs, models), daemon=True).start()
     return import_state()
 
@@ -555,6 +555,9 @@ def _import_run(src_lib: str, src: str, songs: list[str], models: list[str]):
             os.makedirs(d, exist_ok=True)
         for d in songs:
             bring(os.path.join(src_lib, d), LIB)
+            if os.path.isfile(os.path.join(LIB, d, "cover.jpg")):  # (the first steps float it on the water)
+                with _import_lock:
+                    _import["covers"].append(d)
         for n in models:
             bring(os.path.join(src, "models", n), MODEL_DIR)
         old = os.path.join(src, "settings.json")

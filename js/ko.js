@@ -314,7 +314,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Developer tools": "개발자 도구",
   "Import beta library": "베타 라이브러리 가져오기", "Copy songs and settings from the beta folder": "베타 폴더의 노래와 설정 복사",
   "Choose folder": "폴더 선택", "The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own": "압축을 푼 Pitchroom 폴더나 그 안의 library 폴더. 복사만 하니 베타는 그대로예요",
-  "Copying… {d} of {n}": "복사하는 중… {d}/{n}", "Nothing new to copy": "새로 복사할 게 없어요", "1 song copied": "노래 1곡을 복사했어요", "{n} songs copied": "노래 {n}곡을 복사했어요",
+  "Copying… {d} of {n}": "복사하는 중… {d}/{n}", "Nothing new to copy": "새로 복사할 게 없어요", "Have a library already?": "라이브러리가 이미 있나요?", "Bringing in your library": "라이브러리 가져오는 중", "Your library’s in": "라이브러리를 가져왔어요", "1 song copied": "노래 1곡을 복사했어요", "{n} songs copied": "노래 {n}곡을 복사했어요",
   "{n} marked · next: {line}": "{n}줄 표시 · 다음: {line}", "{n} marked": "{n}줄 표시",
   "T: this line starts now, as you hear it, not as it lights · Shift+T: back a line, its mark off · Y: skip one · click a phrase to start from its line. Saved in truth.json. Your reaction time (150–250 ms, steady) is fine: scoring takes off the median offset": "T: 이 줄이 지금 시작해요, 불이 켜질 때가 아니라 들리는 대로 · Shift+T: 한 줄 뒤로, 표시도 지워요 · Y: 한 줄 건너뛰기 · 소절을 누르면 그 줄부터 시작해요. truth.json에 저장돼요. 반응 시간(150–250 ms, 일정함)은 괜찮아요: 채점할 때 중앙값만큼 빼요",
   "Copy phrase marks": "소절 표시 복사", "Updating for the new version…": "새 버전에 맞게 다시 만드는 중…", "Copied": "복사했어요", "Couldn’t copy: {why}": "복사하지 못했어요: {why}",

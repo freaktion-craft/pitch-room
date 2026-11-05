@@ -1168,6 +1168,7 @@ const isGuide = (name) => VOCAL_TRACKS.includes(name);
 function leaveSong() { if (ED.on) edOpen(false); if (P.playing) pauseSong(); K.on = false; K.counting = false; A4 = 440; $("#countIn").hidden = true; }
 function songToggle() {
   if (P.playing) { pauseSong(); return; }
+  if (songBusy()) return; // its new key or tempo still being made
   if (!micOn && !testOsc) startMic();
   // again after a pause (not at a phrase's count-in, where a jump put it): from the count-in's beats before, counted;
   // from the start, a voice that comes straight in is counted in before the song (the intro's count-in, as a lead-in)

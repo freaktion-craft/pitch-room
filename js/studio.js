@@ -52,7 +52,8 @@ function paintMeta() {
 function closeSong() {
   pauseSong();
   P.song = null; P.buffers = {}; P.peaks = P.trackPeaks = null; P.keep = {}; P.tsel = P.mark = null; // waveforms flat until the next song's peaks are in
-  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.rate = P.rateWant = 1; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
+  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.rate = P.rateWant = 1; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null; P.keyWarnAt = 0;
+  paintBusy();
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
 }
@@ -168,7 +169,7 @@ const FADE = 0.05;
 const fadeIn = (g, at, to = 1) => { g.setValueAtTime(0, at); g.linearRampToValueAtTime(to, at + FADE); };
 const fadeOut = (g, now) => { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + FADE); };
 function playSong() {
-  if (!P.song || !Object.keys(P.buffers).length) return;
+  if (!P.song || !Object.keys(P.buffers).length || songBusy()) return;
   ensureCtx();
   listenStop(); // a take that's playing gives way to the song
   if (P.offset >= songDur() - 0.05) P.offset = 0;
@@ -543,7 +544,17 @@ const rateOf = (x) => Math.round(Math.max(RATE_MIN, Math.min(RATE_MAX, x)) * 100
 const rateMap = () => { const r = store.get("tempos", {}); return r && typeof r === "object" ? r : {}; }; // song id -> speed
 const savedRate = (id) => (Number.isFinite(+rateMap()[id]) ? rateOf(+rateMap()[id]) : 1);
 function saveRate(id, s) { const r = rateMap(); if (s !== 1) r[id] = s; else delete r[id]; store.set("tempos", r); }
-const KEYS = 6, KEY_WARN = 4; // from KEY_WARN semitones on, the processing can be heard
+const KEYS = 6, KEY_WARN = 4, KEY_WARN_FOR = 3000; // from KEY_WARN semitones on, the processing can be heard (said beside the control for KEY_WARN_FOR ms once such a key's chosen)
+// A version being made (its render, then its files loading): the song held still till it's in, its controls out of
+// reach (html.song-busy), but for the key and tempo themselves, to choose again
+const songBusy = () => P.keyProg != null;
+const BUSY_PARTS = "#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl, #stage";
+function paintBusy() {
+  const busy = songBusy();
+  if (busy && P.playing) pauseSong();
+  document.documentElement.classList.toggle("song-busy", busy);
+  document.querySelectorAll(BUSY_PARTS).forEach((n) => { n.inert = busy; });
+}
 const keySign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n); // +2, −3, 0
 const keyAfter = (k, n) => k && { pc: (((k.pc + n) % 12) + 12) % 12, mode: k.mode };
 // the open song's key as it plays: its own, moved n semitones (P.key, or a take's), for the note names (absName)
@@ -578,8 +589,10 @@ const setRate = (s) => setVersion(P.keyWant, rateOf(s));
 function setVersion(n, s) {
   const m = P.song;
   if (!m || (n === P.keyWant && s === P.rateWant)) return;
+  if (n !== P.keyWant) P.keyWarnAt = Math.abs(n) >= KEY_WARN ? performance.now() : 0; // its warning: a while after it's chosen (paintKey)
   P.keyWant = n; P.rateWant = s; saveKey(m.id, n); saveRate(m.id, s); P.keyProg = keyHere(n, s) ? null : 0; P.keyNote = ""; P.keyErr = false;
   paintKey();
+  clearTimeout(P.keyWarnT); if (P.keyWarnAt) P.keyWarnT = setTimeout(paintKey, KEY_WARN_FOR + 20);
   clearTimeout(P.keyTimer);
   P.keyTimer = setTimeout(() => loadKey(m, n, s), 0); // picked from a list or typed in, so no steps on the way to wait out
 }
@@ -653,7 +666,9 @@ function keyItems(m, want) {
 }
 function paintKey() {
   const n = P.keyWant, items = keyItems(P.song, n);
-  const note = P.keyErr ? tr(P.keyNote) : Math.abs(n) >= KEY_WARN ? tr("{n} or more semitones can sound processed.", { n: KEY_WARN }) : "";
+  const warn = Math.abs(n) >= KEY_WARN && performance.now() - (P.keyWarnAt || -1e9) < KEY_WARN_FOR; // (only just chosen)
+  const note = P.keyErr ? tr(P.keyNote) : warn ? tr("{n} or more semitones can sound processed.", { n: KEY_WARN }) : "";
+  paintBusy();
   document.querySelectorAll(".keyctl").forEach((box) => {
     box.pick.set(items, n);
     box.note.textContent = box.note.title = note; box.note.classList.toggle("err", P.keyErr); box.note.classList.toggle("warn", !P.keyErr && !!note);
