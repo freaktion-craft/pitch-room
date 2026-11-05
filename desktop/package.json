@@ -70,6 +70,7 @@
       "icon": "build/icon-win.png"
     },
     "nsis": {
+      "installerIcon": "build/installerIcon.ico",
       "oneClick": true,
       "perMachine": false,
       "runAfterFinish": true,
