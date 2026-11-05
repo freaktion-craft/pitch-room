@@ -349,8 +349,17 @@ async function welcome(resume) { // resume: a step to come back to (Settings' ba
   w.style.setProperty("--ob-left", Math.round(brand.left) + "px");
   await word.animate([{ transform: place(...mid()) }, { transform: place(brand.left, brand.top, brand.width / from.width) }],
     { duration: still ? 1 : R.slide, easing: R.slideEase, fill: "forwards" }).finished;
+  // the window made bigger or smaller meanwhile (maximised, put back, dragged): the name, and the steps' column from
+  // its left edge, kept where the header's name is now, not where it was as they came
+  const settle = () => {
+    const b = $("#app > header .brand").getBoundingClientRect();
+    w.style.setProperty("--ob-left", Math.round(b.left) + "px");
+    word.getAnimations().forEach((a) => a.cancel()); word.style.transform = place(b.left, b.top, b.width / from.width);
+  };
+  settle(); addEventListener("resize", settle);
   w.classList.add("onboarding");
   let left = await onboard(resume ?? 0);
+  removeEventListener("resize", settle);
   const exited = !!left?.exit; // out by Exit (visited again, through them before): back where you were, as you were
   if (exited) left = null;
   w.classList.remove("onboarding");
