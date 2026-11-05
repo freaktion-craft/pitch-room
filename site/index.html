@@ -51,8 +51,8 @@ a { -webkit-user-drag: none; }
 /* The app's welcome (js/app.js, welcome(), and css/base.css, #welcome): a book (the screen less 20 % each side), its
    right half turned over to the left like a page, one after another, each an accent colour; the name large in the middle
    meanwhile. Here it starts closed, its dark cover alone in the middle, and moves right as it opens (its spine to the
-   middle); the last page lands dark, and the right page under it, the button on it (there under the pages all along,
-   shown as the last one lifts off it), comes back to the middle on its own as the left one goes: a plain page, no book.
+   middle); the last page lands dark, then turns back over behind the right page under it, which (the button on it, there
+   under the pages all along, shown as the last one lifts off it) comes back to the middle on its own: a plain page, no book.
    The pages are built by riffle() */
 .book { position: fixed; inset: 20%; }
 .book .half { position: absolute; top: 0; bottom: 0; width: 50%; }
@@ -160,7 +160,8 @@ tip.addEventListener("click", () => tip.classList.remove("on"));
 const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06, -0.04, 0.05, -0.06, 0.03, -0.05, 0.04],
   pageEase: "cubic-bezier(0.38, 0, 0.12, 1)", rest: 200, last: 700, lastEase: "cubic-bezier(0.55, 0, 0.2, 1)",
   fade: 320, shade: 0.32, // fade: the name going, from the last page's start
-  open: 520, openEase: "cubic-bezier(0.45, 0, 0.2, 1)", close: 640, closeEase: "cubic-bezier(0.65, 0, 0.25, 1)" }; // open: the closed book over to the right as its cover starts to lift; close: the right page back to the middle at the end
+  open: 520, openEase: "cubic-bezier(0.45, 0, 0.2, 1)", close: 640, closeEase: "cubic-bezier(0.65, 0, 0.25, 1)", // open: the closed book over to the right as its cover starts to lift; close: the right page back to the middle at the end
+  back: 620, backEase: "cubic-bezier(0.45, 0, 0.2, 1)" }; // back: the last page turned back over, behind the right one
 const CLOSED = "translateX(-25%)"; // the book with its right half (its cover, then its right page) in the middle
 const ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "blue", "violet", "pink"]; // as the app has them (js/stage.js)
 async function riffle() {
@@ -216,10 +217,19 @@ async function riffle() {
   const leaves = [...book.querySelectorAll(".leaf")], left = leaves.pop();
   leaves.forEach((p) => p.remove()); // the last page over the left, the dark right page under it
   document.body.classList.add("shown"); // the line at the foot
-  // the book away: the left page going, the right one (the button on it) back to the middle, a plain page on its own
-  const o = { duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" };
-  left.animate([{ opacity: 1 }, { opacity: 0 }], { ...o, easing: "ease-out", duration: still ? 1 : R.close * 0.6 });
-  book.animate([{ transform: still ? CLOSED : "none" }, { transform: CLOSED }], o);
+  // the book away: the last page turned on over to the right, behind the right page (under it: -1, under the book's own),
+  // so it goes in under it; the right one (the button on it) back to the middle as it does, a plain page
+  left.getAnimations({ subtree: true }).forEach((a) => a.cancel());
+  const [recto, verso] = left.children, b = { duration: still ? 1 : R.back, easing: R.backEase, fill: "forwards" };
+  Object.assign(recto.style, { left: "0", width: "100%" }); // its front no longer a pixel past the spine: under the right page, that pixel showed at its edge
+  // on round the same way, through the back of the book (away from you, smaller in its depth, so none of it shows round
+  // the right page), to lie flat under it
+  left.animate([{ transform: `${depth} rotateY(-180deg)`, zIndex: -1 }, { transform: `${depth} rotateY(-360deg)`, zIndex: -1 }], b);
+  verso.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], b);
+  recto.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], b);
+  verso.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], b); // darker as it stands up
+  book.animate([{ transform: still ? CLOSED : "none" }, { transform: CLOSED }],
+    { delay: still ? 0 : R.back * 0.3, duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" });
   await gone; word.remove();
 }
 riffle();
