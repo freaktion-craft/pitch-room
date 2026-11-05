@@ -141,8 +141,8 @@ header { position: relative; }
 /* their list the only thing that scrolls (fitSettings: its height), so the page itself doesn't: no room under it */
 html.set-view .app { padding-bottom: 0; }
 html.set-view #micSet { overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-16); }
-.settings { display: grid; gap: var(--space-8); }
-.set-group { display: grid; gap: var(--space-3); scroll-margin-top: var(--space-6); }
+.settings { display: grid; gap: var(--space-8); align-content: start; } /* (packed at the top: as tall as the window now, a grid would stretch its groups, and their cards, into the room under them) */
+.set-group { display: grid; gap: var(--space-3); align-content: start; scroll-margin-top: var(--space-6); }
 .set-group > h2 { margin: 0; }
 .set-list { padding: 0 var(--pad-card); border-radius: var(--radius-card); background: var(--surface); }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); min-height: 68px; padding: var(--space-3) 0; }
