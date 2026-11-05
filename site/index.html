@@ -155,7 +155,7 @@ const showTip = () => {
 // the button gone up to where the download is: its words going as it draws in round its logo, a circle, then off up to
 // the browser's downloads icon (where the tip points), smaller, into the toolbar; the tip as it gets there, and in the
 // button's place the name, out of a blur. A copy flies (the button itself, its link and its download, as they are)
-const FLY = { shrink: 280, fly: 760, size: 40, bend: [1, 0.05] }; // bend: the arc's control point, its share of the way across and up (across first, then up)
+const FLY = { shrink: 280, fly: 760, size: 40, bend: [1, 0.05], blue: "#a8c7fa" }; // bend: the arc's control point, its share of the way across and up (across first, then up)
 document.fonts.load('400 44px "Geist Serif"').catch(() => {}); // the name's typeface in ahead of a click
 let flying = false;
 async function fly(get) {
@@ -174,7 +174,9 @@ async function fly(get) {
   svg.animate([{ left: `${s.left - r.left}px` }, { left: `${(D - s.width) / 2}px` }], shrink);
   // its logo going as it draws in, blurring away as it fades: a plain dot by the time it sets off
   svg.animate([{ opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(6px)" }], { ...shrink, easing: "ease-in" });
-  await ghost.animate([{ left: `${r.left}px`, width: `${r.width}px` }, { left: `${r.left + (r.width - D) / 2}px`, width: `${D}px` }], shrink).finished;
+  // and into the blue of the browser's downloads (Chrome's, #A8C7FA), the colour of where it's going
+  await ghost.animate([{ left: `${r.left}px`, width: `${r.width}px`, backgroundColor: getComputedStyle(get).backgroundColor },
+    { left: `${r.left + (r.width - D) / 2}px`, width: `${D}px`, backgroundColor: FLY.blue }], shrink).finished;
   // off up to the downloads icon: its middle to the top edge, under it, getting smaller, gone as it gets there
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2, tx = innerWidth - tipAt(), ty = 0;
   // along an arc: out to the right first, then sweeping up into the toolbar (a curve bent toward a point level with where
