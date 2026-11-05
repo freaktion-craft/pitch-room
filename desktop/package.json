@@ -70,6 +70,7 @@
       "icon": "build/icon-win.png"
     },
     "nsis": {
+      "artifactName": "pitchroom_install.${ext}",
       "installerIcon": "build/installerIcon.ico",
       "oneClick": true,
       "perMachine": false,

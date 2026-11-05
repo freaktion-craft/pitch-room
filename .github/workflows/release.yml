@@ -73,7 +73,7 @@ jobs:
         run: |
           names=$(gh release view "$TAG" --repo freaktion-craft/pitchroom-releases --json assets --jq '.assets[].name')
           echo "$names"
-          for f in latest.yml latest-mac.yml latest-linux.yml '-mac-arm64.dmg' '-mac-x64.dmg' '-win-x64.exe' '.AppImage'; do
+          for f in latest.yml latest-mac.yml latest-linux.yml '-mac-arm64.dmg' '-mac-x64.dmg' 'pitchroom_install.exe' '.AppImage'; do
             echo "$names" | grep -qF -- "$f" || { echo "::error::$f is missing from the $TAG draft"; exit 1; }
           done
       - name: The draft published, as the latest
