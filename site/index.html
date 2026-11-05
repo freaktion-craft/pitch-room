@@ -190,6 +190,10 @@ async function riffle() {
     const o = { duration, delay, easing, fill: "both" };
     leaf.animate([{ transform: `${depth} rotateY(0deg)`, zIndex: 100 - k }, { transform: `${depth} rotateY(-90deg)`, zIndex: 100 - k, offset: 0.5 },
       { transform: `${depth} rotateY(-90deg)`, zIndex: 200 + k, offset: 0.5 }, { transform: `${depth} rotateY(-180deg)`, zIndex: 200 + k }], o); // over the spine, it lies on those turned before it
+    // which face shows, by the turn itself: the front till it's on edge, the back after (backface-visibility alone let
+    // the back show through for a frame now and then, the book moving under it)
+    front.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], o);
+    back.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], o);
     front.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], o);
     return back.lastChild.animate([{ opacity: R.shade }, { opacity: R.shade, offset: 0.5 }, { opacity: 0 }], o).finished.then(() => {
       // once it's down, those down under it go: all their edges at the spine, a soft one over them let theirs show as a
