@@ -275,7 +275,8 @@ function reveal(at, nameThere = false) {
     t += 90;
   }
   rise($("#sLib .lib-cols"), t); // the column heads on their own: they're sticky, and one in a rising list isn't drawn till it's risen, then shows at once
-  [...$("#sLib").querySelectorAll(".row, .lib-group")].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6)); // (the Artist or Album view's headings with their songs)
+  const items = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums").querySelectorAll(".al-card") : $("#sLib").querySelectorAll(".row, .lib-group, .al-bar");
+  [...items].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6)); // (the rows, the Artist view's headings with them, or the Album view's cards)
   const rising = document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity);
   Promise.all(rising.map((a) => a.finished)).then(pinLibTop, pinLibTop); // measured where it rose to
 }

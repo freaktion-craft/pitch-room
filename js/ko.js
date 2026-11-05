@@ -243,7 +243,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Paste YouTube links, one per line": "YouTube 링크를 붙여넣으세요 (한 줄에 하나씩)", "YouTube links": "YouTube 링크",
   "Paste YouTube links or a playlist": "YouTube 링크나 플레이리스트를 붙여넣으세요", "YouTube links, one per line, or a YouTube or Spotify playlist link": "YouTube 링크(한 줄에 하나씩), 또는 YouTube나 Spotify 플레이리스트 링크",
   "Import playlist": "플레이리스트 가져오기", "Reading the playlist…": "플레이리스트 읽는 중…", "That playlist is empty.": "빈 플레이리스트예요.",
-  "YouTube playlist": "YouTube 플레이리스트", "Spotify playlist": "Spotify 플레이리스트", "1 song": "1곡", "{n} songs": "{n}곡", "Artist": "아티스트", "Album": "앨범", "Unknown artist": "아티스트 미상", "Unknown album": "앨범 미상", "First {n}": "처음 {n}곡",
+  "YouTube playlist": "YouTube 플레이리스트", "Spotify playlist": "Spotify 플레이리스트", "1 song": "1곡", "{n} songs": "{n}곡", "Artist": "아티스트", "Album": "앨범", "Albums": "앨범", "Unknown artist": "아티스트 미상", "Unknown album": "앨범 미상", "First {n}": "처음 {n}곡",
   "Only the first {n} are listed": "처음 {n}곡만 보여요", "All or none": "모두 선택 / 해제", "In library": "라이브러리에 있음", "Unavailable": "볼 수 없음", "Add {n}": "{n}곡 추가",
   "Added one at a time, at low priority, so the PC stays free": "PC가 느려지지 않게 한 곡씩, 낮은 우선순위로 추가해요",
 

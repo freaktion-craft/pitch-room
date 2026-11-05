@@ -332,18 +332,35 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 /* the view in the name's place (#sLibView, a .seg): its left edge where the name's was; and in the Artist or Album
    view, a heading over each one's songs: its name, and how many (an album's, whose they are) */
 .lib-view { margin-left: calc(-1 * var(--space-half)); }
-#sLib .lib-group { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: var(--space-8) var(--space-3) var(--space-2); }
+#sLib .lib-group { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; padding: var(--space-8) var(--space-3) var(--space-2); }
 #sLib .lib-cols + .lib-group { padding-top: var(--space-4); }
-#sLib .lg-what { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
 #sLib .lib-group b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--text-lg); color: var(--ink); }
 #sLib .lib-group small { flex: none; color: var(--muted); font-size: var(--text-sm); }
-/* an album's: its cover first, bigger than a row's, its name over whose it is and how many; its songs under it
-   without their own (the same cover each time), their places kept so the titles stay in line */
-#sLib .lib-group.album { padding-bottom: var(--space-3); }
-#sLib .lib-group .cover { flex: none; width: 64px; height: 64px; border-radius: var(--radius-md); }
-#sLib .lib-group.album .lg-what { display: grid; gap: 2px; }
-#sLib .lib-group.album small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#sLib.by-album .row .cover { visibility: hidden; }
+/* the Album view: a grid of the albums in the list's place (the list under it out of sight, its column heads too),
+   each its cover, its name, whose and how many; one opened, its songs as the list, under a bar back to them */
+#sAlbums { display: none; }
+#sLibPage.album-grid #sLib { display: none; }
+#sLibPage.album-grid #sAlbums { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--space-6) var(--space-5); padding-top: var(--space-2); }
+#sAlbums .lib-none { grid-column: 1 / -1; }
+.al-card { display: grid; gap: 2px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.al-card .cover { position: relative; width: 100%; aspect-ratio: 1; margin-bottom: var(--space-2); border-radius: var(--radius-md); overflow: hidden;
+  background: var(--fill) center / cover; transition: filter var(--duration-fast); }
+.al-card .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 0.25px var(--fg-30); }
+.al-card .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-slow); }
+.al-card .cover img.in { opacity: 1; }
+.al-card .cover img.now { transition: none; }
+.al-card:hover .cover { filter: brightness(1.08); }
+.al-card.none .cover { display: grid; place-items: center; color: var(--faint); }
+.al-card.none .cover .ico { width: 36px; height: 36px; }
+.al-card:focus-visible { outline: none; }
+.al-card:focus-visible .cover { outline: 2px solid var(--ink); outline-offset: 2px; }
+.al-card b, .al-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-card b { font-weight: var(--weight-medium); font-size: var(--text-md); line-height: 20px; color: var(--ink); }
+.al-card small { font-size: var(--text-sm); line-height: 18px; color: var(--muted); }
+#sLib .al-bar { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: 0 var(--space-3) var(--space-4); }
+#sLib .al-what { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+#sLib .al-what b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--text-lg); color: var(--ink); }
+#sLib .al-what small { flex: none; color: var(--muted); font-size: var(--text-sm); }
 .ln-pull { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: grid; opacity: 0; pointer-events: none; transition: opacity var(--duration-fast); }
 .ln-pull.on { opacity: 1; }
 .ln-pull .ring { width: var(--icon-lg); height: var(--icon-lg); transform: rotate(-90deg); }
