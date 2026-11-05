@@ -50,7 +50,7 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
       const s = steps[i];
       s.hidden = false;
       if (s.dataset.step !== "song" && s.dataset.step !== "tools") obHeroOut(); // the found song's cover: beside its steps only
-      $("#obFloats").hidden = s.dataset.step !== "song"; // a library's covers: beside the song's step only
+      $("#obFloats").hidden = s.dataset.step !== "song" && s.dataset.step !== "tools"; // a library's covers: beside the song's step and its tools', as a first song's is
       if (i === 0) { obWashEnd(); w.classList.add("ob-pic"); obArt(); } // the picture beside the intro, and only there
       if (OB_SCOPED.has(s.dataset.step) && !OB.scope) { w.classList.add("ob-scope"); obScope(); } // beside the mic's step and the colour's, what it hears
       if (s.dataset.step !== "mic" && OB_SCOPED.has(s.dataset.step) && !OB.an && OB.open && OB.micState === "live") OB.open(); // come back to: the mic on again for it, if it was
@@ -435,7 +435,10 @@ async function obTools() {
       else { say(line, "Split once the tools are in"); say(sst, word.waiting); done = done && !OB.pending ? done : false; }
       if (st?.installed && !j && !OB.pending && !OB.firstErr) done = false; // sent, its job not seen yet
     }
-    say(title, done ? "Job done" : "Getting your song tools");
+    // a library still coming in (chosen after, from the song's step): not done till it's in, so its covers go down with the end
+    const copying = OB.lib?.st?.status === "running";
+    if (copying) done = false;
+    say(title, done ? "Job done" : copying && st?.installed ? "Bringing in your library" : "Getting your song tools");
     go.hidden = !done;
     if (done) { say(state, ""); if (!OB.doneSaid) { OB.doneSaid = true; window.pitchroom?.attention?.(); } return; } // looked for, should you be away
     OB.dlT = setTimeout(paint, 1000);
@@ -569,12 +572,13 @@ async function obSink(list, panel) {
   });
 }
 // what goes into the water at the steps' end: the song's cover, through from its tools; a library's, brought in on the
-// song's step (none: no end played, as with no right half)
+// song's step, through from there (the tools in already) or from the tools' step after it (none: no end played, as with
+// no right half)
 function obFinaleCovers(step) {
   if (getComputedStyle($("#obVisual")).display === "none") return null;
   const hero = $("#obHero");
   if (step === "tools" && !hero.hidden) return [{ el: hero.querySelector(".cover"), art: OB.first?.art || hero.querySelector("img").src }];
-  if (step === "song" && OB.lib?.st?.status === "done" && OB.floats.length) return OB.floats.map((f) => ({ el: f.el.firstChild, art: f.src }));
+  if ((step === "song" || step === "tools") && OB.lib?.st?.status === "done" && OB.floats.length) return OB.floats.map((f) => ({ el: f.el.firstChild, art: f.src }));
   return null;
 }
 
@@ -660,9 +664,13 @@ async function obLibPoll(paint, st) {
   if (!st) { OB.libT = setTimeout(() => obLibPoll(paint), 700); return; }
   const fresh = (st.covers || []).slice(lib.seen); lib.seen += fresh.length;
   fresh.forEach((id, k) => setTimeout(() => OB.lib === lib && obFloatAdd(id), k * FLOAT.every));
+  if (st.status === "done") { // (the tools known before it's taken as done, so it's never painted done without them)
+    if (st.songs || st.settings) obLibIn();
+    lib.tools = !!(await obStatus())?.installed; // not in: on to their download, as with a first song (obSong)
+    if (OB.lib !== lib) return;
+  }
   lib.st = st;
   if (st.status === "running") OB.libT = setTimeout(() => obLibPoll(paint), 400);
-  else if (st.status === "done" && (st.songs || st.settings)) obLibIn();
   paint();
 }
 async function obLibIn() { // what came in, in the page: the settings not here yet (as the server merged them), the library drawn again
@@ -772,8 +780,9 @@ function obSong(next, back, end) {
     if (link) { $("#obClipV").textContent = link.replace(/^https?:\/\/(www\.)?/, ""); clip.onclick = () => { url.value = link; label(); clip.hidden = true; form.requestSubmit(); }; }
   };
   if (!obSong.on) { obSong.on = true; addEventListener("focus", () => OB.songClip?.()); }
-  // a library chosen instead (obLib): how far it's got, then how it went and Continue, through to the end (no tools
-  // needed); stopped, or nothing new in it, back to the link with why
+  // a library chosen instead (obLib): how far it's got, then how it went; with the song tools in, Continue, through
+  // to the end; without, what they're for and Download, on to their step (the covers floating on beside it), as a first
+  // song goes, so they're in before the library's shown. Stopped, or nothing new in it, back to the link with why
   const libPaint = () => {
     if (!OB.songStep || !OB.lib) return;
     const st = OB.lib.st || {};
@@ -788,13 +797,21 @@ function obSong(next, back, end) {
     if (on) say(libLine, "Copying… {d} of {n}", { d: st.done || 0, n: st.total || 0 });
     else say(libLine, st.songs === 1 ? "1 song copied" : "{n} songs copied", { n: st.songs });
     go.hidden = on;
-    if (!on) { say(go, "Continue"); go.onclick = end; }
+    $("#obGetsNote").hidden = on || OB.lib.tools; // (what the tools are, where they're offered)
+    if (!on) {
+      say(go, OB.lib.tools ? "Continue" : "Download the tools · 3–4 GB");
+      go.onclick = OB.lib.tools ? end : () => { obStartTools(); next(); };
+    }
   };
   $("#obLibGo").onclick = () => obLibGo(libPaint);
   OB.songStep = true;
   again.onclick = () => { url.value = ""; label(); state("ask"); obTint(null); OB.songClip(); };
   label();
-  if (OB.lib) libPaint(); // come back to with a library coming in
+  if (OB.lib) { // come back to with a library coming in, or in: the tools asked after again (in since, from their step: Continue, not Download)
+    libPaint();
+    const lib = OB.lib;
+    if (lib.st?.status === "done") obStatus().then((s) => { if (OB.lib === lib && OB.songStep) { lib.tools = !!s?.installed; libPaint(); } });
+  }
   else { state("ask"); OB.songClip(); }
 }
 async function obSend({ url }) {

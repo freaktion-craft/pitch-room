@@ -34,8 +34,10 @@ a { color: inherit; text-decoration: none; }
   pointer-events: none; opacity: 0; filter: blur(28px); transition: opacity 0.8s; }
 #aurora.on { opacity: 0.4; } /* there, not looked at */
 #app { position: relative; z-index: 1; }
-/* One width for every page, so the header and column edges don't jump when switching views */
-.app { max-width: 1440px; margin: 0 auto; padding-block: var(--space-6) var(--space-16);
+/* One width for every page, so the header and column edges don't jump when switching views. In the middle of the
+   window, not of what's left of it beside the scrollbar's room (100vw has it): as much either side, the scrollbar's
+   strip counted in the right's */
+.app { max-width: 1440px; margin: 0; margin-left: max(0px, (100vw - 1440px) / 2); padding-block: var(--space-6) var(--space-16);
   padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
 
 /* Top bar: app name, then its chips (quiet small buttons): songs being added, the mic, settings */
