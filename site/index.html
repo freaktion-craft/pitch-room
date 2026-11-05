@@ -57,9 +57,8 @@ a { -webkit-user-drag: none; }
 /* The app's welcome (js/app.js, welcome(), and css/base.css, #welcome): a book (the screen less 20 % each side), its
    right half turned over to the left like a page, one after another, each an accent colour (no name over it, here).
    Here it starts closed, its dark cover alone in the middle, and moves right as it opens (its spine to the
-   middle); the last page lands dark, then turns back over behind the right page under it, which (the button on it, there
-   under the pages all along, shown as the last one lifts off it) comes back to the middle on its own: a plain page, no book.
-   The pages are built by riffle() */
+   middle); the last page lands in the page's own black, the book gone into it, and the button comes up in the middle,
+   out of a blur. The pages are built by riffle() */
 .book { position: fixed; inset: 20%; }
 .book .half { position: absolute; top: 0; bottom: 0; width: 50%; }
 .book .leaf { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: 0 50%; transform-style: preserve-3d; }
@@ -71,10 +70,9 @@ a { -webkit-user-drag: none; }
    what's under it there; the last page's own back goes past it (riffle()), over the edge of the one it lands on */
 .book .leaf > .recto { left: -1px; width: calc(100% + 1px); }
 .book > .half:first-child { width: calc(50% + 1px); }
-/* the right page's own: the button, on the open book's right half, under every page still to turn (they're above it, 100
-   and up), so the last one lifting off is what shows it */
-.book .page { position: absolute; top: 0; bottom: 0; left: 50%; right: 0; z-index: 1; display: grid; place-items: center; }
-.book:not(.built) .page { visibility: hidden; } /* (till its pages are there over it) */
+/* the button, in the middle of the screen over it all, unseen till the book's gone (riffle() brings it out of a blur) */
+.page { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; pointer-events: none; }
+.page .get { pointer-events: auto; opacity: 0; }
 .note { opacity: 0; transition: opacity 0.6s var(--ease); }
 .shown .note { opacity: 1; }
 /* a phone, up on end: the book narrower at its sides, taller, so a page still holds the button */
@@ -82,12 +80,13 @@ a { -webkit-user-drag: none; }
 </style>
 </head>
 <body>
-<div class="book" id="book"><div class="page" id="page">
+<div class="book" id="book"></div>
+<div class="page" id="page">
 <a class="get" id="get" href="https://github.com/freaktion-craft/pitchroom-releases/releases/latest">
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
   <span id="getLabel">Download</span>
 </a>
-</div></div>
+</div>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
 <div class="tip" id="tip" role="status"></div>
 
@@ -175,8 +174,8 @@ tip.addEventListener("click", () => tip.classList.remove("on"));
 const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06, -0.04, 0.05, -0.06, 0.03, -0.05, 0.04],
   pageEase: "cubic-bezier(0.38, 0, 0.12, 1)", rest: 200, last: 700, lastEase: "cubic-bezier(0.55, 0, 0.2, 1)",
   shade: 0.32,
-  open: 520, openEase: "cubic-bezier(0.45, 0, 0.2, 1)", close: 640, closeEase: "cubic-bezier(0.65, 0, 0.25, 1)", // open: the closed book over to the right as its cover starts to lift; close: the right page back to the middle at the end
-  back: 620, backEase: "cubic-bezier(0.45, 0, 0.2, 1)" }; // back: the last page turned back over, behind the right one
+  open: 520, openEase: "cubic-bezier(0.45, 0, 0.2, 1)", // open: the closed book over to the right as its cover starts to lift
+  reveal: 700, revealBlur: 12 }; // reveal: the button coming up out of a blur (px) once the last page is down
 const CLOSED = "translateX(-25%)"; // the book with its right half (its cover, then its right page) in the middle
 const ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "blue", "violet", "pink"]; // as the app has them (js/stage.js)
 async function riffle() {
@@ -192,7 +191,7 @@ async function riffle() {
     return h;
   };
   const inside = half(0, "", "0"); inside.style.background = "transparent"; // nothing to the cover's left till it's turned
-  book.replaceChildren(inside, half(n, "", "50%"), document.getElementById("page")); // the right page's button on it, under the pages
+  book.replaceChildren(inside, half(n, "", "50%"));
   if (!still) book.animate([{ transform: CLOSED }, { transform: "none" }], { delay: R.start - R.open / 2, duration: R.open, easing: R.openEase, fill: "both" }); // over to the right as the cover lifts
   const depth = `perspective(${Math.round(book.clientWidth * 2)}px)`; // a page's depth as it turns, for its size
   const turn = (k, delay, duration, easing, showAt = 0) => { // page k: colour k on its front (the right), k + 1 on its back
@@ -222,29 +221,12 @@ async function riffle() {
   const onset = (k) => { const x = k / (n - 2); return R.start + R.span * (x + R.bunch * Math.sin(2 * Math.PI * x) / (2 * Math.PI)); };
   if (!still) for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase, k ? onset(k - 1) : 0);
   const lastAt = still ? 0 : onset(n - 2) + R.page / 2 + R.rest, landed = turn(n - 1, lastAt, still ? 1 : R.last, R.lastEase, still ? 0 : onset(n - 2));
-  book.classList.add("built"); // every page over the button now
- // the last page's back 2 px past the spine (a verso's box is its spine side's left): as it lands, over the edge of the
-  // one under it, which would show through its own soft one; past the spine only the dark of the open book's right
-  Object.assign(book.lastChild.querySelector(".verso").style, { left: "-2px", width: "calc(100% + 2px)" });
   await landed;
-  const leaves = [...book.querySelectorAll(".leaf")], left = leaves.pop();
-  leaves.forEach((p) => p.remove()); // the last page over the left, the dark right page under it
+  book.replaceChildren(); // the last page down in the page's own black, the right one under it the same: the book gone into it
+  // and the button where it's been all along, in the middle, coming up out of a blur
+  document.getElementById("get").animate([{ opacity: 0, filter: `blur(${R.revealBlur}px)` }, { opacity: 1, filter: "blur(0px)" }],
+    { duration: still ? 1 : R.reveal, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "forwards" });
   document.body.classList.add("shown"); // the line at the foot
-  // the book away: the last page turned on over to the right, behind the right page (under it: -1, under the book's own),
-  // so it goes in under it; the right one (the button on it) back to the middle as it does, a plain page
-  left.getAnimations({ subtree: true }).forEach((a) => a.cancel());
-  const [recto, verso] = left.children, b = { duration: still ? 1 : R.back, easing: R.backEase, fill: "forwards" };
-  // its front no longer a pixel past the spine (under the right page, that pixel showed at its edge), and dark as the
-  // page it goes under, so a corner of it at the end, a pixel or so, doesn't show pink
-  Object.assign(recto.style, { left: "0", width: "100%", background: colours[n] });
-  // on round the same way, through the back of the book (away from you, smaller in its depth, so none of it shows round
-  // the right page), to lie flat under it
-  left.animate([{ transform: `${depth} rotateY(-180deg)`, zIndex: -1 }, { transform: `${depth} rotateY(-360deg)`, zIndex: -1 }], b)
-    .finished.then(() => left.remove()); // gone once it's under: lying there just its size, its edges showed round the page
-  verso.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], b);
-  recto.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], b);
-  book.animate([{ transform: still ? CLOSED : "none" }, { transform: CLOSED }],
-    { delay: still ? 0 : R.back * 0.3, duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" });
 }
 riffle();
 </script>
