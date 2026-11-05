@@ -36,10 +36,10 @@ a { -webkit-user-drag: none; }
 /* the button: the app's own primary one (.btn.primary, in css/base.css): 40 px high, 14 px type, an 18 px icon; round at its ends (a pill: a little more room inside them) */
 .get { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 18px 0 14px; border-radius: 999px; background: var(--ink); color: var(--on-ink);
   font: 500 14px/1 var(--font); text-decoration: none; -webkit-tap-highlight-color: transparent;
-  transition: transform 0.2s var(--ease), background 0.2s, box-shadow 0.2s var(--ease); }
-/* hover: where it is, at the full white, a glow round it; pressed: a little smaller, a shade darker */
-.get:hover { background: var(--ink-strong); box-shadow: 0 6px 18px rgba(255, 255, 255, 0.1); }
-.get:active { background: oklch(0.82 0 0); transform: scale(0.97); box-shadow: none; transition-duration: 0.06s; }
+  transition: transform 0.2s var(--ease), background 0.2s; }
+/* hover: at the full white; pressed: a little smaller, a shade darker */
+.get:hover { background: var(--ink-strong); }
+.get:active { background: oklch(0.82 0 0); transform: scale(0.97); transition-duration: 0.06s; }
 .get:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .get svg { width: 18px; height: 18px; }
 /* the line at the page's foot, 24 px up as the app's column is in from its sides */
@@ -63,10 +63,10 @@ a { -webkit-user-drag: none; }
 .book .leaf > .half { left: 0; width: 100%; backface-visibility: hidden; }
 .book .leaf > .verso { transform: rotateY(180deg); }
 .book .shade { position: absolute; inset: 0; background: #000; opacity: 0; } /* the light going off a page as it stands up */
-/* each page a pixel over the spine, so a turning one's soft edge lies over the page beside it, not the dark under it (as
-   the app's). Both faces from a pixel before the spine: a verso's turned over twice (on its own, and with its leaf), so
-   its spine side's where a recto's is */
-.book .leaf > .half { left: -1px; width: calc(100% + 1px); }
+/* a page's front a pixel past the spine, its soft edge under the one turned over it, so no line down the middle (as the
+   app's). Not its back: a back past the spine shows as a strip of its colour on the right while the last page lifts off
+   what's under it there; the last page's own back goes past it (riffle()), over the edge of the one it lands on */
+.book .leaf > .recto { left: -1px; width: calc(100% + 1px); }
 .book > .half:first-child { width: calc(50% + 1px); }
 /* once it's open: the spine's shade, as the app's colour book has it */
 .book::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% - 16px); width: 32px; z-index: 1000; pointer-events: none; opacity: 0;
@@ -81,7 +81,7 @@ a { -webkit-user-drag: none; }
 /* the right page, where the button is: over the book, in its right half */
 .page { position: fixed; top: 20%; bottom: 20%; left: 50%; right: 20%; z-index: 1001; display: grid; place-items: center; }
 .page .get, .note { opacity: 0; transition: opacity 0.6s var(--ease); }
-.page .get { transition: opacity 0.6s var(--ease), transform 0.2s var(--ease), background 0.2s, box-shadow 0.2s var(--ease); }
+.page .get { transition: opacity 0.6s var(--ease), transform 0.2s var(--ease), background 0.2s; }
 .shown .page .get, .shown .note { opacity: 1; }
 /* a phone, up on end: the book narrower at its sides, taller, so a page still holds the button */
 @media (max-aspect-ratio: 3 / 4) { .book { inset: 24% 6%; } .page { top: 24%; bottom: 24%; right: 6%; } }
@@ -206,7 +206,11 @@ async function riffle() {
   };
   const onset = (k) => { const x = k / (n - 2); return R.start + R.span * (x + R.bunch * Math.sin(2 * Math.PI * x) / (2 * Math.PI)); };
   if (!still) for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase);
-  await turn(n - 1, still ? 0 : onset(n - 2) + R.page / 2 + R.rest, still ? 1 : R.last, R.lastEase);
+  const landed = turn(n - 1, still ? 0 : onset(n - 2) + R.page / 2 + R.rest, still ? 1 : R.last, R.lastEase);
+  // the last page's back 2 px past the spine (a verso's box is its spine side's left): as it lands, over the edge of the
+  // one under it, which would show through its own soft one; past the spine only the dark of the open book's right
+  Object.assign(book.lastChild.querySelector(".verso").style, { left: "-2px", width: "calc(100% + 2px)" });
+  await landed;
   [...book.querySelectorAll(".leaf")].slice(0, -1).forEach((p) => p.remove()); // the open book: the last page over the left, the dark right under it
   book.classList.add("open"); document.body.classList.add("shown"); // and on its right page, the button
   const to = logo.getBoundingClientRect(), from = word.getBoundingClientRect();
