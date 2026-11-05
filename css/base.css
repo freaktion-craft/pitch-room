@@ -189,11 +189,12 @@ html.welcome #boot, html.asking #welcome { display: none; }
 #welcome .leaf { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: 0 50%; transform-style: preserve-3d; } /* its faces turn with it, so the back shows once it's over */
 #welcome .leaf > .half { left: 0; width: 100%; backface-visibility: hidden; }
 #welcome .leaf > .verso { transform: rotateY(180deg); } /* a page's back (its front, .recto); not .back, the back link's */
-/* each page a pixel over the spine, so a turning one's soft edge (antialiased, as it's in 3D) lies over the page beside it,
-   not over the black under the book: no line down the middle. Both faces from a pixel before it: a verso's turned over
-   twice (on its own, and with its leaf), so its spine side's where a recto's is. (And the pages down under another are
-   hidden, welcome()'s turn(): all their edges at the spine, the top one's soft edge let theirs show through as a line.) */
-#welcome .leaf > .half { left: -1px; width: calc(100% + 1px); }
+/* a page's front a pixel past the spine, its soft edge (antialiased, as it's in 3D) under the one turned over it, so no
+   line down the middle. Not its back: a back past the spine shows as a strip of its colour on the right while the black
+   page lifts off the black under it (the black page's own back goes past it, welcome(), over the edge of the one it
+   lands on). And the pages down under another are hidden (welcome()'s turn()): all their edges at the spine, the top
+   one's soft edge let theirs show through as a line. */
+#welcome .leaf > .recto { left: -1px; width: calc(100% + 1px); }
 #welcome .book > .half:first-child { width: calc(50% + 1px); }
 #welcome .shade { position: absolute; inset: 0; background: #000; opacity: 0; }
 #welcome .word { position: absolute; z-index: 1; left: 0; top: 0; transform-origin: 0 0; white-space: nowrap; color: var(--ink); visibility: hidden;
