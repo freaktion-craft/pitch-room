@@ -262,11 +262,13 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
    page dimmed beside it (#addVeil); in from the right and back out (display kept for the slide). On the desktop app
    what's in it starts under the strip that moves the window, which goes on over its top. */
 .add-at { position: relative; display: inline-flex; }
-#addPop, #jobsPop { --drawer-top: 0px; position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: min(520px, 100vw); margin: 0;
-  padding-top: calc(var(--drawer-top) + var(--space-4)); border-radius: 0; z-index: var(--z-modal); align-content: start; overflow-y: auto; overscroll-behavior: contain;
+/* its title row on the header's line (the name's): the page's padding over the header, less the title row's -6 px
+   margin, plus half of what the 32 px header has over the row's 20 px */
+#addPop, #jobsPop { --drawer-top: 0px; --head-top: var(--space-6); position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: min(520px, 100vw); margin: 0;
+  padding-top: calc(var(--head-top) + 6px); border-radius: 0; z-index: var(--z-modal); align-content: start; overflow-y: auto; overscroll-behavior: contain;
   -webkit-app-region: no-drag; transition: translate var(--duration-slow) var(--ease), display var(--duration-slow) allow-discrete; }
-html.desktop-win :is(#addPop, #jobsPop) { --drawer-top: var(--titlebar); }
-html.desktop-mac :is(#addPop, #jobsPop) { --drawer-top: var(--space-6); }
+html.desktop-win :is(#addPop, #jobsPop) { --drawer-top: var(--titlebar); --head-top: calc(var(--titlebar) + var(--space-3)); }
+html.desktop-mac :is(#addPop, #jobsPop) { --drawer-top: var(--space-6); --head-top: calc(var(--space-6) + var(--space-3)); }
 :is(html.desktop-win, html.desktop-mac) :is(#addPop, #jobsPop)::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: var(--drawer-top); -webkit-app-region: drag; }
 #addPop[hidden], #jobsPop[hidden] { translate: 100% 0; pointer-events: none; }
 @starting-style { #addPop:not([hidden]), #jobsPop:not([hidden]) { translate: 100% 0; } }
