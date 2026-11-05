@@ -561,6 +561,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .pop .btn.primary:hover { background: var(--hover-2); }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
 .btn.quiet:hover { background: var(--fg-8); }
+#app > header .btn.quiet:not(.mic) { color: var(--ink); } /* the header's buttons in ink, the mic's beside them: a grey one there reads as off */
 #micSetBtn.on { background: var(--hover-2); color: var(--ink); } /* the gear, on the settings' page */
 .btn.quiet > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .btn.ghost { background: transparent; color: var(--muted); }
