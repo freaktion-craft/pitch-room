@@ -612,17 +612,22 @@ addEventListener("resize", pinLibTop);
 const FADE_H = 192;
 // the room the New row takes above the list (none while it's hidden): hidden, the list starts where it does
 const newRoom = () => { const n = $("#sNew"); return n.hidden ? 0 : $("#sLib").offsetTop - n.offsetTop; };
+// The foot's fade on a song's page too (the Studio), as its tracks go on below the window; the top's is the library's
+// alone (under its pinned top)
 function paintFade(now) {
-  const lib = view === "stems" && stemsPage === "lib", below = document.documentElement.scrollHeight - (scrollY + innerHeight);
+  const lib = view === "stems" && stemsPage === "lib", song = view === "stems" && stemsPage === "song";
+  const below = document.documentElement.scrollHeight - (scrollY + innerHeight);
   // the New row, over the band behind the pinned top while it goes up: cut off where it reaches the search's line
   const nw = $("#sNew");
   if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
-  for (const [f, px] of [[$("#listFade"), below], [$("#listFadeTop"), scrollY - newRoom()]]) {
+  for (const [f, px, here] of [[$("#listFade"), below, lib || song], [$("#listFadeTop"), scrollY - newRoom(), lib]]) {
     if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
     f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
-    f.classList.toggle("on", lib && px > 0);
+    f.classList.toggle("on", here && px > 0);
   }
 }
+// the page growing or shrinking under a still window (a song's tracks in, its video shown): the foot's fade with it
+new ResizeObserver(() => paintFade()).observe(document.body);
 function initCoverView() {
   const view = $("#coverView"), card = view.querySelector(".cv-card");
   view.addEventListener("pointermove", (e) => {
