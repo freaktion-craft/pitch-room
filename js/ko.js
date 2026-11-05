@@ -121,11 +121,6 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "A YouTube link, or a playlist to pick from. It’s split and timed in the background, so you can look around meanwhile.":
     "YouTube 링크나, 곡을 고를 재생목록이면 돼요. 나누고 맞추는 건 뒤에서 하니까, 그동안 둘러보세요.",
   "Paste a YouTube link": "YouTube 링크 붙여넣기", "YouTube link": "YouTube 링크",
-  "Mona Lisa": "모나리자", "humming, probably": "흥얼거리는 중", "The Scream": "절규", "hitting the high C": "3옥타브 고음 찍는 중",
-  "Sunflowers": "해바라기", "the backing vocals": "코러스", "Girl with a Pearl Earring": "진주 귀걸이를 한 소녀", "in-ear monitor": "인이어 모니터",
-  "The Creation of Adam": "아담의 창조", "passing the mic": "마이크 넘기는 중", "The Great Wave": "가나가와 해변의 큰 파도", "a big crescendo": "크게 크레셴도",
-  "The Starry Night": "별이 빛나는 밤", "all vibrato": "온통 비브라토", "American Gothic": "아메리칸 고딕", "the duet": "듀엣",
-  "The Birth of Venus": "비너스의 탄생", "enters on cue": "딱 맞춰 등장",
   "Paste a YouTube link to a song you’d like to sing.": "부르고 싶은 곡의 YouTube 링크를 넣어 주세요.", "Find": "찾기", "Paste": "붙여넣기", "Copied link": "복사한 링크", "Finding the song": "곡 정보를 찾고 있어요",
   "Another link": "다른 링크", "Download": "내려받기", "Download the tools · 3–4 GB": "도구 다운로드 · 3–4 GB",
   "Runs the models": "모델을 돌려요", "Reads the audio": "오디오를 읽어요", "Voice from band": "목소리와 반주를 나눠요", "Lead from backing": "메인과 코러스를 나눠요",
