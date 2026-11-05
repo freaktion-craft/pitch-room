@@ -8,6 +8,12 @@
 <meta name="theme-color" content="#141414">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<script>
+  // a phone or a tablet (an iPad says it's a Mac, but has a touch screen): there's nothing to install on it, so the
+  // page says to come from a computer instead; set before the page is drawn, so the button never shows there
+  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (/Mac/i.test(navigator.platform) && navigator.maxTouchPoints > 1) || (navigator.userAgentData && navigator.userAgentData.mobile))
+    document.documentElement.classList.add("phone");
+</script>
 <style>
 /* the app's own tokens (css/tokens.css), the few this page uses: dark only, as the app is */
 :root {
@@ -67,6 +73,10 @@ a { -webkit-user-drag: none; }
 .get { animation: reveal 0.7s cubic-bezier(0.2, 0, 0, 1) 0.15s both; }
 .note { animation: rise 0.6s var(--ease) 0.45s both; }
 @media (prefers-reduced-motion: reduce) { .get, .note { animation: none; } }
+/* on a phone: that one line in the middle, nothing else */
+.desktop { display: none; grid-area: 1 / 1; margin: 0; padding: 0 24px; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 15px/1.5 var(--font); }
+.phone .desktop { display: block; }
+.phone .get, .phone .note, .phone .word, .phone .tip { display: none; }
 </style>
 </head>
 <body>
@@ -75,6 +85,7 @@ a { -webkit-user-drag: none; }
   <span id="getLabel">Download</span>
 </a>
 <span class="word" id="word" aria-hidden="true">Pitchroom</span>
+<p class="desktop" id="desktop">Please visit from a desktop</p>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
 <div class="tip" id="tip" role="status"><img src="img/installer-icon.png" alt="" width="28" height="28"><span id="tipText"></span></div>
 
@@ -121,6 +132,7 @@ async function detectMacArch() {
 
 (async () => {
   if (ko) document.getElementById("note").textContent = "노래 연습을 하고 싶은 사람들을 위한 취미 프로젝트예요.";
+  if (ko) document.getElementById("desktop").textContent = "데스크톱에서 방문해 주세요";
   const os = detectOS();
   const label = document.getElementById("getLabel");
   label.textContent = !os ? (ko ? "다운로드" : "Download") : ko ? `${NAMES[os]}용 다운로드` : `Download for ${NAMES[os]}`;
