@@ -152,7 +152,7 @@ const showTip = () => {
 // the button gone up to where the download is: its words going as it draws in round its logo, a circle, then off up to
 // the browser's downloads icon (where the tip points), smaller, into the toolbar; the tip as it gets there, and in the
 // button's place the name, out of a blur. A copy flies (the button itself, its link and its download, as they are)
-const FLY = { shrink: 280, fly: 760, size: 40, bend: [0.05, 1] }; // bend: the arc's control point, its share of the way across and up
+const FLY = { shrink: 280, fly: 760, size: 40, bend: [1, 0.05] }; // bend: the arc's control point, its share of the way across and up (across first, then up)
 document.fonts.load('400 44px "Geist Serif"').catch(() => {}); // the name's typeface in ahead of a click
 let flying = false;
 async function fly(get) {
@@ -173,8 +173,8 @@ async function fly(get) {
   // off up to the downloads icon: its middle to the top edge, under it, getting smaller, gone as it gets there
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2, tx = innerWidth - tipAt(), ty = 0;
   svg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FLY.fly * 0.4, easing: "ease-out", fill: "forwards" }); // its logo going as it sets off: a plain dot goes up
-  // along an arc, as a thing tossed up: rising first, then bending over to the right (a curve through a point above where
-  // it starts, its control), not straight across; eased in and out along it, smaller as it goes, gone as it gets there
+  // along an arc: out to the right first, then sweeping up into the toolbar (a curve bent toward a point level with where
+  // it starts, under the icon: its control), not straight across; eased along it, smaller as it goes, gone as it gets there
   const dx = tx - cx, dy = ty - cy - 8, c = { x: dx * FLY.bend[0], y: dy * FLY.bend[1] }, ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
   const path = Array.from({ length: 25 }, (_, i) => {
     const t = i / 24, e = ease(t), u = 1 - e, x = 2 * u * e * c.x + e * e * dx, y = 2 * u * e * c.y + e * e * dy; // a quadratic curve from here to there
