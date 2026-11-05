@@ -211,7 +211,9 @@ async function riffle() {
   // so it goes in under it; the right one (the button on it) back to the middle as it does, a plain page
   left.getAnimations({ subtree: true }).forEach((a) => a.cancel());
   const [recto, verso] = left.children, b = { duration: still ? 1 : R.back, easing: R.backEase, fill: "forwards" };
-  Object.assign(recto.style, { left: "0", width: "100%" }); // its front no longer a pixel past the spine: under the right page, that pixel showed at its edge
+  // its front no longer a pixel past the spine (under the right page, that pixel showed at its edge), and dark as the
+  // page it goes under, so a corner of it at the end, a pixel or so, doesn't show pink
+  Object.assign(recto.style, { left: "0", width: "100%", background: "var(--surface)" });
   // on round the same way, through the back of the book (away from you, smaller in its depth, so none of it shows round
   // the right page), to lie flat under it
   left.animate([{ transform: `${depth} rotateY(-180deg)`, zIndex: -1 }, { transform: `${depth} rotateY(-360deg)`, zIndex: -1 }], b)
