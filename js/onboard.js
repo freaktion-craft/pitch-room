@@ -27,7 +27,7 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
       moving = true;
       // through, from the song's tools with its cover out in the right half (or from the song's step with a library
       // brought in, its covers on the water): the steps' end played first (obFinale); not when left by Exit
-      if (i >= steps.length && !out?.exit && OB.lib && OB.floats.length) { await obRingsOut(); await obLibWave(); } // a library's covers, turning till now: blurred away, the water back with a wave, then the page
+      if (i >= steps.length && !out?.exit && OB.lib && OB.floats.length) $("#welcome").classList.remove("ob-lib"); // a library's covers, turning till now: the water back under them, for them to sink into as a first song's cover does
       const finale = i >= steps.length && !out?.exit && obFinaleCovers(steps[at]?.dataset.step);
       if (finale) await obFinale(finale);
       // going on to allowing the mic when it's allowed already (asked here before, or in the browser): on past it
@@ -590,6 +590,7 @@ function obFinaleCovers(step) {
   if (getComputedStyle($("#obVisual")).display === "none") return null;
   const hero = $("#obHero");
   if (step === "tools" && !hero.hidden) return [{ el: hero.querySelector(".cover"), art: OB.first?.art || hero.querySelector("img").src }];
+  if ((step === "song" || step === "tools") && OB.lib?.st?.status === "done" && OB.floats.length) return OB.floats.map((f) => ({ el: f.el.firstChild, art: f.src }));
   return null;
 }
 
@@ -603,7 +604,7 @@ function obFinaleCovers(step) {
 // 10, 15: every other one, every third, on the inner's spokes), upright; each blurring in as its song's copied, and
 // the whole turning slowly as one, as long as it goes on. More songs than places: the
 // oldest blurs out for the next. All in, the step says so, and they go on turning till it's left: through (Continue),
-// they blur out one after another (obRingsOut), the water comes back with a wave (obLibWave), then the page.
+// the water comes back under them and they sink into it as a first song's cover does (obFinale), then the page.
 // size: a cover's side; r0: the inner ring's radius; step: from a ring to the next; spin: the turn, rad/s
 const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 150, spin: 0.1 };
 const FLOAT = { every: 140 }; // ms between several coming in at once
@@ -640,19 +641,6 @@ function obFloatOut(f, now = false) { // blurred away where it is
   if (now || !f.el.isConnected) return f.el.remove();
   return f.el.firstChild.animate([{ opacity: 1, filter: "blur(0)", transform: "none" }, { opacity: 0, filter: "blur(14px)", transform: "scale(1.08)" }], { duration: 520, easing: "ease-in", fill: "forwards" })
     .finished.then(() => f.el.remove(), () => f.el.remove());
-}
-// all in: the covers blur out, one after another round the rings, then the step says so
-function obRingsOut() {
-  const all = [...OB.floats].sort((a, b) => a.slot - b.slot), step = Math.min(60, 900 / Math.max(1, all.length));
-  return Promise.all(all.map((f, k) => new Promise((ok) => setTimeout(() => { const p = obFloatOut(f); (p || Promise.resolve()).then(ok, ok); }, stillMotion() ? 0 : k * step))));
-}
-// the covers gone at the end: the water comes back, a wave going out from the middle where they were, a moment of it
-async function obLibWave() {
-  $("#welcome").classList.remove("ob-lib");
-  if (stillMotion() || !OB.scope) return;
-  const r = $("#obVisual").getBoundingClientRect();
-  OB.splashes.push({ x: r.width / 2, y: r.height / 2, rad: 160, amp: 6 });
-  await sleep(1500);
 }
 // the rings turning, as one: each cover where it's got to round the middle, upright
 function obFloatRun() {
