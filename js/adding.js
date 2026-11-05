@@ -23,10 +23,10 @@ function paintJobs() {
   arc.style.strokeDasharray = `${!jobs.length ? 0 : btn.classList.contains("err") ? 100 : Math.max(6, waiting ? 25 : p * 100)} 100`;
   arc.style.visibility = jobs.length ? "" : "hidden"; // empty: just the track, no dot of a round end
   if (!btn.querySelector(":scope > .ico")) btn.append(icon("plus"));
-  btn.classList.toggle("idle", !jobs.length); // nothing being added: a + (the panel adds a song) in the ring's place
-  const pct = Math.round(p * 100);
+  btn.classList.toggle("idle", !jobs.length); // nothing being added: a + (the panel adds a song) in the ring's place; beside Add song, the ring empty
+  const pct = Math.round(p * 100), byAdd = !!btn.closest(".lib-head");
   say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : ready.length > 1 ? "{n} songs added"
-    : ready.length ? "Song added" : failed ? "Couldn’t add a song" : "Add songs", { n: live.length || ready.length, pct }, "title");
+    : ready.length ? "Song added" : failed ? "Couldn’t add a song" : byAdd ? "Songs being added" : "Add songs", { n: live.length || ready.length, pct }, "title");
   // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
   say($(".jobs-head b"), !live.length && ready.length ? "Songs added" : "Adding songs");
@@ -74,10 +74,21 @@ function forgetAdded(songId) {
   for (const [id, j] of adding) if (j.done && j.songId === songId) { adding.delete(id); document.getElementById("job-" + id)?.remove(); gone = true; }
   if (gone) paintJobs();
 }
+// Their button (the ring): in the library right of Add song, always, the ring empty while nothing's being added;
+// elsewhere in the header by the mic, a + then (its panel adds a song, so one can be added from any page)
+function placeJobs() {
+  const btn = $("#jobsBtn"), lib = view === "stems" && stemsPage === "lib", head = $("#app > header");
+  if (lib) { if (btn.previousElementSibling !== $("#sAddAt")) $("#sAddAt").after(btn); }
+  else if (btn.parentElement !== head) { const at = head.querySelector(":scope > #micBtn, :scope > .ob-mic-hold"); at ? at.before(btn) : head.append(btn); } // (the mic out over the first steps: its place kept)
+  paintJobs();
+}
+// The songs being added: their panel a modal in the middle of the window, over the page dimmed (#addVeil, as Add
+// song's is); a click beside it or Escape closes it
 function showJobs(on) {
   const was = !$("#jobsPop").hidden;
   $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
   if (on) { showAdd(false); paintJobs(); } // marks those in as seen
+  if (on) $("#addVeil").classList.add("on"); else if ($("#addPop").hidden) $("#addVeil").classList.remove("on"); // (after Add song's closing, which takes it off)
   else closeYt();
   if (!on && was) { // closed: the songs it showed as in have been seen
     showJobsAdd(false);

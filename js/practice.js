@@ -1255,8 +1255,9 @@ function initSing() {
   });
   initTakes(); initEars(); initSync(); initLyEdit();
   initSetNav(); // settings: their page, its tab in the header's (#micSetBtn)
-  // the songs being added: their panel under their ring, the same way
+  // the songs being added: their panel a modal (showJobs), out of the header so it's over all the page
   const jobsBtn = $("#jobsBtn"), jobsPop = $("#jobsPop");
+  document.body.append(jobsPop); jobsPop.setAttribute("aria-modal", "true");
   jobsBtn.onclick = (e) => { e.stopPropagation(); showJobs(jobsPop.hidden); };
   document.addEventListener("click", (e) => { if (!jobsPop.hidden && !e.composedPath().includes(jobsPop)) showJobs(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !jobsPop.hidden) { showJobs(false); jobsBtn.focus(); } });

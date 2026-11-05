@@ -186,7 +186,7 @@ function route() {
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra);
-  paintCrumbs(); lastHash = location.hash || "#stems";
+  paintCrumbs(); placeJobs(); lastHash = location.hash || "#stems";
   pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   // back in the library: the song (still loaded) starts from the top when it's opened again, in the Studio or Practice
