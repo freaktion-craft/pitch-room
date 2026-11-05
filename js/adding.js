@@ -86,9 +86,9 @@ function afterSlide(pop, fn) {
 function showJobs(on) {
   const was = !$("#jobsPop").hidden;
   $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
-  if (on) { showAdd(false); paintJobs(); } // marks those in as seen
-  if (on) $("#addVeil").classList.add("on"); else if ($("#addPop").hidden) $("#addVeil").classList.remove("on"); // (after Add song's closing, which takes it off)
-  else closeYt();
+  if (on || was) drawerEdge($("#jobsPop"), on);
+  if (on) { showAdd(false); paintJobs(); $("#addVeil").classList.add("on"); } // marks those in as seen; the veil after Add song's closing, which takes it off
+  else { if ($("#addPop").hidden) $("#addVeil").classList.remove("on"); closeYt(); }
   if (!on && was) { // closed: the songs it showed as in have been seen
     afterSlide($("#jobsPop"), () => { if ($("#jobsPop").hidden) showJobsAdd(false); }); // the form back once it's out, not swapped as it goes
     for (const [id, j] of adding) if (j.done && j.seen) { adding.delete(id); document.getElementById("job-" + id)?.remove(); }
@@ -323,6 +323,14 @@ function showAdd(on) {
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
   $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // a click beside it closes it
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
+  drawerEdge(pop, on);
+}
+// A drawer open: the page's scrollbar (its room always kept, base.css) in the drawer's colour, so the drawer meets the
+// window's edge; back once it's slid out (and the other isn't open)
+function drawerEdge(pop, on) {
+  const html = document.documentElement, any = () => !$("#addPop").hidden || !$("#jobsPop").hidden;
+  if (on) html.classList.add("drawer-open");
+  else afterSlide(pop, () => html.classList.toggle("drawer-open", any()));
 }
 // The ring's panel has Add song too, so a song can be added from any page: the same form, moved into the panel under
 // the songs being added, its button stepping aside; it goes back when the panel closes or a song is sent.
