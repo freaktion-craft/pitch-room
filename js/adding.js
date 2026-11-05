@@ -293,7 +293,7 @@ async function submitYoutube(e) {
   }
   field.value = [...failed, ...(list ? [list] : [])].join("\n"); fitLinks(); // what didn't start stays, to fix
   if (list) { if (sent) landRing(); if (!failed.length) await readPlaylist(list); }
-  else if (!failed.length) { addMsg(""); await tuckAway(); } // all sent: the panel goes into the ring
+  else if (!failed.length) { addMsg(""); await tuckAway(); } // all sent: the drawer shows them being added
   else if (sent) landRing(); // some sent: the ring shows them; the panel stays, saying why the rest couldn't start
 }
 // A playlist (YouTube's or Spotify's, or a Spotify album): its songs listed under the field first, to pick from, ticked
@@ -362,8 +362,8 @@ async function addPicked() {
     closePlaylist(); $("#sYtUrl").value = ""; fitLinks(); addMsg(""); await tuckAway();
   } else { countPicked(); addMsg(failed.join("\n"), true); if (sent) landRing(); } // what didn't start stays ticked, to try again
 }
-// A song sent: the drawer slides back out, the page behind clearing, and the ring by the mic, where the songs being
-// added show, comes in (or gives a nudge, there already).
+// A song sent: the drawer turns to the songs being added, the new one among them, and the ring by the mic comes in
+// (or gives a nudge, there already).
 // holdRing, before the first song's job shows: the ring keeps its place unseen until then.
 function holdRing() {
   const ring = $("#jobsBtn");
@@ -380,7 +380,14 @@ async function tuckAway() {
   const pop = $("#addPop");
   if (!$("#jobsAdd").hidden) { showJobsAdd(false); landRing(); return; } // sent from the ring's drawer: the form folds away there, the songs show in its place
   const open = !pop.hidden;
-  showAdd(false); // the drawer slides back out (its CSS), then the ring takes them
+  if (open && !document.documentElement.classList.contains("welcome")) { // sent (Add, or Enter): the drawer stays, turned to the songs being added, the new one in them
+    for (const d of [pop, $("#jobsPop")]) d.classList.add("swap"); // (in place: neither slides)
+    showJobs(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => { for (const d of [pop, $("#jobsPop")]) d.classList.remove("swap"); }));
+    $("#jobsClose").focus({ preventScroll: true });
+    return landRing();
+  }
+  showAdd(false); // (in the first steps: away, under them)
   if (open) await new Promise((r) => afterSlide(pop, r));
   landRing();
 }

@@ -277,6 +277,7 @@ html.desktop-mac :is(#addPop, #jobsPop) { --drawer-top: var(--space-6); --head-t
 #addPop[hidden], #jobsPop[hidden] { translate: 100% 0; pointer-events: none; }
 @starting-style { #addPop:not([hidden]), #jobsPop:not([hidden]) { translate: 100% 0; } }
 @media (prefers-reduced-motion: reduce) { #addPop, #jobsPop { transition: none; } }
+:is(#addPop, #jobsPop).swap { transition: none; } /* one turned into the other (a song sent): in place */
 :is(#addPop, #jobsPop) .pop-title { font-size: 16px; } /* a drawer's name: a little over a panel's 14 px (its line the same, on the header's) */
 .add-form { display: grid; gap: var(--space-3); }
 .add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0 var(--space-2); } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
