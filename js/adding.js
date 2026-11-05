@@ -13,7 +13,7 @@ const adding = new Map();
 function addingJob(id, j) { adding.set(id, { ...(adding.get(id) || {}), ...j }); paintJobs(); }
 // A song's progress in pixels: PX_ROWS rows of PX_COLS, filled a column at a time from the left (the CSS's grid fills
 // down each column); the next one blinks while it's going.
-const PX_COLS = 36, PX_ROWS = 3;
+const PX_COLS = 60, PX_ROWS = 5;
 function pixBar() {
   const bar = el("div", "px"); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
   for (let k = 0; k < PX_COLS * PX_ROWS; k++) bar.append(el("i"));
@@ -73,18 +73,23 @@ function paintJobs() {
     let row = document.getElementById("job-" + id);
     if (!row) {
       row = el("div", "job"); row.id = "job-" + id;
-      const top = el("div", "top"); top.append(el("b"), el("span"));
+      const top = el("div", "top"), who = el("b"); who.append(el("span", "t"), el("small", "who")); top.append(who, el("span", "st"));
       const x = el("button", "btn sm icon ghost x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
       const acts = el("div", "row-acts"), ask = lyricsAsk(id); acts.append(ask.open, x); // Paste lyrics left of the x, its box under the pixels
-      row.append(top, acts, pixBar(), ask.form);
+      const pic = el("span", "job-cover"); pic.setAttribute("aria-hidden", "true");
+      row.append(pic, top, acts, pixBar(), ask.form);
     }
     rowOf.set(id, row);
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err, at = Math.round((j.progress || 0) * 100);
     const need = !!j.needLyrics, lyr = j.phase === "lyrics" && !need && !j.done; // (its lyrics' part can't be stopped: the song's in)
     row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need);
-    const name = ((j.arrived || j.done) && libCache.get(j.songId)?.title) || j.name;
-    row.querySelector("b").textContent = name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song");
-    const state = row.querySelector(".top span");
+    // what it is: its link, then its video's title, then the record it was found to be (its title, its artist), each
+    // wiped in over the last, blurred to clear; its cover coming in at its left once there's one
+    const found = j.song?.artist ? j.song : null, lib = (j.arrived || j.done) && libCache.get(j.songId);
+    const name = (lib && lib.title) || found?.title || j.name;
+    wipeTo(row.querySelector(".top b"), name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song"), (lib && lib.artist) || found?.artist || "");
+    jobCover(row.querySelector(".job-cover"), j.songId, (lib && lib.cover) || j.song?.cover);
+    const state = row.querySelector(".top .st");
     if (j.done) say(state, "Added");
     else if (need) say(state, j.lyricsError ? "Manual lyrics needed · {why}" : "Manual lyrics needed", { why: () => tr(j.lyricsError || "") });
     else if (err) say(state, j.error || "That didn’t work.");
@@ -109,6 +114,28 @@ function paintJobs() {
     if (want.length !== rows.children.length || want.some((r, i) => rows.children[i] !== r)) want.forEach((r) => rows.append(r));
     sec.hidden = !want.length; sec.querySelector(".n").textContent = want.length;
   }
+}
+// A row's name changed (the link, its video's title, the record's): the new one wiped in from the left over the old,
+// blurred to clear. The first time, at once.
+function wipeTo(b, title, artist) {
+  const key = title + "\u0000" + artist;
+  if (b.dataset.key === key) return;
+  const first = b.dataset.key == null;
+  b.dataset.key = key;
+  b.querySelector(".t").textContent = title; b.querySelector(".who").textContent = artist;
+  if (first || stillMotion()) return;
+  b.animate([{ maskPosition: "100% 0", filter: "blur(6px)", opacity: 0.3 }, { maskPosition: "0% 0", filter: "blur(0)", opacity: 1 }],
+    { duration: 620, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+}
+// its cover at its left, once it's found (cover-96.jpg): it opens a place for itself and comes in, blurred to clear
+function jobCover(pic, songId, cover) {
+  const src = cover && songId ? `/library/${songId}/${cover.thumb ? `cover-${cover.thumb}` : "cover"}.jpg?v=${cover.at}` : "";
+  if (pic.dataset.src === src) return;
+  pic.dataset.src = src;
+  if (!src) { pic.classList.remove("on"); pic.replaceChildren(); return; }
+  const img = el("img"); img.alt = ""; img.decoding = "async";
+  img.onload = () => { if (pic.dataset.src === src) { pic.replaceChildren(img); requestAnimationFrame(() => pic.classList.add("on")); } };
+  img.src = src;
 }
 // A song stopped for its lyrics: Paste lyrics, on its title's line left of the x, opens a box under its pixels for
 // them (a line of the song to each line; pressed again, it folds away) and Add lyrics, that sends them; the song goes
@@ -266,10 +293,10 @@ function watchJob(id, kind, forSong) {
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
     } else if (j.status !== "cancelled") {
-      const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError } = j;
+      const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError, song } = j;
       skip = status === "queued" && ahead > 1 ? 4 : 0;
       const arrive = status === "done" && !needLyrics && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
-      addingJob(id, { ...(name ? { name } : {}), status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
+      addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
         done: status === "done" && !needLyrics, ...(arrive ? { arrived: true } : {}) });
       if (arrive) songArrived(songId);
     }

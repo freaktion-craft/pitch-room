@@ -117,12 +117,37 @@ def active_jobs() -> list[dict]:
         for j in _jobs.values():
             _settled(j)
         jobs = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics"))]
-        return [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError")}
-                | {"progress": _shown(j)} for j in sorted(jobs, key=lambda j: j["started"])]
+        out = [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError")}
+               | {"progress": _shown(j)} for j in sorted(jobs, key=lambda j: j["started"])]
+    for j in out:
+        if j.get("songId"):
+            j["song"] = _found(j["songId"])
+    return out
+
+
+def _found(song_id) -> dict | None:
+    """What a song being added was found to be, for its row in the drawer: {title, artist, cover} (cover: meta's, with
+    its at and thumb, once there's a picture), from its meta.json (the lookup's: _look_up); None before it's written."""
+    try:
+        meta = _load_json(os.path.join(LIB, song_id, "meta.json")) if song_id else None
+    except (OSError, ValueError):
+        return None
+    if not isinstance(meta, dict):
+        return None
+    c = meta.get("cover")
+    return {"title": meta.get("title"), "artist": meta.get("artist") or "", "cover": c if isinstance(c, dict) and c.get("at") else None}
 
 
 def get_job(job_id: str) -> dict | None:
-    """A job as it stands; a song waiting its turn says how many songs are ahead of it (ahead)."""
+    """A job as it stands; a song waiting its turn says how many songs are ahead of it (ahead); one being added, once
+    it's in its folder, what it was found to be (song: _found)."""
+    out = _get_job(job_id)
+    if out and out["kind"] == "separate" and out.get("songId"):
+        out["song"] = _found(out["songId"])
+    return out
+
+
+def _get_job(job_id: str) -> dict | None:
     with _jobs_lock:
         job = _jobs.get(job_id)
         if job is None:
