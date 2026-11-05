@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitchroom</title>
+<meta name="description" content="Download Pitchroom for macOS, Windows or Linux.">
+<meta name="theme-color" content="#141414">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+/* the app's own tokens (css/tokens.css), the few this page uses: dark only, as the app is */
+@font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+:root {
+  --font-brand: "Geist Serif", var(--font);
+  --bg: oklch(0.165 0 0); --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0);
+  --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: dark;
+}
+/* one screen, held still: no scrolling and no rubber-band pull past its edges (a trackpad's, a touch screen's) */
+html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+body { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } /* nothing here worth copying */
+a { -webkit-user-drag: none; }
+/* the top bar: the app's (.app and header in css/base.css), one 1440 px column with 24 px at its sides and above, the
+   name in it as the app has it (.brand) */
+.bar { position: fixed; top: 0; left: 0; right: 0; max-width: 1440px; margin: 0 auto; display: flex; align-items: center; height: 56px; box-sizing: border-box; /* its padding inside the 1440, as the app's * rule has it */
+  padding: 24px max(24px, env(safe-area-inset-right, 0px)) 0 max(24px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.logo { color: var(--ink); text-decoration: none; font: 400 18px/1 var(--font-brand); letter-spacing: -0.01em; pointer-events: auto; }
+/* the button: the app's own primary one (.btn.primary, in css/base.css): 40 px high, 14 px type, an 18 px icon; round at its ends (a pill: a little more room inside them) */
+.get { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 18px 0 14px; border-radius: 999px; background: var(--ink); color: var(--on-ink);
+  font: 500 14px/1 var(--font); text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s var(--ease), background 0.2s, box-shadow 0.2s var(--ease); }
+/* hover: where it is, at the full white, a glow round it; pressed: a little smaller, a shade darker */
+.get:hover { background: var(--ink-strong); box-shadow: 0 6px 18px rgba(255, 255, 255, 0.1); }
+.get:active { background: oklch(0.82 0 0); transform: scale(0.97); box-shadow: none; transition-duration: 0.06s; }
+.get:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.get svg { width: 18px; height: 18px; }
+/* the line at the page's foot, 24 px up as the app's column is in from its sides */
+.note { position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
+  margin: 0; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 13px/1.45 var(--font); }
+/* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (how far
+   in, set by tipAt(); its arrow 38 px in from its right) */
+.tip { position: fixed; top: 14px; right: 58px; padding: 10px 14px; border-radius: 10px; background: var(--ink); color: var(--on-ink);
+  font: 500 14px/1.3 var(--font); white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); } /* it fades in and out, and stays still */
+.tip.on { opacity: 1; pointer-events: auto; }
+.tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
+</style>
+</head>
+<body>
+<header class="bar"><a class="logo" href="/">Pitchroom</a></header>
+<a class="get" id="get" href="https://github.com/freaktion-craft/pitchroom-releases/releases/latest">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
+  <span id="getLabel">Download</span>
+</a>
+<p class="note" id="note">A hobby project for people who want to practice their singing.</p>
+<div class="tip" id="tip" role="status"></div>
+
+<script>
+const API = "https://api.github.com/repos/freaktion-craft/pitchroom-releases/releases/latest";
+const ko = /^ko/i.test(navigator.language);
+const NAMES = { mac: "macOS", win: "Windows", linux: "Linux" };
+const FILES = { "mac-arm64": /mac-arm64\.dmg$/, "mac-x64": /mac-x64\.dmg$/, win: /win-x64\.exe$/, linux: /linux-.*\.AppImage$/ };
+
+function detectOS() {
+  const ua = navigator.userAgent, p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  if (/iPhone|iPad|iPod|Android/i.test(ua)) return null;
+  if (/Win/i.test(p) || /Windows/i.test(ua)) return "win";
+  if (/Mac/i.test(p) || /Macintosh/i.test(ua)) return "mac";
+  if (/Linux|X11/i.test(p + ua)) return "linux";
+  return null;
+}
+// Apple silicon or Intel: Chromium says; Safari doesn't, so it's Apple silicon (most Macs now)
+async function detectMacArch() {
+  try {
+    const v = await navigator.userAgentData.getHighEntropyValues(["architecture"]);
+    if (v.architecture) return v.architecture === "arm" ? "arm64" : "x64";
+  } catch {}
+  try {
+    const gl = document.createElement("canvas").getContext("webgl");
+    const r = gl.getParameter(gl.getExtension("WEBGL_debug_renderer_info").UNMASKED_RENDERER_WEBGL);
+    if (/Intel|AMD|Radeon/i.test(r)) return "x64";
+  } catch {}
+  return "arm64";
+}
+
+(async () => {
+  if (ko) document.getElementById("note").textContent = "노래 연습을 하고 싶은 사람들을 위한 취미 프로젝트예요.";
+  const os = detectOS();
+  const label = document.getElementById("getLabel");
+  label.textContent = !os ? (ko ? "다운로드" : "Download") : ko ? `${NAMES[os]}용 다운로드` : `Download for ${NAMES[os]}`;
+  if (!os) return; // a phone, or unknown: the button stays on the releases page
+  const key = os === "mac" ? `mac-${await detectMacArch()}` : os;
+  try {
+    const r = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });
+    if (!r.ok) return;
+    const file = (await r.json()).assets.find((a) => FILES[key].test(a.name));
+    if (file) document.getElementById("get").href = file.browser_download_url;
+  } catch {} // offline or rate-limited: the releases page
+})();
+
+// the tip, only when the button downloads the file itself (not when it opens the releases page)
+const tip = document.getElementById("tip");
+let tipTimer;
+// how far in from the page's right edge Chrome's downloads icon is: past the profile and the menu (about 96 px); with
+// vertical tabs, the window's own buttons are in that row too (about 268 px). Those are told apart by the frame round
+// the page: vertical tabs have no tab strip above it (49 px of frame there, against 85 or more) and one at its side
+function tipAt() {
+  const frameH = outerHeight - innerHeight, frameW = outerWidth - innerWidth;
+  const vertical = !/Mac/i.test(navigator.platform) && frameW >= 40 && frameH < 82; // a Mac's window buttons are at the left
+  return vertical ? 268 : 96;
+}
+document.getElementById("get").addEventListener("click", (e) => {
+  if (!/\/releases\/download\//.test(e.currentTarget.href)) return;
+  tip.style.right = `${tipAt() - 38}px`;
+  tip.textContent = ko ? "다운로드 중이에요. 여기서 열 수 있어요" : "Downloading. Open it from here";
+  tip.classList.add("on");
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => tip.classList.remove("on"), 12000);
+});
+tip.addEventListener("click", () => tip.classList.remove("on"));
+</script>
+</body>
+</html>
