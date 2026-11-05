@@ -26,8 +26,8 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
       if (moving || i === at) return;
       moving = true;
       // through, from the song's tools with its cover out in the right half (or from the song's step with a library
-      // brought in, its covers on the water): the steps' end played first (obFinale)
-      const finale = i >= steps.length && obFinaleCovers(steps[at]?.dataset.step);
+      // brought in, its covers on the water): the steps' end played first (obFinale); not when left by Exit
+      const finale = i >= steps.length && !out?.exit && obFinaleCovers(steps[at]?.dataset.step);
       if (finale) await obFinale(finale);
       // going on to allowing the mic when it's allowed already (asked here before, or in the browser): on past it
       if (steps[i]?.dataset.step === "allow" && i > at && at >= 0 && !ONBOARD_EVERY_STEP && (await obMicAccess()) === "granted") i++;
@@ -46,7 +46,7 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
         was.hidden = true;
       }
       at = i; moving = false;
-      if (i >= steps.length) { box.hidden = true; OB.tint = null; OB.drain = null; w.classList.remove("ob-finale"); obHeroOut(); obLibEnd(); obWashEnd(); obArtStop(); obMicTipOff(); return done(out); }
+      if (i >= steps.length) { box.hidden = true; exitOff(); OB.tint = null; OB.drain = null; w.classList.remove("ob-finale"); obHeroOut(); obLibEnd(); obWashEnd(); obArtStop(); obMicTipOff(); return done(out); }
       const s = steps[i];
       s.hidden = false;
       if (s.dataset.step !== "song" && s.dataset.step !== "tools") obHeroOut(); // the found song's cover: beside its steps only
@@ -75,6 +75,18 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
       if (!e.target.closest("[data-ob-leave]")) return;
       e.preventDefault(); go(steps.length, { at: steps[at].dataset.step });
     };
+    // been through them before (visited again from Settings): Exit, where the header's gear is, or Esc, out at once,
+    // back where you were. (Left half-way the first time, Settings' banner brings them back: no Exit then.)
+    const exit = $("#obExit"), gear = $("#micSetBtn");
+    const placeExit = () => { const r = gear.getBoundingClientRect(); Object.assign(exit.style, { top: r.top + "px", left: r.right - exit.offsetWidth + "px" }); }; // (by its left: a fixed box's right is the scrollbar's strip short)
+    const onKey = (e) => { if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector(".pick-list:not([hidden]), .menu:not([hidden])")) { e.preventDefault(); exit.click(); } };
+    const exitOff = () => { exit.hidden = true; removeEventListener("resize", placeExit); removeEventListener("keydown", onKey); };
+    exit.hidden = !store.get("welcomed", false);
+    if (!exit.hidden) {
+      placeExit(); addEventListener("resize", placeExit); addEventListener("keydown", onKey);
+      exit.onclick = () => go(steps.length, { exit: true });
+      exit.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
+    }
     box.hidden = false;
     for (let k = 0; k < start; k++) seen.add(k); // come back to from Settings: the steps before it been to
     if (start > steps.findIndex((s) => s.dataset.step === "mic")) obMicHint(false); // come back to after the mic's step: its button out, as it was

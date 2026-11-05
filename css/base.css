@@ -226,6 +226,7 @@ html.welcome #boot, html.asking #welcome { display: none; }
 /* The first steps (onboard()): one at a time in a column in the middle of the black, the name already at its place in
    the header; each rises in as the one before fades. The overlay takes the clicks meanwhile (the page under it is out of reach). */
 #welcome.onboarding { pointer-events: auto; }
+.ob-exit { position: fixed; z-index: 3; } /* where the header's gear is (placed by onboard()), over the right half */
 /* Beside the intro (html… #welcome.ob-pic, onboard()), the window's right half to its top, right and bottom edges: the
    picture. It goes once the intro's left, the steps after it on their own. Narrow windows have none. */
 .ob-visual { position: absolute; z-index: 2; top: 0; right: calc(100% - 100vw); bottom: 0; left: 50%; background: var(--bg); overflow: hidden; display: none; } /* over the scrollbar's kept room too */

@@ -344,13 +344,15 @@ async function welcome(resume) { // resume: a step to come back to (Settings' ba
   await word.animate([{ transform: place(...mid()) }, { transform: place(brand.left, brand.top, brand.width / from.width) }],
     { duration: still ? 1 : R.slide, easing: R.slideEase, fill: "forwards" }).finished;
   w.classList.add("onboarding");
-  const left = await onboard(resume ?? 0);
+  let left = await onboard(resume ?? 0);
+  const exited = !!left?.exit; // out by Exit (visited again, through them before): back where you were, as you were
+  if (exited) left = null;
   w.classList.remove("onboarding");
   OB.left = left ? left.at : null; $("#obBack").hidden = !left; root.classList.toggle("ob-left", !!left); // left for Settings: its banner brings the steps back
   if (left) { location.hash = "#settings"; route(); } // the page comes in as Settings
   else {
     store.set("welcomed", true); // only once they're through: a first time left half-way is a first time again
-    if (resume != null && view === "settings") { location.hash = "#stems"; route(); } // through from Settings: to the library, the first song in it
+    if (resume != null && view === "settings" && !exited) { location.hash = "#stems"; route(); } // through from Settings: to the library, the first song in it
   }
   // then the page round the name: it shows under the black (its parts held back by the rises), which goes
   root.classList.remove("booting");
