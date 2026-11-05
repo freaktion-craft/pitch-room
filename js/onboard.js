@@ -604,7 +604,7 @@ function obFinaleCovers(step) {
 // the whole turning slowly as one, as long as it goes on. More songs than places: the
 // oldest blurs out for the next. All in: they blur out, one after another, and the step says so (obRingsOut).
 // size: a cover's side; r0: the inner ring's radius; step: from a ring to the next; spin: the turn, rad/s
-const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 118, spin: 0.1 };
+const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 150, spin: 0.1 };
 const FLOAT = { every: 140 }; // ms between several coming in at once
 function obRingOf(k) { // slot k: its ring, and its place round it
   let r = 0, cap = RING.first;
@@ -1268,3 +1268,27 @@ function obScope() {
   };
   requestAnimationFrame(frame);
 }
+
+// ?demo=rings (to look at, in development): the library's rings alone, played again and again with the library's own
+// covers, as if a library of 30 songs were coming in (nothing's copied: the import is pretended, here in the page)
+if (new URLSearchParams(location.search).get("demo") === "rings") (async () => {
+  await libDrawn;
+  const have = [...libCache.values()].filter((m) => m.cover?.at).map((m) => m.id);
+  if (!have.length) return;
+  const ids = Array.from({ length: 30 }, (_, k) => have[k % have.length]);
+  let t0 = 0;
+  const state = () => { const n = Math.min(ids.length, Math.floor((performance.now() - t0) / 450)), done = n >= ids.length;
+    return { status: done ? "done" : "running", done: n, total: ids.length, covers: ids.slice(0, n), songs: done ? ids.length : 0, settings: false }; };
+  const real = window.fetch.bind(window);
+  window.fetch = (u, o) => (String(u).startsWith("/api/import") ? ((o?.method === "POST" && (t0 = performance.now())), Promise.resolve(new Response(JSON.stringify(state())))) : real(u, o));
+  window.pitchroom = { ...(window.pitchroom || {}), pickFolder: async () => "Pitchroom" };
+  welcome("song");
+  while (!$("#obLibGo").onclick) await sleep(100); // (the song's step in)
+  await sleep(600);
+  const intro = $('#onboard .ob-step[data-step="intro"]'); if (intro) intro.hidden = true; // (jumped over: not left showing)
+  await sleep(600);
+  $("#obLibGo").click();
+  while (!(OB.lib?.st?.status === "done" && !OB.floats.length)) await sleep(300);
+  await sleep(3000); // (the step saying it's in, a moment)
+  location.reload(); // and again
+})();
