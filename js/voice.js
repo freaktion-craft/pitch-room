@@ -10,7 +10,7 @@
 // an: an analyser of its own, long enough to tell the lowest harmonics apart; x (0…1 across), bright, db, h12: as read now,
 // smoothed; trail: where the dot has been, the last VC_TRAIL s; rec: "chest" or "head" while one's being taught; train:
 // what's been taught ({chest, head}: frames of VC_F); model: the axis fitted to it; from: the page to go back to
-const VC = { an: null, data: null, hz: 0, x: null, h12: null, bright: null, db: null, trail: [], last: null, rec: null, model: null, from: "#stems", painted: 0, live: null };
+const VC = { an: null, data: null, hz: 0, x: null, h12: null, bright: null, db: null, trail: [], last: null, rec: null, model: null, painted: 0, live: null };
 const VC_DEFAULT = { chest: 3, head: 14, mid: -24 }; // untaught: H1−H2 (dB) at the dashed lines, and the middle's brightness (dB)
 const VC_SPAN = 12, VC_TRAIL = 1.5; // dB of brightness from the middle to the top or bottom; s
 // a frame taught: [H1−H2, H2−H4, slope (dB an octave), periodicity, brightness]; the first VC_D part chest from head
@@ -409,11 +409,8 @@ function voiceShow() {
   $("#vcOff").hidden = micOn || !!testOsc;
 }
 function initVoice() {
-  $("#vcBack").prepend(icon("back"));
   // the header's Lab tab: in, and the mic on with it (this click lets it start)
   $("#tabLab").onclick = () => { if (view !== "voice") startMic(); };
-  addEventListener("hashchange", (e) => { if (location.hash === "#voice") { const was = new URL(e.oldURL).hash; if (was && was !== "#voice") VC.from = was; } });
-  $("#vcBack").onclick = () => { location.hash = VC.from; };
   $("#vcMic").onclick = () => startMic();
   $("#vcChest").onclick = () => vcTeach("chest");
   $("#vcHead").onclick = () => vcTeach("head");

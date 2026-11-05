@@ -159,8 +159,8 @@ const EMPTY_LIBRARY = false;
     </div>
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
-    <div class="backbar"><button class="btn sm back" id="vcBack" type="button">Back</button>
-      <div class="bb-acts"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div></div>
+    <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div>
     <div class="vc">
       <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
       <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false" title="Keep this moment faintly behind, to sing against (an onion skin): the spectrum, the vowel's shape, the formants, and the dot on the pad. Pressed again, it goes">Freeze</button></section>
