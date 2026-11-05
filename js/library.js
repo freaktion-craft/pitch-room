@@ -484,9 +484,9 @@ function albumBar(g, songs) {
   return albumBarNode;
 }
 let albumScroll = 0; // where the grid was when an album was opened: back there after
-function openAlbum(key) { albumScroll = scrollY; libAlbum = key; arrangeRows(); pinLibTop(); scrollTo(0, 0); }
+function openAlbum(key) { albumScroll = scrollY; libAlbum = key; arrangeRows(); pinLibTop(); scrollTo(0, 0); paintFade(true); }
 function closeAlbum() {
-  const was = libAlbum; libAlbum = null; arrangeRows(); pinLibTop(); scrollTo(0, albumScroll);
+  const was = libAlbum; libAlbum = null; arrangeRows(); pinLibTop(); scrollTo(0, albumScroll); paintFade(true);
   albumCards.get(was)?.focus({ preventScroll: true }); // (where you were in the grid, in sight again)
 }
 function paintLibView() {
@@ -673,7 +673,7 @@ function initLibSearch() {
   const pickView = (v) => {
     if (v === libView && !(v === "album" && libAlbum != null)) return; // (Album again, an album open: back to the grid)
     if (!LIB_VIEWS.includes(v)) return;
-    libView = v; libAlbum = null; store.set("libView", v); paintLibView(); arrangeRows(); pinLibTop();
+    libView = v; libAlbum = null; store.set("libView", v); paintLibView(); arrangeRows(); pinLibTop(); paintFade(true); // (the fades where they are at once: no blink of them across the switch)
   };
   // an album open: Escape back to the grid (not while typing, nor over a cover up close, a menu or a panel, whose own
   // Escape closes them: looked at before they do, in the capture)
