@@ -343,5 +343,6 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Loading…": "불러오는 중…", "Getting the band in key {n}…": "{n} 키 반주 준비하는 중…", "The song changed.": "곡이 바뀌었어요.",
   "Play on": "이어서 재생", "Play this take with the band": "반주와 함께 이 테이크 듣기", "Where in the take": "테이크 안의 위치",
   "Manual lyrics needed": "가사를 직접 넣어 주세요", "Manual lyrics needed · {why}": "가사를 직접 넣어 주세요 · {why}", "Add lyrics": "가사 넣기",
-  "Skip lyrics": "가사 없이 두기", "Pending": "대기 중", "Processing": "처리 중", "Stopped": "멈춤", "Waiting to find the lyrics": "가사 찾을 차례를 기다리는 중", "No lyrics for this song yet.": "이 곡엔 아직 가사가 없어요.", "Lyrics needed": "가사가 필요해요", "A line of the song to each line": "한 줄에 노래 한 줄씩",
+  "Skip lyrics": "가사 없이 두기", "From your clipboard": "클립보드에서", "Not this": "이건 아니에요", "Pick songs": "곡 고르기",
+  "A playlist: its songs to pick from": "플레이리스트: 곡을 골라요", "{n} YouTube links": "YouTube 링크 {n}개", "Pending": "대기 중", "Processing": "처리 중", "Stopped": "멈춤", "Waiting to find the lyrics": "가사 찾을 차례를 기다리는 중", "No lyrics for this song yet.": "이 곡엔 아직 가사가 없어요.", "Lyrics needed": "가사가 필요해요", "A line of the song to each line": "한 줄에 노래 한 줄씩",
 }, KO_SERVER);

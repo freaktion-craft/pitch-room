@@ -158,8 +158,8 @@ function showJobs(on) {
   const was = !$("#jobsPop").hidden;
   $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
   if (on || was) drawerEdge($("#jobsPop"), on);
-  if (on) { showAdd(false); paintJobs(); $("#addVeil").classList.add("on"); } // marks those in as seen; the veil after Add song's closing, which takes it off
-  else { if ($("#addPop").hidden) $("#addVeil").classList.remove("on"); closeYt(); }
+  if (on) { showAdd(false); paintJobs(); $("#addVeil").classList.add("on"); placeClip(); if (!was) checkClip(); } // marks those in as seen; the veil after Add song's closing, which takes it off
+  else if ($("#addPop").hidden) $("#addVeil").classList.remove("on");
   if (!on && was) { // closed: the songs it showed as in have been seen
     afterSlide($("#jobsPop"), () => { if ($("#jobsPop").hidden) showJobsAdd(false); }); // the form back once it's out, not swapped as it goes
     for (const [id, j] of adding) if (j.done && j.seen) { adding.delete(id); document.getElementById("job-" + id)?.remove(); }
@@ -294,7 +294,7 @@ async function submitYoutube(e) {
     } catch (err) { failed.push(url); addMsg(urls.length > 1 ? tr("{url}: {why}", { url, why: () => tr(err.message) }) : err.message, true); }
   }
   field.value = [...failed, ...(list ? [list] : [])].join("\n"); fitLinks(); // what didn't start stays, to fix
-  if (list) { if (sent) landRing(); if (!failed.length) await readPlaylist(list); }
+  if (list) { clipSkipped.add(list); if (clipOffer?.includes(list)) showClip(clipOffer); if (sent) landRing(); if (!failed.length) await readPlaylist(list); }
   else if (!failed.length) { addMsg(""); await tuckAway(); } // all sent: the drawer shows them being added
   else if (sent) landRing(); // some sent: the ring shows them; the panel stays, saying why the rest couldn't start
 }
@@ -395,7 +395,10 @@ async function tuckAway() {
 }
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
 // The new songs' progress shows beside the mic; they land in the library.
-function jobStarted(id, name) { addingJob(id, { name, status: "queued", progress: 0 }); watchJob(id, "separate"); }
+function jobStarted(id, name) {
+  lastStarted = id; addingJob(id, { name, link: name, status: "queued", progress: 0 }); watchJob(id, "separate");
+  if (clipOffer) showClip(clipOffer); // (sent from the form, the card's own may be among them: not offered again)
+}
 // Add song: a drawer at the window's right (an empty library's row opens it too). It opens with the links field ready
 // to type in; a click elsewhere, Escape or a song sent off closes it.
 let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
@@ -407,6 +410,7 @@ function showAdd(on) {
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
   $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // a click beside it closes it
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
+  if (on) { placeClip(); if (!was) checkClip(); }
   drawerEdge(pop, on);
 }
 // A drawer open: the page's scrollbar away (its room kept, base.css), so the drawer meets the window's edge; back once
@@ -422,76 +426,130 @@ function showJobsAdd(on) {
   const host = $("#jobsAdd"), pop = $("#jobsPop");
   if (on === !host.hidden) return;
   if (on) host.append($("#sAdd"), $("#sAddSetup")); else $("#addPop").append($("#sAdd"), $("#sAddSetup"));
-  host.hidden = !on; $("#jobsAddBtn").hidden = on; pop.classList.toggle("adding", on);
+  host.hidden = !on; $("#jobsAddBtn").hidden = on; pop.classList.toggle("adding", on); placeClip();
   paintJobs();
   if (on) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
   else if (!pop.hidden) $("#jobsAddBtn").focus();
 }
-// A YouTube link copied is offered as it is: Add song reads what's copied (the browser asks once whether it may), and a
-// paste anywhere but in a field (Ctrl+V) brings the panel with the same offer, needing no asking. Nothing starts until
-// Import is pressed, so a stray paste costs nothing. Anything else goes to the form, as before.
+// A YouTube link copied is offered as a card in the drawer (Add song's, or the songs being added's): its video's
+// picture and title, and Add, which sends it, the card then turning into the song's row as it starts. Read when a
+// drawer opens, and when the app's window is come back to with one open; a paste anywhere but in a field (Ctrl+V)
+// opens the drawer with it. Not a link already in the library or being added, nor one let go (its x) this session.
 const YT_LINK = /^(https?:\/\/)?((www|m|music)\.)?(youtube\.com\/(watch\?\S*v=|shorts\/|live\/)|youtu\.be\/)\S+$/i;
-const ytLinks = (text) => String(text || "").split(/\s+/).filter((w) => YT_LINK.test(w) || PLAYLIST.test(w));
-let ytOffer = null; // the links the menu offers, while it's open
+const ytLinks = (text) => String(text || "").split(/\s+/).filter((w) => YT_LINK.test(w) || PLAYLIST.test(w)).map((w) => (/^https?:\/\//i.test(w) ? w : "https://" + w));
+const ytId = (u) => (String(u || "").match(/(?:[?&]v=|youtu\.be\/|shorts\/|live\/)([\w-]{11})/) || [])[1] || null;
 const ytTitles = new Map(); // link → its video's title (YouTube's oEmbed: no key, a short answer)
-async function jobsAddPressed() {
-  if (ytOffer) return closeYt();
+const clipSkipped = new Set(); // links let go from the card
+let clipOffer = null, lastStarted = null; // the card's links, while it's up; the job the last song sent started
+function ytTitle(link) {
+  if (ytTitles.has(link)) return Promise.resolve(ytTitles.get(link));
+  const ask = new AbortController(); setTimeout(() => ask.abort(), 4000);
+  return fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(link), { signal: ask.signal })
+    .then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.title) ytTitles.set(link, j.title); return j?.title || null; }).catch(() => null);
+}
+function clipHave(link) { // in the library, or on its way there
+  const id = ytId(link);
+  if (!id) return [...adding.values()].some((j) => j.link === link || j.name === link);
+  return [...libCache.values()].some((m) => ytId(m.source) === id) || [...adding.values()].some((j) => ytId(j.link || j.name) === id);
+}
+// a video's title naming a song in the library: its title's words and its artist's all in it (another upload of it)
+const wordsOf = (t) => new Set(String(t || "").toLowerCase().normalize("NFKC").split(/[^\p{L}\p{N}]+/u).filter(Boolean));
+function clipNamed(title) {
+  const said = wordsOf(title), all = (w) => w.size > 0 && [...w].every((x) => said.has(x));
+  return [...libCache.values()].some((m) => m.artist && all(wordsOf(m.title)) && all(wordsOf(m.artist)));
+}
+function clipCard() {
+  let card = $("#clipCard");
+  if (card) return card;
+  card = el("div", "clip-card"); card.id = "clipCard"; card.hidden = true;
+  const pic = el("span", "cc-pic"), what = el("span", "cc-what"), from = el("small"), name = el("b"), add = el("button", "btn sm primary cc-add"), x = el("button", "btn sm icon ghost cc-x");
+  say(from, "From your clipboard"); what.append(from, name);
+  add.type = x.type = "button"; add.append(icon("plus"), el("span")); say(add.lastChild, "Add");
+  x.append(icon("close")); say(x, "Not this", null, "title"); say(x, "Not this", null, "aria-label");
+  add.onclick = (e) => { e.stopPropagation(); sendClip(); };
+  x.onclick = (e) => {
+    e.stopPropagation(); for (const l of clipOffer || []) clipSkipped.add(l); hideClip();
+    (!$("#sAdd").hidden && $("#sAdd").closest("#addPop:not([hidden]), #jobsPop:not([hidden])") ? $("#sYtUrl") : $("#jobsClose")).focus({ preventScroll: true });
+  };
+  card.append(pic, what, add, x);
+  return card;
+}
+function hideClip() { clipOffer = null; const c = $("#clipCard"); if (c) c.hidden = true; }
+// where it goes: under the links field where the form is, else at the top of the songs being added
+function placeClip() {
+  const card = clipCard(), form = !$("#sAdd").hidden && $("#sAdd").closest("#addPop:not([hidden]), #jobsPop:not([hidden])");
+  if (form) { if (card.previousElementSibling !== $("#sYtForm")) $("#sYtForm").after(card); }
+  else if (card.nextElementSibling !== $("#jobsList")) $("#jobsList").before(card);
+}
+function showClip(links) {
+  links = links.filter((l) => !clipSkipped.has(l) && !clipHave(l));
+  if (!links.length) return hideClip();
+  if (links.length === 1 && ytTitles.has(links[0]) && clipNamed(ytTitles.get(links[0]))) return hideClip(); // (in the library under another upload)
+  const card = clipCard(), one = links.length === 1, list = links.find((l) => PLAYLIST.test(l));
+  const key = links.join(" ");
+  placeClip();
+  if (!card.hidden && card.dataset.key === key) return;
+  card.dataset.key = key; clipOffer = links;
+  const pic = card.querySelector(".cc-pic"), name = card.querySelector("b"), id = one && ytId(links[0]);
+  pic.replaceChildren(); pic.classList.toggle("none", !id);
+  if (id) { const img = el("img"); img.alt = ""; img.decoding = "async"; img.src = `https://i.ytimg.com/vi/${id}/mqdefault.jpg`; img.onerror = () => { img.remove(); pic.classList.add("none"); }; pic.append(img); }
+  else pic.append(icon(list ? "studio" : "plus"));
+  const bare = (l) => l.replace(/^https?:\/\/(www\.)?/, "");
+  if (list) say(name, "A playlist: its songs to pick from");
+  else if (one) { name.textContent = ytTitles.get(links[0]) || bare(links[0]); ytTitle(links[0]).then((t) => { if (!t || clipOffer !== links) return; if (clipNamed(t)) hideClip(); else name.textContent = t; }); }
+  else say(name, "{n} YouTube links", { n: links.length });
+  say(card.querySelector(".cc-add span"), list ? "Pick songs" : "Add");
+  card.hidden = false;
+  if (!stillMotion()) card.animate([{ opacity: 0, transform: "translateY(-4px)", filter: "blur(4px)" }, { opacity: 1, transform: "none", filter: "blur(0)" }], { duration: 320, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+}
+async function checkClip() {
+  if ($("#addPop").hidden && $("#jobsPop").hidden) return;
   let text = "";
-  try { text = await navigator.clipboard.readText(); } catch (e) {} // not allowed, or nothing: the form
+  try { text = await navigator.clipboard.readText(); } catch (e) { return; } // not allowed (the browser asks once), or the page not in front
   const links = ytLinks(text);
-  if (links.length && !$("#sAdd").hidden) offerYoutube(links); else showJobsAdd(true);
+  if (links.length) showClip(links); else hideClip();
 }
-function offerYoutube(links) {
-  if ($("#jobsPop").hidden) showJobs(true);
-  showJobsAdd(false);
-  ytOffer = links;
-  const sub = $("#ytTitle"), one = links.length === 1, list = one && PLAYLIST.test(links[0]);
-  say($("#ytImport .yt-what > span"), list ? "Import playlist" : one ? "Import from YouTube" : "Import {n} from YouTube", { n: links.length });
-  sub.textContent = one ? ytTitles.get(links[0]) || links[0].replace(/^https?:\/\/(www\.)?/, "") : "";
-  $("#ytMenu").hidden = false; $("#jobsAddBtn").setAttribute("aria-expanded", "true");
-  $("#ytImport").focus({ preventScroll: true }); // (under Add song by its CSS: it comes in with the drawer)
-  if (one && !list && !ytTitles.has(links[0])) {
-    const ask = new AbortController(); setTimeout(() => ask.abort(), 4000);
-    fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(links[0]), { signal: ask.signal })
-      .then((r) => (r.ok ? r.json() : null)).then((j) => {
-        if (!j?.title) return;
-        ytTitles.set(links[0], j.title);
-        if (ytOffer === links) sub.textContent = j.title;
-      }).catch(() => {});
-  }
-}
-function closeYt() {
-  if (!ytOffer) return;
-  ytOffer = null; $("#ytMenu").hidden = true; $("#jobsAddBtn").setAttribute("aria-expanded", "false");
-}
-// Import: sent as from the form; one that couldn't start opens the form, saying why
-async function importYoutube() {
-  const links = ytOffer; closeYt();
+// Add on the card: sent as from the form; the card flies to the row its song gets (the drawer turned to the songs
+// being added, if it was Add song's), fading into it as the row comes in. A playlist opens in the form, to pick from.
+async function sendClip() {
+  const card = $("#clipCard"), links = clipOffer;
   if (!links) return;
-  $("#sYtUrl").value = links.join("\n"); fitLinks();
-  if (links.some((u) => PLAYLIST.test(u))) showJobsAdd(true); // its songs are listed in the form, to pick from
+  const at = card.getBoundingClientRect(), fly = stillMotion() ? null : card.cloneNode(true);
+  hideClip(); lastStarted = null;
+  if (fly) { fly.removeAttribute("id"); fly.classList.add("cc-fly"); Object.assign(fly.style, { left: at.left + "px", top: at.top + "px", width: at.width + "px", height: at.height + "px" }); document.body.append(fly); }
+  const field = $("#sYtUrl"), typed = field.value.trim(); // (what's typed there stays, after the card's are sent)
+  field.value = links.join("\n"); fitLinks();
+  if (links.some((u) => PLAYLIST.test(u)) && $("#jobsPop").hidden === false && $("#jobsAdd").hidden) showJobsAdd(true); // (the picker is in the form)
   await submitYoutube({ preventDefault() {} });
-  if ($("#sYtUrl").value.trim()) showJobsAdd(true);
+  const left = field.value.trim();
+  field.value = [typed, left].filter(Boolean).join("\n"); fitLinks();
+  if (left && !$("#sAdd").closest("#addPop:not([hidden]), #jobsPop:not([hidden])")) { // one that couldn't start: the form, saying why
+    if (!$("#jobsPop").hidden) showJobsAdd(true); else showAdd(true);
+  } else if (!$("#jobsPop").hidden && !document.activeElement?.closest?.("#jobsPop")) $("#jobsClose").focus({ preventScroll: true });
+  if (!fly) return;
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const row = lastStarted && document.getElementById("job-" + lastStarted);
+  if (!row || !row.getClientRects().length) { fly.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200 }).finished.then(() => fly.remove()); return; }
+  const to = row.getBoundingClientRect(), ease = "cubic-bezier(0.55, 0, 0.25, 1)";
+  fly.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${to.left - at.left}px, ${to.top - at.top}px) scale(${to.width / at.width}, ${to.height / at.height})`, opacity: 0 }],
+    { duration: 460, easing: ease, fill: "forwards" }).finished.then(() => fly.remove(), () => fly.remove());
+  row.animate([{ opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0)" }], { duration: 360, delay: 160, easing: "ease-out", fill: "backwards" });
 }
 function initYoutubeOffer() {
-  $("#jobsAddBtn").onclick = jobsAddPressed;
-  $("#ytImport").onclick = importYoutube;
-  $("#ytOther").onclick = () => { closeYt(); showJobsAdd(true); };
+  $("#jobsAddBtn").onclick = () => showJobsAdd(true);
   $("#plGo").onclick = addPicked;
   $("#plBack").onclick = () => { closePlaylist(); $("#sYtUrl").focus(); };
   $("#plAll").onchange = (e) => { for (const i of plFound?.items || []) if (!i.gone) i.box.checked = e.target.checked; countPicked(); };
-  $("#jobsPop").addEventListener("click", (e) => { if (ytOffer && !e.composedPath().some((n) => n === $("#ytMenu") || n === $("#jobsAddBtn"))) closeYt(); });
-  $("#ytMenu").addEventListener("keydown", (e) => {
-    const items = [...$("#ytMenu").querySelectorAll("button")], i = items.indexOf(document.activeElement);
-    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
-    if (to !== undefined) { e.preventDefault(); items[(to + items.length) % items.length].focus(); }
-    else if (e.key === "Escape") { e.stopPropagation(); closeYt(); $("#jobsAddBtn").focus(); } // the menu, not the panel
-  });
+  addEventListener("focus", checkClip); // back to the app with a drawer open: something may have been copied meanwhile
   document.addEventListener("paste", (e) => {
     if (e.target.closest?.("input, textarea, [contenteditable]")) return; // pasting into a field: theirs
     const links = ytLinks(e.clipboardData?.getData("text"));
     if (!links.length || $("#sAdd").hidden) return;
-    e.preventDefault(); offerYoutube(links);
+    e.preventDefault();
+    for (const l of links) clipSkipped.delete(l); // (pasted on purpose)
+    if ($("#addPop").hidden && $("#jobsPop").hidden) showJobs(true);
+    showClip(links);
+    if (!$("#clipCard").hidden) $("#clipCard .cc-add").focus({ preventScroll: true });
   });
 }
 // the links field: a line tall, growing with what's in it (CSS stops it at five)

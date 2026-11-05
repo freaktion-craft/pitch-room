@@ -62,14 +62,19 @@
 .jobs-sec h3 .n { color: var(--faint); font-variant-numeric: tabular-nums; }
 .jobs-rows { display: grid; gap: var(--space-4); }
 /* a YouTube link copied: Add song (or a paste) offers it, named by its video's title */
-#ytMenu { width: max-content; max-width: min(340px, calc(100vw - 32px)); }
-/* under Add song, their right edges together, held there (it moves with the drawer as it slides in) */
-.jobs-add-at { position: relative; display: inline-flex; }
-.jobs-add-at > #ytMenu { position: absolute; top: calc(100% + var(--gap-float)); right: 0; left: auto; }
-#ytImport { height: auto; min-height: 36px; padding-block: var(--space-2); }
-.yt-what { display: grid; min-width: 0; }
-.yt-what small { color: var(--muted); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.yt-what small:empty { display: none; }
+/* a YouTube link copied, offered (showClip): its picture, "From your clipboard" over its title, Add and its x */
+.clip-card { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-lg); background: var(--fill); }
+.clip-card .cc-pic { flex: none; width: 64px; height: 36px; border-radius: var(--radius-sm); overflow: hidden; background: var(--fill); display: grid; place-items: center; color: var(--muted); }
+.clip-card .cc-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.clip-card .cc-pic .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.clip-card .cc-what { display: grid; flex: 1; min-width: 0; }
+.clip-card .cc-what small { color: var(--muted); font-size: var(--text-xs); line-height: 16px; }
+.clip-card .cc-what b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip-card .cc-add .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.clip-card .cc-x .ico { width: var(--icon-sm); height: var(--icon-sm); }
+#jobsPop > .clip-card { margin-top: var(--space-4); }
+/* sent: a copy of it flying to the song's row (sendClip), over the drawer */
+.cc-fly { position: fixed; z-index: calc(var(--z-modal) + 1); margin: 0; pointer-events: none; transform-origin: 0 0; }
 .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-2); align-items: center; }
 .job > .top, .job > .px { grid-column: 1; }
 .job > .lyr-ask { grid-column: 1 / -1; }
