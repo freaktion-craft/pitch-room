@@ -516,6 +516,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .switch:checked::after { transform: translateX(16px); background: var(--on-ink); }
 .hint { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
 .credit { margin: var(--space-3) 0 0; color: var(--faint); font-size: var(--text-xs); }
+#keysWrap { display: flex; align-items: flex-end; gap: var(--space-6); } /* the keys, and the piano's credit in the room beside them */
+#keysWrap .credit { flex: none; margin: 0 0 0 auto; line-height: 16px; white-space: nowrap; }
 .credit a { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 
 /* Buttons: one component, .btn, set on three axes.
