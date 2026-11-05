@@ -102,13 +102,14 @@
 .px i.on { background: var(--ink); }
 .px i.next { animation: px-blink 1s steps(1, end) infinite; }
 /* the empty ones while it's going: a faint glow passing over them on the diagonal, like a wave (--d: column + row) */
-.job:not(.done):not(.need):not(.err) .px i:not(.on):not(.next) { animation: px-wave 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * 40ms); }
+.px.going i:not(.on):not(.next) { animation: px-wave 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * 40ms); } /* (only while it's being worked on: paintPix) */
 @keyframes px-wave { 0%, 62%, 100% { background: var(--fill); } 74% { background: var(--fg-16); } }
 @media (prefers-reduced-motion: reduce) { .px i { animation: none !important; } }
 @keyframes px-blink { 50% { background: var(--fg-30); } }
 /* stopped for its lyrics (none found, or finding them failed): orange where it stopped, and the way to paste them */
-.job.need .px i.ly.on { background: var(--orange); } /* only its lyrics' part, the rest done as it was */
-.job.need .px i.ly:not(.on) { background: color-mix(in oklab, var(--orange) 22%, transparent); }
+/* paused (paintPix's paused: wanting its lyrics): the bar as it was, white and gray, its next block alone blinking orange */
+.px.paused i.next { animation: px-pause 1s steps(1, end) infinite; }
+@keyframes px-pause { 0% { background: var(--orange); } 50% { background: var(--fill); } }
 .job.need .top .st { color: var(--orange); white-space: normal; }
 .lyr-form { display: grid; gap: var(--space-2); }
 .lyr-open.on { background: var(--hover-2); } /* its box open */
@@ -118,6 +119,38 @@
 .lyr-form textarea:hover { background: var(--hover-2); }
 .lyr-form textarea:focus { outline: none; background: var(--surface-2); border-color: var(--ink); }
 .lyr-acts { display: flex; justify-content: flex-end; }
+/* Which song it is (pickAsk): its candidates under its pixels, opened from Other matches; each with its cover, its name,
+   artist and album, and how sure (%); the one it is ringed and ticked */
+.job > .cand-list { grid-column: 1 / -1; }
+.cand-open.on { background: var(--hover-2); }
+.cand { position: relative; display: grid; align-items: center; border: 0; border-radius: var(--radius-md); background: transparent; color: inherit; font: inherit;
+  text-align: left; cursor: pointer; transition: background-color var(--duration-fast); }
+.cand:hover { background: color-mix(in oklab, var(--ink) 6%, transparent); }
+.cand:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.cand-cover { display: block; border-radius: var(--radius-sm); overflow: hidden; background: var(--fill); }
+.cand-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cand.own .cand-cover img { object-fit: cover; transform: scale(1.34); } /* (the video's picture: letterboxed in its 4:3, the bars cut off) */
+.cand-words { display: grid; min-width: 0; }
+.cand-words > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cand-words b { font-weight: var(--weight-medium); font-size: var(--text-sm); line-height: 18px; }
+.cand-words small { font-size: var(--text-xs); line-height: 16px; color: var(--muted); }
+.cand-words small.cand-sub { color: var(--faint); }
+.cand-words small:empty { display: none; }
+.cand-pct .n { font-size: var(--text-xs); line-height: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cand.on .cand-pct .n { color: var(--ink); }
+.cand > .ico { width: var(--icon-sm); height: var(--icon-sm); color: var(--ink); }
+/* as tiles: their covers side by side, how sure on each, the name under it */
+.cand-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; } /* (all five on a line: 4 candidates and its own name) */
+.cand-list .cand { grid-template-rows: auto auto; align-items: start; gap: 6px; padding: 6px; }
+.cand-list .cand-cover { aspect-ratio: 1; width: 100%; box-shadow: 0 0 0 2px transparent; transition: box-shadow var(--duration-fast); }
+.cand-list .cand.on .cand-cover { box-shadow: 0 0 0 2px var(--ink); }
+/* the badge and the tick on one line: both 20 px tall, 4 px in from the cover's corners (the tile's 6 px padding + 4) */
+.cand-err { grid-column: 1 / -1; margin: 0; font-size: var(--text-sm); color: var(--bad); }
+.cand-list .cand-pct { position: absolute; top: 10px; left: 10px; display: flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 999px; background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: blur(6px); }
+.cand-list .cand.on .cand-pct { background: var(--ink); }
+.cand-list .cand.on .cand-pct .n { color: var(--bg); }
+.cand-list .cand > .ico { position: absolute; top: 10px; right: 10px; padding: 3px; border-radius: 50%; background: var(--ink); color: var(--bg); width: 20px; height: 20px; }
 
 .player { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */
@@ -288,7 +321,9 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
    margin, plus half of what the 32 px header has over the row's 20 px */
 #jobsPop { --drawer-top: 0px; --head-top: var(--space-6); position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: min(520px, 100vw); margin: 0;
   padding-top: calc(var(--head-top) + 6px); border-radius: 0; z-index: var(--z-modal); align-content: start; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-gutter: stable; padding-right: calc(var(--space-4) - 12px); /* its scrollbar's place kept (12 px, base.css), scrolling or not: nothing moves when it comes; the right as far in as the left */
   -webkit-app-region: no-drag; transition: translate var(--duration-slow) var(--ease), display var(--duration-slow) allow-discrete; }
+@supports not selector(::-webkit-scrollbar) { #jobsPop { padding-right: var(--space-4); } } /* (no 12 px scrollbar of ours there: the browser's own, its place kept as it has it) */
 html.desktop-win #jobsPop { --drawer-top: var(--titlebar); --head-top: calc(var(--titlebar) + var(--space-3)); }
 html.desktop-mac #jobsPop { --drawer-top: var(--space-6); --head-top: calc(var(--space-6) + var(--space-3)); }
 :is(html.desktop-win, html.desktop-mac) #jobsPop::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: var(--drawer-top); -webkit-app-region: drag; }

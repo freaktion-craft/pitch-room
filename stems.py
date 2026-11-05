@@ -79,6 +79,10 @@ def _new_job(kind: str, name: str = "") -> dict:
 # A song being added: its stems and the rest (SPLIT_SHARE of its progress), then its lyrics found and timed (the rest;
 # _lyrics_phase). Their progress is shown as one (_shown).
 SPLIT_SHARE = 0.8
+# Below this sure of the record a link was taken for (covers.confidence), a song being added stops before its lyrics
+# to be asked which song it is (_lyrics_phase): of 140 titles, 60 % caught 74 % of the wrong ones, asking 28 % of
+# all (of the library's own, none: it was surer of them), right for 93 % of those it didn't ask
+PAUSE_BELOW = 0.6
 
 
 def _shown(job: dict) -> float:
@@ -88,6 +92,8 @@ def _shown(job: dict) -> float:
         return job["progress"]
     if job.get("needLyrics"):
         return SPLIT_SHARE + (1 - SPLIT_SHARE) * job.get("stoppedAt", 0.0)
+    if job.get("needPick"):  # (stopped before its lyrics, to be told which song it is)
+        return SPLIT_SHARE
     if job["status"] == "done":
         return 1.0
     if job.get("phase") == "lyrics":  # (pasted after it stopped: on from there, not back)
@@ -99,6 +105,8 @@ def _shown(job: dict) -> float:
 def _settled(job: dict):
     """A song stopped wanting its lyrics (needLyrics) that doesn't any more: deleted, or given them another way (its
     Info page, or Practice without them). Under _jobs_lock."""
+    if job.get("needPick") and job.get("songId") and not os.path.isfile(os.path.join(LIB, job["songId"], "meta.json")):
+        job["needPick"] = False  # (deleted meanwhile)
     if not job.get("needLyrics") or not job.get("songId"):
         return
     folder = os.path.join(LIB, job["songId"])
@@ -110,14 +118,18 @@ def _settled(job: dict):
         job["needLyrics"] = False
 
 
+def _stopped(j: dict) -> bool:  # a song being added stopped, to be told something: its lyrics, or which song it is
+    return bool(j.get("needLyrics") or j.get("needPick"))
+
+
 def active_jobs() -> list[dict]:
     """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress;
     and those stopped wanting their lyrics pasted (needLyrics), till they are or that's let go."""
     with _jobs_lock:
         for j in _jobs.values():
             _settled(j)
-        jobs = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics"))]
-        out = [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError")}
+        jobs = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or _stopped(j))]
+        out = [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError", "waiting", "needPick")}
                | {"progress": _shown(j)} for j in sorted(jobs, key=lambda j: j["started"])]
     for j in out:
         if j.get("songId"):
@@ -179,8 +191,8 @@ def cancel_job(job_id: str) -> str:
         if job is None or job["kind"] not in ("separate", "key"):
             raise ValueError("Unknown job.")
         if job.get("phase") == "lyrics":  # its lyrics' part isn't stopped; one stopped wanting them is let go, song and all
-            if job.get("needLyrics") and job["status"] == "done":
-                job.update(needLyrics=False, status="cancelled", stage="Cancelled")
+            if _stopped(job) and job["status"] == "done":
+                job.update(needLyrics=False, needPick=False, status="cancelled", stage="Cancelled")
                 if job.get("songId"):
                     shutil.rmtree(os.path.join(LIB, job["songId"]), ignore_errors=True)
             return job["status"]
@@ -771,7 +783,7 @@ def library() -> list[dict]:
                 continue
             if meta.get("adding"):
                 with _jobs_lock:
-                    going = any(j.get("songId") == d and j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics")) for j in _jobs.values())
+                    going = any(j.get("songId") == d and j["kind"] == "separate" and (j["status"] in ("queued", "running") or _stopped(j)) for j in _jobs.values())
                 if going:
                     continue
                 meta.pop("adding", None)  # (cut off: the app closed meanwhile; in as it is)
@@ -855,7 +867,7 @@ def _lookup_wanted(meta: dict) -> bool:
     c = meta.get("cover", False)
     # named from before covers.own_name: by the record's translation of its own name (a link's, not renamed since; a
     # file's own tags name it as they are)
-    translated = (not meta.get("named") and bool(re.match(r"^https?://", meta.get("source") or ""))
+    translated = (not meta.get("named") and not meta.get("picked") and bool(re.match(r"^https?://", meta.get("source") or ""))
                   and bool(covers.own_name(meta.get("sourceTitle") or "", meta.get("title") or "")))
     return "artist" not in meta or translated or (c is not None and (not c or c.get("px", 0) < covers.SIZE))
 
@@ -928,9 +940,10 @@ def find(url: str) -> dict:
     own, dur = info.get("title") or "", float(info.get("duration") or 0)
     channel, thumb = info.get("channel") or info.get("uploader") or "", covers.youtube(url) or info.get("thumbnail") or ""
     cover = covers.is_cover(own)
-    record = None
+    record, seen = None, []
     with contextlib.suppress(RuntimeError):
-        record = covers.online(own, dur, "", cover=cover, channel="" if cover else channel)
+        got = covers.search_records(own, dur, "", cover=cover, channel="" if cover else channel, least=3)  # (3 to pick from, at least)
+        record, seen = got["pick"], got["seen"]
     if cover:  # a cover: the song it covers, sung by whoever the title says, or the channel
         song = lyrics.split_title(covers.COVER.sub(" ", covers.COVER_BY.sub(" ", own)))[1] or own
         name = (f"{(record or {}).get('track') or song} (Cover)", covers.cover_by(own) or channel)
@@ -941,16 +954,165 @@ def find(url: str) -> dict:
         name = (song or own, artist or channel)
     square = bool(record and record.get("art") and not cover)
     return {"title": name[0][:TITLE_MAX], "artist": name[1][:TITLE_MAX], "art": record["art"] if square else thumb, "square": square,
-            "video": own, "duration": round(dur)}
+            "video": own, "duration": round(dur), **_candidates(own, thumb, record, seen, cover, channel)}
 
 
-def _look_up(song_id: str):
+CANDIDATES = 4  # records a song's row offers to pick from, besides its video's own name (3 at least, where seen)
+
+
+def _candidates(own: str, thumb: str, record: dict | None, seen: list[dict], cover: bool, channel: str) -> dict:
+    """The records a link could be, to pick from (the drawer's picker): the one taken first, then the likeliest others,
+    CANDIDATES in all where there are as many; each {title (as it'd be named), artist, album, art, duration, pct (how
+    sure, %), pick (the one taken), record (what's sent back to pick it: pick_record)}; and own, its video's own name,
+    with how sure it is that it's none of them (pct)."""
+    import covers
+    import lyrics
+    p, none = covers.confidence(seen, record) if seen else ([], 1.0)
+    order = sorted(range(len(seen)), key=lambda i: -p[i])
+    if record is not None:
+        first = next((i for i in order if seen[i]["artist"] == record["artist"] and seen[i]["track"] == record["track"]), None)
+        if first is not None:
+            order.remove(first)
+            order.insert(0, first)
+    out = []
+    for i in order[:CANDIDATES]:
+        r = seen[i]
+        title = f"{r['track']} (Cover)" if cover else covers.own_name(own, r["track"], r["artist"]) or r["track"]
+        out.append({"title": title[:TITLE_MAX], "artist": r["artist"][:TITLE_MAX], "album": covers.album_name(r.get("album") or "")[:TITLE_MAX],
+                    "art": r.get("art") or "", "duration": round(r["duration"] or 0), "pct": round(100 * p[i]),
+                    "pick": record is not None and i == order[0],
+                    "record": {k: r.get(k) for k in ("artist", "track", "album", "art", "duration", "site")}})
+    artist, song = lyrics.split_title(own)
+    return {"candidates": out, "own": {"title": (song or own)[:TITLE_MAX], "artist": (artist or channel)[:TITLE_MAX], "art": thumb,
+                                       "pct": round(100 * none), "pick": record is None}}
+
+
+# A record picked for a song being added, of the candidates its row offers (find's "candidates"; the drawer's picker),
+# or its video's own name ({"own": True}): kept on its job till the song's in its folder, then in its meta ("picked"),
+# and its lookup takes it instead of searching (_look_up). Picked once it's named: named again with it (_repick).
+PICK_ART = re.compile(r"^https://[\w.-]+\.(?:mzstatic\.com|dzcdn\.net)/")  # (a picked record's art: only the stores' own)
+
+
+def _clean_pick(rec) -> dict:
+    if isinstance(rec, dict) and rec.get("keep"):
+        return {"keep": True}  # (the name it has, as it was found: a paused one with nothing else to pick from)
+    if rec is None or (isinstance(rec, dict) and rec.get("own")):
+        return {"own": True}
+    if not isinstance(rec, dict):
+        raise ValueError("Pick a song.")
+    out = {k: " ".join(str(rec.get(k) or "").split())[:TITLE_MAX] for k in ("artist", "track", "album", "site")}
+    if not out["artist"] or not out["track"]:
+        raise ValueError("Pick a song.")
+    art = str(rec.get("art") or "")
+    out["art"] = art if PICK_ART.match(art) else ""
+    try:
+        out["duration"] = float(rec.get("duration") or 0)
+    except (TypeError, ValueError):
+        out["duration"] = 0.0
+    return out
+
+
+def pick_record(job_id: str, rec) -> str:
+    """A song being added, told which record it is (or that it's its video's own name): see PICK_ART. One stopped to
+    be asked (needPick) goes on to its lyrics, by that name; one stopped wanting its lyrics (needLyrics) looks for
+    them again by it, as one whose lyrics were found by its old name does (_relyric)."""
+    rec = _clean_pick(rec)
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is None or job["kind"] != "separate":
+            raise ValueError("Unknown job.")
+        job["pick"] = rec
+        song_id = job.get("songId")
+        resume = bool(song_id) and job["status"] == "done" and _stopped(job)
+        if resume:
+            job.update(status="running", needPick=False, needLyrics=False, lyricsError=None, lyricsFrom=0.0)
+    if resume:
+        def body():
+            try:
+                _repick(song_id, rec)
+                _lyrics_phase(job, song_id, None)
+            finally:
+                _set(job, status="done", progress=1.0, stage="Done")
+        threading.Thread(target=body, daemon=True).start()
+        return "running"
+    if song_id:
+        low = bool(job.get("low"))
+        threading.Thread(target=lambda: _repick(song_id, rec) and _relyric(song_id, low), daemon=True).start()
+    return "ok"
+
+
+def _relyric(song_id: str, low: bool = False):
+    """A song renamed by a pick (its title or artist changed: _repick), its lyrics found (or not) by its old name:
+    looked for again by the new one, once any finding of them going on is done (however long it waits its turn).
+    Not lyrics pasted or let go, nor a cover's (looked for by its video's title, which a pick doesn't change)."""
+    import covers
+    folder = os.path.join(LIB, song_id)
+    while True:
+        running = get_job(_lyrics_jobs.get(song_id, ""))
+        if not (running and running["status"] in ("queued", "running")):
+            break
+        if not os.path.isfile(os.path.join(folder, "meta.json")):
+            return  # deleted meanwhile
+        time.sleep(1)
+    try:
+        meta = _read_meta(folder)
+        data = _load_json(os.path.join(folder, "lyrics.json")) if os.path.isfile(os.path.join(folder, "lyrics.json")) else None
+    except (OSError, ValueError):
+        return
+    if data is None or covers.is_cover(meta.get("title") or "") or (data.get("source") or {}).get("site") == "pasted" or data.get("dropped"):
+        return  # none yet (they'll be looked for by the new name), a cover's, pasted, or let go
+    with contextlib.suppress(ValueError):
+        start_lyrics(song_id, None, low=low)
+
+
+def _job_pick(song_id: str) -> dict | None:
+    with _jobs_lock:
+        return next((j["pick"] for j in _jobs.values() if j.get("songId") == song_id and j.get("pick")), None)
+
+
+def _repick(song_id: str, rec: dict) -> bool:
+    """Named as picked (a "keep": as it is). True when that changed its name (its title or artist)."""
+    if rec.get("keep"):
+        return False
+    try:
+        before = _read_meta(_song_dir(song_id))
+        _look_up(song_id, force=True, pick=rec)
+        after = _read_meta(_song_dir(song_id))
+        return (before.get("title"), before.get("artist")) != (after.get("title"), after.get("artist"))
+    except Exception as e:  # noqa: BLE001
+        print(f"Couldn't name library/{song_id} as picked: {e}", file=sys.stderr)
+        return False
+
+
+_naming: dict[str, threading.Lock] = {}  # a song's naming, one at a time: a pick made while it's searching waits, then wins
+
+
+def _look_up(song_id: str, force: bool = False, pick: dict | None = None):
+    """pick: written into its meta first, under the same lock (picks one after another: the last one names it)."""
+    with _lookup_lock:
+        lock = _naming.setdefault(song_id, threading.Lock())
+    with lock:
+        if pick is not None:
+            with _meta_lock:
+                path = os.path.join(LIB, song_id, "meta.json")
+                if not os.path.isfile(path):
+                    return
+                meta = _load_json(path)
+                meta["picked"] = pick
+                _write_json(path, meta, ensure_ascii=False)
+        _look_up_now(song_id, force)
+
+
+def _look_up_now(song_id: str, force: bool):
     import covers
     import lyrics
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
-    if not _lookup_wanted(meta):
+    if not force and not _lookup_wanted(meta):
         return
+    picked = meta.get("picked") or _job_pick(song_id)
+    if picked and picked.get("keep"):
+        picked = None  # (kept as found: searched as ever)
     own, dur = meta.get("sourceTitle") or meta["title"], float(meta["duration"])
     out, art, name, record, failed = os.path.join(folder, "cover.jpg"), None, None, None, None
     src = _saved(folder, "source")
@@ -975,10 +1137,18 @@ def _look_up(song_id: str):
     channel = meta.get("channel") or ""
     if from_link and not cover and not hint and not lyrics.split_title(own)[0] and not channel:
         channel = _channel(meta["source"])
-    try:
-        record = covers.online(own, dur, hint, cover=cover, channel="" if cover else channel)
-    except RuntimeError as e:
-        failed = e
+    sure = None  # how sure it is of the record taken (or, none taken, that it's none of them): a link's, for PAUSE_BELOW
+    if picked:  # picked from its candidates: that record, or its video's own name; nothing searched
+        record = None if picked.get("own") else picked
+    else:
+        try:
+            got = covers.search_records(own, dur, hint, cover=cover, channel="" if cover else channel)
+            record = got["pick"]
+            if from_link and not tagged and got["seen"]:
+                p, none = covers.confidence(got["seen"], record)
+                sure = next((p[i] for i, r in enumerate(got["seen"]) if record and r["artist"] == record["artist"] and r["track"] == record["track"]), none)
+        except RuntimeError as e:
+            failed = e
     if record and not name:
         name = (covers.own_name(own, record["track"], record["artist"]) or record["track"], record["artist"])
     if cover and not tagged:  # the song it covers, sung by: whoever the title says, or the artist before " - " if
@@ -989,7 +1159,7 @@ def _look_up(song_id: str):
         if not singer and from_link:
             singer = channel or _channel(meta["source"])
         name = (f"{song} (Cover)", singer)
-    if not art and record and not (cover and from_link):
+    if not art and record and record.get("art") and not (cover and from_link):
         with contextlib.suppress(RuntimeError):
             if (data := covers.fetch(record["art"])) and covers.save(ffmpeg_exe(), data, out):
                 art = record["site"]
@@ -1001,7 +1171,8 @@ def _look_up(song_id: str):
         raise failed  # couldn't ask: left to look up again
     if not name:
         artist, song = lyrics.split_title(own)
-        name = (song or own, artist)
+        # (its video's own name picked: as the picker showed it, the channel's for an artist the title doesn't give)
+        name = (song or own, artist or (channel if picked and picked.get("own") else ""))
     # its album: the file's own, else the record's; a cover's record is the song it covers, not this one's (tagged or not)
     album = file_album or ("" if cover else covers.album_name((record or {}).get("album", "")))
     with _meta_lock:  # read again: renamed meanwhile, the new name stays
@@ -1013,7 +1184,12 @@ def _look_up(song_id: str):
                     cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
         if channel and not meta.get("channel"):
             meta["channel"] = channel
-        if not meta.get("named"):
+        if picked:
+            meta["picked"] = picked
+            meta.pop("sure", None)
+        elif sure is not None:
+            meta["sure"] = round(sure, 3)
+        if not meta.get("named") or picked:  # (a pick's the user's word too: it names it)
             meta["title"] = name[0][:TITLE_MAX]
         _write_json(path, meta, ensure_ascii=False)
 
@@ -1120,10 +1296,11 @@ def rename_song(song_id: str, title) -> str:
 
 
 # ---------- separation pipeline ----------
-def start_youtube(url: str, model: str, find=None, low: bool = False, name=None) -> str:
+def start_youtube(url: str, model: str, find=None, low: bool = False, name=None, ask: bool = True) -> str:
     """A song from a link. find: {artist, title, duration} for a playlist's song from Spotify, looked for on YouTube once
     its turn comes (playlists.match) rather than linked. low: a playlist's, worked on at low priority (_low_priority).
-    name: what to call it until its video's title is known."""
+    name: what to call it until its video's title is known. ask: False, never stopped to be asked which song it is
+    (the first steps' first song, which has nowhere to pick it: named as it's found)."""
     if find is not None:
         if not isinstance(find, dict) or not isinstance(find.get("title"), str) or not find["title"].strip():
             raise ValueError("Send the song’s title to look for.")
@@ -1138,7 +1315,7 @@ def start_youtube(url: str, model: str, find=None, low: bool = False, name=None)
             raise ValueError("That’s a playlist: add it from the Add song form.")
         name = name[:TITLE_MAX] if isinstance(name, str) and name.strip() else url  # a playlist's video: its title, known already
     job = _new_job("separate", name)
-    job["link"], job["low"] = url or None, bool(low)
+    job["link"], job["low"], job["noAsk"] = url or None, bool(low), not ask
     return _run(job, _pipeline, {"kind": "url", "url": url, "find": find}, model)
 
 
@@ -1150,7 +1327,7 @@ def playlist(url: str) -> dict:
     found = playlists.read(url)
     songs = library()
     with _jobs_lock:
-        adding = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics"))]
+        adding = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or _stopped(j))]
     ids = {v for s in [m.get("source") or "" for m in songs] + [j["link"] or "" for j in adding] if (v := _video_id(s))}
     known = [(_words_of(playlists._base(m.get("title") or "")), _words_of(m.get("artist") or ""), _words_of(f"{m.get('title')} {m.get('sourceTitle') or ''}"),
               _words_of(f"{m.get('artist') or ''} {m.get('channel') or ''} {m.get('sourceTitle') or ''}")) for m in songs]
@@ -1487,7 +1664,20 @@ def _lyrics_phase(job, song_id: str, how):
     """A song being added's last part: its lyrics found and timed (start_lyrics, how as there), that job's steps shown
     as this one's (phase "lyrics"); only then is it in the library (its meta's "adding" taken off). None found, or it
     failed: this one stops there (needLyrics, with why in lyricsError when it failed), the song still out of the
-    library, for them to be pasted (resume_lyrics), or the song let go (cancel_job: it's deleted)."""
+    library, for them to be pasted (resume_lyrics), or the song let go (cancel_job: it's deleted).
+    A link not surely the record it was taken for (less than PAUSE_BELOW sure, its meta's "sure": _look_up) stops
+    before them (needPick): they're found by its name, so it's asked which song it is first (its candidates, in the
+    drawer), and goes on once it's picked (pick_record); a song picked already doesn't."""
+    if how is None:
+        _set(job, phase="lyrics", stage="Finding out which song it is", progress=0.0, needLyrics=False, needPick=False, lyricsError=None)
+        _looked_up(song_id, wait=60)
+        try:
+            meta = _read_meta(_song_dir(song_id))
+        except ValueError:
+            return  # deleted meanwhile
+        if not job.get("noAsk") and not meta.get("picked") and not _job_pick(song_id) and isinstance(meta.get("sure"), (int, float)) and meta["sure"] < PAUSE_BELOW:
+            _set(job, needPick=True, stoppedAt=0.0, stage="Which song is it?")
+            return
     _set(job, phase="lyrics", stage="Finding the lyrics" if how is None else "Lining the lyrics up with the voice", progress=0.0, needLyrics=False, lyricsError=None)
     try:
         lid = start_lyrics(song_id, how, low=bool(job.get("low")), front=True)
@@ -1502,8 +1692,9 @@ def _lyrics_phase(job, song_id: str, how):
         seen = lj["progress"]
         with _jobs_lock:
             waiting = lid in _line and _line[0] != lid
-        _set(job, stage="Waiting to find the lyrics" if waiting else lj["stage"], progress=seen)
+        _set(job, stage="Waiting to find the lyrics" if waiting else lj["stage"], progress=seen, waiting=waiting)  # (waiting: its pixels still)
         time.sleep(0.4)
+    _set(job, waiting=False)
     base = job.get("lyricsFrom", 0.0)
     held = base + (1 - base) * seen  # where it stopped, of its lyrics' part
     folder = os.path.join(LIB, song_id)

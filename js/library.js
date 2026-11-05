@@ -97,13 +97,13 @@ async function drawLibrary() {
   const tiles = new Map([...libRows].map(([id, row]) => [id, row.querySelector(".cover")]));
   libRows = new Map();
   // songs still being added (this page was reloaded, or opened in a second tab meanwhile) are shown by the mic again
-  for (const [id, a] of adding) if (a.needLyrics && !jobs.some((j) => j.id === id)) { adding.delete(id); document.getElementById("job-" + id)?.remove(); } // settled elsewhere
+  for (const [id, a] of adding) if ((a.needLyrics || a.needPick) && !jobs.some((j) => j.id === id)) { adding.delete(id); document.getElementById("job-" + id)?.remove(); } // settled elsewhere
   if (adding.size) paintJobs();
   for (const j of jobs) {
     if (pollers[j.id] || adding.has(j.id)) continue;
-    addingJob(j.id, { ...j, arrived: false, done: j.status === "done" && !j.needLyrics }); // (none of these is in the list yet)
+    addingJob(j.id, { ...j, arrived: false, done: j.status === "done" && !j.needLyrics && !j.needPick }); // (none of these is in the list yet)
     if (j.status !== "done") watchJob(j.id, "separate");
-    if (!j.song) findEarly(j.id, j.link); // (what it is, till it's in its folder)
+    findEarly(j.id, j.link); // (what it is, till it's in its folder; and what else it could be, for its Other matches: a paused one's to pick from)
   }
   box.innerHTML = "";
   const coming = [...adding.values()].some((j) => j.status !== "error");

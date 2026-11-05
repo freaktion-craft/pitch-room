@@ -14,12 +14,10 @@ function addingJob(id, j) { adding.set(id, { ...(adding.get(id) || {}), ...j });
 // A song's progress in pixels: PX_ROWS rows of PX_COLS, filled a column at a time from the left (the CSS's grid fills
 // down each column); the next one blinks while it's going.
 const PX_COLS = 60, PX_ROWS = 5;
-const LYRICS_FROM = 0.8; // where its lyrics' part starts (stems.SPLIT_SHARE): those blocks marked (.ly), orange while they're wanted
 function pixBar() {
   const bar = el("div", "px"); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
   for (let k = 0; k < PX_COLS * PX_ROWS; k++) {
     const c = el("i"); c.style.setProperty("--d", Math.floor(k / PX_ROWS) + (k % PX_ROWS));
-    if (k >= Math.round(LYRICS_FROM * PX_COLS) * PX_ROWS) c.className = "ly";
     bar.append(c);
   }
   return bar;
@@ -27,10 +25,10 @@ function pixBar() {
 // the blocks newly filled grow in one after another (from nothing to their size), not all at once: a step apart, the
 // whole lot within PX_GROW ms however many there are
 const PX_STEP = 18, PX_GROW = 700;
-function paintPix(bar, p, going) {
+function paintPix(bar, p, going, paused) { // (paused: stopped till it's told something: its next block blinks orange, the rest as it was)
   const n = Math.round(Math.max(0, Math.min(1, p)) * PX_COLS * PX_ROWS), was = +(bar.dataset.n || 0), cells = bar.children;
-  bar.dataset.n = n;
-  [...cells].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", going && k === n); });
+  bar.dataset.n = n; bar.classList.toggle("going", !!going); bar.classList.toggle("paused", !!paused); // (going: being worked on; waiting its turn, it's still: no wave, no blink)
+  [...cells].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", (going || paused) && k === n); });
   if (n > was && !stillMotion()) {
     const step = Math.min(PX_STEP, PX_GROW / (n - was));
     for (let k = was; k < n; k++) cells[k].animate([{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1.25)", opacity: 1, offset: 0.6 }, { transform: "none", opacity: 1 }],
@@ -38,12 +36,13 @@ function paintPix(bar, p, going) {
   }
   bar.setAttribute("aria-valuenow", Math.round(p * 100));
 }
-// The drawer's songs in sections, each shown only while it has any: Pending (waiting their turn, or stopped wanting
-// their lyrics pasted: orange, the next going on meanwhile), Processing, Stopped (failed); in each, in the order they
-// were sent. One that's in leaves the drawer for the library (leaveDrawer, songArrived).
-const JOB_SECS = [["pending", "Pending"], ["processing", "Processing"], ["stopped", "Stopped"]]; // (one in leaves the drawer: leaveDrawer)
+// The drawer's songs in sections, each shown only while it has any: Processing, then Pending under it (waiting their
+// turn, or stopped wanting their lyrics pasted: orange, the next going on meanwhile), Stopped (failed); in each, in the
+// order they were sent. The sections always in that order, however they came. One that's in leaves the drawer for the
+// library (leaveDrawer, songArrived).
+const JOB_SECS = [["processing", "Processing"], ["pending", "Pending"], ["stopped", "Stopped"]]; // (one in leaves the drawer: leaveDrawer)
 // (Pending: waiting behind another song still going; the first, with none before it, is Processing from the start)
-function jobSec(j, behind) { return j.done ? "done" : j.needLyrics ? "pending" : j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
+function jobSec(j, behind) { return j.done ? "done" : j.needLyrics || j.needPick ? "pending" : j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
 function jobSection(key, name) {
   const list = $("#jobsList");
   let sec = list.querySelector(`:scope > .jobs-sec[data-sec="${key}"]`);
@@ -64,8 +63,8 @@ function etaLeft(j) {
   return dt < ETA_WAIT || dp < ETA_GOT ? null : (1 - (j.progress || 0)) * (dt / dp);
 }
 function paintJobs() {
-  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !j.needLyrics && j.status !== "error"), ready = jobs.filter((j) => j.done);
-  const need = jobs.filter((j) => j.needLyrics);
+  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !j.needLyrics && !j.needPick && j.status !== "error"), ready = jobs.filter((j) => j.done);
+  const need = jobs.filter((j) => j.needLyrics || j.needPick); // (stopped, to be told something: its lyrics, or which song it is)
   const counted = jobs.filter((j) => j.status !== "error"), failed = jobs.length > counted.length;
   const p = counted.length ? counted.reduce((s, j) => s + (j.done ? 1 : j.progress || 0), 0) / counted.length : 1;
   const btn = $("#jobsBtn"), open = !$("#jobsPop").hidden;
@@ -83,14 +82,14 @@ function paintJobs() {
   btn.classList.toggle("idle", !jobs.length); // nothing added: not there (CSS); one sent, it comes in
   if (wasIdle && jobs.length && !stillMotion()) btn.animate([{ transform: "scale(0.5)", opacity: 0 }, { transform: "scale(1.12)", opacity: 1, offset: 0.55 }, { transform: "none", opacity: 1 }], { duration: 380, easing: "ease-out" });
   const pct = Math.round(p * 100);
-  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : need.length ? "Lyrics needed" : ready.length > 1 ? "{n} songs added"
+  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : need.length ? (need.some((j) => j.needLyrics) ? "Lyrics needed" : "Which song is it?") : ready.length > 1 ? "{n} songs added"
     : ready.length ? "Song added" : failed ? "Couldn’t add a song" : "Add songs", { n: live.length || ready.length, pct }, "title");
   // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
   const rowOf = new Map(); // (one just made isn't in the page yet)
   const secOf = new Map();
   let going = 0; // songs before this one still going
-  for (const [id, j] of adding) { secOf.set(id, jobSec(j, going > 0)); if (!j.done && !j.needLyrics && j.status !== "error") going++; }
+  for (const [id, j] of adding) { secOf.set(id, jobSec(j, going > 0)); if (!j.done && !j.needLyrics && !j.needPick && j.status !== "error") going++; }
   for (const [id, j] of adding) {
     if (j.done && open) j.seen = true; // in while the panel's open: shown
     let row = document.getElementById("job-" + id);
@@ -98,29 +97,33 @@ function paintJobs() {
       row = el("div", "job"); row.id = "job-" + id;
       const top = el("div", "top"), who = el("b"); who.append(el("span", "t"), el("small", "who")); top.append(who, el("span", "st"));
       const x = el("button", "btn sm icon ghost x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
-      const acts = el("div", "row-acts"), ask = lyricsAsk(id); acts.append(ask.open, x); // Paste lyrics left of the x, its box under the pixels
+      const acts = el("div", "row-acts"), ask = lyricsAsk(id), pk = pickAsk(id); acts.append(pk.open, ask.open, x); // Paste lyrics left of the x, its box under the pixels
       const pic = el("span", "job-cover"); pic.setAttribute("aria-hidden", "true");
-      row.append(pic, top, acts, pixBar(), ask.form);
+      row.append(pic, top, acts, pixBar(), ask.form, pk.form);
     }
     rowOf.set(id, row);
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err;
-    const need = !!j.needLyrics, lyr = j.phase === "lyrics" && !need && !j.done; // (its lyrics' part can't be stopped: the song's in)
-    row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need);
+    const need = !!j.needLyrics, ask = !!j.needPick && !need, lyr = j.phase === "lyrics" && !need && !ask && !j.done; // (its lyrics' part can't be stopped: the song's in)
+    row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need || ask); // (ask: stopped to be told which song it is)
     // what it is: its link, then its video's title, then the record it was found to be (its title, its artist), each
     // wiped in over the last, blurred to clear; its cover coming in at its left once there's one
-    const found = j.song?.artist ? j.song : j.early?.title ? j.early : null, lib = (j.arrived || j.done) && libCache.get(j.songId);
+    // (one picked: that, till the song's own name and cover are what was picked: its cover saved after the pick)
+    const fresh = j.picked && !(j.song?.cover?.at * 1000 > j.picked.at), lib = !fresh && (j.arrived || j.done) && libCache.get(j.songId);
+    const found = fresh ? j.picked : j.song?.artist ? j.song : j.early?.title ? j.early : null;
     const name = (lib && lib.title) || found?.title || j.name;
     wipeTo(row.querySelector(".top b"), name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song"), (lib && lib.artist) || found?.artist || "");
-    jobCover(row.querySelector(".job-cover"), j.songId, (lib && lib.cover) || j.song?.cover, j.early?.art);
+    jobCover(row.querySelector(".job-cover"), fresh ? null : j.songId, fresh ? null : (lib && lib.cover) || j.song?.cover, fresh ? j.picked.art : j.early?.art);
+    paintPicks(row, id, j);
     const state = row.querySelector(".top .st");
     if (j.done) say(state, "Added");
     else if (need) say(state, j.lyricsError ? "Manual lyrics needed · {why}" : "Manual lyrics needed", { why: () => tr(j.lyricsError || "") });
+    else if (ask) say(state, "Not sure which song this is · pick it below");
     else if (err) say(state, j.error || "That didn’t work.");
     else if (stopping) say(state, "Cancelling…");
     else if (j.status === "queued" && secOf.get(id) === "processing") say(state, "Starting…"); // (the first: none before it)
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
     else { const left = etaLeft(j); say(state, left == null ? "{stage}" : left < 60 ? "{stage} · under a minute left" : "{stage} · about {n} min left", { stage: () => tr(j.stage || ""), n: Math.round(left / 60) }); }
-    paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, !j.done && !need && !err && !stopping && !stillMotion());
+    paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, j.status === "running" && !j.waiting && !j.done && !need && !ask && !err && !stopping && !stillMotion(), (need || ask) && !stopping); // (queued, or waiting for its lyrics' turn: still; wanting its lyrics, or which song it is: paused)
     row.querySelector(".lyr-open").hidden = !need; // (not "open": that's the drawer's, read above, for one in that's seen)
     if (!need && !row.querySelector(".lyr-form").hidden) lyricsBox(row, false); // (pasted, or settled elsewhere)
     // cancel, or clear one that failed; once it's in, open it; one wanting its lyrics, let go without them
@@ -130,8 +133,10 @@ function paintJobs() {
     say(x, j.done ? "Open song" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping || lyr; x.style.visibility = lyr ? "hidden" : ""; // (its room kept: the pixels as wide as the others')
   }
   // into their sections (made in their order, the first time), in order; a row moved only when it's out of place (one moved loses its hover and focus)
-  for (const [key, name] of JOB_SECS) {
+  for (const [n, [key, name]] of JOB_SECS.entries()) {
     const sec = jobSection(key, name), rows = sec.querySelector(".jobs-rows");
+    const secs = list.querySelectorAll(":scope > .jobs-sec");
+    if (secs[n] !== sec) secs[n] ? list.insertBefore(sec, secs[n]) : list.append(sec); // (in JOB_SECS's order, moved only when out of it)
     const want = [...adding].filter(([id]) => secOf.get(id) === key).map(([id]) => rowOf.get(id));
     if (want.length !== rows.children.length || want.some((r, i) => rows.children[i] !== r)) want.forEach((r) => rows.append(r));
     sec.hidden = !want.length && !rows.querySelector(".leaving"); sec.querySelector(".n").textContent = want.length; // (kept while one goes out of it)
@@ -201,6 +206,102 @@ function lyricsAsk(id) {
   go.disabled = true; acts.append(go); form.append(text, acts);
   return { open, form };
 }
+// Which song it is, picked: the records its link could be (/api/yt/find's candidates, the one taken first), each with
+// how sure it is (%), and its video's own name (with how sure it is that it's none of them). Other matches, on its
+// title's line beside Paste lyrics, opens them under its pixels as the lyrics' box opens; one picked, it's named so
+// (stems.pick_record: kept for when it's named, or named again with it) and they fold away. As tiles of their covers,
+// how sure on each, the one it is ringed and ticked.
+function foldBox(form, open, on, focus) {
+  if (on === !form.hidden) return;
+  open.setAttribute("aria-expanded", String(on)); open.classList.toggle("on", on);
+  if (!on) { form.hidden = true; return; }
+  form.hidden = false;
+  if (!stillMotion()) {
+    const h = form.offsetHeight;
+    form.style.overflow = "hidden";
+    form.animate([{ height: "0px", opacity: 0 }, { height: h + "px", opacity: 1 }], { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" })
+      .finished.then(() => { form.style.overflow = ""; }, () => { form.style.overflow = ""; });
+  }
+  focus?.focus({ preventScroll: true });
+}
+function pickAsk(id) {
+  const open = el("button", "btn sm cand-open"), form = el("div", "cand-list");
+  open.hidden = true; form.hidden = true; open.type = "button"; say(open, "Other matches"); open.setAttribute("aria-expanded", "false");
+  form.setAttribute("role", "radiogroup"); say(form, "Which song it is", null, "aria-label");
+  open.onclick = (e) => {
+    e.stopPropagation();
+    if (open.dataset.keep === "true") return keepName(id, open);
+    foldBox(form, open, form.hidden, form.querySelector(".cand.on") || form.querySelector(".cand"));
+  };
+  return { open, form };
+}
+function paintPicks(row, id, j) {
+  const open = row.querySelector(".cand-open"), form = row.querySelector(".cand-list"), e = j.early;
+  const cands = e?.candidates || [];
+  const keep = !!j.needPick && !cands.length; // (paused, with nothing to pick from: go on with the name it has)
+  open.hidden = (!cands.length && !keep) || !!j.done || j.status === "error";
+  if (open.hidden && !form.hidden) foldBox(form, open, false);
+  if (open.dataset.keep !== String(keep)) { open.dataset.keep = String(keep); say(open, keep ? "Keep this name" : "Other matches"); }
+  if (keep && !j.findAgain && (j.link || j.name) && YT_LINK.test(j.link || j.name)) { j.findAgain = true; findEarly(id, j.link || j.name); } // (asked once more)
+  if (j.needPick && !open.hidden && !j.askShown) { j.askShown = true; requestAnimationFrame(() => foldBox(form, open, true)); } // (asked which song it is: its tiles open, once)
+  const chosen = j.picked ? j.picked.key : cands.findIndex((c) => c.pick) >= 0 ? "c" + cands.findIndex((c) => c.pick) : e?.own?.pick ? "own" : null;
+  const key = JSON.stringify([cands.map((c) => [c.title, c.artist, c.pct]), e?.own?.pct, chosen, j.pickError || ""]);
+  if (form.dataset.key === key) return;
+  form.dataset.key = key;
+  const items = cands.map((c, i) => ({ ...c, key: "c" + i, sub: c.album }));
+  if (e?.own) items.push({ ...e.own, key: "own", own: true });
+  form.replaceChildren(...items.map((c) => pickItem(id, c, c.key === chosen)));
+  if (j.pickError) { const p = el("p", "cand-err"); say(p, j.pickError); form.append(p); } // (a pick that didn't go: why, in the list, as the lyrics' box says)
+}
+function pickItem(id, c, on) {
+  const b = el("button", "cand" + (on ? " on" : "") + (c.own ? " own" : "")); b.type = "button";
+  b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(on));
+  const pic = el("span", "cand-cover");
+  if (c.art) { const img = el("img"); img.alt = ""; img.decoding = "async"; img.loading = "lazy"; img.referrerPolicy = "no-referrer"; img.src = c.art; pic.append(img); }
+  const words = el("span", "cand-words"), t = el("b"), who = el("small"), sub = el("small", "cand-sub");
+  t.textContent = c.title; who.textContent = c.artist || ""; if (c.own) say(sub, "Video’s own name"); else sub.textContent = c.sub || ""; // (say: in the language picked, should it change)
+  words.append(t, who, sub);
+  const pct = el("span", "cand-pct"), num = el("span", "n");
+  num.textContent = c.pct + "%"; pct.append(num); say(pct, "{pct}% sure", { pct: c.pct }, "title");
+  b.append(pic, words, pct);
+  if (on) b.append(icon("tick"));
+  b.onclick = () => choosePick(id, c, b);
+  return b;
+}
+// a paused one, gone on with the name it was found by (nothing else to pick from)
+async function keepName(id, open) {
+  open.disabled = true;
+  try {
+    const r = await fetch(`/api/jobs/${id}/pick`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keep: true }) });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || "That didn’t work.");
+    if (body.status === "running" && adding.has(id)) { addingJob(id, { needPick: false, done: false, status: "running", stage: "Finding the lyrics" }); watchJob(id, "separate"); }
+  } catch (e) {
+    if (adding.has(id)) addingJob(id, { pickError: e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message });
+  } finally { open.disabled = false; }
+}
+async function choosePick(id, c, b) {
+  const j = adding.get(id);
+  if (!j) return;
+  const form = b.closest(".cand-list"), open = b.closest(".job").querySelector(".cand-open");
+  form.querySelectorAll(".cand").forEach((p) => { p.classList.toggle("on", p === b); p.setAttribute("aria-checked", String(p === b)); });
+  const done = () => { foldBox(form, open, false); open.focus({ preventScroll: true }); }; // (focus back where the list was opened from)
+  if (j.demo) { addingJob(id, { picked: { key: c.key, title: c.title, artist: c.artist, art: c.art, at: Date.now() }, pickError: null }); done(); return; } // (?demo=picker)
+  try {
+    const r = await fetch(`/api/jobs/${id}/pick`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c.own ? { own: true } : { record: c.record }) });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || "That didn’t work.");
+  } catch (e) {
+    if (adding.has(id)) addingJob(id, { pickError: e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message }); // (the list as it was, and why)
+    return;
+  }
+  if (!adding.has(id)) return; // (gone from the drawer meanwhile)
+  const going = body.status === "running"; // (it was stopped, for this or its lyrics: on again, by this name)
+  addingJob(id, { picked: { key: c.key, title: c.title, artist: c.artist, art: c.art, at: Date.now() }, pickError: null,
+    ...(going ? { needPick: false, needLyrics: false, lyricsError: null, done: false, status: "running", stage: "Finding the lyrics" } : {}) });
+  if (going) { const row = document.getElementById("job-" + id); if (row) lyricsBox(row, false); watchJob(id, "separate"); }
+  done();
+}
 // An added song, opened from the panel: it leaves the panel, which closes.
 function openAdded(id) {
   const j = adding.get(id);
@@ -252,7 +353,7 @@ async function cancelJob(id) {
   const j = adding.get(id);
   if (!j) return;
   if (j.status === "error") return dropJob(id);
-  if (j.needLyrics) { await fetch(`/api/jobs/${id}/cancel`, { method: "POST" }).catch(() => {}); return dropJob(id); } // the song let go: it's deleted (told first: the list read again after it)
+  if (j.needLyrics || j.needPick) { await fetch(`/api/jobs/${id}/cancel`, { method: "POST" }).catch(() => {}); return dropJob(id); } // the song let go: it's deleted (told first: the list read again after it)
   addingJob(id, { stopping: true });
   try {
     const r = await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
@@ -330,13 +431,15 @@ function watchJob(id, kind, forSong) {
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
     } else if (j.status !== "cancelled") {
-      const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError, song } = j;
+      const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError, song, waiting, needPick, link } = j;
+      const had = adding.get(id); // (a playlist's song: sent by its name, its link known once it's found; its candidates asked then)
+      if (had && link && YT_LINK.test(link) && !had.early && !had.findAsked) { had.findAsked = true; findEarly(id, link); }
       skip = status === "queued" && ahead > 1 ? 4 : 0;
       const was = adding.get(id), now = performance.now(); // (its time left: timed from when it started going, again from where it is if it went back)
       const etaAt = status !== "running" ? null : !was?.etaAt || progress < was.etaAt.p ? { t: now, p: progress } : was.etaAt;
-      const arrive = status === "done" && !needLyrics && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
-      addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), etaAt, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
-        done: status === "done" && !needLyrics, ...(arrive ? { arrived: true } : {}) });
+      const arrive = status === "done" && !needLyrics && !needPick && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
+      addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), etaAt, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError, waiting: !!waiting, needPick: !!needPick,
+        done: status === "done" && !needLyrics && !needPick, ...(arrive ? { arrived: true } : {}) });
       if (arrive) leaveDrawer(id).then(() => songArrived(songId));
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
@@ -487,7 +590,7 @@ function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, t
 function findEarly(id, link) {
   if (!link || !YT_LINK.test(link)) return;
   fetch("/api/yt/find?url=" + encodeURIComponent(link)).then((r) => (r.ok ? r.json() : null)).then((f) => {
-    if (f && adding.has(id)) addingJob(id, { early: { title: f.title, artist: f.artist, art: f.art } });
+    if (f && adding.has(id)) addingJob(id, { early: { title: f.title, artist: f.artist, art: f.art, candidates: f.candidates || [], own: f.own || null } });
   }).catch(() => {});
 }
 function jobStarted(id, name) {
@@ -625,3 +728,16 @@ function initYoutubeOffer() {
 }
 // the links field: a line tall, growing with what's in it (CSS stops it at five)
 function fitLinks() { const f = $("#sYtUrl"); f.style.height = ""; f.style.height = Math.max(32, f.scrollHeight + 2) + "px"; }
+// ?demo=picker (to look at, in development): the drawer with three songs as if being added, each one's candidates
+// (asked of /api/yt/find, as adding them would) open under it. Nothing's added or sent.
+if (/[?&]demo=picker\b/.test(location.search)) addEventListener("load", () => setTimeout(async () => {
+  const demo = [["https://www.youtube.com/watch?v=42v9nCf5gzM", 0.42], ["https://www.youtube.com/watch?v=cIGgSI1uhKI", 0.18], ["https://www.youtube.com/watch?v=Zzonsjphqlc", 0]];
+  demo.forEach(([link, p], n) => addingJob("demo-" + n, { name: link, link, demo: true, status: n === 2 ? "queued" : "running", stage: n ? "Downloading" : "Splitting voice and band", progress: p }));
+  showJobs(true);
+  await Promise.all(demo.map(async ([link], n) => {
+    const f = await fetch("/api/yt/find?url=" + encodeURIComponent(link)).then((r) => r.json()).catch(() => null);
+    if (f) addingJob("demo-" + n, { early: { title: f.title, artist: f.artist, art: f.art, candidates: f.candidates || [], own: f.own || null } });
+    const row = document.getElementById("job-demo-" + n);
+    row && foldBox(row.querySelector(".cand-list"), row.querySelector(".cand-open"), true);
+  }));
+}, 400));

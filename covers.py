@@ -248,6 +248,47 @@ def online(title: str, duration: float, hint: str = "", cover: bool = False, cha
     ("Bam Pyeonji", "Through the Night") is left to the title's own name.
     Words that name no one ("the", "Official", "Lyrics": NAMELESS) don't make a record the title's artist's, nor
     count as shared; an artist's name of 5 letters or more in the title with its spaces gone does ("Baek-hyun")."""
+    found = search_records(title, duration, hint, cover, channel)
+    return found["pick"]
+
+
+# How sure it is of each candidate: P(this record is the song), with "none of them" the rest (the video's own name), a
+# multinomial logit over what search_records weighed, its weights learned from real titles whose records are known
+# (the library's and two sets of others: scratch confidence.py, cross-checked). CONF_W: a weight to each of _feats.
+# Learned 2026-11-06 from 140 titles: across 5 folds, of the titles it was 90-100 % sure of the top one was right for
+# 97 %, 80-90 %: 94 %, 60-80 %: 80 %, 40-60 %: 62 %; its top right for 85 % (online()'s pick: 81 %).
+CONF_W = {"pick": 1.145, "theirs": 0.746, "names": 1.013, "untold": 0.704, "both": 1.887, "shared": 0.100, "near": 0.573, "close": 0.479,
+          "off": -0.809, "fits": 0.306, "other": -0.273, "rejected": -0.738, "deezer": -0.297, "first": 0.910, "rank": -1.943}
+CONF_NONE = 3.199  # the score of "none of them"
+
+
+def _feats(why: dict, pick: bool) -> dict[str, float]:
+    off, dur = why["off"], max(1.0, why["dur"] or 1.0)
+    return {"pick": float(pick), "theirs": float(why["theirs"]), "names": float(why["names"] and why["told"]),
+            "untold": float(not why["told"]), "both": float(why["theirs"] and why["names"]), "shared": min(why["shared"], 4) / 4,
+            "near": float(off <= 2), "close": float(off <= max(10.0, 0.08 * dur)), "off": min(off / dur, 0.5) * 2,
+            "fits": float(why["fits"]), "other": float(why["other"]), "rejected": float(why["rejected"]),
+            "deezer": float(why["s"]), "first": float(why["k"] == 0), "rank": min(why["i"], 9) / 9}
+
+
+def confidence(seen: list[dict], pick: dict | None) -> tuple[list[float], float]:
+    """Each seen record's chance of being the song, and of none of them being it (summing to 1)."""
+    import math
+    is_pick = lambda r: pick is not None and r["artist"] == pick["artist"] and r["track"] == pick["track"]  # noqa: E731
+    scores = [sum(CONF_W.get(k, 0.0) * v for k, v in _feats(r["why"], is_pick(r)).items()) for r in seen]
+    top = max([CONF_NONE, *scores])
+    ex = [math.exp(s - top) for s in scores]
+    none = math.exp(CONF_NONE - top)
+    total = none + sum(ex)
+    return [e / total for e in ex], none / total
+
+
+def search_records(title: str, duration: float, hint: str = "", cover: bool = False, channel: str = "", full: bool = False, least: int = 0) -> dict:
+    """online()'s search, and all it saw: {pick: the record online() takes (or None), seen: every record found, once
+    each (the first search that brought it), with what was weighed (its "why": theirs, names, told, shared, off,
+    fits, other, rejected, s, k, i)}. full: every search on both sites, none of online()'s stopping early (to learn
+    the confidence's weights from: confidence.py); least: not stopping early till it's seen that many (the picker's
+    candidates). Raises as online() does: neither site answering, nothing found."""
     if cover:
         title = COVER.sub(" ", COVER_BY.sub(" ", title))
     artist, song = lyrics.split_title(title)
@@ -257,7 +298,12 @@ def online(title: str, duration: float, hint: str = "", cover: bool = False, cha
     by = [f"{n} {song or title}" for n in ([who, *_spellings(who)] if who else [])]
     qs = list(dict.fromkeys(by + ([hint] if hint else []) + lyrics.queries(title)))
     latin = not cover and bool(song) and not CJK.search(f"{artist} {song}")  # the title all in Latin letters
-    failed, kept = None, []
+    # (settled: the pick where online() would have stopped: searching on for least's sake doesn't change it. seen: each
+    # record once, the first search that brought it; every one of them weighed for the pick all the same, an album's
+    # copy of a song as much as a compilation's)
+    failed, kept, seen, keys, settled = None, [], [], set(), None
+    best = lambda: min(kept, key=lambda c: c[0])  # noqa: E731
+    out = lambda: {"pick": settled if settled is not None else best()[1] if kept else None, "seen": seen}  # noqa: E731
     for s, (site, search) in enumerate((("itunes", _itunes), ("deezer", _deezer))):
         for k, q in enumerate(qs):
             try:
@@ -266,8 +312,10 @@ def online(title: str, duration: float, hint: str = "", cover: bool = False, cha
                 failed = e
                 break
             for i, r in enumerate(found):
-                if other_version(r, title):
-                    continue
+                key = (_compact(r["artist"]), _compact(r["track"]), round(r["duration"] or 0))
+                new = key not in keys
+                keys.add(key)
+                other = other_version(r, title)
                 off, shared = abs(r["duration"] - duration), len(named_by & _w(f"{r['artist']} {r['track']} {r['album']}"))
                 ca = _compact(r["artist"])
                 theirs = bool(named_by & (_w(r["artist"]) - NAMELESS)) or (len(ca) >= 5 and ca in whole)
@@ -276,24 +324,29 @@ def online(title: str, duration: float, hint: str = "", cover: bool = False, cha
                 cjk = bool(CJK.search(r["track"]))
                 told = {w for w in named_by - _w(r["artist"]) if bool(CJK.search(w)) == cjk}
                 names = _names_it(r["track"], tw, whole) if told else True
-                if latin and not cjk and not names:
-                    continue
+                rejected = other or (latin and not cjk and not names)
                 named = bool(_w(r["track"])) and _w(lyrics.split_title(r["track"])[1] or r["track"]) <= tw
                 fits = off <= max(30.0, 0.2 * duration) and named if cover else off <= max(10.0, 0.08 * duration) and (shared or off <= 3)
                 if not cover and not theirs:
                     fits = fits and off <= 2
-                if r["duration"] and fits:
-                    kept.append(((-(theirs and names), -theirs, -names, -shared, off, s, k, i), r | {"site": site}))
-            if kept and min(kept, key=lambda c: c[0])[0][0] < 0:  # by the artist named, named as in the title: that's it
-                return min(kept, key=lambda c: c[0])[1]
-        best = min(kept, key=lambda c: c[0])[0] if kept else None
-        if best and best[2] < 0 and best[3] < 0:  # one named as in the title and sharing words: no need of the other site
-            break
-    if kept:
-        return min(kept, key=lambda c: c[0])[1]
-    if failed:
+                fits = bool(fits and r["duration"])
+                rec = r | {"site": site}
+                if new:
+                    seen.append(rec | {"why": {"theirs": theirs, "names": names, "told": bool(told), "shared": shared, "off": off, "dur": duration,
+                                               "fits": fits, "other": other, "rejected": rejected, "s": s, "k": k, "i": i}})
+                if fits and not rejected and settled is None:
+                    kept.append(((-(theirs and names), -theirs, -names, -shared, off, s, k, i), rec))
+            if not full and kept and best()[0][0] < 0:  # by the artist named, named as in the title: that's it
+                settled = best()[1] if settled is None else settled
+                if len(seen) >= least:
+                    return out()
+        if not full and kept and best()[0][2] < 0 and best()[0][3] < 0:  # one named as in the title and sharing words: no need of the other site
+            settled = best()[1] if settled is None else settled
+            if len(seen) >= least:
+                break
+    if failed and not kept:
         raise failed  # not "none found": that's only said once both have answered
-    return None
+    return out()
 
 
 YT_ID = re.compile(r"(?:youtube\.com/(?:watch\?(?:[^#]*&)?v=|shorts/|embed/|live/)|youtu\.be/)([\w-]{11})")
