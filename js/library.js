@@ -22,7 +22,7 @@ async function stemsRefresh(list = true, got = null) {
   $("#sErr").hidden = !err;
   if (err) say($("#sErr"), window.pitchroom ? "The server is running, but checking the stem tools failed: {err}. Help → Show Log has the details." // the desktop app (desktop/preload.js): no terminal
     : "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err: () => tr(err) });
-  $("#sInstall").hidden = !st || st.installed || stemsPage !== "lib";
+  paintTools(st);
   $("#sAdd").hidden = !st || !st.installed;
   $("#sAddSetup").hidden = !st || st.installed; // the Add song panel points at the setup until the tools are in
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
@@ -39,26 +39,28 @@ async function stemsRefresh(list = true, got = null) {
   }
   pinLibTop(); // a notice or the setup above the list moves it down
 }
-// The tools in: the banner says so for a moment and folds away, and an empty library, which waited under it, rises in
-// where it was, as it does on opening. With reduced motion, at once.
-async function installDone() {
-  const box = $("#sInstall"), page = $("#sLibPage");
-  if (box.hidden || matchMedia("(prefers-reduced-motion: reduce)").matches) return stemsRefresh();
-  const waited = getComputedStyle(page).display === "none";
-  $("#sInstallBtn").disabled = true; // done with
-  say($("#sInstallState"), "Installed").prepend(icon("tick"));
-  // meanwhile the check (the server's first look at the new tools takes a few seconds) and the list, drawn while
-  // still out of sight, so what rises is what stays
-  const [got] = await Promise.all([stemsCheck(), renderLibrary(), sleep(900)]);
-  box.style.overflow = "hidden";
-  const fold = box.animate([{ height: box.offsetHeight + "px", opacity: 1, marginBottom: "24px", paddingTop: "12px", paddingBottom: "12px" },
-    { height: "0px", opacity: 0, marginBottom: "0px", paddingTop: "0px", paddingBottom: "0px" }], { duration: 360, easing: RISE_EASE, fill: "forwards" });
-  await fold.finished;
-  await stemsRefresh(false, got);
-  fold.cancel(); box.style.overflow = "";
-  if (!box.hidden || !waited) return;
-  // each part on its own, not the list as a whole: rising, the list would take its pinned column heads under the mast
-  rise($("#sLibPage .lib-head"), 0); rise($("#sLib .lib-cols"), 90); rise($("#sLib .add-first"), 180, 6, 6);
+// Settings' Song tools (#sInstall, its parts the job's line, bar and log: watchJob): how they are, in (on which
+// device) or not, and its button: Install, Update, or (the desktop app, new versions in while the old are in memory)
+// Restart. While a job's on, its line says how it's going and is left be.
+function paintTools(st) {
+  if (!st) return;
+  const line = $("#sInstallState"), btn = $("#sInstallBtn"), busy = ["queued", "running"].includes(st.install?.status);
+  const mode = !st.installed ? "install" : st.restartNeeded && window.pitchroom?.restart ? "restart" : "update";
+  btn.dataset.mode = mode; btn.disabled = busy;
+  say(btn.querySelector("span"), mode === "install" ? "Install" : mode === "restart" ? "Restart" : "Update");
+  if (busy) return;
+  const dev = st.deviceName || (st.device === "cuda" ? "GPU" : st.device === "mps" ? "Apple GPU" : "CPU");
+  if (!st.installed) say(line, "Split songs into voice and band, and read their melody and lyrics: a 3–4 GB download, once.");
+  else if (st.restartNeeded) say(line, "Updated. Restart the app to use them.");
+  else say(line, "Installed · {dev}", { dev });
+  $("#sInstallBar").hidden = true;
+}
+// The tools in, or brought up to date (j: the job): the library drawn again with them (Add song, the first song's
+// button), and their row says how it went
+async function installDone(j) {
+  await stemsRefresh();
+  if (!j?.update || stemsStatus?.restartNeeded) return;
+  say($("#sInstallState"), j.changed ? "Updated" : "Up to date").prepend(icon("tick"));
 }
 // The library's first drawing, which the opening waits for.
 let libDrawnNow;

@@ -891,8 +891,38 @@ function initWave() {
   });
   wave.addEventListener("pointercancel", () => { down = false; endScrub(); });
 }
+// Check's report (stems.check_tools), plain text to read or copy when something's wrong: the Python and the device,
+// each tool's version and whether it loads (why not, if not), the others' versions, the models downloaded
+const TOOL_LOADS = [["torch", "torch"], ["torchaudio", "torchaudio"], ["demucs", "demucs"], ["audio_separator", "audio-separator"],
+  ["librosa", "librosa"], ["whisper", "openai-whisper"], ["stable_whisper", "stable-ts"]];
+function toolsReport(r) {
+  const v = r.versions || {}, loads = r.loads || {}, out = [];
+  out.push(`Python ${r.python} · ${r.device}${r.deviceName ? ` (${r.deviceName})` : ""}${r.gpuUnused ? " · NVIDIA card not used" : ""}${r.driverOld ? " · NVIDIA driver too old" : ""}${r.restartNeeded ? " · restart needed" : ""}`);
+  if (loads.python) out.push(`Couldn’t check them: ${loads.python}`);
+  for (const [mod, dist] of TOOL_LOADS) {
+    const err = loads[mod];
+    out.push(`${(dist + " " + (v[dist] || "—")).padEnd(30)} ${!v[dist] ? "not installed" : err == null ? "" : err ? `✗ ${err}` : "✓"}`);
+  }
+  for (const d of ["numpy", "yt-dlp"]) out.push(`${(d + " " + (v[d] || "—")).padEnd(30)}`);
+  out.push(`Models: ${(r.models || []).map((m) => `${m.name} (${m.mb} MB)`).join(", ") || "none"}`);
+  return out.map((l) => l.trimEnd()).join("\n");
+}
 function initStems() {
-  $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { say($("#sInstallState"), e.message); $("#sInstallBtn").disabled = false; } };
+  // Settings' Song tools: Install, Update (start_install's update), or Restart; and Check, the report in its log
+  $("#sInstallBtn").onclick = async () => {
+    const b = $("#sInstallBtn"), mode = b.dataset.mode || "install";
+    if (mode === "restart") return window.pitchroom.restart();
+    b.disabled = true; $("#sInstallLog").textContent = "";
+    try { watchJob(await postJob("/api/stems/install" + (mode === "update" ? "?update=1" : "")), "install"); }
+    catch (e) { say($("#sInstallState"), e.message); b.disabled = false; }
+  };
+  $("#setToolsCheck").onclick = async () => {
+    const b = $("#setToolsCheck"), log = $("#sInstallLog");
+    b.disabled = true; log.hidden = false; log.textContent = tr("Checking…");
+    try { log.textContent = toolsReport(await (await fetch("/api/stems/check", { cache: "no-store" })).json()); }
+    catch (e) { log.textContent = e instanceof TypeError ? tr("Couldn’t reach the server.") : e.message; }
+    finally { b.disabled = false; }
+  };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { say($("#sGpuState"), e.message); $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
   // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it

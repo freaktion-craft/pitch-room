@@ -164,7 +164,7 @@ async function obStartTools() {
   obToolsAsked = true;
   const st = await obStatus();
   if (!st || st.installed || st.install?.status === "running") return;
-  try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) {} // the library's banner offers it again
+  try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) {} // Settings' Song tools offers it again
 }
 
 // ---------- the mic: allowing it, then choosing it ----------
@@ -834,7 +834,7 @@ async function obSend({ url }) {
   jobStarted(id, url);
   return id; // (followed in the first steps' last box: obTools)
 }
-// the song given before the tools were in: sent once they are, the library's banner showing them coming meanwhile
+// the song given before the tools were in: sent once they are, Settings' Song tools showing them coming meanwhile
 async function obSendLater() {
   clearTimeout(OB.laterT);
   const st = await obStatus();

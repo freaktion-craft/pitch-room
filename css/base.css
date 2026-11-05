@@ -131,6 +131,13 @@ header { position: relative; }
 .set-nav button[aria-current="true"] { background: var(--fill); color: var(--ink); }
 .set-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 @media (max-width: 720px) { .set-layout { grid-template-columns: minmax(0, 1fr); } .set-nav { display: none; } }
+/* Song tools (paintTools): its buttons side by side; under the row, while it's busy or after a Check, the install's bar
+   and its log, or the Check's report, the row's whole width (a report to read and copy, taller than a log) */
+.set-tools { flex-wrap: wrap; row-gap: var(--space-3); }
+.set-acts { display: flex; flex: none; gap: var(--space-2); }
+.set-tools-out { flex: 1 1 100%; display: grid; gap: var(--space-2); }
+.set-tools-out:not(:has(> :not([hidden]))) { display: none; }
+.set-tools-out .log { max-height: 260px; white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
 /* their list the only thing that scrolls (fitSettings: its height), so the page itself doesn't: no room under it */
 html.set-view .app { padding-bottom: 0; }
 html.set-view #micSet { overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-16); }

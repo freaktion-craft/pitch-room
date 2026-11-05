@@ -223,6 +223,9 @@ const EMPTY_LIBRARY = false;
         <section class="set-group" aria-labelledby="setMore">
           <h2 class="group-label" id="setMore">Advanced</h2>
           <div class="set-list">
+            <!-- the song tools (paintTools): how they are, Install (missing) or Update, and Check, a report of each one to copy -->
+            <div class="set-row set-tools" id="sInstall"><div class="set-what"><b>Song tools</b><small id="sInstallState"></small></div><div class="set-acts"><button class="btn sm" id="setToolsCheck" type="button">Check</button><button class="btn sm primary" id="sInstallBtn" type="button"><span>Install</span></button></div>
+              <div class="set-tools-out"><div class="bar" hidden id="sInstallBar"><i></i></div><pre class="log" id="sInstallLog" hidden></pre></div></div>
             <div class="set-row" id="setImport" hidden><div class="set-what"><b>Import beta library</b><small id="setImportWhy">Copy songs and settings from the beta folder</small></div><button class="btn sm" id="setImportGo" type="button" title="The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own">Choose folder</button></div>
             <label class="set-row"><span class="set-what"><b>Developer tools</b><small>Mark where Practice’s phrases should split or join</small></span><input type="checkbox" class="switch" id="devTools"></label>
             <div class="set-row"><div class="set-what"><b>Onboarding</b><small>The first steps again: your mic, your color, a song</small></div><button class="btn sm" id="setOnboard" type="button">Visit</button></div>
@@ -236,12 +239,6 @@ const EMPTY_LIBRARY = false;
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
-    <!-- the tools to add songs, in the library and on Add song while they're missing (an update can add one) -->
-    <section class="panel-card" id="sInstall" hidden>
-      <div class="setup-line"><p class="muted">First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.</p><span class="muted" id="sInstallState"></span><button class="btn sm primary" id="sInstallBtn" type="button">Install</button></div>
-      <div class="bar" hidden id="sInstallBar"><i></i></div>
-      <pre class="log" id="sInstallLog" hidden></pre>
-    </section>
 
     <div id="libMast" aria-hidden="true"></div>
     <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
@@ -267,7 +264,7 @@ const EMPTY_LIBRARY = false;
         </div>
         <p class="muted" id="sAddMsg" hidden></p>
       </div>
-      <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
+      <p class="muted" id="sAddSetup" data-html hidden>Install the song tools first, in <a href="#settings">Settings</a>.</p>
     </div>
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">

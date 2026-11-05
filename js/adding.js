@@ -160,7 +160,7 @@ function watchJob(id, kind, forSong) {
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
       if (j.status === "cancelled") return dropJob(id);
-      if (kind === "install" && j.status === "done") installDone();
+      if (kind === "install" && j.status === "done") installDone(j);
       if (kind === "gpu" && j.status === "done") stemsRefresh();
       if (kind === "video") videoFetched(forSong, j.status === "done");
       if (kind === "lyrics") lyricsDone(forSong, j.status === "done");

@@ -10,14 +10,13 @@
 .panel-card a:not(.btn) { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .row-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .inline-field { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); }
-/* the one-time setup: a banner, its line and its button; once it's started, how it's going in the line's place */
-#sInstall, #obBack { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
+/* a banner, its line and its button (the steps left half-way: Settings'); the song tools' Installed tick (Settings' Song tools) */
+#obBack { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
 /* Settings' one, the steps again (welcome()): in the crumbs' place while they're unfinished */
 #obBack { flex: 1; min-width: 0; margin: 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); } /* room round its button */
 .backbar:has(#obBack:not([hidden])) .crumbs { display: none; }
-#sInstall .setup-line, #obBack .setup-line { display: flex; align-items: center; gap: var(--space-4); }
-#sInstall .setup-line > :not(.btn), #obBack .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
-#sInstallState:empty, #sInstall .setup-line:has(#sInstallState:not(:empty)) p { display: none; }
+#obBack .setup-line { display: flex; align-items: center; gap: var(--space-4); }
+#obBack .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
 #sInstallState .ico { width: var(--icon-sm); height: var(--icon-sm); margin-right: 6px; vertical-align: -3px; color: var(--good); } /* Installed's tick */
 .gpu-row { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--note-bg); color: var(--note-ink); font-size: var(--text-sm); }
 .gpu-row .btn { justify-self: start; }
@@ -380,8 +379,6 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .add-first:hover .plus { border-color: var(--faint); color: var(--ink); }
 #sLib .add-first .plus .ico { width: var(--icon-lg); height: var(--icon-lg); }
 #sLib .add-first small { color: var(--muted); font-size: var(--text-sm); }
-/* one step at a time: with the tools still to install, an empty library waits under their banner */
-#sInstall:not([hidden]) ~ #sLibPage:has(.add-first) { display: none; }
 /* the album art (covers.py), as tall as the title and its details beside it: a square the row has from the start, so
    nothing moves when the picture comes in (fading); a quiet tile until then, or for good when there's none. A hairline
    inside, for a white cover on the white list. */

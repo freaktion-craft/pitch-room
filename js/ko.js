@@ -210,7 +210,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "The server is running, but checking the stem tools failed: {err}. Help → Show Log has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 Help → Show Log에 있어요.",
   "First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.":
     "처음 한 번, 곡을 나누고 멜로디와 가사를 읽는 도구를 받아요 (3–4 GB).",
-  "Install": "설치", "Installed": "설치 완료", "Install the tools first, from the banner above.": "먼저 위 배너에서 도구를 설치하세요.", "Add a song": "새 곡 추가", "Add": "추가",
+  "Install": "설치", "Installed": "설치 완료", "Install the song tools first, in Settings.": '먼저 <a href="#settings">설정</a>에서 곡 도구를 설치하세요.', "Song tools": "곡 도구", "Check": "점검", "Checking…": "점검하는 중…", "Split songs into voice and band, and read their melody and lyrics: a 3–4 GB download, once.": "곡을 목소리와 반주로 나누고 멜로디와 가사를 읽는 도구예요. 3–4 GB를 한 번만 받아요.", "Installed · {dev}": "설치됨 · {dev}", "Up to date": "최신이에요", "Updated. Restart the app to use them.": "업데이트했어요. 앱을 다시 시작하면 적용돼요.", "Updated": "업데이트했어요", "Restart": "다시 시작", "Add a song": "새 곡 추가", "Add": "추가",
   "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
   "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
   "This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).":

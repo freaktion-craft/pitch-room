@@ -288,12 +288,47 @@ _install_job: dict | None = None
 _restart_needed = False
 
 
-def start_install(gpu_only: bool = False) -> str:
+def start_install(gpu_only: bool = False, update: bool = False) -> str:
+    """The song tools in (the first steps, the library's banner), or, update (Settings' Song tools), brought up to date
+    where they are: everything but PyTorch upgraded (pip's own on Windows is the CPU build, which would take an NVIDIA
+    card's GPU build's place; it's only moved if what's upgraded needs a newer one), the models fetched if missing."""
     global _install_job
     if _install_job and _install_job["status"] in ("queued", "running"):
         return _install_job["id"]
     _install_job = _new_job("install")
-    return _run(_install_job, _install, gpu_only)
+    return _run(_install_job, _install, gpu_only, update)
+
+
+# What Settings' Song tools Check says (check_tools): each tool's version (by its pip name), whether each loads (by
+# its import name, in a Python of its own, so a broken one can't take the server with it), the device, the models.
+CHECK_DISTS = ("torch", "torchaudio", "demucs", "audio-separator", "librosa", "openai-whisper", "stable-ts", "numpy", "yt-dlp")
+CHECK_IMPORTS = ("torch", "torchaudio", "demucs", "audio_separator", "librosa", "whisper", "stable_whisper")
+
+
+def check_tools() -> dict:
+    from importlib import metadata
+    versions = {}
+    for d in CHECK_DISTS:
+        try:
+            versions[d] = metadata.version(d)
+        except metadata.PackageNotFoundError:
+            versions[d] = None
+    code = ("import importlib, json, sys\nout = {}\nfor m in sys.argv[1:]:\n    try:\n        importlib.import_module(m); out[m] = ''\n"
+            "    except BaseException as e:\n        out[m] = (type(e).__name__ + ': ' + str(e))[:300]\nprint(json.dumps(out))")
+    try:
+        r = subprocess.run([sys.executable, "-c", code, *CHECK_IMPORTS], capture_output=True, text=True, timeout=180,
+                           **({"creationflags": 0x08000000} if os.name == "nt" else {}))
+        loads = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"python": (r.stderr or "no answer").strip()[-300:]}
+    except (subprocess.TimeoutExpired, ValueError, OSError) as e:
+        loads = {"python": f"{type(e).__name__}: {e}"[:300]}
+    models = []
+    if os.path.isdir(MODEL_DIR):
+        for n in sorted(os.listdir(MODEL_DIR)):
+            p = os.path.join(MODEL_DIR, n)
+            size = os.path.getsize(p) if os.path.isfile(p) else sum(os.path.getsize(os.path.join(a, f)) for a, _, fs in os.walk(p) for f in fs)
+            models.append({"name": n, "mb": round(size / 1e6)})
+    return {"python": sys.version.split()[0], "installed": installed(), "versions": versions, "loads": loads,
+            "models": models, **gpu_status()}
 
 
 # The song tools the first steps show a box each for (onboard.js, TOOL_BOXES), and how each is going, as pip says it:
@@ -384,8 +419,10 @@ def _install_cuda_torch(job, replace: bool) -> bool:
     return False
 
 
-def _install(job, gpu_only: bool = False):
+def _install(job, gpu_only: bool = False, update: bool = False):
     global _restart_needed
+    if update:
+        return _update(job)
     _set(job, status="running", stage="Downloading and installing (≈3–4 GB, a few minutes)…")
     with _jobs_lock:
         job["pkgs"] = {}  # how each tool's going (_pip_line), and the two models (below)
@@ -423,6 +460,42 @@ def _install(job, gpu_only: bool = False):
             with _jobs_lock:
                 job["log"].append(f"The melody model will be downloaded with the first song ({e}).")
     if torch_was_loaded:  # the old PyTorch is already in memory; a fresh start picks up the new one
+        _restart_needed = True
+
+
+def _update(job):
+    """start_install(update=True): requirements-stems.txt but PyTorch, upgraded (only-if-needed for what they need),
+    then the models fetched if they're missing; a restart wanted once anything new's in and the old's in memory."""
+    global _restart_needed
+    _set(job, status="running", stage="Updating the song tools…")
+    with _jobs_lock:
+        job["pkgs"] = {}
+    loaded = any(m in sys.modules for m in ("torch", "demucs", "whisper", "librosa"))
+    with open(os.path.join(ROOT, "requirements-stems.txt"), encoding="utf-8") as f:
+        wanted = [ln for ln in (x.split("#", 1)[0].strip() for x in f) if ln and _pkg_name(ln) not in ("torch", "torchaudio")]
+    req = os.path.join(DATA, ".tools-update.txt")
+    with open(req, "w", encoding="utf-8") as f:
+        f.write("\n".join(wanted) + "\n")
+    try:
+        before = len(job["log"])
+        if _pip(job, ["install", "-U", "--upgrade-strategy", "only-if-needed", "-r", req], (0.02, 0.9)) != 0:
+            raise RuntimeError("Updating failed. The last lines of the log say why.")
+        changed = any(ln.startswith("Successfully installed ") for ln in job["log"][before:])
+    finally:
+        with contextlib.suppress(OSError):
+            os.remove(req)
+    importlib.invalidate_caches()
+    for name, fetch, share in (("lyrics-model", _fetch_whisper, (0.9, 0.97)), ("melody-model", _fetch_rmvpe, (0.97, 1.0))):
+        try:
+            fetch(job, share)
+            with _jobs_lock:
+                job["pkgs"][name] = "done"
+        except Exception as e:  # noqa: BLE001
+            with _jobs_lock:
+                job["pkgs"][name] = "later"
+                job["log"].append(f"{name}: {e}")
+    _set(job, update=True, changed=changed)  # (Settings says: up to date, or updated)
+    if changed and loaded:  # the old versions are in memory: a fresh start takes up the new ones
         _restart_needed = True
 
 

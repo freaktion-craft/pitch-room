@@ -306,6 +306,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _get_api(self, path):
         if path == "/api/health":
             return self._json(200, {"ok": True, "app": "stem"})
+        if path == "/api/stems/check":  # Settings' Song tools, Check: versions, whether each loads, device, models (stems.check_tools)
+            return self._json(200, stems.check_tools())
         if path == "/api/stems/status":
             return self._json(200, {"installed": stems.installed(), "models": stems.MODELS, **stems.gpu_status(),
                                     "install": stems.get_job(stems._install_job["id"]) if stems._install_job else None})
@@ -363,7 +365,7 @@ class Handler(SimpleHTTPRequestHandler):
             body = json.loads(self._body(10_000) or b"{}")
             return self._json(200, stems.start_import(body.get("path") if isinstance(body, dict) else None))
         if url.path == "/api/stems/install":
-            return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1")})
+            return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1", update=(q.get("update") or ["0"])[0] == "1")})
         if url.path == "/api/stems/youtube":
             body = json.loads(self._body(10_000) or b"{}")
             return self._json(200, {"job": stems.start_youtube(str(body.get("url") or "").strip(), body.get("model", model), body.get("find"), bool(body.get("low")), body.get("name"))})
