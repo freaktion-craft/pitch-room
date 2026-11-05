@@ -30,6 +30,18 @@ function resize() {
   K.lyAt = null;
 }
 new ResizeObserver(() => { resize(); if (K.on && view === "practice") practiceFrame(); }).observe(cv);
+// The stage as tall as leaves the keyboard under it inside the window (the page at its top), between min and max: a
+// shorter window, a shorter stage, rather than the keyboard out of sight below it (the desktop app's window is no
+// shorter than gives it min: desktop/main.js). foot: room under the keyboard. As the window or what's over it changes.
+const STAGE = { min: 320, max: 640, foot: 16 };
+function fitStage() {
+  if (view !== "practice") return;
+  const st = $("#stage"), r = st.getBoundingClientRect(), below = $("#keysWrap").getBoundingClientRect().bottom - r.bottom;
+  const h = Math.max(STAGE.min, Math.min(STAGE.max, Math.floor(innerHeight - (r.top + scrollY) - below - STAGE.foot)));
+  if (Math.round(r.height) !== h) st.style.height = h + "px";
+}
+addEventListener("resize", fitStage);
+{ const ro = new ResizeObserver(() => fitStage()); ro.observe($("#songBar")); ro.observe($("#keysWrap")); for (const n of document.querySelectorAll("#vPractice .tl-row, #vPractice .backbar")) ro.observe(n); }
 readColors();
 
 // accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked from the

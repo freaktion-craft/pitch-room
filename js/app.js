@@ -181,7 +181,7 @@ function route() {
     openSync(); // beside Record: the delay as it is now
     renderStart();
     // size and draw the stage now, so the view's first frame is complete rather than an empty stage
-    paintTakesShown(); resize(); centerKeys();
+    paintTakesShown(); fitStage(); resize(); centerKeys();
     if (K.on) practiceFrame();
   }
   if (view === "voice") voiceShow();

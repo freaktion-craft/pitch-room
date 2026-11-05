@@ -6,7 +6,7 @@
 //   macOS    ~/Library/Application Support/Pitchroom
 //   Windows  %APPDATA%\Pitchroom
 // Closing the window quits, and stops the server with it (after asking, while a song is being added).
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, session, shell, systemPreferences } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, screen, session, shell, systemPreferences } = require("electron");
 const { spawn, execFile } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -121,21 +121,29 @@ async function serverStopped(code) {
 
 // ---------- the window ----------
 function savedBounds() { try { return JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { return {}; } }
+// The page no smaller than PAGE_MIN: 1440 wide, and tall enough for Practice's keyboard under its stage at the least
+// the stage goes to (fitStage, js/stage.js: 865 at 1440 wide; a little more under macOS's buttons). The window's frame
+// on top of that; on a screen too small for it, the screen's room.
+const PAGE_MIN = { w: 1440, h: 880 };
+function fitMinimum(w) {
+  const [ow, oh] = w.getSize(), [cw, ch] = w.getContentSize(), room = screen.getDisplayMatching(w.getBounds()).workAreaSize;
+  const mw = Math.min(room.width, PAGE_MIN.w + ow - cw), mh = Math.min(room.height, PAGE_MIN.h + oh - ch);
+  w.setMinimumSize(mw, mh);
+  if (!w.isMaximized() && (ow < mw || oh < mh)) w.setSize(Math.max(ow, mw), Math.max(oh, mh)); // a size kept from smaller, up to it
+}
 function createWindow() {
-  const b = savedBounds();
-  // no smaller than the first steps' water beside them needs (it goes under 900 px wide, base.css), every step in its
-  // height, and still inside a 1366 × 768 laptop's screen; a size kept from smaller comes up to it
-  const MIN_W = 960, MIN_H = 640;
+  const b = savedBounds(), room = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: Math.max(MIN_W, b.width || 1280), height: Math.max(MIN_H, b.height || 860), x: b.x, y: b.y, minWidth: MIN_W, minHeight: MIN_H,
+    width: b.width || Math.min(room.width, 1520), height: b.height || Math.min(room.height, 960), x: b.x, y: b.y,
     title: "Pitchroom", backgroundColor: BG, show: false, autoHideMenuBar: true,
     // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
     ...(process.platform === "darwin" ? { titleBarStyle: "hidden" } : {}),
     // DevTools in development only: a released app has no way into its page
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });
+  fitMinimum(win); win.on("moved", () => fitMinimum(win)); // (another screen, another room)
   if (b.maximized) win.maximize();
-  const ours = (url) => { try { const u = new URL(url); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
+  const ours =(url) => { try { const u = new URL(url); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
   win.webContents.on("will-navigate", (e, url) => { if (!ours(url)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
   win.once("ready-to-show", () => { win.show(); closeSplash(); });
