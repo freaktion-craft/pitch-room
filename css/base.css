@@ -165,9 +165,7 @@ label.set-row { cursor: pointer; }
 .gate-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
 .gate-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .gate-acts { display: flex; gap: var(--space-2); }
-/* the mic, on and off, as the header's chip: tinted red while it's off */
-#micBtn2:not(.on) { background: color-mix(in oklab, var(--bad) 14%, var(--surface-2)); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
-#micBtn2:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, var(--surface-2)); }
+/* the mic: the header's own button's look (.btn.quiet.mic), on and off, the same in both places */
 .gate { position: relative; height: 20px; }
 .gate-meter { position: absolute; left: 0; right: 0; top: 6px; height: 8px; border-radius: var(--radius-pill); background: var(--fg-8); overflow: hidden; }
 .gate-meter i { display: block; height: 100%; width: 0; background: var(--fg-30); }

@@ -80,7 +80,7 @@ const EMPTY_LIBRARY = false;
 
   <main id="vPractice" aria-label="Practice" hidden>
     <div class="backbar"><nav class="crumbs" id="kCrumbs" aria-label="Where you are"></nav>
-      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b class="pop-title">Headphones</b><div id="earRows"></div></div></span><button class="btn sm quiet sync-btn" id="syncGo" type="button" aria-live="polite"><span id="syncNow"></span></button><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
+      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b class="pop-title">Headphones</b><div id="earRows"></div></div></span><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
     <div class="pr-cols" id="prCols">
     <div class="pr-main">
     <div class="songbar" id="songBar">
@@ -198,7 +198,7 @@ const EMPTY_LIBRARY = false;
     <!-- left from the onboarding's color step for here (welcome()): in the crumbs' place, the steps again from there -->
     <div class="backbar"><nav class="crumbs" id="setCrumbs" aria-label="Where you are"></nav><section class="panel-card ob-back" id="obBack" hidden><div class="setup-line"><p class="muted">You have a few steps left.</p><button class="btn sm primary" id="obBackBtn" type="button">Back to onboarding</button></div></section></div>
     <div class="set-layout">
-      <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Microphone</button><button type="button" data-to="setMore">Advanced</button></nav>
+      <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Microphone</button><button type="button" data-to="setRec">Recording</button><button type="button" data-to="setMore">Advanced</button></nav>
       <div class="settings" id="micSet">
         <section class="set-group" aria-labelledby="setGeneral">
           <h2 class="group-label" id="setGeneral">General</h2>
@@ -213,12 +213,17 @@ const EMPTY_LIBRARY = false;
           <h2 class="group-label" id="setMic">Microphone</h2>
           <div class="set-list">
             <div class="set-row"><div class="set-what"><b>Input</b><small>What you sing into</small></div><button class="pick" id="micDev" type="button"></button></div>
-            <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button" title="Hold your headphones close to the mic, then press">Measure</button></div></div>
             <div class="set-row gate-sec">
-              <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button></div></div>
+              <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon quiet mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button></div></div>
               <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>
             </div>
             <label class="set-row"><span class="set-what"><b>Filter out speaker sound</b><small>For speakers; leave it off with headphones</small></span><input type="checkbox" class="switch" id="echo"></label>
+          </div>
+        </section>
+        <section class="set-group" aria-labelledby="setRec">
+          <h2 class="group-label" id="setRec">Recording</h2>
+          <div class="set-list">
+            <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button" title="Hold your headphones close to the mic, then press">Measure</button></div></div>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMore">
