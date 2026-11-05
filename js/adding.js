@@ -14,9 +14,14 @@ function addingJob(id, j) { adding.set(id, { ...(adding.get(id) || {}), ...j });
 // A song's progress in pixels: PX_ROWS rows of PX_COLS, filled a column at a time from the left (the CSS's grid fills
 // down each column); the next one blinks while it's going.
 const PX_COLS = 60, PX_ROWS = 5;
+const LYRICS_FROM = 0.8; // where its lyrics' part starts (stems.SPLIT_SHARE): those blocks marked (.ly), orange while they're wanted
 function pixBar() {
   const bar = el("div", "px"); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
-  for (let k = 0; k < PX_COLS * PX_ROWS; k++) { const c = el("i"); c.style.setProperty("--d", Math.floor(k / PX_ROWS) + (k % PX_ROWS)); bar.append(c); }
+  for (let k = 0; k < PX_COLS * PX_ROWS; k++) {
+    const c = el("i"); c.style.setProperty("--d", Math.floor(k / PX_ROWS) + (k % PX_ROWS));
+    if (k >= Math.round(LYRICS_FROM * PX_COLS) * PX_ROWS) c.className = "ly";
+    bar.append(c);
+  }
   return bar;
 }
 // the blocks newly filled grow in one after another (from nothing to their size), not all at once: a step apart, the

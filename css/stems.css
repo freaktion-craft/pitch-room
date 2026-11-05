@@ -107,7 +107,8 @@
 @media (prefers-reduced-motion: reduce) { .px i { animation: none !important; } }
 @keyframes px-blink { 50% { background: var(--fg-30); } }
 /* stopped for its lyrics (none found, or finding them failed): orange where it stopped, and the way to paste them */
-.job.need .px i.on { background: var(--orange); }
+.job.need .px i.ly.on { background: var(--orange); } /* only its lyrics' part, the rest done as it was */
+.job.need .px i.ly:not(.on) { background: color-mix(in oklab, var(--orange) 22%, transparent); }
 .job.need .top .st { color: var(--orange); white-space: normal; }
 .lyr-form { display: grid; gap: var(--space-2); }
 .lyr-open.on { background: var(--hover-2); } /* its box open */
