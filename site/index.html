@@ -79,7 +79,7 @@ a { -webkit-user-drag: none; }
 const API = "https://api.github.com/repos/freaktion-craft/pitchroom-releases/releases/latest";
 const ko = /^ko/i.test(navigator.language);
 const NAMES = { mac: "macOS", win: "Windows", linux: "Linux" };
-const FILES = { "mac-arm64": /mac-arm64\.dmg$/, "mac-x64": /mac-x64\.dmg$/, win: /win-x64\.exe$/, linux: /linux-.*\.AppImage$/ };
+const FILES = { "mac-arm64": /mac-arm64\.dmg$/, "mac-x64": /mac-x64\.dmg$/, win: /(pitchroom_install|win-x64)\.exe$/, linux: /linux-.*\.AppImage$/ }; // (Windows': pitchroom_install.exe from 1.0.5, -win-x64.exe before)
 
 // the systems' logos, the apple and Tux from Font Awesome Free 6.5.2 (icons CC BY 4.0, https://fontawesome.com/license/free), Windows' drawn here: the button's
 // arrow swapped for the one it downloads for (a phone, or a system it doesn't know, keeps the arrow)
@@ -152,7 +152,7 @@ const showTip = () => {
 // the button gone up to where the download is: its words going as it draws in round its logo, a circle, then off up to
 // the browser's downloads icon (where the tip points), smaller, into the toolbar; the tip as it gets there, and in the
 // button's place the name, out of a blur. A copy flies (the button itself, its link and its download, as they are)
-const FLY = { shrink: 280, fly: 620, size: 40 };
+const FLY = { shrink: 280, fly: 760, size: 40, bend: [0.05, 1] }; // bend: the arc's control point, its share of the way across and up
 document.fonts.load('400 44px "Geist Serif"').catch(() => {}); // the name's typeface in ahead of a click
 let flying = false;
 async function fly(get) {
@@ -173,8 +173,14 @@ async function fly(get) {
   // off up to the downloads icon: its middle to the top edge, under it, getting smaller, gone as it gets there
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2, tx = innerWidth - tipAt(), ty = 0;
   svg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FLY.fly * 0.4, easing: "ease-out", fill: "forwards" }); // its logo going as it sets off: a plain dot goes up
-  await ghost.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${tx - cx}px, ${ty - cy}px) scale(0.35)`, opacity: 1, offset: 0.85 },
-    { transform: `translate(${tx - cx}px, ${ty - cy - 8}px) scale(0.2)`, opacity: 0 }], { duration: FLY.fly, easing: "cubic-bezier(0.55, 0, 0.25, 1)", fill: "forwards" }).finished;
+  // along an arc, as a thing tossed up: rising first, then bending over to the right (a curve through a point above where
+  // it starts, its control), not straight across; eased in and out along it, smaller as it goes, gone as it gets there
+  const dx = tx - cx, dy = ty - cy - 8, c = { x: dx * FLY.bend[0], y: dy * FLY.bend[1] }, ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+  const path = Array.from({ length: 25 }, (_, i) => {
+    const t = i / 24, e = ease(t), u = 1 - e, x = 2 * u * e * c.x + e * e * dx, y = 2 * u * e * c.y + e * e * dy; // a quadratic curve from here to there
+    return { offset: t, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${(1 - 0.8 * e).toFixed(3)})`, opacity: t < 0.85 ? 1 : (1 - t) / 0.15 };
+  });
+  await ghost.animate(path, { duration: FLY.fly, easing: "linear", fill: "forwards" }).finished;
   ghost.remove();
   showTip();
   // the button gone for good (its download's begun), the name in its place, wiped on from the left out of a blur
