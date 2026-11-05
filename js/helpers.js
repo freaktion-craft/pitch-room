@@ -71,7 +71,7 @@ function resetOnDblClick(input, def) {
     });
   }, true);
   document.addEventListener("focusout", (e) => { if (e.target.matches?.('input[type="range"]') && !held) show(null); }, true);
-  addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true });
+  addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true, capture: true }); // (a box scrolled too: Settings' list)
 })();
 
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
@@ -161,7 +161,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   // a click elsewhere closes it (the path, not contains(): a click on a row that redraws the list leaves its target out)
   document.addEventListener("click", (e) => { const path = e.composedPath(); if (!list.hidden && !path.includes(list) && !path.includes(btn)) show(false); });
   addEventListener("resize", () => show(false));
-  addEventListener("scroll", () => show(false), { passive: true }); // it's fixed in place; the button isn't
+  addEventListener("scroll", (e) => { if (!list.contains(e.target)) show(false); }, { passive: true, capture: true }); // it's fixed in place; the button isn't (the page scrolled, or a box it's in: Settings' list; not its own)
   const pick = {
     set(next, v) { items = next; value = v; paint(); if (!list.hidden) show(true); },
     get value() { return value; },

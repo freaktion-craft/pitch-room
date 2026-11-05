@@ -131,6 +131,9 @@ header { position: relative; }
 .set-nav button[aria-current="true"] { background: var(--fill); color: var(--ink); }
 .set-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 @media (max-width: 720px) { .set-layout { grid-template-columns: minmax(0, 1fr); } .set-nav { display: none; } }
+/* their list the only thing that scrolls (fitSettings: its height), so the page itself doesn't: no room under it */
+html.set-view .app { padding-bottom: 0; }
+html.set-view #micSet { overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-16); }
 .settings { display: grid; gap: var(--space-8); }
 .set-group { display: grid; gap: var(--space-3); scroll-margin-top: var(--space-6); }
 .set-group > h2 { margin: 0; }
