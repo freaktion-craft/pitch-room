@@ -188,7 +188,8 @@ async function riffle() {
     front.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], o);
     back.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], o);
     front.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], o);
-    return back.lastChild.animate([{ opacity: R.shade }, { opacity: R.shade, offset: 0.5 }, { opacity: 0 }], o).finished.then(() => {
+    const dim = k === n - 1 ? 0 : R.shade; // (the last page's back the page's own black: no darker than it, ever)
+    return back.lastChild.animate([{ opacity: dim }, { opacity: dim, offset: 0.5 }, { opacity: 0 }], o).finished.then(() => {
       // once it's down, those down under it go: all their edges at the spine, a soft one over them let theirs show as a
       // line. Only those down (a page can land before one turned ahead of it, still in the air) and under the top one
       leaf.dataset.down = "1"; book.firstChild.style.visibility = "hidden";
@@ -220,7 +221,6 @@ async function riffle() {
     .finished.then(() => left.remove()); // gone once it's under: lying there just its size, its edges showed round the page
   verso.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], b);
   recto.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], b);
-  verso.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], b); // darker as it stands up
   book.animate([{ transform: still ? CLOSED : "none" }, { transform: CLOSED }],
     { delay: still ? 0 : R.back * 0.3, duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" });
 }
