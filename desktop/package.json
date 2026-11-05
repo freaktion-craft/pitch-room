@@ -66,7 +66,8 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "build/icon-win.png"
     },
     "nsis": {
       "oneClick": true,
@@ -79,7 +80,8 @@
       "target": [
         "AppImage"
       ],
-      "category": "Audio"
+      "category": "Audio",
+      "icon": "build/icon-win.png"
     },
     "publish": [
       {
