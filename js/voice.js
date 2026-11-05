@@ -417,13 +417,15 @@ function initVoice() {
   $("#vcMic").onclick = () => startMic();
   $("#vcChest").onclick = () => vcTeach("chest");
   $("#vcHead").onclick = () => vcTeach("head");
-  // the view: the pad, or the spectrogram in its place
+  // the view: the pad, the spectrogram or the EQ in its place (the spectrogram's to begin with); the mic's ask
+  // (#vcOff) over whichever's shown
   const showView = (v) => {
     $(".vc-pad").hidden = v !== "pad"; $(".vc-spec").hidden = v !== "spec"; $(".vc-eq").hidden = v !== "eq";
+    $(".vc-" + v).append($("#vcOff"));
     for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
   };
   for (const b of $("#vcView").children) b.onclick = () => { showView(b.dataset.v); store.set("voiceView", b.dataset.v); };
-  showView(["spec", "eq"].includes(store.get("voiceView", "pad")) ? store.get("voiceView", "pad") : "pad");
+  showView(["pad", "spec", "eq"].includes(store.get("voiceView", "spec")) ? store.get("voiceView", "spec") : "spec"); // (the spectrogram, till another's picked)
   // Freeze: this moment kept faintly behind (the EQ's spectrum, envelope and formants, and the pad's dot), or let go
   $("#vcFreeze").onclick = () => {
     const live = VC.last && performance.now() - VC.last.t < 300;

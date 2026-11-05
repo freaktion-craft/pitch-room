@@ -160,11 +160,11 @@ const EMPTY_LIBRARY = false;
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
     <div class="backbar"><button class="btn sm back" id="vcBack" type="button">Back</button>
-      <div class="bb-acts"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="true">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="false">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div></div>
+      <div class="bb-acts"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div></div>
     <div class="vc">
-      <section class="vc-spec" aria-label="Spectrogram" hidden><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
+      <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
       <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false" title="Keep this moment faintly behind, to sing against (an onion skin): the spectrum, the vowel's shape, the formants, and the dot on the pad. Pressed again, it goes">Freeze</button></section>
-      <section class="vc-pad" aria-label="Where your voice is">
+      <section class="vc-pad" aria-label="Where your voice is" hidden>
         <canvas id="vcPad" aria-hidden="true"></canvas>
         <span class="vc-ax up">Forward · bright</span><span class="vc-ax down">Back · dark</span><span class="vc-ax left">Chest</span><span class="vc-ax right">Head</span>
         <div class="overlay" id="vcOff" hidden><p>Use headphones, so the speakers don’t leak in.</p><button class="btn primary" id="vcMic" type="button">Turn the mic on</button></div>
@@ -178,11 +178,6 @@ const EMPTY_LIBRARY = false;
           <div><dt>Level</dt><dd id="vcLvl">–</dd></div>
           <div title="Formants, the vowel's shape: F1 rises as the mouth opens, F2 as the tongue comes forward. Less sure on high notes, where the harmonics are far apart"><dt>F1 · F2</dt><dd id="vcF12">–</dd></div>
         </dl>
-        <div class="vc-step">
-          <div class="vc-step-head"><b title="Set a note, then go up a semitone at a time">Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button" title="Play it">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
-          <label title="Hold the note on pitch for a second and the next one plays">Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
-          <p class="muted">Tap a key to start there.</p>
-        </div>
         <div class="vc-cal">
           <b>Set it to your voice</b>
           <p class="muted">Turn one on and sing in it. A few notes and vowels of each, the same notes in both.</p>
@@ -191,7 +186,13 @@ const EMPTY_LIBRARY = false;
         </div>
       </aside>
     </div>
-    <div class="keys-wrap"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
+    <!-- the keyboard, and beside it Step up: the note to sing (lit on it, a key tapped sets it) and a semitone up at a time -->
+    <div class="keys-wrap vc-keys"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div>
+      <div class="vc-step">
+        <div class="vc-step-head"><b title="Set a note, then go up a semitone at a time">Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button" title="Play it">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
+        <label title="Hold the note on pitch for a second and the next one plays">Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
+        <p class="muted">Tap a key to start there.</p>
+      </div></div>
   </main>
   <main id="vSettings" aria-label="Settings" hidden>
     <!-- left from the onboarding's color step for here (welcome()): in the crumbs' place, the steps again from there -->
