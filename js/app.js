@@ -274,6 +274,9 @@ const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06
 // the steps again, where they were left
 const obResume = () => { $("#obBack").hidden = true; document.documentElement.classList.remove("ob-left"); welcome(OB.left); };
 $("#obBackBtn").onclick = obResume;
+// Settings' Onboarding: the steps again from the first, over the page as it is (as the banner brings them back), the
+// library after them
+$("#setOnboard").onclick = () => { $("#obBack").hidden = true; document.documentElement.classList.remove("ob-left"); welcome(0); };
 $("#micSetBtn").addEventListener("click", (e) => { if (OB.left == null) return; e.preventDefault(); obResume(); });
 async function welcome(resume) { // resume: a step to come back to (Settings' banner), without the riffle
   const root = document.documentElement, w = $("#welcome"), pages = w.querySelector(".pages"), book = w.querySelector(".book"), word = w.querySelector(".word");

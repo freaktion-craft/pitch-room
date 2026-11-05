@@ -311,7 +311,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Click a phrase to go to it · drag across phrases (or Shift+click another) to loop the run between them": "소절을 누르면 그리로 가요 · 여러 소절을 드래그하면(또는 다른 소절을 Shift+클릭) 그 사이를 묶어 반복해요",
   "Click a phrase to go to it · drag across phrases (or Shift+click another) to loop the run between them · Alt+click (Option on a Mac), or M as it plays, marks where a phrase should be split, or two joined":
     "소절을 누르면 그리로 가요 · 여러 소절을 드래그하면(또는 다른 소절을 Shift+클릭) 그 사이를 묶어 반복해요 · Alt+클릭(Mac은 Option), 또는 재생 중 M으로 소절을 나눌 곳이나 합칠 곳을 표시해요",
-  "Developer tools": "개발자 도구",
+  "Developer tools": "개발자 도구", "Onboarding": "온보딩", "The first steps again: your mic, your color, a song": "처음 단계를 다시: 마이크, 색, 노래", "Visit": "보기",
   "Import beta library": "베타 라이브러리 가져오기", "Copy songs and settings from the beta folder": "베타 폴더의 노래와 설정 복사",
   "Choose folder": "폴더 선택", "The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own": "압축을 푼 Pitchroom 폴더나 그 안의 library 폴더. 복사만 하니 베타는 그대로예요",
   "Copying… {d} of {n}": "복사하는 중… {d}/{n}", "Nothing new to copy": "새로 복사할 게 없어요", "Have a library already?": "라이브러리가 이미 있나요?", "Bringing in your library": "라이브러리 가져오는 중", "Your library’s in": "라이브러리를 가져왔어요", "1 song copied": "노래 1곡을 복사했어요", "{n} songs copied": "노래 {n}곡을 복사했어요",
