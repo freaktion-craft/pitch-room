@@ -101,6 +101,10 @@
 .px i { aspect-ratio: 1; border-radius: 1px; background: var(--fill); transition: background-color var(--duration-base); }
 .px i.on { background: var(--ink); }
 .px i.next { animation: px-blink 1s steps(1, end) infinite; }
+/* the empty ones while it's going: a faint glow passing over them on the diagonal, like a wave (--d: column + row) */
+.job:not(.done):not(.need):not(.err) .px i:not(.on):not(.next) { animation: px-wave 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * 40ms); }
+@keyframes px-wave { 0%, 62%, 100% { background: var(--fill); } 74% { background: var(--fg-16); } }
+@media (prefers-reduced-motion: reduce) { .px i { animation: none !important; } }
 @keyframes px-blink { 50% { background: var(--fg-30); } }
 /* stopped for its lyrics (none found, or finding them failed): orange where it stopped, and the way to paste them */
 .job.need .px i.on { background: var(--orange); }

@@ -16,12 +16,21 @@ function addingJob(id, j) { adding.set(id, { ...(adding.get(id) || {}), ...j });
 const PX_COLS = 60, PX_ROWS = 5;
 function pixBar() {
   const bar = el("div", "px"); bar.setAttribute("role", "progressbar"); say(bar, "Progress", null, "aria-label");
-  for (let k = 0; k < PX_COLS * PX_ROWS; k++) bar.append(el("i"));
+  for (let k = 0; k < PX_COLS * PX_ROWS; k++) { const c = el("i"); c.style.setProperty("--d", Math.floor(k / PX_ROWS) + (k % PX_ROWS)); bar.append(c); }
   return bar;
 }
+// the blocks newly filled grow in one after another (from nothing to their size), not all at once: a step apart, the
+// whole lot within PX_GROW ms however many there are
+const PX_STEP = 18, PX_GROW = 700;
 function paintPix(bar, p, going) {
-  const n = Math.round(Math.max(0, Math.min(1, p)) * PX_COLS * PX_ROWS);
-  [...bar.children].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", going && k === n); });
+  const n = Math.round(Math.max(0, Math.min(1, p)) * PX_COLS * PX_ROWS), was = +(bar.dataset.n || 0), cells = bar.children;
+  bar.dataset.n = n;
+  [...cells].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", going && k === n); });
+  if (n > was && !stillMotion()) {
+    const step = Math.min(PX_STEP, PX_GROW / (n - was));
+    for (let k = was; k < n; k++) cells[k].animate([{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1.25)", opacity: 1, offset: 0.6 }, { transform: "none", opacity: 1 }],
+      { duration: 280, delay: (k - was) * step, easing: "ease-out", fill: "backwards" });
+  }
   bar.setAttribute("aria-valuenow", Math.round(p * 100));
 }
 // The drawer's songs in sections, each shown only while it has any: Pending (waiting their turn, or stopped wanting
@@ -85,10 +94,10 @@ function paintJobs() {
     row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need);
     // what it is: its link, then its video's title, then the record it was found to be (its title, its artist), each
     // wiped in over the last, blurred to clear; its cover coming in at its left once there's one
-    const found = j.song?.artist ? j.song : null, lib = (j.arrived || j.done) && libCache.get(j.songId);
+    const found = j.song?.artist ? j.song : j.early?.title ? j.early : null, lib = (j.arrived || j.done) && libCache.get(j.songId);
     const name = (lib && lib.title) || found?.title || j.name;
     wipeTo(row.querySelector(".top b"), name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song"), (lib && lib.artist) || found?.artist || "");
-    jobCover(row.querySelector(".job-cover"), j.songId, (lib && lib.cover) || j.song?.cover);
+    jobCover(row.querySelector(".job-cover"), j.songId, (lib && lib.cover) || j.song?.cover, j.early?.art);
     const state = row.querySelector(".top .st");
     if (j.done) say(state, "Added");
     else if (need) say(state, j.lyricsError ? "Manual lyrics needed · {why}" : "Manual lyrics needed", { why: () => tr(j.lyricsError || "") });
@@ -128,12 +137,12 @@ function wipeTo(b, title, artist) {
     { duration: 620, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
 }
 // its cover at its left, once it's found (cover-96.jpg): it opens a place for itself and comes in, blurred to clear
-function jobCover(pic, songId, cover) {
-  const src = cover && songId ? `/library/${songId}/${cover.thumb ? `cover-${cover.thumb}` : "cover"}.jpg?v=${cover.at}` : "";
+function jobCover(pic, songId, cover, art) { // (art: the link's, found as it was sent, till the song's own is saved)
+  const src = cover && songId ? `/library/${songId}/${cover.thumb ? `cover-${cover.thumb}` : "cover"}.jpg?v=${cover.at}` : art || "";
   if (pic.dataset.src === src) return;
   pic.dataset.src = src;
   if (!src) { pic.classList.remove("on"); pic.replaceChildren(); return; }
-  const img = el("img"); img.alt = ""; img.decoding = "async";
+  const img = el("img"); img.alt = ""; img.decoding = "async"; img.referrerPolicy = "no-referrer";
   img.onload = () => { if (pic.dataset.src === src) { pic.replaceChildren(img); requestAnimationFrame(() => pic.classList.add("on")); } };
   img.src = src;
 }
@@ -443,8 +452,16 @@ function tuckAway() {
 }
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
 // The new songs' progress shows beside the mic; they land in the library.
+// What a song's link is, asked as soon as it's sent (/api/yt/find, as the first steps do): the record it most likely
+// is, its artist and album art, for its row till the song's own (its meta) come once it's in its folder.
+function findEarly(id, link) {
+  if (!link || !YT_LINK.test(link)) return;
+  fetch("/api/yt/find?url=" + encodeURIComponent(link)).then((r) => (r.ok ? r.json() : null)).then((f) => {
+    if (f && adding.has(id)) addingJob(id, { early: { title: f.title, artist: f.artist, art: f.art } });
+  }).catch(() => {});
+}
 function jobStarted(id, name) {
-  lastStarted = id; addingJob(id, { name, link: name, status: "queued", progress: 0 }); watchJob(id, "separate");
+  lastStarted = id; addingJob(id, { name, link: name, status: "queued", progress: 0 }); watchJob(id, "separate"); findEarly(id, name);
   if (clipOffer) showClip(clipOffer); // (sent from the form, the card's own may be among them: not offered again)
 }
 // Add song: the drawer (the + by the mic's), its links field ready to type in (an empty library's row opens it too). It opens with the links field ready

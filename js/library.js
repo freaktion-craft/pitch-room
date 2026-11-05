@@ -103,6 +103,7 @@ async function drawLibrary() {
     if (pollers[j.id] || adding.has(j.id)) continue;
     addingJob(j.id, { ...j, arrived: false, done: j.status === "done" && !j.needLyrics }); // (none of these is in the list yet)
     if (j.status !== "done") watchJob(j.id, "separate");
+    if (!j.song) findEarly(j.id, j.link); // (what it is, till it's in its folder)
   }
   box.innerHTML = "";
   const coming = [...adding.values()].some((j) => j.status !== "error");
