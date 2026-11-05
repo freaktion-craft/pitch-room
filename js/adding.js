@@ -24,6 +24,20 @@ function paintPix(bar, p, going) {
   [...bar.children].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", going && k === n); });
   bar.setAttribute("aria-valuenow", Math.round(p * 100));
 }
+// The drawer's songs in sections, each shown only while it has any: Pending (waiting their turn), Processing,
+// Stopped (wanting their lyrics pasted, or failed), Done; in each, in the order they were sent.
+const JOB_SECS = [["pending", "Pending"], ["processing", "Processing"], ["stopped", "Stopped"], ["done", "Done"]];
+function jobSec(j) { return j.done ? "done" : j.needLyrics || j.status === "error" ? "stopped" : j.status === "queued" ? "pending" : "processing"; }
+function jobSection(key, name) {
+  const list = $("#jobsList");
+  let sec = list.querySelector(`:scope > .jobs-sec[data-sec="${key}"]`);
+  if (!sec) {
+    sec = el("section", "jobs-sec"); sec.dataset.sec = key;
+    const h = el("h3"), n = el("span", "n"); h.append(el("span"), n); say(h.firstChild, name);
+    sec.append(h, el("div", "jobs-rows")); list.append(sec);
+  }
+  return sec;
+}
 function paintJobs() {
   const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !j.needLyrics && j.status !== "error"), ready = jobs.filter((j) => j.done);
   const need = jobs.filter((j) => j.needLyrics);
@@ -49,6 +63,7 @@ function paintJobs() {
   say($(".jobs-head b"), !live.length && ready.length ? "Songs added" : "Adding songs");
   const formHere = !$("#jobsAdd").hidden; // the form says what it is: the panel's own heading steps aside while it's alone
   $(".jobs-head").hidden = formHere && !jobs.length; $("#jobsNone").hidden = formHere || jobs.length > 0;
+  const rowOf = new Map(); // (one just made isn't in the page yet)
   for (const [id, j] of adding) {
     if (j.done && open) j.seen = true; // in while the panel's open: shown
     let row = document.getElementById("job-" + id);
@@ -56,8 +71,9 @@ function paintJobs() {
       row = el("div", "job"); row.id = "job-" + id;
       const top = el("div", "top"); top.append(el("b"), el("span"));
       const x = el("button", "btn sm icon ghost x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
-      row.append(top, pixBar(), x, lyricsAsk(id)); list.append(row);
+      row.append(top, pixBar(), x, lyricsAsk(id));
     }
+    rowOf.set(id, row);
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err, at = Math.round((j.progress || 0) * 100);
     const need = !!j.needLyrics, lyr = j.phase === "lyrics" && !need && !j.done; // (its lyrics' part can't be stopped: the song's in)
     row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need);
@@ -77,6 +93,13 @@ function paintJobs() {
     if (x.dataset.icon !== kind) { x.replaceChildren(icon(kind)); x.dataset.icon = kind; }
     x.classList.toggle("ghost", !j.done); x.classList.toggle("primary", !!j.done); // in: the way to it, the panel's one strong button
     say(x, j.done ? "Open song" : need ? "Skip lyrics" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping || lyr; x.style.visibility = lyr ? "hidden" : ""; // (its room kept: the pixels as wide as the others')
+  }
+  // into their sections (made in their order, the first time), in order; a row moved only when it's out of place (one moved loses its hover and focus)
+  for (const [key, name] of JOB_SECS) {
+    const sec = jobSection(key, name), rows = sec.querySelector(".jobs-rows");
+    const want = [...adding].filter(([, j]) => jobSec(j) === key).map(([id]) => rowOf.get(id));
+    if (want.length !== rows.children.length || want.some((r, i) => rows.children[i] !== r)) want.forEach((r) => rows.append(r));
+    sec.hidden = !want.length; sec.querySelector(".n").textContent = want.length;
   }
 }
 // Under a song stopped for its lyrics: Paste lyrics, which opens a box for them (a line of the song to each line) and
