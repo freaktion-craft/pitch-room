@@ -60,6 +60,7 @@ MODEL_DIR = os.path.join(DATA, "models")
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _work_lock = threading.Lock()  # one separation at a time; others wait as "queued"
+_download_slots = threading.Semaphore(2)  # songs' downloads at once, ahead of their turn to be split (_pipeline)
 _line: list[str] = []  # the jobs waiting for _work_lock (the one holding it first), in the order they asked
 _model_cache: dict = {}
 
@@ -146,12 +147,9 @@ def _turn(job):
                 time.sleep(0.1)
         try:
             _check(job)
-            if job.get("low"):
-                _low_priority(True)
-            yield
+            with _held_low(job):
+                yield
         finally:
-            if job.get("low"):
-                _low_priority(False)
             _free_gpu()
             _work_lock.release()
     finally:
@@ -170,6 +168,30 @@ def _low_priority(on: bool):
     k.GetCurrentProcess.restype = ctypes.c_void_p
     k.SetPriorityClass.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
     k.SetPriorityClass(k.GetCurrentProcess(), 0x4000 if on else 0x20)  # BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS
+
+
+_low_n = 0  # a playlist's songs' work running now (_held_low)
+
+
+@contextlib.contextmanager
+def _held_low(job):
+    """_low_priority for a playlist's song's work, kept till the last such work running is done: two can overlap (one's
+    tracks saved while the next is split, _pipeline), and the first done mustn't put the other back to normal."""
+    global _low_n
+    if not job.get("low"):
+        yield
+        return
+    with _jobs_lock:
+        _low_n += 1
+        if _low_n == 1:
+            _low_priority(True)
+    try:
+        yield
+    finally:
+        with _jobs_lock:
+            _low_n -= 1
+            if _low_n == 0:
+                _low_priority(False)
 
 
 def _free_gpu():
@@ -1120,8 +1142,11 @@ def _pipeline(job, src: dict, model_name: str):
     folder = os.path.join(LIB, song_id)
     os.makedirs(folder, exist_ok=True)
     try:
-        _set(job, status="queued", stage="Waiting for the previous song to finish")
-        with _turn(job):
+        # the download first, outside the queue: the network's work, so the next song's comes down while this one's
+        # being split (two at most at once); only the splitting waits its turn
+        _set(job, status="queued", stage="Waiting to download")
+        with _download_slots:
+            _check(job)
             _set(job, status="running", stage="Getting the audio", progress=0.02)
             video, channel = None, ""
             # from a link (YouTube, or a Spotify playlist's song looked for there): the only way a song comes in
@@ -1145,6 +1170,11 @@ def _pipeline(job, src: dict, model_name: str):
                 video = _download_video(job, src["url"], folder, 0.12, 0.2)
             except Exception:  # noqa: BLE001  (the song still works without a picture)
                 video = None
+        _set(job, status="queued", stage="Waiting for the previous song to finish", progress=0.2)
+        with contextlib.ExitStack() as held:
+            turn = held.enter_context(contextlib.ExitStack())
+            turn.enter_context(_turn(job))
+            _set(job, status="running")
             _stage(job, "Reading the audio", 0.2)
             wav = _decode_stereo(path)
             dur = wav.shape[1] / SR
@@ -1157,28 +1187,33 @@ def _pipeline(job, src: dict, model_name: str):
             _stage(job, f"Separating on {device().upper()}", 0.25)
             names, stems = _separate(job, wav, model_name)
             _free_gpu()  # room for the lead-vocal model
-            _stage(job, "Finding the beat", 0.71)
             drum_stem = stems[names.index("drums")].mean(0) if "drums" in names else None
-            bpm, beats = _beats(wav.mean(0) if drum_stem is None else drum_stem, wav.mean(0), dur)
-            _stage(job, "Finding the key", 0.72)
-            try:
-                key = _key(sum(stems[i].mean(0) for i, n in enumerate(names) if n != "drums"))
-            except Exception:  # noqa: BLE001  (the song works without it)
-                key = None
             if "vocals" in names:
                 vox = stems[names.index("vocals")]
-                lead = _lead_vocal(vox, job, (0.73, 0.86))
+                lead = _lead_vocal(vox, job, (0.71, 0.85))
                 if lead is not None:
                     _check(job)
                     _write_split(folder, vox, lead)
                 try:
-                    _fetch_rmvpe(job, (0.86, 0.87))
+                    _fetch_rmvpe(job, (0.85, 0.86))
                 except Exception:  # noqa: BLE001  (offline: read with pYIN now, again once the model is there)
                     pass
-                _stage(job, "Reading the vocal melody", 0.87)
+                _stage(job, "Reading the vocal melody", 0.86)
                 n = vox.shape[1] if lead is None else min(vox.shape[1], lead.shape[1])
                 _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None,
                              None if lead is None else (vox[:, :n] - lead[:, :n]).mean(0))  # = backing.mp3
+            # what's left (the beat, the key, the tracks to mp3) is the CPU's: with a GPU, the turn's given up for it,
+            # so the next song's split starts meanwhile. (On the CPU alone, both at once would only slow each other.)
+            if device() != "cpu":
+                held.enter_context(_held_low(job))  # a playlist's song still below normal till it's in (held first: no moment at normal between)
+                turn.close()
+            _stage(job, "Finding the beat", 0.88)
+            bpm, beats = _beats(wav.mean(0) if drum_stem is None else drum_stem, wav.mean(0), dur)
+            _stage(job, "Finding the key", 0.89)
+            try:
+                key = _key(sum(stems[i].mean(0) for i, n in enumerate(names) if n != "drums"))
+            except Exception:  # noqa: BLE001  (the song works without it)
+                key = None
             _stage(job, "Saving tracks", 0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):

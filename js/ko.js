@@ -41,7 +41,7 @@ const KO_SERVER = {
   "This song wasn’t added from a link, so there’s no video to get.": "링크로 추가한 곡이 아니라서 받을 영상이 없어요.",
   "Getting the video": "영상 받는 중", "Couldn’t get the video. {why}": "영상을 받지 못했어요. {why}", "That link has no video.": "그 링크에는 영상이 없어요.",
   "Pitchroom’s tools aren’t installed yet.": "Pitchroom 도구가 아직 설치되지 않았어요.",
-  "Waiting for the previous song to finish": "앞 곡이 끝나길 기다리는 중", "Getting the audio": "오디오 받는 중", "Reading the audio": "오디오 읽는 중",
+  "Waiting for the previous song to finish": "앞 곡이 끝나길 기다리는 중", "Waiting to download": "받기 대기 중", "Getting the audio": "오디오 받는 중", "Reading the audio": "오디오 읽는 중",
   "The audio is shorter than 3 seconds.": "오디오가 3초보다 짧아요.", "Songs up to 20 minutes, please.": "20분까지의 곡만 넣을 수 있어요.",
   "Loading the separation model ({model})": "분리 모델 불러오는 중 ({model})", "Separating on {dev}": "{dev}로 분리하는 중",
   "Finding the beat": "박자 찾는 중", "Finding the key": "키 찾는 중", "Reading the vocal melody": "보컬 멜로디 읽는 중", "Saving tracks": "트랙 저장하는 중",
