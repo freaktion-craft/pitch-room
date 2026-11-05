@@ -42,10 +42,13 @@ a { -webkit-user-drag: none; }
   margin: 0; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 13px/1.45 var(--font); }
 /* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (how far
    in, set by tipAt(); its arrow 38 px in from its right) */
-.tip { position: fixed; top: 14px; right: 58px; padding: 10px 14px; border-radius: 10px; background: var(--ink); color: var(--on-ink);
+/* the app's icon at its left, inset the same on its three sides (7 px), its corners the tip's less that (12 − 7: the
+   app's own rule for a box in a box), 8 px to the words, the words 14 px from the right */
+.tip { position: fixed; top: 14px; right: 58px; display: flex; align-items: center; gap: 8px; padding: 7px 14px 7px 7px; border-radius: 12px; background: var(--ink); color: var(--on-ink);
   font: 400 13px/1.3 var(--font); white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32); /* (regular: a word in passing, not a button) */
   opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); } /* it fades in and out, and stays still */
 .tip.on { opacity: 1; pointer-events: auto; }
+.tip svg { width: 20px; height: 20px; flex: none; display: block; } /* (its corners 8 of 32: 5 px at this size) */
 .tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
 /* the name, as the app's welcome has it (Geist Serif, 44 px), where the button was, once it's gone up to the download */
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
@@ -73,7 +76,7 @@ a { -webkit-user-drag: none; }
 </a>
 <span class="word" id="word" aria-hidden="true">Pitchroom</span>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
-<div class="tip" id="tip" role="status"></div>
+<div class="tip" id="tip" role="status"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#202020"/><path fill="#fff" stroke="#fff" stroke-width="0.8" stroke-linejoin="round" d="M8.74 25.34 10.43 24.38Q10.75 24.19 10.87 24.01Q10.99 23.84 10.99 23.49V8.51Q10.99 8.16 10.87 7.99Q10.75 7.81 10.43 7.62L8.74 6.66V6.5H16.23Q19.9 6.5 21.88 7.88Q23.86 9.26 23.86 11.96Q23.86 14.37 22.2 15.99Q20.54 17.61 16.85 17.61H13.5V23.49Q13.5 23.84 13.62 24.01Q13.74 24.19 14.07 24.38L15.75 25.34V25.5H8.74ZM15.89 16.67Q21.18 16.67 21.18 12.01Q21.18 9.79 20.01 8.61Q18.83 7.44 16.47 7.44H13.5V16.67Z"/></svg><span id="tipText"></span></div>
 
 <script>
 const API = "https://api.github.com/repos/freaktion-craft/pitchroom-releases/releases/latest";
@@ -144,7 +147,7 @@ function tipAt() {
   return vertical ? 268 : 96;
 }
 const showTip = () => {
-  tip.textContent = ko ? "다운로드 중이에요. 여기서 열 수 있어요" : "Downloading. Open it from here";
+  document.getElementById("tipText").textContent = ko ? "다운로드 중이에요. 여기서 열 수 있어요" : "Downloading. Open it from here";
   tip.classList.add("on");
   clearTimeout(tipTimer);
   tipTimer = setTimeout(() => tip.classList.remove("on"), 12000);
