@@ -1256,14 +1256,12 @@ function initSing() {
   });
   initTakes(); initEars(); initSync(); initLyEdit();
   initSetNav(); // settings: their page, its tab in the header's (#micSetBtn)
-  // the songs being added: their drawer (showJobs), out of the header so it's over all the page; its close at its top
-  // right, where the + it covers was
+  // the drawer (Add song, and the songs being added under it: showJobs), out of the page so it's over all of it
   const jobsBtn = $("#jobsBtn"), jobsPop = $("#jobsPop");
   document.body.append(jobsPop); jobsPop.setAttribute("aria-modal", "true");
-  $("#jobsClose").append(icon("close")); $("#jobsClose").onclick = (e) => { e.stopPropagation(); showJobs(false); jobsBtn.focus({ preventScroll: true }); };
   jobsBtn.onclick = (e) => { e.stopPropagation(); showJobs(jobsPop.hidden); };
   document.addEventListener("click", (e) => { if (!jobsPop.hidden && !e.composedPath().includes(jobsPop)) showJobs(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !jobsPop.hidden) { showJobs(false); jobsBtn.focus({ preventScroll: true }); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !jobsPop.hidden) closeDrawer(); });
   jobsPop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!jobsPop.hidden && to && !jobsPop.contains(to) && to !== jobsBtn) showJobs(false); });
   initYoutubeOffer();
   paintJobs(); // the ring is always there, empty while nothing's being added

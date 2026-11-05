@@ -925,18 +925,12 @@ function initStems() {
   };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { say($("#sGpuState"), e.message); $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
-  // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it
-  const addPop = $("#addPop");
-  document.body.append($("#addVeil"), addPop); // over all the page, the list's blurred edges too (they're outside #app)
-  // the close by the title: whichever panel the form is in (the ring's has it too), the focus back to what opened it
+  // Add song: its button opens the drawer (the + by the mic's: practice.js closes it on a click beside it or Escape);
+  // files dragged over the library open it too
+  document.body.append($("#addVeil")); // over all the page, the list's blurred edges too (they're outside #app)
   $("#sAddClose").append(icon("close"));
-  $("#sAddClose").onclick = (e) => {
-    e.stopPropagation();
-    if (addPop.contains($("#sAdd"))) { showAdd(false); $("#sAddBtn").focus({ preventScroll: true }); } else showJobsAdd(false);
-  };
-  $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
-  document.addEventListener("click", (e) => { if (!addPop.hidden && !e.composedPath().includes(addPop)) showAdd(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !addPop.hidden) { showAdd(false); if (!$("#sAddAt").hidden) $("#sAddBtn").focus({ preventScroll: true }); } }); // (the focus back without scrolling the page to it)
+  $("#sAddClose").onclick = (e) => { e.stopPropagation(); closeDrawer(); }; // the close by the title, the drawer's
+  $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd($("#jobsPop").hidden); };
   $("#pGetVideo").onclick = async () => {
     const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
     videoWait("Getting the video…");
@@ -946,7 +940,7 @@ function initStems() {
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
   $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
   // text buttons with an icon in front of the label
-  [["#sAddBtn", "plus"], ["#jobsAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
+  [["#sAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
     ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   $("#pSave").onclick = saveMix;
   document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page

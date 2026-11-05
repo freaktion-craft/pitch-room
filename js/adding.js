@@ -62,9 +62,6 @@ function paintJobs() {
     : ready.length ? "Song added" : failed ? "Couldn’t add a song" : "Add songs", { n: live.length || ready.length, pct }, "title");
   // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
-  say($(".jobs-head b"), !live.length && ready.length ? "Songs added" : "Adding songs");
-  const formHere = !$("#jobsAdd").hidden; // the form says what it is: the panel's own heading steps aside while it's alone
-  $(".jobs-head").hidden = formHere && !jobs.length; $("#jobsNone").hidden = formHere || jobs.length > 0;
   const rowOf = new Map(); // (one just made isn't in the page yet)
   for (const [id, j] of adding) {
     if (j.done && open) j.seen = true; // in while the panel's open: shown
@@ -154,17 +151,27 @@ function afterSlide(pop, fn) {
 }
 // The songs being added: their drawer at the window's right, over the page dimmed (#addVeil, as Add song's is); a
 // click beside it or Escape closes it
+let drawerFrom = null; // what opened the drawer: the focus goes back to it as it closes
 function showJobs(on) {
-  const was = !$("#jobsPop").hidden;
-  $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
-  if (on || was) drawerEdge($("#jobsPop"), on);
-  if (on) { showAdd(false); paintJobs(); $("#addVeil").classList.add("on"); placeClip(); if (!was) checkClip(); } // marks those in as seen; the veil after Add song's closing, which takes it off
-  else if ($("#addPop").hidden) $("#addVeil").classList.remove("on");
-  if (!on && was) { // closed: the songs it showed as in have been seen
-    afterSlide($("#jobsPop"), () => { if ($("#jobsPop").hidden) showJobsAdd(false); }); // the form back once it's out, not swapped as it goes
+  const pop = $("#jobsPop"), was = !pop.hidden;
+  if (on && !was) drawerFrom = document.activeElement;
+  pop.hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on)); $("#sAddBtn").setAttribute("aria-expanded", String(on));
+  $("#sAddAt").classList.toggle("open", on);
+  if (on || was) drawerEdge(pop, on);
+  $("#addVeil").classList.toggle("on", on); // a click beside it closes it
+  if (on) {
+    paintJobs(); placeClip(); // marks those in as seen
+    if (!was) { checkClip(); requestAnimationFrame(() => { if (!$("#sAdd").hidden && !pop.contains(document.activeElement)) $("#sYtUrl").focus({ preventScroll: true }); }); }
+  } else if (was) { // closed: the songs it showed as in have been seen
     for (const [id, j] of adding) if (j.done && j.seen) { adding.delete(id); document.getElementById("job-" + id)?.remove(); }
     paintJobs();
   }
+}
+// closed by its x or Escape: the focus back to what opened it, where that's still there
+function closeDrawer() {
+  showJobs(false);
+  const to = [drawerFrom, $("#sAddBtn"), $("#jobsBtn")].find((b) => b && b !== document.body && b.isConnected && b.getClientRects().length);
+  to?.focus({ preventScroll: true });
 }
 // Stop a song that's being added (the server stops within a second or so and throws its files away); one that
 // failed is just cleared away.
@@ -378,19 +385,9 @@ function landRing() {
   ring.animate(first ? [{ transform: "scale(0.5)", opacity: 0 }, { transform: "scale(1.12)", opacity: 1, offset: 0.55 }, { transform: "none", opacity: 1 }]
     : [{ transform: "none" }, { transform: "scale(1.1)", offset: 0.4 }, { transform: "none" }], { duration: first ? 380 : 260, easing: "ease-out" });
 }
-async function tuckAway() {
-  const pop = $("#addPop");
-  if (!$("#jobsAdd").hidden) { showJobsAdd(false); landRing(); return; } // sent from the ring's drawer: the form folds away there, the songs show in its place
-  const open = !pop.hidden;
-  if (open && !document.documentElement.classList.contains("welcome")) { // sent (Add, or Enter): the drawer stays, turned to the songs being added, the new one in them
-    for (const d of [pop, $("#jobsPop")]) d.classList.add("swap"); // (in place: neither slides)
-    showJobs(true);
-    requestAnimationFrame(() => requestAnimationFrame(() => { for (const d of [pop, $("#jobsPop")]) d.classList.remove("swap"); }));
-    $("#jobsClose").focus({ preventScroll: true });
-    return landRing();
-  }
-  showAdd(false); // (in the first steps: away, under them)
-  if (open) await new Promise((r) => afterSlide(pop, r));
+function tuckAway() {
+  if (document.documentElement.classList.contains("welcome")) showJobs(false); // (in the first steps: away, under them)
+  else if (!$("#jobsPop").hidden && !$("#sAdd").hidden) $("#sYtUrl").focus({ preventScroll: true }); // the field ready for the next
   landRing();
 }
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
@@ -399,37 +396,16 @@ function jobStarted(id, name) {
   lastStarted = id; addingJob(id, { name, link: name, status: "queued", progress: 0 }); watchJob(id, "separate");
   if (clipOffer) showClip(clipOffer); // (sent from the form, the card's own may be among them: not offered again)
 }
-// Add song: a drawer at the window's right (an empty library's row opens it too). It opens with the links field ready
+// Add song: the drawer (the + by the mic's), its links field ready to type in (an empty library's row opens it too). It opens with the links field ready
 // to type in; a click elsewhere, Escape or a song sent off closes it.
 let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
-function showAdd(on) {
-  const pop = $("#addPop"), btn = $("#sAddBtn");
-  if (on) showJobs(false);
-  const was = !pop.hidden;
-  if (on) { showJobsAdd(false); pop.append($("#sAdd"), $("#sAddSetup")); } // back from the ring's drawer, if it was there
-  pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
-  $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // a click beside it closes it
-  if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
-  if (on) { placeClip(); if (!was) checkClip(); }
-  drawerEdge(pop, on);
-}
+function showAdd(on) { showJobs(on); }
 // A drawer open: the page's scrollbar away (its room kept, base.css), so the drawer meets the window's edge; back once
 // it's slid out (and the other isn't open)
 function drawerEdge(pop, on) {
-  const html = document.documentElement, any = () => !$("#addPop").hidden || !$("#jobsPop").hidden;
+  const html = document.documentElement, any = () => !$("#jobsPop").hidden;
   if (on && !html.classList.contains("drawer-open")) { html.style.setProperty("--sbw", innerWidth - html.clientWidth + "px"); html.classList.add("drawer-open"); }
   else afterSlide(pop, () => html.classList.toggle("drawer-open", any()));
-}
-// The ring's panel has Add song too, so a song can be added from any page: the same form, moved into the panel under
-// the songs being added, its button stepping aside; it goes back when the panel closes or a song is sent.
-function showJobsAdd(on) {
-  const host = $("#jobsAdd"), pop = $("#jobsPop");
-  if (on === !host.hidden) return;
-  if (on) host.append($("#sAdd"), $("#sAddSetup")); else $("#addPop").append($("#sAdd"), $("#sAddSetup"));
-  host.hidden = !on; $("#jobsAddBtn").hidden = on; pop.classList.toggle("adding", on); placeClip();
-  paintJobs();
-  if (on) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
-  else if (!pop.hidden) $("#jobsAddBtn").focus();
 }
 // A YouTube link copied is offered as a card in the drawer (Add song's, or the songs being added's): its video's
 // picture and title, and Add, which sends it, the card then turning into the song's row as it starts. Read when a
@@ -469,19 +445,19 @@ function clipCard() {
   add.onclick = (e) => { e.stopPropagation(); sendClip(); };
   x.onclick = (e) => {
     e.stopPropagation(); for (const l of clipOffer || []) clipSkipped.add(l); hideClip();
-    (!$("#sAdd").hidden && $("#sAdd").closest("#addPop:not([hidden]), #jobsPop:not([hidden])") ? $("#sYtUrl") : $("#jobsClose")).focus({ preventScroll: true });
+    $("#sYtUrl").focus({ preventScroll: true });
   };
   card.append(pic, what, add, x);
   return card;
 }
 function hideClip() { clipOffer = null; const c = $("#clipCard"); if (c) c.hidden = true; }
-// where it goes: under the links field where the form is, else at the top of the songs being added
+// where it goes: under the links field
 function placeClip() {
-  const card = clipCard(), form = !$("#sAdd").hidden && $("#sAdd").closest("#addPop:not([hidden]), #jobsPop:not([hidden])");
-  if (form) { if (card.previousElementSibling !== $("#sYtForm")) $("#sYtForm").after(card); }
-  else if (card.nextElementSibling !== $("#jobsList")) $("#jobsList").before(card);
+  const card = clipCard();
+  if (card.previousElementSibling !== $("#sYtForm")) $("#sYtForm").after(card);
 }
 function showClip(links) {
+  if ($("#sAdd").hidden) return hideClip(); // (the song tools not in: nothing to send it with)
   links = links.filter((l) => !clipSkipped.has(l) && !clipHave(l));
   if (!links.length) return hideClip();
   if (links.length === 1 && ytTitles.has(links[0]) && clipNamed(ytTitles.get(links[0]))) return hideClip(); // (in the library under another upload)
@@ -503,7 +479,7 @@ function showClip(links) {
   if (!stillMotion()) card.animate([{ opacity: 0, transform: "translateY(-4px)", filter: "blur(4px)" }, { opacity: 1, transform: "none", filter: "blur(0)" }], { duration: 320, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
 }
 async function checkClip() {
-  if ($("#addPop").hidden && $("#jobsPop").hidden) return;
+  if ($("#jobsPop").hidden) return;
   let text = "";
   try { text = await navigator.clipboard.readText(); } catch (e) { return; } // not allowed (the browser asks once), or the page not in front
   const links = ytLinks(text);
@@ -519,13 +495,11 @@ async function sendClip() {
   if (fly) { fly.removeAttribute("id"); fly.classList.add("cc-fly"); Object.assign(fly.style, { left: at.left + "px", top: at.top + "px", width: at.width + "px", height: at.height + "px" }); document.body.append(fly); }
   const field = $("#sYtUrl"), typed = field.value.trim(); // (what's typed there stays, after the card's are sent)
   field.value = links.join("\n"); fitLinks();
-  if (links.some((u) => PLAYLIST.test(u)) && $("#jobsPop").hidden === false && $("#jobsAdd").hidden) showJobsAdd(true); // (the picker is in the form)
   await submitYoutube({ preventDefault() {} });
   const left = field.value.trim();
   field.value = [typed, left].filter(Boolean).join("\n"); fitLinks();
-  if (left && !$("#sAdd").closest("#addPop:not([hidden]), #jobsPop:not([hidden])")) { // one that couldn't start: the form, saying why
-    if (!$("#jobsPop").hidden) showJobsAdd(true); else showAdd(true);
-  } else if (!$("#jobsPop").hidden && !document.activeElement?.closest?.("#jobsPop")) $("#jobsClose").focus({ preventScroll: true });
+  if (left && $("#jobsPop").hidden) showJobs(true); // one that couldn't start: the form, saying why
+  if (!$("#jobsPop").hidden && !document.activeElement?.closest?.("#jobsPop")) $("#sYtUrl").focus({ preventScroll: true });
   if (!fly) return;
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const row = lastStarted && document.getElementById("job-" + lastStarted);
@@ -536,7 +510,6 @@ async function sendClip() {
   row.animate([{ opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0)" }], { duration: 360, delay: 160, easing: "ease-out", fill: "backwards" });
 }
 function initYoutubeOffer() {
-  $("#jobsAddBtn").onclick = () => showJobsAdd(true);
   $("#plGo").onclick = addPicked;
   $("#plBack").onclick = () => { closePlaylist(); $("#sYtUrl").focus(); };
   $("#plAll").onchange = (e) => { for (const i of plFound?.items || []) if (!i.gone) i.box.checked = e.target.checked; countPicked(); };
@@ -547,7 +520,7 @@ function initYoutubeOffer() {
     if (!links.length || $("#sAdd").hidden) return;
     e.preventDefault();
     for (const l of links) clipSkipped.delete(l); // (pasted on purpose)
-    if ($("#addPop").hidden && $("#jobsPop").hidden) showJobs(true);
+    if ($("#jobsPop").hidden) showJobs(true);
     showClip(links);
     if (!$("#clipCard").hidden) $("#clipCard .cc-add").focus({ preventScroll: true });
   });

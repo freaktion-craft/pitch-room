@@ -50,10 +50,8 @@
 #jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
 #jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */
-.jobs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 28px; margin: -6px 0; } /* as Add song's title row: the close at the right edge */
-.jobs-acts { display: flex; align-items: center; gap: var(--space-2); }
 #jobsPop > p { margin: 0; }
-#jobsPop.adding { font-size: var(--text-md); } /* the form, as in its own drawer */
+#jobsPop { font-size: var(--text-md); }
 #jobsList { display: grid; gap: var(--space-8); margin-top: var(--space-4); }
 #jobsList:not(:has(> .jobs-sec:not([hidden]))) { display: none; }
 /* its sections (JOB_SECS): a name and how many, then the songs */
@@ -72,7 +70,6 @@
 .clip-card .cc-what b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clip-card .cc-add .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .clip-card .cc-x .ico { width: var(--icon-sm); height: var(--icon-sm); }
-#jobsPop > .clip-card { margin-top: var(--space-4); }
 /* sent: a copy of it flying to the song's row (sendClip), over the drawer */
 .cc-fly { position: fixed; z-index: calc(var(--z-modal) + 1); margin: 0; pointer-events: none; transform-origin: 0 0; }
 .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-2); align-items: center; }
@@ -273,19 +270,18 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
 .add-at { position: relative; display: inline-flex; }
 /* its title row on the header's line (the name's): the page's padding over the header, less the title row's -6 px
    margin, plus half of what the 32 px header has over the row's 20 px */
-#addPop, #jobsPop { --drawer-top: 0px; --head-top: var(--space-6); position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: min(520px, 100vw); margin: 0;
+#jobsPop { --drawer-top: 0px; --head-top: var(--space-6); position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: min(520px, 100vw); margin: 0;
   padding-top: calc(var(--head-top) + 6px); border-radius: 0; z-index: var(--z-modal); align-content: start; overflow-y: auto; overscroll-behavior: contain;
   -webkit-app-region: no-drag; transition: translate var(--duration-slow) var(--ease), display var(--duration-slow) allow-discrete; }
-html.desktop-win :is(#addPop, #jobsPop) { --drawer-top: var(--titlebar); --head-top: calc(var(--titlebar) + var(--space-3)); }
-html.desktop-mac :is(#addPop, #jobsPop) { --drawer-top: var(--space-6); --head-top: calc(var(--space-6) + var(--space-3)); }
-:is(html.desktop-win, html.desktop-mac) :is(#addPop, #jobsPop)::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: var(--drawer-top); -webkit-app-region: drag; }
-#addPop[hidden], #jobsPop[hidden] { translate: 100% 0; pointer-events: none; }
-@starting-style { #addPop:not([hidden]), #jobsPop:not([hidden]) { translate: 100% 0; } }
-@media (prefers-reduced-motion: reduce) { #addPop, #jobsPop { transition: none; } }
-:is(#addPop, #jobsPop).swap { transition: none; } /* one turned into the other (a song sent): in place */
-:is(#addPop, #jobsPop) .pop-title { font-size: 16px; } /* a drawer's name: a little over a panel's 14 px (its line the same, on the header's) */
+html.desktop-win #jobsPop { --drawer-top: var(--titlebar); --head-top: calc(var(--titlebar) + var(--space-3)); }
+html.desktop-mac #jobsPop { --drawer-top: var(--space-6); --head-top: calc(var(--space-6) + var(--space-3)); }
+:is(html.desktop-win, html.desktop-mac) #jobsPop::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: var(--drawer-top); -webkit-app-region: drag; }
+#jobsPop[hidden] { translate: 100% 0; pointer-events: none; }
+@starting-style { #jobsPop:not([hidden]) { translate: 100% 0; } }
+@media (prefers-reduced-motion: reduce) { #jobsPop { transition: none; } }
+#jobsPop .pop-title { font-size: 16px; } /* a drawer's name: a little over a panel's 14 px (its line the same, on the header's) */
 .add-form { display: grid; gap: var(--space-3); }
-.add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0 var(--space-2); } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
+.add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0 0; } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
 .add-form p, #sAddSetup { margin: 0; }
 /* a playlist's songs, to pick from before any is added: ticked unless in the library already (or gone from YouTube) */
 .pl { display: grid; gap: var(--space-2); }

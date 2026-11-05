@@ -681,7 +681,7 @@ function initLibSearch() {
   // Escape closes them: looked at before they do, in the capture)
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || libAlbum == null || !(view === "stems" && stemsPage === "lib") || CV.tile || typing(e.target)) return;
-    if (document.querySelector(".menu:not([hidden]), .pick-list:not([hidden]), .pop:not([hidden]), #addPop:not([hidden]), #songMenu:not([hidden])")) return;
+    if (document.querySelector(".menu:not([hidden]), .pick-list:not([hidden]), .pop:not([hidden]), #songMenu:not([hidden])")) return;
     e.preventDefault(); closeAlbum();
   }, true);
   vs.forEach((b) => (b.onclick = () => pickView(b.dataset.v)));

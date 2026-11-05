@@ -79,7 +79,6 @@ const EMPTY_LIBRARY = false;
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
-    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b class="pop-title">Adding songs</b><span class="jobs-acts"><button class="btn sm" id="jobsAddBtn" type="button">Add song</button><button class="btn sm icon ghost" id="jobsClose" type="button" aria-label="Close" title="Close"></button></span></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div></div>
   </header>
 
   <main id="vPractice" aria-label="Practice" hidden>
@@ -253,10 +252,11 @@ const EMPTY_LIBRARY = false;
     <div id="libMast" aria-hidden="true"></div>
     <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
     <div id="addVeil" aria-hidden="true"></div>
-    <!-- Add song's drawer (#sAddBtn opens it): at the window's right, over the veil; both moved out to the body (studio.js), over the list's blur -->
-    <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
+    <!-- the drawer (Add song, and the + by the mic, open it): at the window's right, over the veil; both moved out to the body
+         (studio.js, practice.js), over the list's blur. The form at its top, the songs being added under it (paintJobs) -->
+    <div class="pop" id="jobsPop" role="dialog" aria-label="Add a song" hidden>
+      <div class="add-title"><b class="pop-title">Add a song</b><button class="btn sm icon ghost" id="sAddClose" type="button" aria-label="Close" title="Close"></button></div>
       <div class="add-form" id="sAdd" hidden>
-        <div class="add-title"><b class="pop-title">Add a song</b><button class="btn sm icon ghost" id="sAddClose" type="button" aria-label="Close" title="Close"></button></div>
         <form class="yt" id="sYtForm">
           <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links or a playlist" title="YouTube links, one per line, or a YouTube or Spotify playlist link" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
           <button class="btn sm primary" type="submit">Add</button>
@@ -275,6 +275,7 @@ const EMPTY_LIBRARY = false;
         <p class="muted" id="sAddMsg" hidden></p>
       </div>
       <p class="muted" id="sAddSetup" data-html hidden>Install the song tools first, in <a href="#settings">Settings</a>.</p>
+      <div id="jobsList"></div>
     </div>
     <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
@@ -283,7 +284,7 @@ const EMPTY_LIBRARY = false;
         <div class="seg lib-title lib-view" id="sLibView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="song" aria-checked="true">Song</button><button type="button" role="radio" data-v="artist" aria-checked="false">Artist</button><button type="button" role="radio" data-v="album" aria-checked="false">Album</button></div>
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
         <button class="btn sm" id="sUpdate" type="button" hidden>Update</button>
-        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button></span></div>
+        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="jobsPop">Add song</button></span></div>
       <section class="lib-new" id="sNew" aria-labelledby="sNewTitle" hidden>
         <div class="ln-head"><h2 class="group-label" id="sNewTitle">New <span class="ln-n" id="sNewCount"></span></h2><span class="ln-arrows"><button class="btn sm icon ghost" id="sNewPrev" type="button" aria-label="Back" title="Back"></button><button class="btn sm icon ghost" id="sNewNext" type="button" aria-label="More" title="More"></button></span></div>
         <div class="ln-track" id="sNewTrack"></div>
