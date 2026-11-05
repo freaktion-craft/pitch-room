@@ -41,7 +41,7 @@ let shown = { text: "Starting…" };
 function showSplash() {
   splash = new BrowserWindow({
     width: 360, height: 220, frame: false, resizable: false, maximizable: false, minimizable: false, fullscreenable: false,
-    center: true, show: false, title: "Pitchroom", backgroundColor: BG,
+    center: true, show: false, title: "Pitchroom", backgroundColor: BG, accentColor: BG,
     webPreferences: { contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });
   splash.webContents.on("did-finish-load", () => status(shown.text, shown.percent));
@@ -143,6 +143,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: b.width || Math.min(room.width, 1520), height: b.height || Math.min(room.height, 960), x: b.x, y: b.y,
     title: app.name, backgroundColor: BG, show: false, autoHideMenuBar: true,
+    accentColor: BG, // Windows 11: its edge the page's black (in light mode a pale line round the window otherwise)
     // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
     // Windows: no title bar of the system's either, its three buttons drawn over the page's top right corner, on the
     // page's black, as tall as the strip along the top that moves the window (html.desktop-win, base.css)
