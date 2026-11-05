@@ -168,12 +168,17 @@ def youtube(url: str) -> str | None:
     return m and f"https://i.ytimg.com/vi/{m.group(1)}/hqdefault.jpg"
 
 
+def album_name(album: str) -> str:
+    """A record's album as the library groups by it: iTunes' " - Single" and " - EP" left off (the song's name, then)."""
+    return re.sub(r"\s+-\s+(?:Single|EP)\s*$", "", album or "", flags=re.I).strip()
+
+
 def tags(ffmpeg: str, path: str) -> dict:
-    """An audio file's own title and artist (its ID3 or Vorbis tags), those it has."""
+    """An audio file's own title, artist and album (its ID3 or Vorbis tags), those it has."""
     err = subprocess.run([ffmpeg, "-hide_banner", "-i", path], capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
     head = err.split("Duration:", 1)[0]  # the file's tags, not its streams'
     out = {}
-    for k in ("title", "artist"):
+    for k in ("title", "artist", "album"):  # (album: not album_artist, the pattern's its whole name)
         if m := re.search(rf"(?mi)^\s+{k}\s*: (.*\S)", head):
             out[k] = m.group(1)
     return out

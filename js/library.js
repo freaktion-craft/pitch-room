@@ -407,6 +407,34 @@ function sortArrow(name) { const a = icon(name); a.classList.add("arrow"); retur
 // stay loaded, a rename stays open). libRows: each song's row, shown or not.
 let libRows = new Map();
 const folded = (t) => String(t || "").normalize("NFKC").toLocaleLowerCase();
+// The view, in the list's name's place (#sLibView; store "libView"): its songs as a list, or under a heading for each
+// artist or album, A to Z (none known last), each one's songs in the list's order. The headings made once, kept by
+// what they head (libGroups), the rows only moved under them, as ever.
+const LIB_VIEWS = ["song", "artist", "album"];
+let libView = (() => { const v = store.get("libView", "song"); return LIB_VIEWS.includes(v) ? v : "song"; })();
+const libGroups = new Map();
+// an artist's main name (before "&", ",", "feat.", " x "): an album's songs are often credited to it with others
+const mainArtist = (a) => (a || "").split(/\s*(?:,|&|\bfeat\.?|\bft\.|\bwith\b|\s[x×]\s)\s*/i)[0].trim();
+// which group a song's under: its key (as written, any case or width the same), and what its heading says. An album
+// is its name and whose: two artists' albums of one name ("Greatest Hits") apart
+function groupOf(m) {
+  if (libView === "artist") { const a = mainArtist(m.artist); return { key: folded(a), name: a, by: "" }; } // (with others too: under theirs)
+  if (!m.album) return { key: "", name: "", by: "" };
+  const by = mainArtist(m.artist);
+  return { key: `${folded(m.album)}\u0000${folded(by)}`, name: m.album, by };
+}
+function groupHead(g, songs) {
+  const key = `${libView}:${g.key}`;
+  let h = libGroups.get(key);
+  if (!h) { h = el("div", "lib-group"); h.append(el("b"), el("small")); libGroups.set(key, h); }
+  const n = songs.length === 1 ? tr("1 song") : tr("{n} songs", { n: songs.length });
+  h.querySelector("b").textContent = g.name || tr(libView === "artist" ? "Unknown artist" : "Unknown album");
+  h.querySelector("small").textContent = [g.by, n].filter(Boolean).join(" · ");
+  return h;
+}
+function paintLibView() {
+  for (const b of $("#sLibView").querySelectorAll("button")) b.setAttribute("aria-checked", String(b.dataset.v === libView));
+}
 function arrangeRows() {
   const box = $("#sLib"), c = SORTS[libSort.by], way = libSort.desc ? -1 : 1;
   const words = new Intl.Collator(locale(), { numeric: true, sensitivity: "base" });
@@ -417,11 +445,30 @@ function arrangeRows() {
     if (x == null || y == null) return (x == null) - (y == null) || b.created - a.created;
     return (c.text ? words.compare(x, y) : x - y) * way || b.created - a.created;
   });
-  let shown = 0;
+  const found = [];
   for (const m of songs) {
-    const row = libRows.get(m.id), text = folded(`${m.title} ${m.artist || ""} ${m.sourceTitle || ""}`);
-    if (want.every((w) => text.includes(w))) { box.append(row); shown++; } else row.remove();
+    const text = folded(`${m.title} ${m.artist || ""} ${m.album || ""} ${m.sourceTitle || ""}`);
+    if (want.every((w) => text.includes(w))) found.push(m); else libRows.get(m.id).remove();
   }
+  const heads = new Set();
+  if (libView === "song") for (const m of found) box.append(libRows.get(m.id));
+  else {
+    const groups = new Map(); // key -> {g (as most of its songs spell it), songs}
+    for (const m of found) {
+      const g = groupOf(m);
+      if (!groups.has(g.key)) groups.set(g.key, { g, songs: [], spell: new Map() });
+      const x = groups.get(g.key), s = `${g.name}\u0000${g.by}`;
+      x.songs.push(m); x.spell.set(s, (x.spell.get(s) || 0) + 1);
+      if (x.spell.get(s) > (x.spell.get(`${x.g.name}\u0000${x.g.by}`) || 0)) x.g = g;
+    }
+    const order = [...groups.values()].sort((a, b) => (!a.g.name) - (!b.g.name) || words.compare(a.g.name, b.g.name) || words.compare(a.g.by, b.g.by)); // (none known last)
+    for (const { g, songs: in_ } of order) {
+      const h = groupHead(g, in_); heads.add(h); box.append(h);
+      for (const m of in_) box.append(libRows.get(m.id));
+    }
+  }
+  for (const h of box.querySelectorAll(".lib-group")) if (!heads.has(h)) h.remove(); // (another view's, or one with nothing found)
+  const shown = found.length;
   paintNew();
   let none = box.querySelector(".lib-none");
   if (!shown && songs.length) {
@@ -565,6 +612,19 @@ function tiltTick() {
   CV.raf = requestAnimationFrame(tiltTick);
 }
 function initLibSearch() {
+  // the view: picked, the songs arranged under it at once, where the list is (the arrows through it as the Lab's do)
+  const seg = $("#sLibView"), vs = [...seg.querySelectorAll("button")];
+  const pickView = (v) => {
+    if (v === libView || !LIB_VIEWS.includes(v)) return;
+    libView = v; store.set("libView", v); paintLibView(); arrangeRows(); pinLibTop();
+  };
+  vs.forEach((b) => (b.onclick = () => pickView(b.dataset.v)));
+  seg.onkeydown = (e) => {
+    const i = vs.findIndex((b) => b.dataset.v === libView), d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!d) return;
+    e.preventDefault(); const b = vs[(i + d + vs.length) % vs.length]; pickView(b.dataset.v); b.focus();
+  };
+  paintLibView();
   const f = $("#sSearch"), mac = /Mac|iPhone|iPad/.test(navigator.platform), keys = el("span", "keys");
   f.before(icon("search"));
   keys.setAttribute("aria-hidden", "true"); keys.append(el("kbd", null, mac ? "⌘" : "Ctrl"), el("kbd", null, "K")); f.after(keys);
@@ -654,8 +714,11 @@ function initCoverView() {
 let lookupTimer = 0;
 function awaitLookups(lib, tries = 0) {
   clearTimeout(lookupTimer);
+  // (albums of songs from before they were kept come in slowly, one every few seconds behind any lookup: asked after
+  // longer, less often, ten minutes at most)
   const looking = tries < 20 && lib.some((m) => !("cover" in m) || !("artist" in m)), upgrading = lib.some((m) => m.upgrade != null || m.pending);
-  if (!looking && !upgrading) return;
+  const albums = tries < 120 && lib.some((m) => !("album" in m));
+  if (!looking && !upgrading && !albums) return;
   lookupTimer = setTimeout(async () => {
     if (!(view === "stems" && stemsPage === "lib")) return; // the list asks again when it's shown again
     let now;
@@ -666,6 +729,7 @@ function awaitLookups(lib, tries = 0) {
       const known = libCache.get(m.id), row = libRows.get(m.id);
       if (!known || !row) continue;
       if ("cover" in m) known.cover = m.cover;
+      if ("album" in m && known.album !== m.album) { known.album = m.album; if (libView === "album") renamed = true; } // (its group, in the Album view)
       known.upgrade = m.upgrade; known.pending = m.pending;
       paintCover(row.querySelector(".cover"), m); paintUpgrade(row.querySelector(".cover"), m); paintPending(row, m);
       const card = $(`#sNewTrack .ln-card[data-id="${m.id}"]`);
@@ -678,9 +742,9 @@ function awaitLookups(lib, tries = 0) {
         row.querySelector(".song-actions .btn").setAttribute("aria-label", tr("More for {title}", { title: m.title }));
       }
     }
-    if (renamed && SORTS[libSort.by]?.text) arrangeRows(); // sorted by name: it may belong elsewhere now
+    if (renamed && (SORTS[libSort.by]?.text || libView !== "song")) arrangeRows(); // sorted by name, or under its artist or album: it may belong elsewhere now
     awaitLookups(now, tries + 1);
-  }, upgrading ? 1000 : 3000);
+  }, upgrading ? 1000 : looking ? 3000 : 5000);
 }
 // Key names spelled the usual way for each key (D♭ major, C♯ minor).
 const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]; // G♭ (6 flats, as its notes are spelt) for F♯

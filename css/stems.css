@@ -330,6 +330,13 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
    search taking what's left, the name left out */
 .lib-head { min-width: 0; }
 @media (max-width: 560px) { .lib-title { display: none; } .lib-head .search { flex: 1 1 auto; width: auto; min-width: 0; } }
+/* the view in the name's place (#sLibView, a .seg): its left edge where the name's was; and in the Artist or Album
+   view, a heading over each one's songs: its name, and how many (an album's, whose they are) */
+.lib-view { margin-left: calc(-1 * var(--space-half)); }
+#sLib .lib-group { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; padding: var(--space-8) var(--space-3) var(--space-2); }
+#sLib .lib-cols + .lib-group { padding-top: var(--space-4); }
+#sLib .lib-group b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--text-lg); color: var(--ink); }
+#sLib .lib-group small { flex: none; color: var(--muted); font-size: var(--text-sm); }
 .ln-pull { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: grid; opacity: 0; pointer-events: none; transition: opacity var(--duration-fast); }
 .ln-pull.on { opacity: 1; }
 .ln-pull .ring { width: var(--icon-lg); height: var(--icon-lg); transform: rotate(-90deg); }

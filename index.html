@@ -269,10 +269,11 @@ const EMPTY_LIBRARY = false;
       </div>
       <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
     </div>
-    <section class="group" id="sLibPage" aria-labelledby="sLibTitle">
+    <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
         <span class="ln-pull" id="sNewPull" aria-hidden="true"></span>
-        <h2 class="group-label lib-title" id="sLibTitle">Library</h2>
+        <!-- the list's view, in the name's place: its songs, or them under each artist or album (arrangeRows) -->
+        <div class="seg lib-title lib-view" id="sLibView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="song" aria-checked="true">Song</button><button type="button" role="radio" data-v="artist" aria-checked="false">Artist</button><button type="button" role="radio" data-v="album" aria-checked="false">Album</button></div>
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
         <button class="btn sm" id="sUpdate" type="button" hidden>Update</button>
         <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button></span></div>

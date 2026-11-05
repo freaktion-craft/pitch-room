@@ -631,6 +631,8 @@ def library() -> list[dict]:
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
             if _lookup_wanted(meta):
                 _want_lookup(d)
+            elif _album_wanted(meta):  # looked up before albums were kept: its album alone
+                _want_album(d)
             c = meta.get("cover")
             if isinstance(c, dict) and "hash" not in c and not c.get("none"):
                 _want_extras(d)
@@ -686,6 +688,8 @@ def _extras_worker():
 #   sourceTitle  the video's or file's own title, which lyrics and covers are looked for by
 #   cover        {"from": "file", "itunes", "deezer" or "youtube", "at", "px"} once cover.jpg is saved, None when
 #                there's none to be had; with thumb, tone and hash (cover-96.jpg, its colour, a BlurHash: _want_extras)
+#   album        the record's album (covers.album_name), or a file's own; "" when not known (a cover: the record is the
+#                song it covers, not this one's); absent till looked up (songs from before it: _want_album)
 _lookup_line: list[str] = []
 _lookup_asked: set[str] = set()
 _lookup_lock = threading.Lock()
@@ -795,9 +799,12 @@ def _look_up(song_id: str):
     src = _saved(folder, "source")
     from_link = bool(re.match(r"^https?://", meta.get("source") or ""))
     cover = covers.is_cover(own)
-    if src and not from_link:  # an uploaded file: its own name and picture, if it has them
+    file_album = ""
+    if src and not from_link:  # an uploaded file: its own name, album and picture, if it has them
         path = os.path.join(folder, src)
-        if (t := covers.tags(ffmpeg_exe(), path)).get("title"):
+        t = covers.tags(ffmpeg_exe(), path)
+        file_album = t.get("album", "")
+        if t.get("title"):
             name = (t["title"], t.get("artist", ""))
         if (i := covers.attached(ffmpeg_exe(), path)) is not None and covers.save(ffmpeg_exe(), path, out, stream=i):
             art = "file"
@@ -838,17 +845,101 @@ def _look_up(song_id: str):
     if not name:
         artist, song = lyrics.split_title(own)
         name = (song or own, artist)
+    # its album: the file's own, else the record's; a cover's record is the song it covers, not this one's (tagged or not)
+    album = file_album or ("" if cover else covers.album_name((record or {}).get("album", "")))
     with _meta_lock:  # read again: renamed meanwhile, the new name stays
         path = os.path.join(folder, "meta.json")
         if not os.path.isfile(path):
             return  # deleted meanwhile
         meta = _load_json(path)
-        meta.update(sourceTitle=own, artist=name[1][:TITLE_MAX], cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
+        meta.update(sourceTitle=own, artist=name[1][:TITLE_MAX], album=album[:TITLE_MAX],
+                    cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
         if channel and not meta.get("channel"):
             meta["channel"] = channel
         if not meta.get("named"):
             meta["title"] = name[0][:TITLE_MAX]
         _write_json(path, meta, ensure_ascii=False)
+
+
+# The album of a song looked up before albums were kept (the library's Album view): that alone, in a line of its own
+# that gives way to new songs' lookups (it waits while any's in _lookup_line, so they never wait behind it or meet a
+# site's limit it ran into), one song every ALBUM_GAP s, gently for the sites. Nothing else of it changes: not its
+# title (a renamed one's least), its artist or its cover. A file's from its own tag, if it has one; a cover's is "";
+# else the record searched for again (as _look_up would), taken only if it's by the artist the song has (so it's this
+# song's album). The sites out of reach: nothing written, so it's asked again the next time the server starts.
+ALBUM_GAP = 6.0
+_album_line: list[str] = []
+_album_asked: set[str] = set()
+_album_lock = threading.Lock()
+
+
+def _album_wanted(meta: dict) -> bool:
+    return "artist" in meta and "album" not in meta and not _lookup_wanted(meta)  # (a lookup to come keeps it itself)
+
+
+def _want_album(song_id: str):
+    with _album_lock:
+        if song_id in _album_asked:
+            return
+        _album_asked.add(song_id)
+        _album_line.append(song_id)
+        if len(_album_line) == 1:
+            threading.Thread(target=_album_worker, daemon=True).start()
+
+
+def _album_worker():
+    while True:
+        with _album_lock:
+            if not _album_line:
+                return
+            song_id = _album_line[0]
+        while True:  # a song being added, or others being looked up: theirs first
+            with _lookup_lock:
+                if not _lookup_line:
+                    break
+            time.sleep(1)
+        try:
+            _album_only(song_id)
+        except Exception as e:  # noqa: BLE001  (the song works without; asked again the next time the server starts)
+            print(f"Couldn't find library/{song_id}'s album: {e}", file=sys.stderr)
+        with _album_lock:
+            _album_line.pop(0)
+            if not _album_line:
+                return
+        time.sleep(ALBUM_GAP)
+
+
+def _album_only(song_id: str):
+    import covers
+    import lyrics
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not _album_wanted(meta):
+        return
+    own, dur = meta.get("sourceTitle") or meta["title"], float(meta.get("duration") or 0)
+    src = _saved(folder, "source")
+    album = ""
+    if src and not re.match(r"^https?://", meta.get("source") or ""):  # an uploaded file: its own tag first
+        album = covers.tags(ffmpeg_exe(), os.path.join(folder, src)).get("album", "")
+    if not album and not covers.is_cover(own) and meta.get("artist"):
+        hint = ""
+        with contextlib.suppress(OSError, ValueError, TypeError, KeyError):
+            s = _load_json(os.path.join(folder, "lyrics.json")).get("source") or {}
+            hint = f"{s['artist']} {s['track']}" if s.get("artist") else ""
+        if not hint and not meta.get("named"):  # (a renamed song's title is yours, not the record's: not searched by)
+            hint = f"{meta['artist']} {meta['title']}"
+        record = covers.online(own, dur, hint, cover=False, channel=meta.get("channel") or "")  # (out of reach: raised, nothing written)
+        if record and lyrics._words(record.get("artist") or "") & lyrics._words(meta["artist"]):
+            album = covers.album_name(record.get("album") or "")
+    with _meta_lock:  # read again: only its album added, if it's still without one
+        path = os.path.join(folder, "meta.json")
+        if not os.path.isfile(path):
+            return
+        disk = _load_json(path)
+        if "album" in disk:
+            return
+        disk["album"] = album[:TITLE_MAX]
+        _write_json(path, disk, ensure_ascii=False)
 
 
 def delete_song(song_id: str):
