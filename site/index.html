@@ -10,10 +10,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 /* the app's own tokens (css/tokens.css), the few this page uses: dark only, as the app is */
-@font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 :root {
-  --font-brand: "Geist Serif", var(--font);
-  --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0);
+ --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0);
   --voice-white: oklch(0.87 0 0); --voice-coral: oklch(0.72 0.172 32); --voice-orange: oklch(0.75 0.175 58); --voice-amber: oklch(0.77 0.156 82);
   --voice-green: oklch(0.73 0.197 150); --voice-teal: oklch(0.74 0.124 195); --voice-blue: oklch(0.68 0.166 262); --voice-violet: oklch(0.7 0.174 295); --voice-pink: oklch(0.86 0.08 353);
   --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; --ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -49,8 +47,8 @@ a { -webkit-user-drag: none; }
 .tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
 
 /* The app's welcome (js/app.js, welcome(), and css/base.css, #welcome): a book (the screen less 20 % each side), its
-   right half turned over to the left like a page, one after another, each an accent colour; the name large in the middle
-   meanwhile. Here it starts closed, its dark cover alone in the middle, and moves right as it opens (its spine to the
+   right half turned over to the left like a page, one after another, each an accent colour (no name over it, here).
+   Here it starts closed, its dark cover alone in the middle, and moves right as it opens (its spine to the
    middle); the last page lands dark, then turns back over behind the right page under it, which (the button on it, there
    under the pages all along, shown as the last one lifts off it) comes back to the middle on its own: a plain page, no book.
    The pages are built by riffle() */
@@ -65,10 +63,6 @@ a { -webkit-user-drag: none; }
    what's under it there; the last page's own back goes past it (riffle()), over the edge of the one it lands on */
 .book .leaf > .recto { left: -1px; width: calc(100% + 1px); }
 .book > .half:first-child { width: calc(50% + 1px); }
-/* the name, large in the middle while the pages turn; gone as the book opens */
-.word { position: fixed; left: 0; top: 0; z-index: 1001; transform-origin: 0 0; white-space: nowrap; color: var(--ink); visibility: hidden; pointer-events: none;
-  font: 400 44px/1 var(--font-brand); letter-spacing: -0.01em; }
-.word.ready { visibility: visible; }
 /* the right page's own: the button, on the open book's right half, under every page still to turn (they're above it, 100
    and up), so the last one lifting off is what shows it */
 .book .page { position: absolute; top: 0; bottom: 0; left: 50%; right: 0; z-index: 1; display: grid; place-items: center; }
@@ -86,7 +80,6 @@ a { -webkit-user-drag: none; }
   <span id="getLabel">Download</span>
 </a>
 </div></div>
-<span class="word" id="word" aria-hidden="true">Pitchroom</span>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
 <div class="tip" id="tip" role="status"></div>
 
@@ -156,25 +149,21 @@ tip.addEventListener("click", () => tip.classList.remove("on"));
 
 // ---------- the riffle (js/app.js's welcome(), its RIFFLE as the app has it) ----------
 // slow off the thumb, then a rush, then slow again (the onsets bunched in the middle by bunch), the pages in the air
-// together; a beat (rest), and the last page on its own, slower (last), the name going as it starts (fade).
+// together; a beat (rest), and the last page on its own, slower (last).
 const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06, -0.04, 0.05, -0.06, 0.03, -0.05, 0.04],
   pageEase: "cubic-bezier(0.38, 0, 0.12, 1)", rest: 200, last: 700, lastEase: "cubic-bezier(0.55, 0, 0.2, 1)",
-  fade: 320, shade: 0.32, // fade: the name going, from the last page's start
+  shade: 0.32,
   open: 520, openEase: "cubic-bezier(0.45, 0, 0.2, 1)", close: 640, closeEase: "cubic-bezier(0.65, 0, 0.25, 1)", // open: the closed book over to the right as its cover starts to lift; close: the right page back to the middle at the end
   back: 620, backEase: "cubic-bezier(0.45, 0, 0.2, 1)" }; // back: the last page turned back over, behind the right one
 const CLOSED = "translateX(-25%)"; // the book with its right half (its cover, then its right page) in the middle
 const ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "blue", "violet", "pink"]; // as the app has them (js/stage.js)
 async function riffle() {
-  const R = RIFFLE, book = document.getElementById("book"), word = document.getElementById("word");
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches; // the plain page at once, no name over it
+  const R = RIFFLE, book = document.getElementById("book");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches; // the plain page at once
   // the dark cover, the colours, then the dark last page
   const colours = ["var(--surface)", ...ACCENTS.map((k) => `var(--voice-${k})`), "var(--surface)"], n = colours.length - 1;
   book.style.transform = CLOSED;
-  await Promise.race([document.fonts.load(`400 44px "Geist Serif"`), new Promise((r) => setTimeout(r, 1500))]);
-  const place = (x, y, s = 1) => `translate(${x}px, ${y}px) scale(${s})`;
-  const mid = () => { const r = word.getBoundingClientRect(); return [(innerWidth - r.width) / 2, (innerHeight - r.height) / 2]; };
-  word.style.transform = place(...mid()); word.classList.add("ready");
-  const half = (i, cls, left) => {
+ const half = (i, cls, left) => {
     const h = document.createElement("div"); h.className = "half " + cls; h.style.background = colours[i];
     if (left != null) h.style.left = left;
     h.append(Object.assign(document.createElement("i"), { className: "shade" }));
@@ -208,9 +197,7 @@ async function riffle() {
   if (!still) for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase);
   const lastAt = still ? 0 : onset(n - 2) + R.page / 2 + R.rest, landed = turn(n - 1, lastAt, still ? 1 : R.last, R.lastEase);
   book.classList.add("built"); // every page over the button now
-  // the name going as the last page starts to lift, gone before the button's out from under it (over it, it would cover it)
-  const gone = word.animate([{ opacity: 1 }, { opacity: 0 }], { delay: lastAt, duration: still ? 1 : R.fade, easing: "ease-out", fill: "both" }).finished;
-  // the last page's back 2 px past the spine (a verso's box is its spine side's left): as it lands, over the edge of the
+ // the last page's back 2 px past the spine (a verso's box is its spine side's left): as it lands, over the edge of the
   // one under it, which would show through its own soft one; past the spine only the dark of the open book's right
   Object.assign(book.lastChild.querySelector(".verso").style, { left: "-2px", width: "calc(100% + 2px)" });
   await landed;
@@ -230,9 +217,7 @@ async function riffle() {
   recto.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], b);
   verso.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], b); // darker as it stands up
   book.animate([{ transform: still ? CLOSED : "none" }, { transform: CLOSED }],
-    { delay: still ? 0 : R.back * 0.3, duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" });
-  await gone; word.remove();
-}
+    { delay: still ? 0 : R.back * 0.3, duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" });}
 riffle();
 </script>
 </body>
