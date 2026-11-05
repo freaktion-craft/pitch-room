@@ -13,9 +13,15 @@
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 :root {
   --font-brand: "Geist Serif", var(--font);
-  --bg: oklch(0.165 0 0); --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0);
+  --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0);
+  --voice-white: oklch(0.87 0 0); --voice-coral: oklch(0.72 0.172 32); --voice-orange: oklch(0.75 0.175 58); --voice-amber: oklch(0.77 0.156 82);
+  --voice-green: oklch(0.73 0.197 150); --voice-teal: oklch(0.74 0.124 195); --voice-blue: oklch(0.68 0.166 262); --voice-violet: oklch(0.7 0.174 295); --voice-pink: oklch(0.86 0.08 353);
   --font: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: dark;
+}
+@media (color-gamut: p3) { /* as the app has them on a wide-gamut screen */
+  :root { --voice-blue: oklch(0.68 0.173 262); --voice-violet: oklch(0.7 0.182 295); --voice-coral: oklch(0.72 0.212 32);
+    --voice-orange: oklch(0.75 0.195 58); --voice-amber: oklch(0.77 0.174 82); --voice-green: oklch(0.73 0.266 150); --voice-teal: oklch(0.74 0.162 195); }
 }
 /* one screen, held still: no scrolling and no rubber-band pull past its edges (a trackpad's, a touch screen's) */
 html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
@@ -46,14 +52,51 @@ a { -webkit-user-drag: none; }
   opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); } /* it fades in and out, and stays still */
 .tip.on { opacity: 1; pointer-events: auto; }
 .tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
+
+/* The app's welcome (js/app.js, welcome(), and css/base.css, #welcome): a book in the middle (the screen less 20 % each
+   side), its right half turned over to the left like a page, one after another, each an accent colour; the name large in
+   the middle meanwhile. The last page, here, lands as a closed book does not: a dark spread stays open, and the name goes
+   to its place at the top as the button comes onto its right page. The pages are built by riffle() */
+.book { position: fixed; inset: 20%; }
+.book .half { position: absolute; top: 0; bottom: 0; width: 50%; }
+.book .leaf { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: 0 50%; transform-style: preserve-3d; }
+.book .leaf > .half { left: 0; width: 100%; backface-visibility: hidden; }
+.book .leaf > .verso { transform: rotateY(180deg); }
+.book .shade { position: absolute; inset: 0; background: #000; opacity: 0; } /* the light going off a page as it stands up */
+/* each page a pixel over the spine, so a turning one's soft edge lies over the page beside it, not the dark under it (as
+   the app's). Both faces from a pixel before the spine: a verso's turned over twice (on its own, and with its leaf), so
+   its spine side's where a recto's is */
+.book .leaf > .half { left: -1px; width: calc(100% + 1px); }
+.book > .half:first-child { width: calc(50% + 1px); }
+/* once it's open: the spine's shade, as the app's colour book has it */
+.book::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% - 16px); width: 32px; z-index: 1000; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, transparent, oklch(0 0 0 / 0.16) 40%, oklch(0 0 0 / 0.3) 50%, oklch(0 0 0 / 0.16) 60%, transparent); transition: opacity 0.6s var(--ease); }
+.book.open::after { opacity: 1; }
+/* the name, large in the middle, then drawn down to the logo's place (the logo itself shown once it's there) */
+.word { position: fixed; left: 0; top: 0; z-index: 1001; transform-origin: 0 0; white-space: nowrap; color: var(--ink); visibility: hidden; pointer-events: none;
+  font: 400 44px/1 var(--font-brand); letter-spacing: -0.01em; }
+.word.ready { visibility: visible; }
+.logo { visibility: hidden; }
+.logo.here { visibility: visible; }
+/* the right page, where the button is: over the book, in its right half */
+.page { position: fixed; top: 20%; bottom: 20%; left: 50%; right: 20%; z-index: 1001; display: grid; place-items: center; }
+.page .get, .note { opacity: 0; transition: opacity 0.6s var(--ease); }
+.page .get { transition: opacity 0.6s var(--ease), transform 0.2s var(--ease), background 0.2s, box-shadow 0.2s var(--ease); }
+.shown .page .get, .shown .note { opacity: 1; }
+/* a phone, up on end: the book narrower at its sides, taller, so a page still holds the button */
+@media (max-aspect-ratio: 3 / 4) { .book { inset: 24% 6%; } .page { top: 24%; bottom: 24%; right: 6%; } }
 </style>
 </head>
 <body>
-<header class="bar"><a class="logo" href="/">Pitchroom</a></header>
+<div class="book" id="book" aria-hidden="true"></div>
+<span class="word" id="word" aria-hidden="true">Pitchroom</span>
+<header class="bar"><a class="logo" id="logo" href="/">Pitchroom</a></header>
+<div class="page">
 <a class="get" id="get" href="https://github.com/freaktion-craft/pitchroom-releases/releases/latest">
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
   <span id="getLabel">Download</span>
 </a>
+</div>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
 <div class="tip" id="tip" role="status"></div>
 
@@ -120,6 +163,58 @@ document.getElementById("get").addEventListener("click", (e) => {
   tipTimer = setTimeout(() => tip.classList.remove("on"), 12000);
 });
 tip.addEventListener("click", () => tip.classList.remove("on"));
+
+// ---------- the riffle (js/app.js's welcome(), its RIFFLE as the app has it) ----------
+// slow off the thumb, then a rush, then slow again (the onsets bunched in the middle by bunch), the pages in the air
+// together; a beat (rest), and the last page on its own, slower (last). Then the name to the logo's place (slide).
+const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06, -0.04, 0.05, -0.06, 0.03, -0.05, 0.04],
+  pageEase: "cubic-bezier(0.38, 0, 0.12, 1)", rest: 200, last: 700, lastEase: "cubic-bezier(0.55, 0, 0.2, 1)",
+  slide: 760, slideEase: "cubic-bezier(0.65, 0, 0.2, 1)", shade: 0.32 };
+const ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "blue", "violet", "pink"]; // as the app has them (js/stage.js)
+async function riffle() {
+  const R = RIFFLE, book = document.getElementById("book"), word = document.getElementById("word"), logo = document.getElementById("logo");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches; // the open book at once, the name in its place
+  // black, the colours, then the open book's (its last page dark, not black: the book stays)
+  const colours = ["var(--bg)", ...ACCENTS.map((k) => `var(--voice-${k})`), "var(--surface)"], n = colours.length - 1;
+  await Promise.race([document.fonts.load(`400 44px "Geist Serif"`), new Promise((r) => setTimeout(r, 1500))]);
+  const place = (x, y, s = 1) => `translate(${x}px, ${y}px) scale(${s})`;
+  const mid = () => { const r = word.getBoundingClientRect(); return [(innerWidth - r.width) / 2, (innerHeight - r.height) / 2]; };
+  word.style.transform = place(...mid()); word.classList.add("ready");
+  const half = (i, cls, left) => {
+    const h = document.createElement("div"); h.className = "half " + cls; h.style.background = colours[i];
+    if (left != null) h.style.left = left;
+    h.append(Object.assign(document.createElement("i"), { className: "shade" }));
+    return h;
+  };
+  book.replaceChildren(half(0, "", "0"), half(n, "", "50%"));
+  const depth = `perspective(${Math.round(book.clientWidth * 2)}px)`; // a page's depth as it turns, for its size
+  const turn = (k, delay, duration, easing) => { // page k: colour k on its front (the right), k + 1 on its back
+    const leaf = document.createElement("div"); leaf.className = "leaf"; leaf.style.zIndex = 100 - k; leaf.dataset.k = k;
+    const front = half(k, "recto"), back = half(k + 1, "verso");
+    leaf.append(front, back); book.append(leaf);
+    const o = { duration, delay, easing, fill: "both" };
+    leaf.animate([{ transform: `${depth} rotateY(0deg)`, zIndex: 100 - k }, { transform: `${depth} rotateY(-90deg)`, zIndex: 100 - k, offset: 0.5 },
+      { transform: `${depth} rotateY(-90deg)`, zIndex: 200 + k, offset: 0.5 }, { transform: `${depth} rotateY(-180deg)`, zIndex: 200 + k }], o); // over the spine, it lies on those turned before it
+    front.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], o);
+    return back.lastChild.animate([{ opacity: R.shade }, { opacity: R.shade, offset: 0.5 }, { opacity: 0 }], o).finished.then(() => {
+      // once it's down, those down under it go: all their edges at the spine, a soft one over them let theirs show as a
+      // line. Only those down (a page can land before one turned ahead of it, still in the air) and under the top one
+      leaf.dataset.down = "1"; book.firstChild.style.visibility = "hidden";
+      const down = [...book.querySelectorAll(".leaf[data-down]")], top = Math.max(...down.map((l) => +l.dataset.k));
+      down.forEach((l) => { if (+l.dataset.k < top) l.style.visibility = "hidden"; });
+    });
+  };
+  const onset = (k) => { const x = k / (n - 2); return R.start + R.span * (x + R.bunch * Math.sin(2 * Math.PI * x) / (2 * Math.PI)); };
+  if (!still) for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase);
+  await turn(n - 1, still ? 0 : onset(n - 2) + R.page / 2 + R.rest, still ? 1 : R.last, R.lastEase);
+  [...book.querySelectorAll(".leaf")].slice(0, -1).forEach((p) => p.remove()); // the open book: the last page over the left, the dark right under it
+  book.classList.add("open"); document.body.classList.add("shown"); // and on its right page, the button
+  const to = logo.getBoundingClientRect(), from = word.getBoundingClientRect();
+  await word.animate([{ transform: place(...mid()) }, { transform: place(to.left, to.top, to.width / from.width) }],
+    { duration: still ? 1 : R.slide, easing: R.slideEase, fill: "forwards" }).finished;
+  logo.classList.add("here"); word.remove(); // the logo itself in its place, so it's a link and keeps to its column on a resize
+}
+riffle();
 </script>
 </body>
 </html>
