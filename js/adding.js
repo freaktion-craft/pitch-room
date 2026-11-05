@@ -116,8 +116,7 @@ function paintJobs() {
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
     else { const left = etaLeft(j); say(state, left == null ? "{stage}" : left < 60 ? "{stage} · under a minute left" : "{stage} · about {n} min left", { stage: () => tr(j.stage || ""), n: Math.round(left / 60) }); }
     paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, !j.done && !need && !err && !stopping && !stillMotion());
-    const open = row.querySelector(".lyr-open");
-    open.hidden = !need;
+    row.querySelector(".lyr-open").hidden = !need; // (not "open": that's the drawer's, read above, for one in that's seen)
     if (!need && !row.querySelector(".lyr-form").hidden) lyricsBox(row, false); // (pasted, or settled elsewhere)
     // cancel, or clear one that failed; once it's in, open it; one wanting its lyrics, let go without them
     const x = row.querySelector(".x"), kind = j.done ? "goTo" : "close";
