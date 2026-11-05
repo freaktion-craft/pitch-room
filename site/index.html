@@ -131,13 +131,49 @@ function tipAt() {
   const vertical = !/Mac/i.test(navigator.platform) && frameW >= 40 && frameH < 82; // a Mac's window buttons are at the left
   return vertical ? 268 : 96;
 }
-document.getElementById("get").addEventListener("click", (e) => {
-  if (!/\/releases\/download\//.test(e.currentTarget.href)) return;
-  tip.style.right = `${tipAt() - 38}px`;
+const showTip = () => {
   tip.textContent = ko ? "다운로드 중이에요. 여기서 열 수 있어요" : "Downloading. Open it from here";
   tip.classList.add("on");
   clearTimeout(tipTimer);
   tipTimer = setTimeout(() => tip.classList.remove("on"), 12000);
+};
+// the button gone up to where the download is: its words going as it draws in round its logo, a circle, then off up to
+// the browser's downloads icon (where the tip points), smaller, into the toolbar; the tip as it gets there, and the
+// button back in its place after. A copy flies (the button itself, its link and its download, as they are)
+const FLY = { shrink: 280, fly: 620, back: 900, size: 40 };
+let flying = false;
+async function fly(get) {
+  const r = get.getBoundingClientRect(), s = get.querySelector("svg").getBoundingClientRect(), t = get.querySelector("span").getBoundingClientRect(), D = FLY.size;
+  const ghost = get.cloneNode(true); ghost.removeAttribute("id"); ghost.removeAttribute("href"); ghost.setAttribute("aria-hidden", "true");
+  Object.assign(ghost.style, { position: "fixed", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
+    padding: "0", margin: "0", animation: "none", pointerEvents: "none", zIndex: 2000, overflow: "hidden" });
+  const [svg, label] = [ghost.querySelector("svg"), ghost.querySelector("span")];
+  // each where it is on the button now (its logo's nudge onto the text already in where it's measured)
+  Object.assign(svg.style, { position: "absolute", left: `${s.left - r.left}px`, top: `${s.top - r.top}px`, transform: "none" });
+  Object.assign(label.style, { position: "absolute", left: `${t.left - r.left}px`, top: `${t.top - r.top}px`, whiteSpace: "nowrap" });
+  document.body.append(ghost);
+  get.style.visibility = "hidden";
+  const shrink = { duration: FLY.shrink, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" };
+  label.animate([{ opacity: 1 }, { opacity: 0 }], { ...shrink, duration: FLY.shrink * 0.6 });
+  svg.animate([{ left: `${s.left - r.left}px` }, { left: `${(D - s.width) / 2}px` }], shrink);
+  await ghost.animate([{ left: `${r.left}px`, width: `${r.width}px` }, { left: `${r.left + (r.width - D) / 2}px`, width: `${D}px` }], shrink).finished;
+  // off up to the downloads icon: its middle to the top edge, under it, getting smaller, gone as it gets there
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2, tx = innerWidth - tipAt(), ty = 0;
+  await ghost.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${tx - cx}px, ${ty - cy}px) scale(0.35)`, opacity: 1, offset: 0.85 },
+    { transform: `translate(${tx - cx}px, ${ty - cy - 8}px) scale(0.2)`, opacity: 0 }], { duration: FLY.fly, easing: "cubic-bezier(0.55, 0, 0.25, 1)", fill: "forwards" }).finished;
+  ghost.remove();
+  showTip();
+  await new Promise((ok) => setTimeout(ok, FLY.back));
+  get.style.visibility = "";
+  get.animate([{ opacity: 0, filter: "blur(12px)" }, { opacity: 1, filter: "blur(0px)" }], { duration: 700, easing: "cubic-bezier(0.2, 0, 0, 1)" }); // back as it first came
+}
+document.getElementById("get").addEventListener("click", (e) => {
+  if (!/\/releases\/download\//.test(e.currentTarget.href)) return;
+  tip.style.right = `${tipAt() - 38}px`;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return showTip();
+  if (flying) return;
+  flying = true;
+  fly(e.currentTarget).finally(() => { flying = false; });
 });
 tip.addEventListener("click", () => tip.classList.remove("on"));
 </script>
