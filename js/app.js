@@ -182,7 +182,7 @@ function route() {
     t.classList.toggle("on", on); if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
   }
   paintTabLine();
-  showMicSet(view === "settings"); showEars(false);
+  showMicSet(view === "settings"); showEars(false); if (view !== "stems") showAdd(false); // (its drawer is out of the library's page)
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra);

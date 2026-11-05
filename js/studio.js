@@ -927,6 +927,7 @@ function initStems() {
   $("#sYtForm").onsubmit = submitYoutube;
   // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it
   const addPop = $("#addPop");
+  document.body.append($("#addVeil"), addPop); // over all the page, the list's blurred edges too (they're outside #app)
   // the close by the title: whichever panel the form is in (the ring's has it too), the focus back to what opened it
   $("#sAddClose").append(icon("close"));
   $("#sAddClose").onclick = (e) => {
