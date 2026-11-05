@@ -39,8 +39,10 @@ a { -webkit-user-drag: none; }
    solid block, smaller; the apple about as much ink, a little taller; Tux, open and fine, the largest */
 .get[data-os] { gap: 8px; padding-left: 16px; }
 .get[data-os="win"] svg { width: 13px; height: 13px; }
-.get[data-os="mac"] svg { width: 15px; height: 19px; margin-top: -2px; } /* (its leaf up above it: its body on the text's line) */
-.get[data-os="linux"] svg { width: 17px; height: 20px; margin-top: -1px; }
+/* and each set on the text by its body, not its box: the apple up a pixel (its leaf above it), Tux down (his head small,
+   his weight low: by his box he looked high) */
+.get[data-os="mac"] svg { width: 15px; height: 19px; transform: translateY(-1px); }
+.get[data-os="linux"] svg { width: 17px; height: 20px; transform: translateY(1.5px); }
 /* the line at the page's foot, 24 px up as the app's column is in from its sides */
 .note { position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
   margin: 0; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 13px/1.45 var(--font); }
