@@ -425,7 +425,7 @@ async function obTools() {
   const tb = TOOL_BOXES.map((t) => { const d = box(); say(d.querySelector("b"), t.name); say(d.querySelector("small"), t.what); return d; });
   let sb = null;
   if (OB.first) {
-    sb = box("song"); const img = el("img"); img.alt = ""; img.src = OB.first.art || ""; sb.prepend(img); sb.append(el("i", "bar"));
+    sb = box("song"); const img = el("img"); img.alt = ""; img.src = OB.first.art || ""; sb.prepend(img); sb.append(pixBar()); // (the drawer's pixels: adding.js)
     sb.querySelector("b").textContent = OB.first.title;
   }
   const paint = async () => {
@@ -443,7 +443,7 @@ async function obTools() {
       else if (OB.firstJob) try { j = await (await fetch("/api/jobs/" + OB.firstJob, { cache: "no-store" })).json(); } catch (e) { j = null; }
       const sst = sb.querySelector(".st"), line = sb.querySelector("small"), p = Math.round((j?.progress || 0) * 100);
       sb.dataset.st = j?.status === "done" ? "done" : j && (j.status === "running" || j.status === "queued") ? "getting" : "waiting";
-      sb.querySelector(".bar").style.width = (j?.status === "done" ? 100 : p) + "%";
+      paintPix(sb.querySelector(".px"), j?.status === "done" ? 1 : j?.progress || 0, j?.status === "running" && !stillMotion());
       if (OB.firstErr || j?.status === "error") { say(line, "Couldn’t add it: {err}", { err: () => tr(OB.firstErr || j?.error || "") }); say(sst, ""); done = true; }
       else if (j?.status === "done") { say(line, "In your library"); say(sst, "✓"); }
       else if (j) { say(line, "{stage} · {p}%", { stage: () => tr(j.stage || "Waiting"), p }); say(sst, ""); done = false; }
@@ -840,7 +840,7 @@ async function obSend({ url }) {
     showAdd(true); $("#sYtUrl").value = url; fitLinks(); $("#sYtForm").requestSubmit();
     return;
   }
-  const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" });
+  const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel(), ask: false }), { "Content-Type": "application/json" }); // (never stopped to ask which song: the first steps have nowhere to pick it)
   jobStarted(id, url);
   return id; // (followed in the first steps' last box: obTools)
 }

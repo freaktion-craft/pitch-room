@@ -250,7 +250,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "{url}: {why}": "{url}: {why}", "Waiting · {n} ahead": "대기 중 · 앞에 {n}곡", "Starting next…": "곧 시작해요…",
   "Originally {bpm} BPM": "원래 {bpm} BPM", "The song’s own speed is 100%": "원곡 속도가 100%예요", "Changing tempo… {pct}": "템포 바꾸는 중… {pct}",
   "Tempo (BPM)": "템포 (BPM)", "Speed (%)": "속도 (%)", "Getting the band at that tempo…": "그 템포의 반주를 준비하는 중…",
-  "Couldn’t change the tempo.": "템포를 바꾸지 못했어요.", "Search": "찾기", "Search LRCLIB": "LRCLIB에서 찾기", "Look again": "다시 찾기", "Paste lyrics": "가사 붙여넣기",
+  "Couldn’t change the tempo.": "템포를 바꾸지 못했어요.", "Search": "찾기", "Search LRCLIB": "LRCLIB에서 찾기", "Look again": "다시 찾기", "Paste lyrics": "가사 붙여넣기", "Other matches": "다른 후보", "Keep this name": "이 이름으로 계속", "Which song is it?": "어떤 곡인가요?", "Not sure which song this is · pick it below": "어떤 곡인지 확실하지 않아요 · 아래에서 골라 주세요", "Finding out which song it is": "어떤 곡인지 알아보는 중", "Which song it is": "어떤 곡인지", "Video’s own name": "영상 제목 그대로", "{pct}% sure": "{pct}% 확신",
   "Practise without lyrics": "가사 없이 연습", "Line them up with the voice": "목소리에 맞추기", "Use these": "이 가사 쓰기", "Searching…": "찾는 중…",
   "timed": "줄별 시간 있음", "words only": "가사만", "Play this line of the vocal track": "보컬 트랙에서 이 줄 듣기",
   "Paste the lyrics here, a line of the song to each line.": "가사를 여기에 붙여넣어 주세요. 한 줄에 노래 한 줄씩이요.",

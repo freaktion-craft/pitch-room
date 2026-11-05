@@ -414,7 +414,8 @@ html.welcome #boot, html.asking #welcome { display: none; }
 .ob-box[data-st="done"] .st { color: var(--voice); }
 .ob-box.song { grid-column: 1 / -1; grid-template-columns: auto 1fr; column-gap: var(--space-3); align-items: center; }
 .ob-box.song img { grid-row: 1 / 3; width: 32px; height: 32px; border-radius: var(--radius-sm); object-fit: cover; background: var(--fill); }
-.ob-box.song .bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--voice); transition: width 0.6s var(--ease); }
+.ob-box.song > .px { grid-column: 1 / -1; margin-top: var(--space-2); } /* the drawer's pixels (stems.css), the box's whole width under its name */
+.ob-box.song::after { content: none; } /* (no running line: the pixels say it) */
 #obDlState { font-variant-numeric: tabular-nums; }
 /* the steps' end (obFinale): the name over the right half opening; the cover's dust over all */
 #welcome.ob-finale .word { z-index: 5; }
