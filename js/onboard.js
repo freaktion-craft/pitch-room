@@ -603,7 +603,7 @@ function obFinaleCovers(step) {
 // each its own way (one, then the other) and the outer ones slower, as long as it goes on. More songs than places: the
 // oldest blurs out for the next. All in: they blur out, one after another, and the step says so (obRingsOut).
 // size: a cover's side; r0: the inner ring's radius; step: from a ring to the next; spin: the inner's turn, rad/s
-const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 92, spin: 0.16 };
+const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 118, spin: 0.16 };
 const FLOAT = { every: 140 }; // ms between several coming in at once
 function obRingOf(k) { // slot k: its ring, and its place round it
   let r = 0, cap = RING.first;
