@@ -1259,10 +1259,10 @@ function initSing() {
   // right, where the + it covers was
   const jobsBtn = $("#jobsBtn"), jobsPop = $("#jobsPop");
   document.body.append(jobsPop); jobsPop.setAttribute("aria-modal", "true");
-  $("#jobsClose").append(icon("close")); $("#jobsClose").onclick = (e) => { e.stopPropagation(); showJobs(false); jobsBtn.focus(); };
+  $("#jobsClose").append(icon("close")); $("#jobsClose").onclick = (e) => { e.stopPropagation(); showJobs(false); jobsBtn.focus({ preventScroll: true }); };
   jobsBtn.onclick = (e) => { e.stopPropagation(); showJobs(jobsPop.hidden); };
   document.addEventListener("click", (e) => { if (!jobsPop.hidden && !e.composedPath().includes(jobsPop)) showJobs(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !jobsPop.hidden) { showJobs(false); jobsBtn.focus(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !jobsPop.hidden) { showJobs(false); jobsBtn.focus({ preventScroll: true }); } });
   jobsPop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!jobsPop.hidden && to && !jobsPop.contains(to) && to !== jobsBtn) showJobs(false); });
   initYoutubeOffer();
   paintJobs(); // the ring is always there, empty while nothing's being added

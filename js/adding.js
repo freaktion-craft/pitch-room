@@ -325,11 +325,11 @@ function showAdd(on) {
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
   drawerEdge(pop, on);
 }
-// A drawer open: the page's scrollbar (its room always kept, base.css) in the drawer's colour, so the drawer meets the
-// window's edge; back once it's slid out (and the other isn't open)
+// A drawer open: the page's scrollbar away (its room kept, base.css), so the drawer meets the window's edge; back once
+// it's slid out (and the other isn't open)
 function drawerEdge(pop, on) {
   const html = document.documentElement, any = () => !$("#addPop").hidden || !$("#jobsPop").hidden;
-  if (on) html.classList.add("drawer-open");
+  if (on && !html.classList.contains("drawer-open")) { html.style.setProperty("--sbw", innerWidth - html.clientWidth + "px"); html.classList.add("drawer-open"); }
   else afterSlide(pop, () => html.classList.toggle("drawer-open", any()));
 }
 // The ring's panel has Add song too, so a song can be added from any page: the same form, moved into the panel under

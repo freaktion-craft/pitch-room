@@ -932,11 +932,11 @@ function initStems() {
   $("#sAddClose").append(icon("close"));
   $("#sAddClose").onclick = (e) => {
     e.stopPropagation();
-    if (addPop.contains($("#sAdd"))) { showAdd(false); $("#sAddBtn").focus(); } else showJobsAdd(false);
+    if (addPop.contains($("#sAdd"))) { showAdd(false); $("#sAddBtn").focus({ preventScroll: true }); } else showJobsAdd(false);
   };
   $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
   document.addEventListener("click", (e) => { if (!addPop.hidden && !e.composedPath().includes(addPop)) showAdd(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !addPop.hidden) { showAdd(false); if (!$("#sAddAt").hidden) $("#sAddBtn").focus(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !addPop.hidden) { showAdd(false); if (!$("#sAddAt").hidden) $("#sAddBtn").focus({ preventScroll: true }); } }); // (the focus back without scrolling the page to it)
   $("#pGetVideo").onclick = async () => {
     const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
     videoWait("Getting the video…");
