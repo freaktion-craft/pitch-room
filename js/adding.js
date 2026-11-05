@@ -74,8 +74,15 @@ function forgetAdded(songId) {
   for (const [id, j] of adding) if (j.done && j.songId === songId) { adding.delete(id); document.getElementById("job-" + id)?.remove(); gone = true; }
   if (gone) paintJobs();
 }
-// The songs being added: their panel a modal in the middle of the window, over the page dimmed (#addVeil, as Add
-// song's is); a click beside it or Escape closes it
+// Once a drawer's slide (in or out) is over: straight away if it isn't sliding
+function afterSlide(pop, fn) {
+  if (stillMotion() || !pop.getAnimations().some((a) => a.transitionProperty === "translate")) return fn();
+  const done = () => { pop.removeEventListener("transitionend", end); pop.removeEventListener("transitioncancel", end); clearTimeout(t); fn(); };
+  const end = (e) => { if (e.target === pop && e.propertyName === "translate") done(); };
+  const t = setTimeout(done, 450); pop.addEventListener("transitionend", end); pop.addEventListener("transitioncancel", end);
+}
+// The songs being added: their drawer at the window's right, over the page dimmed (#addVeil, as Add song's is); a
+// click beside it or Escape closes it
 function showJobs(on) {
   const was = !$("#jobsPop").hidden;
   $("#jobsPop").hidden = !on; $("#jobsBtn").setAttribute("aria-expanded", String(on));
@@ -83,7 +90,7 @@ function showJobs(on) {
   if (on) $("#addVeil").classList.add("on"); else if ($("#addPop").hidden) $("#addVeil").classList.remove("on"); // (after Add song's closing, which takes it off)
   else closeYt();
   if (!on && was) { // closed: the songs it showed as in have been seen
-    showJobsAdd(false);
+    afterSlide($("#jobsPop"), () => { if ($("#jobsPop").hidden) showJobsAdd(false); }); // the form back once it's out, not swapped as it goes
     for (const [id, j] of adding) if (j.done && j.seen) { adding.delete(id); document.getElementById("job-" + id)?.remove(); }
     paintJobs();
   }
@@ -280,8 +287,8 @@ async function addPicked() {
     closePlaylist(); $("#sYtUrl").value = ""; fitLinks(); addMsg(""); await tuckAway();
   } else { countPicked(); addMsg(failed.join("\n"), true); if (sent) landRing(); } // what didn't start stays ticked, to try again
 }
-// A song sent: the whole panel draws in, shrinking smoothly into the ring by the mic, where the songs being added
-// show; the page behind clears as it goes, and the ring comes in as it arrives (or gives a nudge, there already).
+// A song sent: the drawer slides back out, the page behind clearing, and the ring by the mic, where the songs being
+// added show, comes in (or gives a nudge, there already).
 // holdRing, before the first song's job shows: the ring keeps its place unseen until then.
 function holdRing() {
   const ring = $("#jobsBtn");
@@ -295,33 +302,24 @@ function landRing() {
     : [{ transform: "none" }, { transform: "scale(1.1)", offset: 0.4 }, { transform: "none" }], { duration: first ? 380 : 260, easing: "ease-out" });
 }
 async function tuckAway() {
-  const pop = $("#addPop"), ring = $("#jobsBtn");
-  if (!$("#jobsAdd").hidden) { showJobsAdd(false); landRing(); return; } // sent from the ring's panel: the form folds away there, the songs show in its place
-  if (stillMotion() || ring.hidden || pop.hidden) { showAdd(false); landRing(); return; }
-  const a = pop.getBoundingClientRect(), r = ring.getBoundingClientRect();
-  const dx = r.left + r.width / 2 - (a.left + a.width / 2), dy = r.top + r.height / 2 - (a.top + a.height / 2), s = r.width / a.width;
-  $("#addVeil").classList.remove("on");
-  const fly = pop.animate([
-    { transform: "none", opacity: 1, borderRadius: "12px" },
-    { transform: "scale(0.96)", offset: 0.16 }, // a breath in
-    { opacity: 1, offset: 0.6 },
-    { transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 0, borderRadius: `${Math.min(a.width, a.height) / 2}px` },
-  ], { duration: 560, easing: "cubic-bezier(0.55, 0, 0.25, 1)", fill: "forwards" });
-  await fly.finished.catch(() => {});
-  showAdd(false); fly.cancel();
+  const pop = $("#addPop");
+  if (!$("#jobsAdd").hidden) { showJobsAdd(false); landRing(); return; } // sent from the ring's drawer: the form folds away there, the songs show in its place
+  const open = !pop.hidden;
+  showAdd(false); // the drawer slides back out (its CSS), then the ring takes them
+  if (open) await new Promise((r) => afterSlide(pop, r));
   landRing();
 }
 function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, text); p.style.color = err ? "var(--bad)" : ""; }
 // The new songs' progress shows beside the mic; they land in the library.
 function jobStarted(id, name) { addingJob(id, { name, status: "queued", progress: 0 }); watchJob(id, "separate"); }
-// Add song: a panel under its button (an empty library's row opens it there too). It opens with the links field ready
+// Add song: a drawer at the window's right (an empty library's row opens it too). It opens with the links field ready
 // to type in; a click elsewhere, Escape or a song sent off closes it.
 let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
 function showAdd(on) {
   const pop = $("#addPop"), btn = $("#sAddBtn");
   if (on) showJobs(false);
   const was = !pop.hidden;
-  if (on) pop.append($("#sAdd"), $("#sAddSetup")); // back from the ring's panel, if it was there
+  if (on) { showJobsAdd(false); pop.append($("#sAdd"), $("#sAddSetup")); } // back from the ring's drawer, if it was there
   pop.hidden = !on; btn.setAttribute("aria-expanded", String(on));
   $("#addVeil").classList.toggle("on", on); $("#sAddAt").classList.toggle("open", on); // a click beside it closes it
   if (on && !was) requestAnimationFrame(() => { if (!$("#sAdd").hidden) $("#sYtUrl").focus(); });
@@ -359,20 +357,16 @@ function offerYoutube(links) {
   say($("#ytImport .yt-what > span"), list ? "Import playlist" : one ? "Import from YouTube" : "Import {n} from YouTube", { n: links.length });
   sub.textContent = one ? ytTitles.get(links[0]) || links[0].replace(/^https?:\/\/(www\.)?/, "") : "";
   $("#ytMenu").hidden = false; $("#jobsAddBtn").setAttribute("aria-expanded", "true");
-  placeYt(); $("#ytImport").focus();
+  $("#ytImport").focus({ preventScroll: true }); // (under Add song by its CSS: it comes in with the drawer)
   if (one && !list && !ytTitles.has(links[0])) {
     const ask = new AbortController(); setTimeout(() => ask.abort(), 4000);
     fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(links[0]), { signal: ask.signal })
       .then((r) => (r.ok ? r.json() : null)).then((j) => {
         if (!j?.title) return;
         ytTitles.set(links[0], j.title);
-        if (ytOffer === links) { sub.textContent = j.title; placeYt(); }
+        if (ytOffer === links) sub.textContent = j.title;
       }).catch(() => {});
   }
-}
-function placeYt() { // under Add song, their right edges together
-  const menu = $("#ytMenu"), r = $("#jobsAddBtn").getBoundingClientRect();
-  menu.style.top = `${r.bottom + floatGap()}px`; menu.style.left = `${Math.max(8, r.right - menu.offsetWidth)}px`;
 }
 function closeYt() {
   if (!ytOffer) return;

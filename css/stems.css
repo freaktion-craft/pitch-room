@@ -50,15 +50,17 @@
 #jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
 #jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */
-.jobs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 28px; }
+.jobs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 28px; margin: -6px 0; } /* as Add song's title row: the close at the right edge */
+.jobs-acts { display: flex; align-items: center; gap: var(--space-2); }
 #jobsPop > p { margin: 0; }
-#jobsPop.adding { width: min(420px, calc(100vw - 32px)); font-size: var(--text-md); } /* the form, as in its own panel */
-/* the panel a modal: in the middle of the window, over the page dimmed (#addVeil), as tall as it needs, scrolling past 80% */
-#jobsPop { position: fixed; left: 50%; top: 50%; right: auto; translate: -50% -50%; z-index: var(--z-modal); width: min(480px, calc(100vw - 32px)); max-height: 80vh; overflow-y: auto; }
+#jobsPop.adding { font-size: var(--text-md); } /* the form, as in its own drawer */
 #jobsList { display: grid; gap: var(--space-4); }
 #jobsList:empty { display: none; }
 /* a YouTube link copied: Add song (or a paste) offers it, named by its video's title */
 #ytMenu { width: max-content; max-width: min(340px, calc(100vw - 32px)); }
+/* under Add song, their right edges together, held there (it moves with the drawer as it slides in) */
+.jobs-add-at { position: relative; display: inline-flex; }
+.jobs-add-at > #ytMenu { position: absolute; top: calc(100% + var(--gap-float)); right: 0; left: auto; }
 #ytImport { height: auto; min-height: 36px; padding-block: var(--space-2); }
 .yt-what { display: grid; min-width: 0; }
 .yt-what small { color: var(--muted); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -237,12 +239,16 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
    typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
    to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. At the
    right, just before Add song. */
-/* Add song: a panel in the middle of the window (links, files, the options), the page dimmed behind it; not a page of its own */
+/* Add song, and the songs being added (the + by the mic): a drawer at the window's right, its full height (under the
+   Windows title bar), the page dimmed behind (#addVeil); in from the right and back out (display kept for the slide) */
 .add-at { position: relative; display: inline-flex; }
-#addPop { position: fixed; inset: 0; margin: auto; width: min(520px, calc(100vw - 32px)); height: fit-content;
-  max-height: calc(100dvh - 2 * var(--space-4)); overflow-y: auto; animation: add-in var(--duration-slow) var(--ease); }
-@keyframes add-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
-@media (prefers-reduced-motion: reduce) { #addPop { animation: none; } }
+#addPop, #jobsPop { position: fixed; top: calc(var(--titlebar, 0px) + var(--space-2)); right: var(--space-2); bottom: var(--space-2); left: auto;
+  width: min(440px, calc(100vw - 2 * var(--space-2))); margin: 0; z-index: var(--z-modal); align-content: start; overflow-y: auto; overscroll-behavior: contain; -webkit-app-region: no-drag;
+  transition: translate var(--duration-slow) var(--ease), opacity var(--duration-slow) var(--ease), display var(--duration-slow) allow-discrete; }
+html.desktop-mac :is(#addPop, #jobsPop) { top: calc(var(--space-6) + var(--space-2)); } /* under the Mac's strip that moves the window */
+#addPop[hidden], #jobsPop[hidden] { translate: calc(100% + var(--space-4)) 0; opacity: 0; pointer-events: none; }
+@starting-style { #addPop:not([hidden]), #jobsPop:not([hidden]) { translate: calc(100% + var(--space-4)) 0; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #addPop, #jobsPop { transition: none; } }
 .add-form { display: grid; gap: var(--space-3); }
 .add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0; } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
 .add-form p, #sAddSetup { margin: 0; }

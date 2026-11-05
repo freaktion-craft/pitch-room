@@ -74,8 +74,7 @@ const EMPTY_LIBRARY = false;
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
-    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b class="pop-title">Adding songs</b><button class="btn sm" id="jobsAddBtn" type="button">Add song</button></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div>
-      <div class="menu" id="ytMenu" role="menu" aria-label="Add song" hidden><button id="ytImport" type="button" role="menuitem"><span class="yt-what"><span>Import from YouTube</span><small id="ytTitle"></small></span></button><button id="ytOther" type="button" role="menuitem"><span>Another link or a file…</span></button></div></div>
+    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b class="pop-title">Adding songs</b><span class="jobs-acts"><span class="jobs-add-at"><button class="btn sm" id="jobsAddBtn" type="button">Add song</button><div class="menu" id="ytMenu" role="menu" aria-label="Add song" hidden><button id="ytImport" type="button" role="menuitem"><span class="yt-what"><span>Import from YouTube</span><small id="ytTitle"></small></span></button><button id="ytOther" type="button" role="menuitem"><span>Another link or a file…</span></button></div></span><button class="btn sm icon ghost" id="jobsClose" type="button" aria-label="Close" title="Close"></button></span></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div></div>
   </header>
 
   <main id="vPractice" aria-label="Practice" hidden>
@@ -249,7 +248,7 @@ const EMPTY_LIBRARY = false;
     <div id="libMast" aria-hidden="true"></div>
     <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
     <div id="addVeil" aria-hidden="true"></div>
-    <!-- Add song's panel (#sAddBtn opens it): in the middle of the window, over the veil, so it's here, not by its button -->
+    <!-- Add song's drawer (#sAddBtn opens it): at the window's right, over the veil, so it's here, not by its button -->
     <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
       <div class="add-form" id="sAdd" hidden>
         <div class="add-title"><b class="pop-title">Add a song</b><button class="btn sm icon ghost" id="sAddClose" type="button" aria-label="Close" title="Close"></button></div>

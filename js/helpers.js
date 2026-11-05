@@ -13,7 +13,7 @@ function resetOnDblClick(input, def) {
   input.title = tr("Double-click to reset"); // (again on a language switch: setLang)
   input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
 }
-// Every slider: only its handle can be grabbed (a press elsewhere on it doesn't jump the level there), and while it's
+// Every slider: a press anywhere on it (its track too, not just the handle) moves the handle there and holds it; while it's
 // held, or moved with the keys, a tip over the handle says the level: a volume out of 100 for full (up to 150), others
 // (data-tip="pos") as how far along they are, out of 100, and data-tip="ms" its value in ms, signed. It also keeps each slider's filled part (--p) in step.
 (function sliderTips() {
@@ -39,15 +39,13 @@ function resetOnDblClick(input, def) {
     tip.hidden = false;
     tip.style.left = thumbX(s) + "px"; tip.style.top = s.getBoundingClientRect().top - 2 + "px";
   }
-  const onHandle = (s, e) => Math.abs(e.clientX - thumbX(s)) <= THUMB / 2 + (e.pointerType === "touch" ? 10 : 4);
+  const over = (s, e) => { const r = s.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
   document.addEventListener("pointerdown", (e) => {
     const s = e.target.closest && e.target.closest('input[type="range"]');
     if (!s || s.disabled) return;
-    if (!onHandle(s, e)) { e.preventDefault(); return; } // not the handle
-    held = s; show(s);
+    held = s; hot(s, true); show(s); // (a press on the track: the value jumps there, its input moving the tip with it)
   }, true);
-  // over the handle (and while it's held): the pointer cursor, and the handle in a muted grey ("hot"); the plain cursor
-  // over the rest of it
+  // over it (and while it's held): the pointer cursor, and the handle in a muted grey ("hot")
   let hotOne = null;
   const hot = (s, on) => {
     s.style.cursor = on ? "pointer" : "default"; s.classList.toggle("hot", on);
@@ -56,11 +54,11 @@ function resetOnDblClick(input, def) {
   document.addEventListener("pointermove", (e) => {
     const s = e.target.closest && e.target.closest('input[type="range"]');
     if (hotOne && hotOne !== s && hotOne !== held) hot(hotOne, false); // left it (or it went away under the pointer)
-    if (s) hot(s, held === s || (!s.disabled && onHandle(s, e)));
+    if (s) hot(s, held === s || !s.disabled);
   }, { passive: true });
   document.addEventListener("pointerout", (e) => { if (e.target.matches?.('input[type="range"]') && held !== e.target) hot(e.target, false); }, true);
   document.addEventListener("input", (e) => { if (e.target === held || (e.target.matches?.('input[type="range"]') && e.target === document.activeElement && keyTimer)) show(e.target); }, true);
-  for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, (e) => { if (held) { const s = held; held = null; show(null); hot(s, e.type === "pointerup" && onHandle(s, e)); } }, true);
+  for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, (e) => { if (held) { const s = held; held = null; show(null); hot(s, e.type === "pointerup" && over(s, e)); } }, true);
   document.addEventListener("keydown", (e) => {
     const s = e.target;
     if (!s.matches || !s.matches('input[type="range"]') || !/^(Arrow|Page|Home|End)/.test(e.key)) return;
