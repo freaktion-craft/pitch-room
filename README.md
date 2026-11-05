@@ -12,7 +12,7 @@ Pitchroom as an app of its own: an installer, a window with its own icon, no ter
 |---|---|
 | macOS (Apple silicon) | `Pitchroom-…-mac-arm64.dmg` |
 | macOS (Intel) | `Pitchroom-…-mac-x64.dmg` |
-| Windows | `Pitchroom-…-win-x64.exe` |
+| Windows | `pitchroom_install.exe` |
 | Linux | `Pitchroom-…-linux-….AppImage` |
 
 Python comes inside it, so there's nothing else to install. The first time a song is added, it downloads the tools that split songs and read their melody and lyrics (3–4 GB, once), as the web version does.

@@ -66,9 +66,12 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "build/icon-win.png"
     },
     "nsis": {
+      "artifactName": "pitchroom_install.${ext}",
+      "installerIcon": "build/installerIcon.ico",
       "oneClick": true,
       "perMachine": false,
       "runAfterFinish": true,
@@ -79,7 +82,8 @@
       "target": [
         "AppImage"
       ],
-      "category": "Audio"
+      "category": "Audio",
+      "icon": "build/icon-win.png"
     },
     "publish": [
       {
