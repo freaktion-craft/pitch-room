@@ -13,7 +13,7 @@ function resetOnDblClick(input, def) {
   input.title = tr("Double-click to reset"); // (again on a language switch: setLang)
   input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
 }
-// Every slider: only its handle can be grabbed (a press elsewhere on it doesn't jump the level there), and while it's
+// Every slider: a press anywhere on it (its track too, not just the handle) moves the handle there and holds it; while it's
 // held, or moved with the keys, a tip over the handle says the level: a volume out of 100 for full (up to 150), others
 // (data-tip="pos") as how far along they are, out of 100, and data-tip="ms" its value in ms, signed. It also keeps each slider's filled part (--p) in step.
 (function sliderTips() {
@@ -39,15 +39,13 @@ function resetOnDblClick(input, def) {
     tip.hidden = false;
     tip.style.left = thumbX(s) + "px"; tip.style.top = s.getBoundingClientRect().top - 2 + "px";
   }
-  const onHandle = (s, e) => Math.abs(e.clientX - thumbX(s)) <= THUMB / 2 + (e.pointerType === "touch" ? 10 : 4);
+  const over = (s, e) => { const r = s.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
   document.addEventListener("pointerdown", (e) => {
     const s = e.target.closest && e.target.closest('input[type="range"]');
     if (!s || s.disabled) return;
-    if (!onHandle(s, e)) { e.preventDefault(); return; } // not the handle
-    held = s; show(s);
+    held = s; hot(s, true); show(s); // (a press on the track: the value jumps there, its input moving the tip with it)
   }, true);
-  // over the handle (and while it's held): the pointer cursor, and the handle in a muted grey ("hot"); the plain cursor
-  // over the rest of it
+  // over it (and while it's held): the pointer cursor, and the handle in a muted grey ("hot")
   let hotOne = null;
   const hot = (s, on) => {
     s.style.cursor = on ? "pointer" : "default"; s.classList.toggle("hot", on);
@@ -56,11 +54,11 @@ function resetOnDblClick(input, def) {
   document.addEventListener("pointermove", (e) => {
     const s = e.target.closest && e.target.closest('input[type="range"]');
     if (hotOne && hotOne !== s && hotOne !== held) hot(hotOne, false); // left it (or it went away under the pointer)
-    if (s) hot(s, held === s || (!s.disabled && onHandle(s, e)));
+    if (s) hot(s, held === s || !s.disabled);
   }, { passive: true });
   document.addEventListener("pointerout", (e) => { if (e.target.matches?.('input[type="range"]') && held !== e.target) hot(e.target, false); }, true);
   document.addEventListener("input", (e) => { if (e.target === held || (e.target.matches?.('input[type="range"]') && e.target === document.activeElement && keyTimer)) show(e.target); }, true);
-  for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, (e) => { if (held) { const s = held; held = null; show(null); hot(s, e.type === "pointerup" && onHandle(s, e)); } }, true);
+  for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, (e) => { if (held) { const s = held; held = null; show(null); hot(s, e.type === "pointerup" && over(s, e)); } }, true);
   document.addEventListener("keydown", (e) => {
     const s = e.target;
     if (!s.matches || !s.matches('input[type="range"]') || !/^(Arrow|Page|Home|End)/.test(e.key)) return;
@@ -71,7 +69,7 @@ function resetOnDblClick(input, def) {
     });
   }, true);
   document.addEventListener("focusout", (e) => { if (e.target.matches?.('input[type="range"]') && !held) show(null); }, true);
-  addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true });
+  addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true, capture: true }); // (a box scrolled too: Settings' list)
 })();
 
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
@@ -161,7 +159,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   // a click elsewhere closes it (the path, not contains(): a click on a row that redraws the list leaves its target out)
   document.addEventListener("click", (e) => { const path = e.composedPath(); if (!list.hidden && !path.includes(list) && !path.includes(btn)) show(false); });
   addEventListener("resize", () => show(false));
-  addEventListener("scroll", () => show(false), { passive: true }); // it's fixed in place; the button isn't
+  addEventListener("scroll", (e) => { if (!list.contains(e.target)) show(false); }, { passive: true, capture: true }); // it's fixed in place; the button isn't (the page scrolled, or a box it's in: Settings' list; not its own)
   const pick = {
     set(next, v) { items = next; value = v; paint(); if (!list.hidden) show(true); },
     get value() { return value; },
@@ -213,7 +211,6 @@ Object.assign(ICONS, {
   chevronDown: '<path d="M18 9.00005C18 9.00005 13.5811 15 12 15C10.4188 15 6 9 6 9"/>', // ArrowDown01
   mic: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C15.8824 18 18.7174 15.3914 19 12M12 22H15M12 22H9"/><path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6V11C16 13.2091 14.2091 15 12 15C9.79086 15 8 13.2091 8 11V6Z"/>', // Mic02
   micOff: '<path d="M12 18V22M12 18H11.5208C8.11765 18 5.28262 15.3914 5 12M12 18H12.4792C14.0193 18 15.443 17.4658 16.5665 16.5665M12 22H15M12 22H9M19 12C18.93 12.8406 18.7031 13.6331 18.3497 14.3497"/><path d="M8.3535 4.3535C8.98114 2.96566 10.3778 2 12 2C14.2091 2 16 3.79086 16 6V11C16 11.309 15.965 11.6098 15.8987 11.8987M8 8V11C8 13.2091 9.79086 15 12 15C12.8492 15 13.6365 14.7354 14.2841 14.2841"/><path d="M2 2L22 22"/>', // MicOff02
-  voice: '<g transform="translate(0.75 0.75)"><path d="M3 9C3 6.17157 3 4.75736 3.87868 3.87868C4.75736 3 6.17157 3 9 3H15C17.8284 3 19.2426 3 20.1213 3.87868C21 4.75736 21 6.17157 21 9V15C21 17.8284 21 19.2426 20.1213 20.1213C19.2426 21 17.8284 21 15 21H9C6.17157 21 4.75736 21 3.87868 20.1213C3 19.2426 3 17.8284 3 15V9Z"/><path d="M12 3V21M3 12H21"/><circle cx="16.5" cy="7.5" r="1.5"/></g>', // the chest & head pad, a dot on it; half a pixel over at 16 px (0.75 of 24), so its straight lines fall on pixels' middles, not between two (blurred over both on a 1× screen)
   back: '<path d="M5.5 12.002H19"/><path d="M10.9999 18.002C10.9999 18.002 4.99998 13.583 4.99997 12.0019C4.99996 10.4208 11 6.00195 11 6.00195"/>', // ArrowLeft02
   goTo: '<path d="M9 6.65032C9 6.65032 15.9383 6.10759 16.9154 7.08463C17.8924 8.06167 17.3496 15 17.3496 15M16.5 7.5L6.5 17.5"/>', // ArrowUpRight01
   headphones: '<path d="M20.0849 17C20.5849 15.5 21 13.4368 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 13.4368 3.41512 15.5 3.91512 17"/><path d="M8.97651 19.6043L7.23857 14.6127C7.05341 14.1466 6.4617 13.9131 5.97493 14.0297C4.46441 14.5333 3.6462 16.1718 4.14742 17.6895L4.58543 19.0158C5.08664 20.5334 6.71747 21.3555 8.22799 20.8519C8.68896 20.6556 9.10449 20.0897 8.97651 19.6043Z"/><path d="M15.0235 19.6043L16.7614 14.6127C16.9466 14.1466 17.5383 13.9131 18.0251 14.0297C19.5356 14.5333 20.3538 16.1718 19.8526 17.6895L19.4146 19.0158C18.9134 20.5334 17.2825 21.3555 15.772 20.8519C15.311 20.6556 14.8955 20.0897 15.0235 19.6043Z"/>', // Headphones
@@ -224,7 +221,6 @@ Object.assign(ICONS, {
   gpu: '<path d="M4 12C4 8.22876 4 6.34315 5.17157 5.17157C6.34315 4 8.22876 4 12 4C15.7712 4 17.6569 4 18.8284 5.17157C20 6.34315 20 8.22876 20 12C20 15.7712 20 17.6569 18.8284 18.8284C17.6569 20 15.7712 20 12 20C8.22876 20 6.34315 20 5.17157 18.8284C4 17.6569 4 15.7712 4 12Z"/><path d="M9.5 2V4"/><path d="M14.5 2V4"/><path d="M9.5 20V22"/><path d="M14.5 20V22"/><path d="M13 9L9 13"/><path d="M15 13L13 15"/><path d="M22 14.5L20 14.5"/><path d="M4 9.5L2 9.5"/><path d="M4 14.5L2 14.5"/><path d="M22 9.5L20 9.5"/>', // Cpu
   studio: '<path d="M3.99963 5.00055L9.99963 5.00031"/><path d="M12.9996 5.00031L19.9996 5.00031"/><path d="M15.9996 9.00031L15.9996 15.0003"/><path d="M9.99963 2.00031L9.99963 8.00031"/><path d="M11.9996 16.0003L11.9996 22.0003"/><path d="M15.9996 12.0001L19.9996 12.0003"/><path d="M3.99963 12.0005L12.9996 12.0003"/><path d="M11.9996 19.0003L19.9996 19.0003"/><path d="M3.99963 19.0005L8.99963 19.0003"/>', // SlidersHorizontal
   loop: '<path d="M16.3884 3L17.3913 3.97574C17.8393 4.41165 18.0633 4.62961 17.9844 4.81481C17.9056 5 17.5888 5 16.9552 5H9.19422C5.22096 5 2 8.13401 2 12C2 13.4872 2.47668 14.8662 3.2895 16"/><path d="M7.61156 21L6.60875 20.0243C6.16074 19.5883 5.93673 19.3704 6.01557 19.1852C6.09441 19 6.4112 19 7.04478 19H14.8058C18.779 19 22 15.866 22 12C22 10.5128 21.5233 9.13383 20.7105 8"/>', // Repeat
-  settings: '<path d="M15.5 12C15.5 13.933 13.933 15.5 12 15.5C10.067 15.5 8.5 13.933 8.5 12C8.5 10.067 10.067 8.5 12 8.5C13.933 8.5 15.5 10.067 15.5 12Z"/><path d="M21.011 14.0965C21.5329 13.9558 21.7939 13.8854 21.8969 13.7508C22 13.6163 22 13.3998 22 12.9669V11.0332C22 10.6003 22 10.3838 21.8969 10.2493C21.7938 10.1147 21.5329 10.0443 21.011 9.90358C19.0606 9.37759 17.8399 7.33851 18.3433 5.40087C18.4817 4.86799 18.5509 4.60156 18.4848 4.44529C18.4187 4.28902 18.2291 4.18134 17.8497 3.96596L16.125 2.98673C15.7528 2.77539 15.5667 2.66972 15.3997 2.69222C15.2326 2.71472 15.0442 2.90273 14.6672 3.27873C13.208 4.73448 10.7936 4.73442 9.33434 3.27864C8.95743 2.90263 8.76898 2.71463 8.60193 2.69212C8.43489 2.66962 8.24877 2.77529 7.87653 2.98663L6.15184 3.96587C5.77253 4.18123 5.58287 4.28891 5.51678 4.44515C5.45068 4.6014 5.51987 4.86787 5.65825 5.4008C6.16137 7.3385 4.93972 9.37763 2.98902 9.9036C2.46712 10.0443 2.20617 10.1147 2.10308 10.2492C2 10.3838 2 10.6003 2 11.0332V12.9669C2 13.3998 2 13.6163 2.10308 13.7508C2.20615 13.8854 2.46711 13.9558 2.98902 14.0965C4.9394 14.6225 6.16008 16.6616 5.65672 18.5992C5.51829 19.1321 5.44907 19.3985 5.51516 19.5548C5.58126 19.7111 5.77092 19.8188 6.15025 20.0341L7.87495 21.0134C8.24721 21.2247 8.43334 21.3304 8.6004 21.3079C8.76746 21.2854 8.95588 21.0973 9.33271 20.7213C10.7927 19.2644 13.2088 19.2643 14.6689 20.7212C15.0457 21.0973 15.2341 21.2853 15.4012 21.3078C15.5682 21.3303 15.7544 21.2246 16.1266 21.0133L17.8513 20.034C18.2307 19.8187 18.4204 19.711 18.4864 19.5547C18.5525 19.3984 18.4833 19.132 18.3448 18.5991C17.8412 16.6616 19.0609 14.6226 21.011 14.0965Z"/>', // Settings02
   record: '<circle cx="12" cy="12" r="8"/>', // Record
   compare: '<path d="M19 9H6.65856C5.65277 9 5.14987 9 5.02472 8.69134C4.89957 8.38268 5.25517 8.01942 5.96637 7.29289L8.21091 5"/><path d="M5 15H17.3414C18.3472 15 18.8501 15 18.9753 15.3087C19.1004 15.6173 18.7448 15.9806 18.0336 16.7071L15.7891 19"/>', // Arrow Data Transfer Horizontal
   retry: '<path d="M18.8078 3.5V6.1624C18.8078 6.4121 18.4955 6.5252 18.3356 6.3333C16.7792 4.5944 14.5174 3.5 12 3.5C7.3056 3.5 3.5 7.3056 3.5 12C3.5 16.6944 7.3056 20.5 12 20.5C16.6944 20.5 20.5 16.6944 20.5 12"/>', // Refresh, drawn at 85 % about the centre: as the set has it, its ring fills the box edge to edge (20 of 24) and looks a size up on the icons beside it

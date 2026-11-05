@@ -30,6 +30,18 @@ function resize() {
   K.lyAt = null;
 }
 new ResizeObserver(() => { resize(); if (K.on && view === "practice") practiceFrame(); }).observe(cv);
+// The stage as tall as leaves the keyboard under it inside the window (the page at its top), between min and max: a
+// shorter window, a shorter stage, rather than the keyboard out of sight below it (the desktop app's window is no
+// shorter than gives it min: desktop/main.js). foot: room under the keyboard. As the window or what's over it changes.
+const STAGE = { min: 320, max: 640, foot: 16 };
+function fitStage() {
+  if (view !== "practice") return;
+  const st = $("#stage"), r = st.getBoundingClientRect(), below = $("#keysWrap").getBoundingClientRect().bottom - r.bottom;
+  const h = Math.max(STAGE.min, Math.min(STAGE.max, Math.floor(innerHeight - (r.top + scrollY) - below - STAGE.foot)));
+  if (Math.round(r.height) !== h) st.style.height = h + "px";
+}
+addEventListener("resize", fitStage);
+{ const ro = new ResizeObserver(() => fitStage()); ro.observe($("#songBar")); ro.observe($("#keysWrap")); for (const n of document.querySelectorAll("#vPractice .tl-row, #vPractice .backbar")) ro.observe(n); }
 readColors();
 
 // accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked from the
@@ -169,12 +181,13 @@ function draw(now, cur, hist, evs, guide) {
 }
 
 // Practice's aurora: the band's spectrum as a glow rising from the bottom of the window while the song plays, behind
-// the page, mostly in your colour with a neighbouring hue or two in it. AUR.n bands from 60 Hz to 8 kHz, low on the
+// the page, in your colour (its own hue throughout, some bands lighter, some deeper). AUR.n bands from 60 Hz to 8 kHz, low on the
 // left; each swells and sinks back slowly, its curtain swaying a little, faint enough to stay out of the way. Drawn into a 64 × 40 canvas that CSS
-// stretches across the window and blurs, so it costs next to nothing; off with reduced motion, and outside Practice.
+// stretches across the window and blurs, so it costs next to nothing; off with reduced motion, outside Practice, and
+// when it's turned off in the settings (S.aurora).
 const AUR = { n: 28, lv: new Float32Array(28), cv: $("#aurora"), fft: null, voice: "", hues: [], still: matchMedia("(prefers-reduced-motion: reduce)") };
 function drawAurora() {
-  const on = K.on && view === "practice" && !!bandTap && !AUR.still.matches; // (matches is live: no new list a frame)
+  const on = S.aurora && K.on && view === "practice" && !!bandTap && !AUR.still.matches; // (matches is live: no new list a frame); off in the settings: none
   AUR.cv.classList.toggle("on", on);
   if (!on) return;
   const a = AUR, fft = a.fft || (a.fft = new Uint8Array(bandTap.frequencyBinCount)), hz = ac.sampleRate / bandTap.fftSize;
@@ -189,17 +202,20 @@ function drawAurora() {
     if (a.lv[i] > 0.01) any = true;
   }
   if (!any) { a.cv.getContext("2d").clearRect(0, 0, a.cv.width, a.cv.height); return; }
-  if (a.voice !== C.voice) { // your colour, and two hues either side of it
+  if (a.voice !== C.voice) { // your colour, all of it in its own hue: as it is, a little lighter and softer, a little deeper
     a.voice = C.voice;
-    const m = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(C.voice) || [0, 0.68, 0.17, 262];
-    a.hues = [[+m[1], +m[2], +m[3]], [+m[1] + 0.04, +m[2] * 0.9, +m[3] - 45], [+m[1] - 0.02, +m[2], +m[3] + 40]];
+    // (as written in tokens.css, or as the desktop app's minified copy has it: lightness and chroma as percentages,
+    // oklch(87% 0 0); a hue "none". Not read at all: a neutral grey, not some colour of its own)
+    const m = /oklch\(\s*([\d.]+)(%?)\s+([\d.]+)(%?)\s+([\d.]+|none)/.exec(C.voice);
+    const L = m ? +m[1] / (m[2] ? 100 : 1) : 0.87, Ch = m ? +m[3] * (m[4] ? 0.004 : 1) : 0, H = m && m[5] !== "none" ? +m[5] : 0;
+    a.hues = [[L, Ch, H], [L + 0.05, Ch * 0.8, H], [L - 0.04, Ch, H]];
   }
   const c = a.cv.getContext("2d"), cw = a.cv.width, ch = a.cv.height, t = performance.now() / 1000;
   c.clearRect(0, 0, cw, ch); c.globalCompositeOperation = "lighter"; c.filter = "blur(1.5px)"; // curtains run into each other
   for (let i = 0; i < a.n; i++) {
     const v = a.lv[i] ** 1.4, hgt = v * ch;
     if (hgt < 0.5) continue;
-    const [L, C2, Hh] = a.hues[i % 7 === 3 ? 1 : i % 5 === 1 ? 2 : 0]; // mostly your colour
+    const [L, C2, Hh] = a.hues[i % 7 === 3 ? 1 : i % 5 === 1 ? 2 : 0]; // mostly your colour as it is
     const cx = ((i + 0.5) / a.n) * cw + Math.sin(t * 0.35 + i * 1.9) * 0.4, half = (cw / a.n) * 1.8;
     const grad = c.createLinearGradient(0, ch, 0, ch - hgt);
     grad.addColorStop(0, `oklch(${L} ${C2} ${Hh} / ${0.5 * v + 0.1})`); grad.addColorStop(1, `oklch(${L} ${C2} ${Hh} / 0)`);

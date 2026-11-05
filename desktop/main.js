@@ -6,7 +6,7 @@
 //   macOS    ~/Library/Application Support/Pitchroom
 //   Windows  %APPDATA%\Pitchroom
 // Closing the window quits, and stops the server with it (after asking, while a song is being added).
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, session, shell, systemPreferences } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, screen, session, shell, systemPreferences } = require("electron");
 const { spawn, execFile } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -17,6 +17,13 @@ const RELEASES = "freaktion-craft/pitchroom-releases"; // public, the installers
 const PORTS = [5278, 5298]; // a range of its own, so a copy started from the repo (5178…) is never taken for this one
 const BG = "#0e0e0e"; // --bg, oklch(0.165 0 0): the window before the page paints
 const win32 = process.platform === "win32";
+const TITLEBAR = 32; // Windows: the window's buttons' strip over the page, px (--titlebar, base.css)
+
+// Pitchroom WIP (scripts/wip.ps1): the app as the repo has it at that moment, unreleased work and all, made into a
+// folder of its own (no installer) under another name, so it's an app apart: its own folder for what's yours (the
+// library, the tools, the settings: %APPDATA%\Pitchroom WIP), its own lock; never updated to a release. package.json's
+// "wip" (put in as it's made): which commit it was made from.
+const WIP = app.isPackaged ? require("./package.json").wip || "" : "";
 
 const DATA = app.getPath("userData");
 const CODE = app.isPackaged ? path.join(process.resourcesPath, "app-code") : path.resolve(__dirname, "..");
@@ -121,18 +128,33 @@ async function serverStopped(code) {
 
 // ---------- the window ----------
 function savedBounds() { try { return JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { return {}; } }
+// The page no smaller than PAGE_MIN: 1440 wide, and tall enough for Practice's keyboard under its stage at the least
+// the stage goes to (fitStage, js/stage.js: 865 at 1440 wide; a little more under macOS's buttons). The window's frame
+// on top of that; on a screen too small for it, the screen's room.
+const PAGE_MIN = { w: 1440, h: 880 };
+function fitMinimum(w) {
+  const [ow, oh] = w.getSize(), [cw, ch] = w.getContentSize(), room = screen.getDisplayMatching(w.getBounds()).workAreaSize;
+  const mw = Math.min(room.width, PAGE_MIN.w + ow - cw), mh = Math.min(room.height, PAGE_MIN.h + oh - ch);
+  w.setMinimumSize(mw, mh);
+  if (!w.isMaximized() && (ow < mw || oh < mh)) w.setSize(Math.max(ow, mw), Math.max(oh, mh)); // a size kept from smaller, up to it
+}
 function createWindow() {
-  const b = savedBounds();
+  const b = savedBounds(), room = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: b.width || 1280, height: b.height || 860, x: b.x, y: b.y, minWidth: 720, minHeight: 560,
-    title: "Pitchroom", backgroundColor: BG, show: false, autoHideMenuBar: true,
+    width: b.width || Math.min(room.width, 1520), height: b.height || Math.min(room.height, 960), x: b.x, y: b.y,
+    title: app.name, backgroundColor: BG, show: false, autoHideMenuBar: true,
     // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
-    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" } : {}),
+    // Windows: no title bar of the system's either, its three buttons drawn over the page's top right corner, on the
+    // page's black, as tall as the strip along the top that moves the window (html.desktop-win, base.css)
+    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" }
+      : win32 ? { titleBarStyle: "hidden", titleBarOverlay: { color: "#00000000", symbolColor: "#ebebeb", height: TITLEBAR } } : {}), // (clear: on what's there, the first steps' picture too)
     // DevTools in development only: a released app has no way into its page
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });
+  fitMinimum(win); win.on("moved", () => fitMinimum(win)); // (another screen, another room)
+  if (WIP) win.on("page-title-updated", (e) => { e.preventDefault(); win.setTitle(`Pitchroom WIP · ${WIP}`); }); // told apart from the release in the taskbar, and which it is
   if (b.maximized) win.maximize();
-  const ours = (url) => { try { const u = new URL(url); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
+  const ours =(url) => { try { const u = new URL(url); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
   win.webContents.on("will-navigate", (e, url) => { if (!ours(url)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
   win.once("ready-to-show", () => { win.show(); closeSplash(); });
@@ -163,7 +185,7 @@ async function requestQuit() {
 async function busy() { // a song being added, or the tools being installed
   try {
     const [jobs, st] = await Promise.all(["/api/jobs", "/api/stems/status"].map((p) => fetch(`http://127.0.0.1:${port}${p}`).then((r) => r.json())));
-    return jobs.length > 0 || st?.install?.status === "running";
+    return jobs.some((j) => j.status === "queued" || j.status === "running") || st?.install?.status === "running"; // (not one only waiting for its lyrics pasted)
   } catch { return false; }
 }
 
@@ -186,7 +208,7 @@ function permissions() {
 // Windows and the Linux AppImage update themselves, in the splash before the engine starts: the latest release's
 // latest.yml looked up (≤ 5 s, or it's skipped this time), a newer version downloaded, installed silently and opened.
 // macOS can't till the app's signed (Squirrel.Mac checks the signature): a newer release is offered as a download.
-const SELF_UPDATES = app.isPackaged && (win32 || (process.platform === "linux" && !!process.env.APPIMAGE));
+const SELF_UPDATES = app.isPackaged && !WIP && (win32 || (process.platform === "linux" && !!process.env.APPIMAGE)); // (WIP: never a release over it)
 const within = (ms, p) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(`no answer in ${ms / 1000} s`)), ms))]);
 async function updateFirst() { // true: it's installing, the app's about to quit
   autoUpdater.autoDownload = false;
@@ -298,6 +320,6 @@ else {
     }
     permissions();
     createWindow();
-    if (!SELF_UPDATES) setTimeout(() => checkUpdates(false), 8000);
+    if (!SELF_UPDATES && !WIP) setTimeout(() => checkUpdates(false), 8000);
   });
 }

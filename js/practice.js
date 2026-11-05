@@ -405,7 +405,13 @@ function notesText() {
   return [`Notes from Pitchroom's Practice: ${[m.artist, m.title].filter(Boolean).join(" – ")} · id ${m.id}`,
     ...NOTE.list.map((n) => `${tc(n.t)} · ${n.text || "(no words)"}${n.line ? ` · line showing: "${n.line}"` : ""}`)].join("\n");
 }
-function paintCopy() { $("#kMarks").disabled = !NOTE.list.length && !(S.dev && K.marks.length); $("#kNotesClear").disabled = !NOTE.list.length; }
+// The notes (T, the pins, copying and clearing them) are a developer's, there with Developer tools on (S.dev) only:
+// off, they're kept, out of sight, and back as they were once it's on again
+function paintCopy() {
+  $("#kMarks").hidden = $("#kNotesClear").hidden = $("#kPins").hidden = !S.dev;
+  say($("#kTl"), S.dev ? "Click or drag to move through the song · T leaves a note here" : "Click or drag to move through the song", null, "title");
+  $("#kMarks").disabled = !NOTE.list.length && !(S.dev && K.marks.length); $("#kNotesClear").disabled = !NOTE.list.length;
+}
 // Clear: the song's notes off, for a new round (asked twice; the server keeps the old round beside them, set_notes)
 function clearNotes() {
   const b = $("#kNotesClear"), calm = () => { b.classList.remove("arm"); say(b, "Clear this song’s notes", null, "title"); };
@@ -546,7 +552,8 @@ function lyricsFor(m, lyr) {
   say($("#stage .plot"), K.lyrics ? "Lyrics off? , . move this line, [ ] all of them, 50 ms a press\nShift+, Shift+. put its start on the voice" : "", null, "title");
   K.lyrNone = !!data && !data.lines && !data.dropped; // none on LRCLIB: looking again finds none again, so they're pasted in
   K.tick = null; K.lyrOff = (data && data.offLines) || 0; // a good share of them not sung here (stems._off_lines): said, nothing moved
-  K.lyricMsg = null;
+  // none (not found, or never looked for), and none on the way: said, with where they're found (no Find button here)
+  K.lyricMsg = lyr && !K.lyrics && !(data && data.dropped) && !lyr.job ? { t: K.lyrNone ? "No lyrics found for this song." : "No lyrics for this song yet.", find: true } : null;
   if (lyr && lyr.job) { if (!lyricJobs.has(m.id)) lyricJobs.set(m.id, { t: "Looking for the lyrics…" }); watchJob(lyr.job, "lyrics", m.id); } // being found from the Info page
 }
 async function startLyrics(id, how) {
@@ -747,7 +754,7 @@ function paintLyrBtn() {
   $("#kEdit").disabled = !K.lyrics; if (!K.lyrics && ED.on) edOpen(false); // (Edit: the lyrics' timing)
   b.dataset.key = key;
   const w0 = b.hidden ? 0 : b.offsetWidth;
-  b.hidden = !id || !!K.lyrics;
+  b.hidden = true; // (gone: finding them is part of adding a song now, its drawer asking for them pasted where none are found; or on its Info page)
   if (b.hidden) return;
   b.classList.toggle("busy", busy); b.setAttribute("aria-busy", String(busy));
   b.replaceChildren(...(busy ? [progRing(0), tr("Finding lyrics…")] : [tr(K.lyrNone ? "Paste lyrics" : "Find lyrics")]));
@@ -1036,9 +1043,10 @@ async function singSong(m, btn) {
   await loadTakes(m); // in first, so Practice opens with its takes beside it, rather than them pushing in after
   go("practice");
 }
-// Settings: a page of their own (#settings, route): going out, their lists closed and Hear yourself off
+// Settings: a page of their own (#settings, route): going out, their lists closed
 function showMicSet(on) {
-  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); hearMe(false); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
+  document.documentElement.classList.toggle("set-view", on); fitSettings();
+  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
 }
 // Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
 // and models beside them, copied in by the server (stems.start_import). Its line says how it's going, then how it went;
@@ -1074,30 +1082,35 @@ let setGroups = [];
 function paintSetNav(at) {
   if (view !== "settings" || !setGroups.length) return;
   if (at == null) {
-    const line = innerHeight * 0.4;
-    at = setGroups.findIndex((g) => g.getBoundingClientRect().bottom > line);
-    if (at < 0 || (scrollY > 0 && innerHeight + scrollY >= document.documentElement.scrollHeight - 2)) at = setGroups.length - 1;
+    const box = $("#micSet"), r = box.getBoundingClientRect(), line = r.top + r.height * 0.4; // (40 % down what's shown of them)
+    if (box.scrollHeight <= box.clientHeight + 1) { // all in view, nothing to scroll: the one picked stays lit (the first, to begin with)
+      at = Math.max(0, [...$("#setNav").querySelectorAll("button")].findIndex((b) => b.getAttribute("aria-current") === "true"));
+    } else {
+      at = setGroups.findIndex((g) => g.getBoundingClientRect().bottom > line);
+      if (at < 0 || (box.scrollTop > 0 && box.scrollTop + box.clientHeight >= box.scrollHeight - 2)) at = setGroups.length - 1;
+    }
   }
   $("#setNav").querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-current", String(i === at)));
 }
+// The settings the only thing on their page that scrolls (html.set-view): their list as tall as leaves it in the
+// window, the header, the crumbs and the list of groups beside it still; the wheel anywhere on the page scrolls it
+function fitSettings() {
+  const box = $("#micSet");
+  if (view !== "settings") { box.style.height = ""; return; }
+  box.style.height = Math.max(240, Math.floor(innerHeight - (box.getBoundingClientRect().top + scrollY))) + "px";
+}
 function initSetNav() {
-  const btns = [...$("#setNav").querySelectorAll("button")];
+  const btns = [...$("#setNav").querySelectorAll("button")], box = $("#micSet");
   setGroups = btns.map((b) => $("#" + b.dataset.to).closest(".set-group"));
   btns.forEach((b, i) => { b.onclick = () => { setGroups[i].scrollIntoView({ behavior: stillMotion() ? "auto" : "smooth", block: "start" }); paintSetNav(i); }; });
-  addEventListener("scroll", () => paintSetNav(), { passive: true }); addEventListener("resize", () => paintSetNav());
+  box.addEventListener("scroll", () => paintSetNav(), { passive: true });
+  addEventListener("resize", () => { fitSettings(); paintSetNav(); });
+  new ResizeObserver(() => fitSettings()).observe($("#vSettings .backbar")); // (the steps-left banner in it, or gone)
+  addEventListener("wheel", (e) => {
+    if (view !== "settings" || e.ctrlKey || box.contains(e.target) || e.target.closest?.(".pick-list, .pop, .menu, #welcome")) return;
+    box.scrollBy({ top: e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? box.clientHeight : 1) });
+  }, { passive: true });
   paintSetNav(); // a reload on the page: shown before this was set up
-}
-// Hear yourself: the mic back through the speakers (headphones, really), while the settings are open, to set the
-// sensitivity by ear; the mic comes on for it.
-let monitor = null, monitorOn = false;
-async function hearMe(on) {
-  if (on === monitorOn) return;
-  if (on && !micOn && !(await startMic())) return;
-  monitorOn = on;
-  if (on && !monitor) { monitor = ac.createGain(); monitor.gain.value = 0; micBus.connect(monitor); monitor.connect(master); }
-  if (monitor) monitor.gain.setTargetAtTime(on ? 1 : 0, ac.currentTime, 0.02);
-  const b = $("#hearMe");
-  b.setAttribute("aria-pressed", String(on)); say(b, on ? "Stop hearing" : "Hear yourself");
 }
 // Headphones, in Practice (S.ears): which ear the band, the guide vocal and the metronome (its count-in too) play in,
 // "l", "r" or "both"; and, when a take is compared, what each ear hears (left, right: "orig", the song as it is, or
@@ -1180,6 +1193,7 @@ const isGuide = (name) => VOCAL_TRACKS.includes(name);
 function leaveSong() { if (ED.on) edOpen(false); if (P.playing) pauseSong(); K.on = false; K.counting = false; A4 = 440; $("#countIn").hidden = true; }
 function songToggle() {
   if (P.playing) { pauseSong(); return; }
+  if (songBusy()) return; // its new key or tempo still being made
   if (!micOn && !testOsc) startMic();
   // again after a pause (not at a phrase's count-in, where a jump put it): from the count-in's beats before, counted;
   // from the start, a voice that comes straight in is counted in before the song (the intro's count-in, as a lead-in)
@@ -1241,26 +1255,25 @@ function initSing() {
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
   });
   initTakes(); initEars(); initSync(); initLyEdit();
-  // settings: their page, under the gear beside the mic chip; the gear again goes back to where you were
-  const setBtn = $("#micSetBtn");
-  setBtn.append(icon("settings"));
-  setBtn.onclick = (e) => { if (view === "settings") { e.preventDefault(); location.hash = setFrom.hash; } };
-  initSetNav();
-  // the songs being added: their panel under their ring, the same way
+  initSetNav(); // settings: their page, its tab in the header's (#micSetBtn)
+  // the drawer (Add song, and the songs being added under it: showJobs), out of the page so it's over all of it
   const jobsBtn = $("#jobsBtn"), jobsPop = $("#jobsPop");
+  document.body.append(jobsPop); jobsPop.setAttribute("aria-modal", "true");
   jobsBtn.onclick = (e) => { e.stopPropagation(); showJobs(jobsPop.hidden); };
   document.addEventListener("click", (e) => { if (!jobsPop.hidden && !e.composedPath().includes(jobsPop)) showJobs(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !jobsPop.hidden) { showJobs(false); jobsBtn.focus(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !jobsPop.hidden) closeDrawer(); });
   jobsPop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!jobsPop.hidden && to && !jobsPop.contains(to) && to !== jobsBtn) showJobs(false); });
   initYoutubeOffer();
   paintJobs(); // the ring is always there, empty while nothing's being added
   $("#gate").value = Math.round(20 * Math.log10(S.gate)); $("#echo").checked = S.echo;
   $("#gate").oninput = (e) => { S.gate = 10 ** (+e.target.value / 20); save(); };
   resetOnDblClick($("#gate"), -40);
-  $("#hearMe").onclick = () => hearMe(!monitorOn);
   $("#setImportGo").onclick = runImport;
+  $("#auroraOn").checked = S.aurora;
+  $("#auroraOn").onchange = (e) => { S.aurora = e.target.checked; save(); };
   $("#devTools").checked = S.dev;
-  $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); };
+  $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); if (!S.dev) showNote(null); paintCopy(); };
+  paintCopy(); // (as they're set from the start, before any song)
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
   micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); syncErr = ""; paintSync(); }); // Sync's is the new input's
   micPick.set([{ v: "", t: "System default" }], "");

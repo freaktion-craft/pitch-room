@@ -22,7 +22,7 @@ async function stemsRefresh(list = true, got = null) {
   $("#sErr").hidden = !err;
   if (err) say($("#sErr"), window.pitchroom ? "The server is running, but checking the stem tools failed: {err}. Help → Show Log has the details." // the desktop app (desktop/preload.js): no terminal
     : "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.", { err: () => tr(err) });
-  $("#sInstall").hidden = !st || st.installed || stemsPage !== "lib";
+  paintTools(st);
   $("#sAdd").hidden = !st || !st.installed;
   $("#sAddSetup").hidden = !st || st.installed; // the Add song panel points at the setup until the tools are in
   if (st && st.install && st.install.status === "running") watchJob(st.install.id, "install");
@@ -39,26 +39,28 @@ async function stemsRefresh(list = true, got = null) {
   }
   pinLibTop(); // a notice or the setup above the list moves it down
 }
-// The tools in: the banner says so for a moment and folds away, and an empty library, which waited under it, rises in
-// where it was, as it does on opening. With reduced motion, at once.
-async function installDone() {
-  const box = $("#sInstall"), page = $("#sLibPage");
-  if (box.hidden || matchMedia("(prefers-reduced-motion: reduce)").matches) return stemsRefresh();
-  const waited = getComputedStyle(page).display === "none";
-  $("#sInstallBtn").disabled = true; // done with
-  say($("#sInstallState"), "Installed").prepend(icon("tick"));
-  // meanwhile the check (the server's first look at the new tools takes a few seconds) and the list, drawn while
-  // still out of sight, so what rises is what stays
-  const [got] = await Promise.all([stemsCheck(), renderLibrary(), sleep(900)]);
-  box.style.overflow = "hidden";
-  const fold = box.animate([{ height: box.offsetHeight + "px", opacity: 1, marginBottom: "24px", paddingTop: "12px", paddingBottom: "12px" },
-    { height: "0px", opacity: 0, marginBottom: "0px", paddingTop: "0px", paddingBottom: "0px" }], { duration: 360, easing: RISE_EASE, fill: "forwards" });
-  await fold.finished;
-  await stemsRefresh(false, got);
-  fold.cancel(); box.style.overflow = "";
-  if (!box.hidden || !waited) return;
-  // each part on its own, not the list as a whole: rising, the list would take its pinned column heads under the mast
-  rise($("#sLibPage .lib-head"), 0); rise($("#sLib .lib-cols"), 90); rise($("#sLib .add-first"), 180, 6, 6);
+// Settings' Song tools (#sInstall, its parts the job's line, bar and log: watchJob): how they are, in (on which
+// device) or not, and its button: Install, Update, or (the desktop app, new versions in while the old are in memory)
+// Restart. While a job's on, its line says how it's going and is left be.
+function paintTools(st) {
+  if (!st) return;
+  const line = $("#sInstallState"), btn = $("#sInstallBtn"), busy = ["queued", "running"].includes(st.install?.status);
+  const mode = !st.installed ? "install" : st.restartNeeded && window.pitchroom?.restart ? "restart" : "update";
+  btn.dataset.mode = mode; btn.disabled = busy;
+  say(btn.querySelector("span"), mode === "install" ? "Install" : mode === "restart" ? "Restart" : "Update");
+  if (busy) return;
+  const dev = st.deviceName || (st.device === "cuda" ? "GPU" : st.device === "mps" ? "Apple GPU" : "CPU");
+  if (!st.installed) say(line, "Split songs into voice and band, and read their melody and lyrics: a 3–4 GB download, once.");
+  else if (st.restartNeeded) say(line, "Updated. Restart the app to use them.");
+  else say(line, "Installed · {dev}", { dev });
+  $("#sInstallBar").hidden = true;
+}
+// The tools in, or brought up to date (j: the job): the library drawn again with them (Add song, the first song's
+// button), and their row says how it went
+async function installDone(j) {
+  await stemsRefresh();
+  if (!j?.update || stemsStatus?.restartNeeded) return;
+  say($("#sInstallState"), j.changed ? "Updated" : "Up to date").prepend(icon("tick"));
 }
 // The library's first drawing, which the opening waits for.
 let libDrawnNow;
@@ -95,10 +97,13 @@ async function drawLibrary() {
   const tiles = new Map([...libRows].map(([id, row]) => [id, row.querySelector(".cover")]));
   libRows = new Map();
   // songs still being added (this page was reloaded, or opened in a second tab meanwhile) are shown by the mic again
+  for (const [id, a] of adding) if (a.needLyrics && !jobs.some((j) => j.id === id)) { adding.delete(id); document.getElementById("job-" + id)?.remove(); } // settled elsewhere
+  if (adding.size) paintJobs();
   for (const j of jobs) {
     if (pollers[j.id] || adding.has(j.id)) continue;
-    addingJob(j.id, j);
-    watchJob(j.id, "separate");
+    addingJob(j.id, { ...j, arrived: false, done: j.status === "done" && !j.needLyrics }); // (none of these is in the list yet)
+    if (j.status !== "done") watchJob(j.id, "separate");
+    if (!j.song) findEarly(j.id, j.link); // (what it is, till it's in its folder)
   }
   box.innerHTML = "";
   const coming = [...adding.values()].some((j) => j.status !== "error");
@@ -129,7 +134,10 @@ async function drawLibrary() {
     text.append(el("b", null, tr("Add your first song")), el("small", null, tr("Paste a YouTube link or a playlist.")));
     a.append(plus, text); box.append(a);
   }
-  if (!lib.length) { drawNew(lib); pinLibTop(); paintFade(true); return; } // the column heads are new: pinned where they stand
+  if (!lib.length) { // the column heads are new: pinned where they stand (no albums' grid over the first-song row)
+    libAlbum = null; $("#sLibPage").classList.remove("album-grid"); $("#sAlbums").replaceChildren(); albumBarNode?.remove();
+    drawNew(lib); pinLibTop(); paintFade(true); return;
+  }
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     row.dataset.id = m.id; libRows.set(m.id, row);
@@ -239,7 +247,7 @@ const NEW_FADE = 72;
 function paintNew() {
   const box = $("#sNew"), track = $("#sNewTrack");
   if (newMove && newMove !== "pull") return; // opening or folding: that says
-  box.hidden = !newIds.size || !!$("#sSearch").value.trim() || !newOpen;
+  box.hidden = !newIds.size || !!$("#sSearch").value.trim() || !newOpen || libView !== "song"; // (the Song view's alone)
   if (newWaiting) { revealNew(); return; }
   if (!box.hidden) paintNewEnds();
 }
@@ -285,7 +293,7 @@ const keepShut = (on) => { try { if (on) sessionStorage.setItem(NEW_SHUT, "1"); 
 let newOpen = (() => { try { return sessionStorage.getItem(NEW_SHUT) !== "1"; } catch (e) { return true; } })();
 let newMove = null; // "shut", "open" or "pull" while one's under way
 const pull = { p: 0, last: 0, t: 0, raf: 0 };
-const canNew = () => view === "stems" && stemsPage === "lib" && newIds.size > 0 && !$("#sSearch").value.trim() && !CV.tile;
+const canNew = () => view === "stems" && stemsPage === "lib" && libView === "song" && newIds.size > 0 && !$("#sSearch").value.trim() && !CV.tile;
 // Folded, the list goes up into the page's gap after it too (a grid row can't be less than nothing, so New's own
 // margin can't take it back), and it's where it is with New gone
 const NEW_TUCK = "calc(var(--space-3) * -1)";
@@ -407,8 +415,88 @@ function sortArrow(name) { const a = icon(name); a.classList.add("arrow"); retur
 // stay loaded, a rename stays open). libRows: each song's row, shown or not.
 let libRows = new Map();
 const folded = (t) => String(t || "").normalize("NFKC").toLocaleLowerCase();
+// The view, in the list's name's place (#sLibView; store "libView"): Song, its songs as a list; Artist, the rows under
+// a heading for each artist, A to Z (none known last), each one's songs in the list's order (the headings made once,
+// libGroups, the rows only moved under them, as ever); Album, a grid of the albums (#sAlbums, a card each, albumCards),
+// one opened (libAlbum, its key) showing its songs as the list, under a bar back to the grid (albumBar).
+const LIB_VIEWS = ["song", "artist", "album"];
+let libView = (() => { const v = store.get("libView", "song"); return LIB_VIEWS.includes(v) ? v : "song"; })();
+let libAlbum = null;
+const libGroups = new Map(), albumCards = new Map();
+// an artist's main name (before "&", ",", "feat.", " x "): an album's songs are often credited to it with others
+const mainArtist = (a) => (a || "").split(/\s*(?:,|&|\bfeat\.?|\bft\.|\bwith\b|\s[x×]\s)\s*/i)[0].trim();
+// which group a song's under: its key (as written, any case or width the same), and what it's called. An album is its
+// name and whose: two artists' albums of one name ("Greatest Hits") apart
+function groupOf(m, by = libView) {
+  if (by === "artist") { const a = mainArtist(m.artist); return { key: folded(a), name: a, by: "" }; } // (with others too: under theirs)
+  if (!m.album) return { key: "", name: "", by: "" };
+  const who = mainArtist(m.artist);
+  return { key: `${folded(m.album)}\u0000${folded(who)}`, name: m.album, by: who };
+}
+// the songs found, in groups (each as most of its songs spell it), A to Z, none known last; each group's in their order
+function groupsOf(found, by, words) {
+  const groups = new Map();
+  for (const m of found) {
+    const g = groupOf(m, by);
+    if (!groups.has(g.key)) groups.set(g.key, { g, songs: [], spell: new Map() });
+    const x = groups.get(g.key), s = `${g.name}\u0000${g.by}`;
+    x.songs.push(m); x.spell.set(s, (x.spell.get(s) || 0) + 1);
+    if (x.spell.get(s) > (x.spell.get(`${x.g.name}\u0000${x.g.by}`) || 0)) x.g = g;
+  }
+  return [...groups.values()].sort((a, b) => (!a.g.name) - (!b.g.name) || words.compare(a.g.name, b.g.name) || words.compare(a.g.by, b.g.by));
+}
+const songsN = (n) => (n === 1 ? tr("1 song") : tr("{n} songs", { n }));
+function groupHead(g, songs) { // an artist's heading: its name, and how many
+  const key = `artist:${g.key}`;
+  let h = libGroups.get(key);
+  if (!h) { h = el("div", "lib-group"); h.append(el("b"), el("small")); libGroups.set(key, h); }
+  h.querySelector("b").textContent = g.name || tr("Unknown artist");
+  h.querySelector("small").textContent = songsN(songs.length);
+  return h;
+}
+// an album's card in the grid: its cover (its first song's that has one), its name, whose and how many; opens it
+function albumCard(g, songs) {
+  let c = albumCards.get(g.key);
+  if (!c) {
+    c = el("button", "al-card"); c.type = "button"; c.append(el("span", "cover"), el("b"), el("small"));
+    c.onclick = () => openAlbum(g.key);
+    albumCards.set(g.key, c);
+  }
+  const name = g.name || tr("Unknown album"), line = [g.by, songsN(songs.length)].filter(Boolean).join(" · ");
+  c.querySelector("b").textContent = name; c.querySelector("small").textContent = line;
+  c.setAttribute("aria-label", `${name} · ${line}`); c.title = name;
+  const m = g.name && songs.find((x) => x.cover && x.cover.at); // (Unknown album: songs of all sorts, none's cover its)
+  if (m) putCover(c.querySelector(".cover"), m, coverSrc(m, false));
+  c.classList.toggle("none", !g.name);
+  if (!g.name && !c.querySelector(".cover .ico")) c.querySelector(".cover").append(icon("other")); // (a note in its place)
+  return c;
+}
+// an album opened: the bar over its songs, back to the grid (or Escape), its name and whose
+let albumBarNode = null;
+function albumBar(g, songs) {
+  if (!albumBarNode) {
+    albumBarNode = el("div", "al-bar");
+    const back = el("button", "btn sm al-back"); back.type = "button"; back.append(icon("back"), el("span"));
+    back.onclick = closeAlbum;
+    const what = el("span", "al-what"); what.append(el("b"), el("small"));
+    albumBarNode.append(back, what);
+  }
+  say(albumBarNode.querySelector(".al-back span"), "Albums");
+  albumBarNode.querySelector(".al-what b").textContent = g.name || tr("Unknown album");
+  albumBarNode.querySelector(".al-what small").textContent = [g.by, songsN(songs.length)].filter(Boolean).join(" · ");
+  return albumBarNode;
+}
+let albumScroll = 0; // where the grid was when an album was opened: back there after
+function openAlbum(key) { albumScroll = scrollY; libAlbum = key; arrangeRows(); pinLibTop(); scrollTo(0, 0); paintFade(true); }
+function closeAlbum() {
+  const was = libAlbum; libAlbum = null; arrangeRows(); pinLibTop(); scrollTo(0, albumScroll); paintFade(true);
+  albumCards.get(was)?.focus({ preventScroll: true }); // (where you were in the grid, in sight again)
+}
+function paintLibView() {
+  for (const b of $("#sLibView").querySelectorAll("button")) b.setAttribute("aria-checked", String(b.dataset.v === libView));
+}
 function arrangeRows() {
-  const box = $("#sLib"), c = SORTS[libSort.by], way = libSort.desc ? -1 : 1;
+  const box = $("#sLib"), grid = $("#sAlbums"), c = SORTS[libSort.by], way = libSort.desc ? -1 : 1;
   const words = new Intl.Collator(locale(), { numeric: true, sensitivity: "base" });
   const typed = $("#sSearch").value.trim(), want = folded(typed).split(/\s+/).filter(Boolean);
   const songs = [...libRows.keys()].map((id) => libCache.get(id)).filter(Boolean);
@@ -417,17 +505,35 @@ function arrangeRows() {
     if (x == null || y == null) return (x == null) - (y == null) || b.created - a.created;
     return (c.text ? words.compare(x, y) : x - y) * way || b.created - a.created;
   });
-  let shown = 0;
+  if (libView !== "album" || (libAlbum != null && !songs.some((m) => groupOf(m, "album").key === libAlbum))) libAlbum = null; // (gone: its songs deleted)
+  const opened = libView === "album" && libAlbum != null, inGrid = libView === "album" && !opened && songs.length > 0; // (no songs: the list's first-song row, not an empty grid)
+  const found = [];
   for (const m of songs) {
-    const row = libRows.get(m.id), text = folded(`${m.title} ${m.artist || ""} ${m.sourceTitle || ""}`);
-    if (want.every((w) => text.includes(w))) { box.append(row); shown++; } else row.remove();
+    const text = folded(`${m.title} ${m.artist || ""} ${m.album || ""} ${m.sourceTitle || ""}`);
+    const mine = !opened || groupOf(m, "album").key === libAlbum;
+    if (mine && want.every((w) => text.includes(w))) found.push(m); else libRows.get(m.id).remove();
   }
+  $("#sLibPage").classList.toggle("album-grid", inGrid);
+  const heads = new Set();
+  if (libView === "artist") {
+    for (const { g, songs: in_ } of groupsOf(found, "artist", words)) {
+      const h = groupHead(g, in_); heads.add(h); box.append(h);
+      for (const m of in_) box.append(libRows.get(m.id));
+    }
+  } else for (const m of found) box.append(libRows.get(m.id)); // (the Album view's grid: the list under it, out of sight)
+  for (const h of box.querySelectorAll(".lib-group")) if (!heads.has(h)) h.remove(); // (another view's, or one with nothing found)
+  grid.replaceChildren(...(inGrid ? groupsOf(found, "album", words) : []).map(({ g, songs: in_ }) => albumCard(g, in_)));
+  if (opened) {
+    const all = songs.filter((m) => groupOf(m, "album").key === libAlbum);
+    box.prepend(albumBar(groupsOf(all, "album", words)[0].g, all));
+  } else albumBarNode?.remove();
+  const shown = found.length;
   paintNew();
-  let none = box.querySelector(".lib-none");
+  let none = box.querySelector(".lib-none") || grid.querySelector(".lib-none");
   if (!shown && songs.length) {
     none ??= el("p", "lib-none");
     none.textContent = tr("No songs match “{q}”", { q: typed });
-    box.append(none);
+    (inGrid ? grid : box).append(none);
   } else none?.remove();
   paintFade();
   for (const b of box.querySelectorAll(".lib-cols .sort")) {
@@ -565,6 +671,27 @@ function tiltTick() {
   CV.raf = requestAnimationFrame(tiltTick);
 }
 function initLibSearch() {
+  // the view: picked, the songs arranged under it at once, where the list is (the arrows through it as the Lab's do)
+  const seg = $("#sLibView"), vs = [...seg.querySelectorAll("button")];
+  const pickView = (v) => {
+    if (v === libView && !(v === "album" && libAlbum != null)) return; // (Album again, an album open: back to the grid)
+    if (!LIB_VIEWS.includes(v)) return;
+    libView = v; libAlbum = null; store.set("libView", v); paintLibView(); arrangeRows(); pinLibTop(); paintFade(true); // (the fades where they are at once: no blink of them across the switch)
+  };
+  // an album open: Escape back to the grid (not while typing, nor over a cover up close, a menu or a panel, whose own
+  // Escape closes them: looked at before they do, in the capture)
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || libAlbum == null || !(view === "stems" && stemsPage === "lib") || CV.tile || typing(e.target)) return;
+    if (document.querySelector(".menu:not([hidden]), .pick-list:not([hidden]), .pop:not([hidden]), #songMenu:not([hidden])")) return;
+    e.preventDefault(); closeAlbum();
+  }, true);
+  vs.forEach((b) => (b.onclick = () => pickView(b.dataset.v)));
+  seg.onkeydown = (e) => {
+    const i = vs.findIndex((b) => b.dataset.v === libView), d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!d) return;
+    e.preventDefault(); const b = vs[(i + d + vs.length) % vs.length]; pickView(b.dataset.v); b.focus();
+  };
+  paintLibView();
   const f = $("#sSearch"), mac = /Mac|iPhone|iPad/.test(navigator.platform), keys = el("span", "keys");
   f.before(icon("search"));
   keys.setAttribute("aria-hidden", "true"); keys.append(el("kbd", null, mac ? "⌘" : "Ctrl"), el("kbd", null, "K")); f.after(keys);
@@ -611,18 +738,26 @@ addEventListener("resize", pinLibTop);
 // list drawn (a reload, scrolled down it), where they're there (or gone) at once with it, not fading in after.
 const FADE_H = 192;
 // the room the New row takes above the list (none while it's hidden): hidden, the list starts where it does
-const newRoom = () => { const n = $("#sNew"); return n.hidden ? 0 : $("#sLib").offsetTop - n.offsetTop; };
+const newRoom = () => { // (down to the list, or to the albums' grid in its place)
+  const n = $("#sNew"), next = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums") : $("#sLib");
+  return n.hidden ? 0 : next.offsetTop - n.offsetTop;
+};
+// The foot's fade on a song's page too (the Studio), as its tracks go on below the window; the top's is the library's
+// alone (under its pinned top)
 function paintFade(now) {
-  const lib = view === "stems" && stemsPage === "lib", below = document.documentElement.scrollHeight - (scrollY + innerHeight);
+  const lib = view === "stems" && stemsPage === "lib", song = view === "stems" && stemsPage === "song";
+  const below = document.documentElement.scrollHeight - (scrollY + innerHeight);
   // the New row, over the band behind the pinned top while it goes up: cut off where it reaches the search's line
   const nw = $("#sNew");
   if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
-  for (const [f, px] of [[$("#listFade"), below], [$("#listFadeTop"), scrollY - newRoom()]]) {
+  for (const [f, px, here] of [[$("#listFade"), below, lib || song], [$("#listFadeTop"), scrollY - newRoom(), lib]]) {
     if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
     f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
-    f.classList.toggle("on", lib && px > 0);
+    f.classList.toggle("on", here && px > 0);
   }
 }
+// the page growing or shrinking under a still window (a song's tracks in, its video shown): the foot's fade with it
+new ResizeObserver(() => paintFade()).observe(document.body);
 function initCoverView() {
   const view = $("#coverView"), card = view.querySelector(".cv-card");
   view.addEventListener("pointermove", (e) => {
@@ -649,8 +784,11 @@ function initCoverView() {
 let lookupTimer = 0;
 function awaitLookups(lib, tries = 0) {
   clearTimeout(lookupTimer);
+  // (albums of songs from before they were kept come in slowly, one every few seconds behind any lookup: asked after
+  // longer, less often, ten minutes at most)
   const looking = tries < 20 && lib.some((m) => !("cover" in m) || !("artist" in m)), upgrading = lib.some((m) => m.upgrade != null || m.pending);
-  if (!looking && !upgrading) return;
+  const albums = tries < 120 && lib.some((m) => !("album" in m));
+  if (!looking && !upgrading && !albums) return;
   lookupTimer = setTimeout(async () => {
     if (!(view === "stems" && stemsPage === "lib")) return; // the list asks again when it's shown again
     let now;
@@ -661,6 +799,7 @@ function awaitLookups(lib, tries = 0) {
       const known = libCache.get(m.id), row = libRows.get(m.id);
       if (!known || !row) continue;
       if ("cover" in m) known.cover = m.cover;
+      if ("album" in m && known.album !== m.album) { known.album = m.album; if (libView === "album") renamed = true; } // (its group, in the Album view)
       known.upgrade = m.upgrade; known.pending = m.pending;
       paintCover(row.querySelector(".cover"), m); paintUpgrade(row.querySelector(".cover"), m); paintPending(row, m);
       const card = $(`#sNewTrack .ln-card[data-id="${m.id}"]`);
@@ -673,9 +812,9 @@ function awaitLookups(lib, tries = 0) {
         row.querySelector(".song-actions .btn").setAttribute("aria-label", tr("More for {title}", { title: m.title }));
       }
     }
-    if (renamed && SORTS[libSort.by]?.text) arrangeRows(); // sorted by name: it may belong elsewhere now
+    if (renamed && (SORTS[libSort.by]?.text || libView !== "song")) arrangeRows(); // sorted by name, or under its artist or album: it may belong elsewhere now
     awaitLookups(now, tries + 1);
-  }, upgrading ? 1000 : 3000);
+  }, upgrading ? 1000 : looking ? 3000 : 5000);
 }
 // Key names spelled the usual way for each key (D♭ major, C♯ minor).
 const KEY_MAJOR = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]; // G♭ (6 flats, as its notes are spelt) for F♯

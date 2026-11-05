@@ -60,6 +60,7 @@ MODEL_DIR = os.path.join(DATA, "models")
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _work_lock = threading.Lock()  # one separation at a time; others wait as "queued"
+_download_slots = threading.Semaphore(2)  # songs' downloads at once, ahead of their turn to be split (_pipeline)
 _line: list[str] = []  # the jobs waiting for _work_lock (the one holding it first), in the order they asked
 _model_cache: dict = {}
 
@@ -75,22 +76,88 @@ def _new_job(kind: str, name: str = "") -> dict:
     return job
 
 
+# A song being added: its stems and the rest (SPLIT_SHARE of its progress), then its lyrics found and timed (the rest;
+# _lyrics_phase). Their progress is shown as one (_shown).
+SPLIT_SHARE = 0.8
+
+
+def _shown(job: dict) -> float:
+    """How far a job is, for the page: a song being added's as a whole (its lyrics' part after its stems'); stopped
+    where its lyrics were while they're wanted (needLyrics)."""
+    if job["kind"] != "separate":
+        return job["progress"]
+    if job.get("needLyrics"):
+        return SPLIT_SHARE + (1 - SPLIT_SHARE) * job.get("stoppedAt", 0.0)
+    if job["status"] == "done":
+        return 1.0
+    if job.get("phase") == "lyrics":  # (pasted after it stopped: on from there, not back)
+        base = job.get("lyricsFrom", 0.0)
+        return SPLIT_SHARE + (1 - SPLIT_SHARE) * (base + (1 - base) * job["progress"])
+    return SPLIT_SHARE * job["progress"]
+
+
+def _settled(job: dict):
+    """A song stopped wanting its lyrics (needLyrics) that doesn't any more: deleted, or given them another way (its
+    Info page, or Practice without them). Under _jobs_lock."""
+    if not job.get("needLyrics") or not job.get("songId"):
+        return
+    folder = os.path.join(LIB, job["songId"])
+    try:
+        data = _load_json(os.path.join(folder, "lyrics.json")) if os.path.isfile(os.path.join(folder, "lyrics.json")) else None
+    except ValueError:
+        data = None
+    if not os.path.isfile(os.path.join(folder, "meta.json")) or (data and (data.get("lines") or data.get("dropped"))):
+        job["needLyrics"] = False
+
+
 def active_jobs() -> list[dict]:
-    """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress."""
+    """Songs being added right now, oldest first, so a page opened (or reloaded) meanwhile can show their progress;
+    and those stopped wanting their lyrics pasted (needLyrics), till they are or that's let go."""
     with _jobs_lock:
-        jobs = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
-        return [{k: j[k] for k in ("id", "kind", "status", "stage", "progress", "cancel", "name", "link")} for j in sorted(jobs, key=lambda j: j["started"])]
+        for j in _jobs.values():
+            _settled(j)
+        jobs = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics"))]
+        out = [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError")}
+               | {"progress": _shown(j)} for j in sorted(jobs, key=lambda j: j["started"])]
+    for j in out:
+        if j.get("songId"):
+            j["song"] = _found(j["songId"])
+    return out
+
+
+def _found(song_id) -> dict | None:
+    """What a song being added was found to be, for its row in the drawer: {title, artist, cover} (cover: meta's, with
+    its at and thumb, once there's a picture), from its meta.json (the lookup's: _look_up); None before it's written."""
+    try:
+        meta = _load_json(os.path.join(LIB, song_id, "meta.json")) if song_id else None
+    except (OSError, ValueError):
+        return None
+    if not isinstance(meta, dict):
+        return None
+    c = meta.get("cover")
+    return {"title": meta.get("title"), "artist": meta.get("artist") or "", "cover": c if isinstance(c, dict) and c.get("at") else None}
 
 
 def get_job(job_id: str) -> dict | None:
-    """A job as it stands; a song waiting its turn says how many songs are ahead of it (ahead)."""
+    """A job as it stands; a song waiting its turn says how many songs are ahead of it (ahead); one being added, once
+    it's in its folder, what it was found to be (song: _found)."""
+    out = _get_job(job_id)
+    if out and out["kind"] == "separate" and out.get("songId"):
+        out["song"] = _found(out["songId"])
+    return out
+
+
+def _get_job(job_id: str) -> dict | None:
     with _jobs_lock:
         job = _jobs.get(job_id)
         if job is None:
             return None
-        out = {k: v for k, v in job.items() if k != "log"} | {"log": job["log"][-6:]}
+        _settled(job)
+        out = {k: v for k, v in job.items() if k != "log"} | {"log": job["log"][-6:], "progress": _shown(job)}
+        if "pkgs" in job:
+            out["pkgs"] = dict(job["pkgs"])  # (a copy: the install's thread goes on changing it)
         if job["kind"] == "separate" and job["status"] == "queued" and job_id in _line:
-            out["ahead"] = sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate")
+            out["ahead"] = sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate" or _jobs.get(j, {}).get("front"))
         return out
 
 
@@ -111,6 +178,12 @@ def cancel_job(job_id: str) -> str:
         job = _jobs.get(job_id)
         if job is None or job["kind"] not in ("separate", "key"):
             raise ValueError("Unknown job.")
+        if job.get("phase") == "lyrics":  # its lyrics' part isn't stopped; one stopped wanting them is let go, song and all
+            if job.get("needLyrics") and job["status"] == "done":
+                job.update(needLyrics=False, status="cancelled", stage="Cancelled")
+                if job.get("songId"):
+                    shutil.rmtree(os.path.join(LIB, job["songId"]), ignore_errors=True)
+            return job["status"]
         if job["status"] in ("queued", "running"):
             job["cancel"] = True
         return job["status"]
@@ -132,7 +205,13 @@ def _turn(job):
     """Hold _work_lock for a job, once the jobs that asked before it have had theirs (a lock alone would let any of the
     waiting ones in next), waiting in short steps so a job cancelled while queued stops at once."""
     with _jobs_lock:
-        _line.append(job["id"])
+        if job.get("front"):  # a song just added's lyrics (_lyrics_phase): next, after the one working and the others of theirs
+            at = 1
+            while at < len(_line) and _jobs.get(_line[at], {}).get("front"):
+                at += 1
+            _line.insert(min(at, len(_line)), job["id"])
+        else:
+            _line.append(job["id"])
     try:
         while True:
             _check(job)
@@ -144,12 +223,9 @@ def _turn(job):
                 time.sleep(0.1)
         try:
             _check(job)
-            if job.get("low"):
-                _low_priority(True)
-            yield
+            with _held_low(job):
+                yield
         finally:
-            if job.get("low"):
-                _low_priority(False)
             _free_gpu()
             _work_lock.release()
     finally:
@@ -168,6 +244,30 @@ def _low_priority(on: bool):
     k.GetCurrentProcess.restype = ctypes.c_void_p
     k.SetPriorityClass.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
     k.SetPriorityClass(k.GetCurrentProcess(), 0x4000 if on else 0x20)  # BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS
+
+
+_low_n = 0  # a playlist's songs' work running now (_held_low)
+
+
+@contextlib.contextmanager
+def _held_low(job):
+    """_low_priority for a playlist's song's work, kept till the last such work running is done: two can overlap (one's
+    tracks saved while the next is split, _pipeline), and the first done mustn't put the other back to normal."""
+    global _low_n
+    if not job.get("low"):
+        yield
+        return
+    with _jobs_lock:
+        _low_n += 1
+        if _low_n == 1:
+            _low_priority(True)
+    try:
+        yield
+    finally:
+        with _jobs_lock:
+            _low_n -= 1
+            if _low_n == 0:
+                _low_priority(False)
 
 
 def _free_gpu():
@@ -264,12 +364,83 @@ _install_job: dict | None = None
 _restart_needed = False
 
 
-def start_install(gpu_only: bool = False) -> str:
+def start_install(gpu_only: bool = False, update: bool = False) -> str:
+    """The song tools in (the first steps, the library's banner), or, update (Settings' Song tools), brought up to date
+    where they are: everything but PyTorch upgraded (pip's own on Windows is the CPU build, which would take an NVIDIA
+    card's GPU build's place; it's only moved if what's upgraded needs a newer one), the models fetched if missing."""
     global _install_job
     if _install_job and _install_job["status"] in ("queued", "running"):
         return _install_job["id"]
     _install_job = _new_job("install")
-    return _run(_install_job, _install, gpu_only)
+    return _run(_install_job, _install, gpu_only, update)
+
+
+# What Settings' Song tools Check says (check_tools): each tool's version (by its pip name), whether each loads (by
+# its import name, in a Python of its own, so a broken one can't take the server with it), the device, the models.
+CHECK_DISTS = ("torch", "torchaudio", "demucs", "audio-separator", "librosa", "openai-whisper", "stable-ts", "numpy", "yt-dlp")
+CHECK_IMPORTS = ("torch", "torchaudio", "demucs", "audio_separator", "librosa", "whisper", "stable_whisper")
+
+
+def check_tools() -> dict:
+    from importlib import metadata
+    versions = {}
+    for d in CHECK_DISTS:
+        try:
+            versions[d] = metadata.version(d)
+        except metadata.PackageNotFoundError:
+            versions[d] = None
+    code = ("import importlib, json, sys\nout = {}\nfor m in sys.argv[1:]:\n    try:\n        importlib.import_module(m); out[m] = ''\n"
+            "    except BaseException as e:\n        out[m] = (type(e).__name__ + ': ' + str(e))[:300]\nprint(json.dumps(out))")
+    try:
+        r = subprocess.run([sys.executable, "-c", code, *CHECK_IMPORTS], capture_output=True, text=True, timeout=180,
+                           **({"creationflags": 0x08000000} if os.name == "nt" else {}))
+        loads = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"python": (r.stderr or "no answer").strip()[-300:]}
+    except (subprocess.TimeoutExpired, ValueError, OSError) as e:
+        loads = {"python": f"{type(e).__name__}: {e}"[:300]}
+    models = []
+    if os.path.isdir(MODEL_DIR):
+        for n in sorted(os.listdir(MODEL_DIR)):
+            p = os.path.join(MODEL_DIR, n)
+            size = os.path.getsize(p) if os.path.isfile(p) else sum(os.path.getsize(os.path.join(a, f)) for a, _, fs in os.walk(p) for f in fs)
+            models.append({"name": n, "mb": round(size / 1e6)})
+    return {"python": sys.version.split()[0], "installed": installed(), "versions": versions, "loads": loads,
+            "models": models, **gpu_status()}
+
+
+# The song tools the first steps show a box each for (onboard.js, TOOL_BOXES), and how each is going, as pip says it:
+# getting (being collected, its files coming down), got (down: pip's on to the next), setting (pip putting them in),
+# done (installed, or there already). job["pkgs"], by the name as pip writes it, lower case, _ as -. The models after
+# them are lyrics-model and melody-model (_install). Read from each line whole: the log keeps only its last 160
+# characters, and the page sees only its last 6 lines
+TOOL_PKGS = ("torch", "torchaudio", "demucs", "audio-separator", "librosa", "openai-whisper", "stable-ts")
+
+
+def _pkg_name(s: str) -> str:
+    return re.split(r"[\[<>=!~;\s(]", s.strip(), maxsplit=1)[0].lower().replace("_", "-")
+
+
+def _pip_line(job, line: str):
+    pkgs = job.get("pkgs")
+    if pkgs is None:
+        return
+    def put(name, state):
+        if name in TOOL_PKGS and pkgs.get(name) != "done":
+            pkgs[name] = state
+    if m := re.match(r"Collecting (\S+)", line):
+        name = _pkg_name(m.group(1))
+        for k, v in pkgs.items():  # what came before it is down
+            if v == "getting" and k != name:
+                pkgs[k] = "got"
+        put(name, "getting")
+    elif m := re.match(r"Requirement already satisfied: (\S+)", line):
+        put(_pkg_name(m.group(1)), "done")
+    elif line.startswith("Installing collected packages:"):
+        for k, v in pkgs.items():
+            if v in ("getting", "got"):
+                pkgs[k] = "setting"
+    elif line.startswith("Successfully installed "):
+        for spec in line[len("Successfully installed "):].split():
+            put(spec.rsplit("-", 1)[0].lower().replace("_", "-"), "done")  # name-version
 
 
 def _pip(job, args: list[str], share: tuple[float, float]) -> int:
@@ -282,6 +453,7 @@ def _pip(job, args: list[str], share: tuple[float, float]) -> int:
             continue
         n += 1
         with _jobs_lock:
+            _pip_line(job, line)
             job["log"].append(line[-160:])
             job["progress"] = share[0] + (share[1] - share[0]) * min(1.0, n / 120)
     return p.wait()
@@ -323,9 +495,16 @@ def _install_cuda_torch(job, replace: bool) -> bool:
     return False
 
 
-def _install(job, gpu_only: bool = False):
+def _install(job, gpu_only: bool = False, update: bool = False):
     global _restart_needed
+    if update:
+        return _update(job)
     _set(job, status="running", stage="Downloading and installing (≈3–4 GB, a few minutes)…")
+    with _jobs_lock:
+        job["pkgs"] = {}  # how each tool's going (_pip_line), and the two models (below)
+    def model(name, state):
+        with _jobs_lock:
+            job["pkgs"][name] = state
     torch_was_loaded = "torch" in sys.modules
     if has_nvidia():
         ok = _install_cuda_torch(job, replace=gpu_only)
@@ -341,16 +520,58 @@ def _install(job, gpu_only: bool = False):
     importlib.invalidate_caches()
     if not gpu_only:
         try:  # the lyrics model now rather than at the first song (it's fetched then if this fails)
+            model("lyrics-model", "getting")
             _fetch_whisper(job, (0.9, 0.99))
+            model("lyrics-model", "done")
         except Exception as e:  # noqa: BLE001
+            model("lyrics-model", "later")
             with _jobs_lock:
                 job["log"].append(f"The lyrics model will be downloaded with the first song ({e}).")
         try:  # and the melody's pitch tracker (≈180 MB)
+            model("melody-model", "getting")
             _fetch_rmvpe(job, (0.99, 1.0))
+            model("melody-model", "done")
         except Exception as e:  # noqa: BLE001
+            model("melody-model", "later")
             with _jobs_lock:
                 job["log"].append(f"The melody model will be downloaded with the first song ({e}).")
     if torch_was_loaded:  # the old PyTorch is already in memory; a fresh start picks up the new one
+        _restart_needed = True
+
+
+def _update(job):
+    """start_install(update=True): requirements-stems.txt but PyTorch, upgraded (only-if-needed for what they need),
+    then the models fetched if they're missing; a restart wanted once anything new's in and the old's in memory."""
+    global _restart_needed
+    _set(job, status="running", stage="Updating the song tools…")
+    with _jobs_lock:
+        job["pkgs"] = {}
+    loaded = any(m in sys.modules for m in ("torch", "demucs", "whisper", "librosa"))
+    with open(os.path.join(ROOT, "requirements-stems.txt"), encoding="utf-8") as f:
+        wanted = [ln for ln in (x.split("#", 1)[0].strip() for x in f) if ln and _pkg_name(ln) not in ("torch", "torchaudio")]
+    req = os.path.join(DATA, ".tools-update.txt")
+    with open(req, "w", encoding="utf-8") as f:
+        f.write("\n".join(wanted) + "\n")
+    try:
+        before = len(job["log"])
+        if _pip(job, ["install", "-U", "--upgrade-strategy", "only-if-needed", "-r", req], (0.02, 0.9)) != 0:
+            raise RuntimeError("Updating failed. The last lines of the log say why.")
+        changed = any(ln.startswith("Successfully installed ") for ln in job["log"][before:])
+    finally:
+        with contextlib.suppress(OSError):
+            os.remove(req)
+    importlib.invalidate_caches()
+    for name, fetch, share in (("lyrics-model", _fetch_whisper, (0.9, 0.97)), ("melody-model", _fetch_rmvpe, (0.97, 1.0))):
+        try:
+            fetch(job, share)
+            with _jobs_lock:
+                job["pkgs"][name] = "done"
+        except Exception as e:  # noqa: BLE001
+            with _jobs_lock:
+                job["pkgs"][name] = "later"
+                job["log"].append(f"{name}: {e}")
+    _set(job, update=True, changed=changed)  # (Settings says: up to date, or updated)
+    if changed and loaded:  # the old versions are in memory: a fresh start takes up the new ones
         _restart_needed = True
 
 
@@ -450,7 +671,7 @@ def set_settings(changes) -> dict:
 # in Settings (Import beta library), that folder's are copied in: the songs not here yet (their rendered keys left
 # behind, made again when asked for), the settings not set here yet, the models not downloaded here yet. The beta's
 # folder stays as it was.
-_import: dict = {"status": "idle"}  # running: {done, total}; done: {songs, settings}; error: {error}
+_import: dict = {"status": "idle"}  # running: {done, total}; done: {songs, settings}; error: {error}; covers: the songs in so far with one
 _import_lock = threading.Lock()
 
 
@@ -466,7 +687,7 @@ def _beta_folders(path) -> tuple[str, str]:
 
 def import_state() -> dict:
     with _import_lock:
-        return dict(_import)
+        return {k: list(v) if isinstance(v, list) else v for k, v in _import.items()}
 
 
 def start_import(path) -> dict:
@@ -481,7 +702,7 @@ def start_import(path) -> dict:
         if _import["status"] == "running":
             raise ValueError("Already importing.")
         _import.clear()
-        _import.update(status="running", done=0, total=len(songs) + len(models))
+        _import.update(status="running", done=0, total=len(songs) + len(models), covers=[])
     threading.Thread(target=_import_run, args=(src_lib, src, songs, models), daemon=True).start()
     return import_state()
 
@@ -505,6 +726,9 @@ def _import_run(src_lib: str, src: str, songs: list[str], models: list[str]):
             os.makedirs(d, exist_ok=True)
         for d in songs:
             bring(os.path.join(src_lib, d), LIB)
+            if os.path.isfile(os.path.join(LIB, d, "cover.jpg")):  # (the first steps float it on the water)
+                with _import_lock:
+                    _import["covers"].append(d)
         for n in models:
             bring(os.path.join(src, "models", n), MODEL_DIR)
         old = os.path.join(src, "settings.json")
@@ -545,6 +769,12 @@ def library() -> list[dict]:
             except (OSError, ValueError) as e:  # one damaged song shouldn't hide the others
                 print(f"Skipped library/{d}: its meta.json can't be read ({e})", file=sys.stderr)
                 continue
+            if meta.get("adding"):
+                with _jobs_lock:
+                    going = any(j.get("songId") == d and j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics")) for j in _jobs.values())
+                if going:
+                    continue
+                meta.pop("adding", None)  # (cut off: the app closed meanwhile; in as it is)
             meta["split"] = _has_split(folder)
             if _upgrading["id"] == d:  # being brought up to date (start_upgrades): how far it's got
                 up = get_job(_upgrading["job"]) or {"status": "queued"}  # (no job yet: it's next, giving way)
@@ -556,6 +786,8 @@ def library() -> list[dict]:
                 threading.Thread(target=_ensure_split, args=(folder,), daemon=True).start()
             if _lookup_wanted(meta):
                 _want_lookup(d)
+            elif _album_wanted(meta):  # looked up before albums were kept: its album alone
+                _want_album(d)
             c = meta.get("cover")
             if isinstance(c, dict) and "hash" not in c and not c.get("none"):
                 _want_extras(d)
@@ -611,6 +843,8 @@ def _extras_worker():
 #   sourceTitle  the video's or file's own title, which lyrics and covers are looked for by
 #   cover        {"from": "file", "itunes", "deezer" or "youtube", "at", "px"} once cover.jpg is saved, None when
 #                there's none to be had; with thumb, tone and hash (cover-96.jpg, its colour, a BlurHash: _want_extras)
+#   album        the record's album (covers.album_name), or a file's own; "" when not known (a cover: the record is the
+#                song it covers, not this one's); absent till looked up (songs from before it: _want_album)
 _lookup_line: list[str] = []
 _lookup_asked: set[str] = set()
 _lookup_lock = threading.Lock()
@@ -684,6 +918,8 @@ def find(url: str) -> dict:
     import lyrics
     import yt_dlp
     os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")  # its deno, beside this Python
+    if vid := _video_id(url):  # the video alone: a link from a mix or a playlist (&list=…&index=…) is read as the playlist, with no title
+        url = "https://www.youtube.com/watch?v=" + vid
     try:
         with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}) as ydl:
             info = ydl.extract_info(url, download=False, process=False)
@@ -720,9 +956,12 @@ def _look_up(song_id: str):
     src = _saved(folder, "source")
     from_link = bool(re.match(r"^https?://", meta.get("source") or ""))
     cover = covers.is_cover(own)
-    if src and not from_link:  # an uploaded file: its own name and picture, if it has them
+    file_album = ""
+    if src and not from_link:  # an uploaded file: its own name, album and picture, if it has them
         path = os.path.join(folder, src)
-        if (t := covers.tags(ffmpeg_exe(), path)).get("title"):
+        t = covers.tags(ffmpeg_exe(), path)
+        file_album = t.get("album", "")
+        if t.get("title"):
             name = (t["title"], t.get("artist", ""))
         if (i := covers.attached(ffmpeg_exe(), path)) is not None and covers.save(ffmpeg_exe(), path, out, stream=i):
             art = "file"
@@ -763,17 +1002,101 @@ def _look_up(song_id: str):
     if not name:
         artist, song = lyrics.split_title(own)
         name = (song or own, artist)
+    # its album: the file's own, else the record's; a cover's record is the song it covers, not this one's (tagged or not)
+    album = file_album or ("" if cover else covers.album_name((record or {}).get("album", "")))
     with _meta_lock:  # read again: renamed meanwhile, the new name stays
         path = os.path.join(folder, "meta.json")
         if not os.path.isfile(path):
             return  # deleted meanwhile
         meta = _load_json(path)
-        meta.update(sourceTitle=own, artist=name[1][:TITLE_MAX], cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
+        meta.update(sourceTitle=own, artist=name[1][:TITLE_MAX], album=album[:TITLE_MAX],
+                    cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
         if channel and not meta.get("channel"):
             meta["channel"] = channel
         if not meta.get("named"):
             meta["title"] = name[0][:TITLE_MAX]
         _write_json(path, meta, ensure_ascii=False)
+
+
+# The album of a song looked up before albums were kept (the library's Album view): that alone, in a line of its own
+# that gives way to new songs' lookups (it waits while any's in _lookup_line, so they never wait behind it or meet a
+# site's limit it ran into), one song every ALBUM_GAP s, gently for the sites. Nothing else of it changes: not its
+# title (a renamed one's least), its artist or its cover. A file's from its own tag, if it has one; a cover's is "";
+# else the record searched for again (as _look_up would), taken only if it's by the artist the song has (so it's this
+# song's album). The sites out of reach: nothing written, so it's asked again the next time the server starts.
+ALBUM_GAP = 6.0
+_album_line: list[str] = []
+_album_asked: set[str] = set()
+_album_lock = threading.Lock()
+
+
+def _album_wanted(meta: dict) -> bool:
+    return "artist" in meta and "album" not in meta and not _lookup_wanted(meta)  # (a lookup to come keeps it itself)
+
+
+def _want_album(song_id: str):
+    with _album_lock:
+        if song_id in _album_asked:
+            return
+        _album_asked.add(song_id)
+        _album_line.append(song_id)
+        if len(_album_line) == 1:
+            threading.Thread(target=_album_worker, daemon=True).start()
+
+
+def _album_worker():
+    while True:
+        with _album_lock:
+            if not _album_line:
+                return
+            song_id = _album_line[0]
+        while True:  # a song being added, or others being looked up: theirs first
+            with _lookup_lock:
+                if not _lookup_line:
+                    break
+            time.sleep(1)
+        try:
+            _album_only(song_id)
+        except Exception as e:  # noqa: BLE001  (the song works without; asked again the next time the server starts)
+            print(f"Couldn't find library/{song_id}'s album: {e}", file=sys.stderr)
+        with _album_lock:
+            _album_line.pop(0)
+            if not _album_line:
+                return
+        time.sleep(ALBUM_GAP)
+
+
+def _album_only(song_id: str):
+    import covers
+    import lyrics
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not _album_wanted(meta):
+        return
+    own, dur = meta.get("sourceTitle") or meta["title"], float(meta.get("duration") or 0)
+    src = _saved(folder, "source")
+    album = ""
+    if src and not re.match(r"^https?://", meta.get("source") or ""):  # an uploaded file: its own tag first
+        album = covers.tags(ffmpeg_exe(), os.path.join(folder, src)).get("album", "")
+    if not album and not covers.is_cover(own) and meta.get("artist"):
+        hint = ""
+        with contextlib.suppress(OSError, ValueError, TypeError, KeyError):
+            s = _load_json(os.path.join(folder, "lyrics.json")).get("source") or {}
+            hint = f"{s['artist']} {s['track']}" if s.get("artist") else ""
+        if not hint and not meta.get("named"):  # (a renamed song's title is yours, not the record's: not searched by)
+            hint = f"{meta['artist']} {meta['title']}"
+        record = covers.online(own, dur, hint, cover=False, channel=meta.get("channel") or "")  # (out of reach: raised, nothing written)
+        if record and lyrics._words(record.get("artist") or "") & lyrics._words(meta["artist"]):
+            album = covers.album_name(record.get("album") or "")
+    with _meta_lock:  # read again: only its album added, if it's still without one
+        path = os.path.join(folder, "meta.json")
+        if not os.path.isfile(path):
+            return
+        disk = _load_json(path)
+        if "album" in disk:
+            return
+        disk["album"] = album[:TITLE_MAX]
+        _write_json(path, disk, ensure_ascii=False)
 
 
 def delete_song(song_id: str):
@@ -827,7 +1150,7 @@ def playlist(url: str) -> dict:
     found = playlists.read(url)
     songs = library()
     with _jobs_lock:
-        adding = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
+        adding = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics"))]
     ids = {v for s in [m.get("source") or "" for m in songs] + [j["link"] or "" for j in adding] if (v := _video_id(s))}
     known = [(_words_of(playlists._base(m.get("title") or "")), _words_of(m.get("artist") or ""), _words_of(f"{m.get('title')} {m.get('sourceTitle') or ''}"),
               _words_of(f"{m.get('artist') or ''} {m.get('channel') or ''} {m.get('sourceTitle') or ''}")) for m in songs]
@@ -1067,8 +1390,11 @@ def _pipeline(job, src: dict, model_name: str):
     folder = os.path.join(LIB, song_id)
     os.makedirs(folder, exist_ok=True)
     try:
-        _set(job, status="queued", stage="Waiting for the previous song to finish")
-        with _turn(job):
+        # the download first, outside the queue: the network's work, so the next song's comes down while this one's
+        # being split (two at most at once); only the splitting waits its turn
+        _set(job, status="queued", stage="Waiting to download")
+        with _download_slots:
+            _check(job)
             _set(job, status="running", stage="Getting the audio", progress=0.02)
             video, channel = None, ""
             # from a link (YouTube, or a Spotify playlist's song looked for there): the only way a song comes in
@@ -1092,6 +1418,11 @@ def _pipeline(job, src: dict, model_name: str):
                 video = _download_video(job, src["url"], folder, 0.12, 0.2)
             except Exception:  # noqa: BLE001  (the song still works without a picture)
                 video = None
+        _set(job, status="queued", stage="Waiting for the previous song to finish", progress=0.2)
+        with contextlib.ExitStack() as held:
+            turn = held.enter_context(contextlib.ExitStack())
+            turn.enter_context(_turn(job))
+            _set(job, status="running")
             _stage(job, "Reading the audio", 0.2)
             wav = _decode_stereo(path)
             dur = wav.shape[1] / SR
@@ -1104,28 +1435,33 @@ def _pipeline(job, src: dict, model_name: str):
             _stage(job, f"Separating on {device().upper()}", 0.25)
             names, stems = _separate(job, wav, model_name)
             _free_gpu()  # room for the lead-vocal model
-            _stage(job, "Finding the beat", 0.71)
             drum_stem = stems[names.index("drums")].mean(0) if "drums" in names else None
-            bpm, beats = _beats(wav.mean(0) if drum_stem is None else drum_stem, wav.mean(0), dur)
-            _stage(job, "Finding the key", 0.72)
-            try:
-                key = _key(sum(stems[i].mean(0) for i, n in enumerate(names) if n != "drums"))
-            except Exception:  # noqa: BLE001  (the song works without it)
-                key = None
             if "vocals" in names:
                 vox = stems[names.index("vocals")]
-                lead = _lead_vocal(vox, job, (0.73, 0.86))
+                lead = _lead_vocal(vox, job, (0.71, 0.85))
                 if lead is not None:
                     _check(job)
                     _write_split(folder, vox, lead)
                 try:
-                    _fetch_rmvpe(job, (0.86, 0.87))
+                    _fetch_rmvpe(job, (0.85, 0.86))
                 except Exception:  # noqa: BLE001  (offline: read with pYIN now, again once the model is there)
                     pass
-                _stage(job, "Reading the vocal melody", 0.87)
+                _stage(job, "Reading the vocal melody", 0.86)
                 n = vox.shape[1] if lead is None else min(vox.shape[1], lead.shape[1])
                 _save_melody(folder, (vox if lead is None else lead).mean(0), drum_stem, lead is not None,
                              None if lead is None else (vox[:, :n] - lead[:, :n]).mean(0))  # = backing.mp3
+            # what's left (the beat, the key, the tracks to mp3) is the CPU's: with a GPU, the turn's given up for it,
+            # so the next song's split starts meanwhile. (On the CPU alone, both at once would only slow each other.)
+            if device() != "cpu":
+                held.enter_context(_held_low(job))  # a playlist's song still below normal till it's in (held first: no moment at normal between)
+                turn.close()
+            _stage(job, "Finding the beat", 0.88)
+            bpm, beats = _beats(wav.mean(0) if drum_stem is None else drum_stem, wav.mean(0), dur)
+            _stage(job, "Finding the key", 0.89)
+            try:
+                key = _key(sum(stems[i].mean(0) for i, n in enumerate(names) if n != "drums"))
+            except Exception:  # noqa: BLE001  (the song works without it)
+                key = None
             _stage(job, "Saving tracks", 0.9)
             order = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in names]
             for i, name in enumerate(order):
@@ -1134,7 +1470,8 @@ def _pipeline(job, src: dict, model_name: str):
                 _set(job, progress=0.9 + 0.09 * (i + 1) / len(order))
             _check(job)  # the last chance: once meta.json is written the song is in the library
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
-                    "beatsV": BEATS_VERSION, "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
+                    "beatsV": BEATS_VERSION, "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video,
+                    "adding": True}  # (out of the library till its lyrics are in: _lyrics_phase)
             if channel:
                 meta["channel"] = channel  # who put the video up: a cover's singer, often
             _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
@@ -1143,10 +1480,67 @@ def _pipeline(job, src: dict, model_name: str):
         shutil.rmtree(folder, ignore_errors=True)
         raise
     _want_lookup(song_id)
+    _lyrics_phase(job, song_id, None)
+
+
+def _lyrics_phase(job, song_id: str, how):
+    """A song being added's last part: its lyrics found and timed (start_lyrics, how as there), that job's steps shown
+    as this one's (phase "lyrics"); only then is it in the library (its meta's "adding" taken off). None found, or it
+    failed: this one stops there (needLyrics, with why in lyricsError when it failed), the song still out of the
+    library, for them to be pasted (resume_lyrics), or the song let go (cancel_job: it's deleted)."""
+    _set(job, phase="lyrics", stage="Finding the lyrics" if how is None else "Lining the lyrics up with the voice", progress=0.0, needLyrics=False, lyricsError=None)
     try:
-        start_lyrics(song_id, None, low=bool(job.get("low")))
-    except Exception as e:  # noqa: BLE001  (the song is in; its lyrics can be found from Practice)
-        print(f"Couldn't start finding library/{song_id}'s lyrics: {e}", file=sys.stderr)
+        lid = start_lyrics(song_id, how, low=bool(job.get("low")), front=True)
+    except Exception as e:  # noqa: BLE001  (pasted ones that can't be used, a job already running: said, and pasted again)
+        _set(job, needLyrics=True, lyricsError=str(e) or e.__class__.__name__, stoppedAt=job.get("lyricsFrom", 0.0))
+        return
+    seen = 0.0
+    while True:
+        lj = get_job(lid)
+        if lj is None or lj["status"] not in ("queued", "running"):
+            break
+        seen = lj["progress"]
+        with _jobs_lock:
+            waiting = lid in _line and _line[0] != lid
+        _set(job, stage="Waiting to find the lyrics" if waiting else lj["stage"], progress=seen)
+        time.sleep(0.4)
+    base = job.get("lyricsFrom", 0.0)
+    held = base + (1 - base) * seen  # where it stopped, of its lyrics' part
+    folder = os.path.join(LIB, song_id)
+    if not os.path.isfile(os.path.join(folder, "meta.json")):
+        return  # deleted meanwhile: nothing to ask for
+    if lj is not None and lj["status"] == "done" and _lyrics_data(folder):  # in, lyrics and all: into the library now
+        with _meta_lock:
+            meta = _read_meta(folder)
+            meta.pop("adding", None)
+            _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
+        return
+    if lj is None or lj["status"] != "done":
+        _set(job, needLyrics=True, lyricsError=(lj or {}).get("error") or "That didn’t work.", stoppedAt=held)
+    elif not _lyrics_data(_song_dir(song_id)):
+        _set(job, needLyrics=True, lyricsError=None, stoppedAt=held)  # none found that's sung in it
+
+
+def resume_lyrics(job_id: str, text) -> str:
+    """A song added whose lyrics weren't found (needLyrics): them pasted in, timed as the rest of its adding. Returns
+    its status (running again)."""
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("Paste the lyrics, a line of the song to each line.")
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is not None:
+            _settled(job)
+        if job is None or job["kind"] != "separate" or not job.get("needLyrics") or job["status"] != "done":
+            raise ValueError("Unknown job.")
+        job.update(status="running", needLyrics=False, lyricsError=None, lyricsFrom=job.get("stoppedAt", 0.0))
+
+    def body():
+        try:
+            _lyrics_phase(job, job["songId"], {"text": text})
+        finally:
+            _set(job, status="done", progress=1.0, stage="Done")
+    threading.Thread(target=body, daemon=True).start()
+    return "running"
 
 
 # ---------- lyrics ----------
@@ -1608,7 +2002,7 @@ def get_lyrics(song_id: str) -> dict:
     return {"lyrics": data, "job": running["id"] if running and running["status"] in ("queued", "running") else None}
 
 
-def start_lyrics(song_id: str, how, again: bool = False, low: bool = False) -> str:
+def start_lyrics(song_id: str, how, again: bool = False, low: bool = False, front: bool = False) -> str:
     """Find a song's lyrics and line them up with its voice, in the background (half a minute at most on a GPU; the
     first time, Whisper's model is downloaded too). how: None to look on LRCLIB by the title, {"id": n} for an entry
     picked from search_lyrics, {"text": …} for lyrics pasted in. again: the lines the song has, lined up again as the
@@ -1666,6 +2060,7 @@ def start_lyrics(song_id: str, how, again: bool = False, low: bool = False) -> s
     job["songId"] = song_id
     job["upgrade"] = again
     job["low"] = low  # a playlist's song's: at low priority too
+    job["front"] = front  # a song just added's: next in line (_turn)
     _lyrics_jobs[song_id] = _run(job, work)
     return _lyrics_jobs[song_id]
 

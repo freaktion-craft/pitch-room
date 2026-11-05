@@ -13,7 +13,12 @@
     const nav = performance.getEntriesByType("navigation")[0];
     let again = false;
     try { again = sessionStorage.getItem("stem:opened") === "1"; sessionStorage.setItem("stem:opened", "1"); } catch (e) { again = false; }
-    if (again || (nav && nav.type !== "navigate") || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (again || (nav && nav.type !== "navigate")) { // a reload (Ctrl R) or a step back: no bar, the page only rising in (boot())
+      document.documentElement.classList.add("coming");
+      window.COMING_TIMER = setTimeout(() => document.documentElement.classList.remove("coming"), 3000);
+      return;
+    }
     document.documentElement.classList.add("booting");
     window.BOOT_TIMER = setTimeout(() => document.documentElement.classList.remove("booting"), 8000); // (the welcome stops it: its steps take longer)
   })();
@@ -49,8 +54,10 @@ const ONBOARD_EVERY_STEP = false;
    going), without touching what's installed: their download only pretended, about 20 s, after which they count as in
    and the song's added for real. false for a release. */
 const ONBOARD_NO_TOOLS = false;
-/* the desktop app on macOS draws no title bar: its window's buttons sit alone in the corner (desktop/main.js, base.css) */
+/* the desktop app on macOS draws no title bar: its window's buttons sit alone in the corner; on Windows they're over
+   the page's top right corner, on a strip of its own (desktop/main.js, base.css) */
 if (window.pitchroom && window.pitchroom.platform === "darwin") document.documentElement.classList.add("desktop-mac");
+if (window.pitchroom && window.pitchroom.platform === "win32") document.documentElement.classList.add("desktop-win");
 /* EMPTY_LIBRARY: the library drawn as if no song had been added (drawLibrary), so a first time can be seen; the songs
    stay as they are, and come back with false. While it's being made. */
 const EMPTY_LIBRARY = false;
@@ -67,18 +74,16 @@ const EMPTY_LIBRARY = false;
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Pitchroom</a>
-    <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
-    <a class="btn sm icon quiet" id="voiceBtn" href="#voice" aria-label="Lab" title="Lab: chest and head voice, the spectrum, formants"></a>
+    <!-- the sections, right of the name, the one you're in lit (route()) -->
+    <nav class="tabs" aria-label="Sections"><a class="btn sm tab" id="tabLib" href="#stems">Library</a><a class="btn sm tab" id="tabLab" href="#voice" title="Lab: chest and head voice, the spectrum, formants">Lab</a><a class="btn sm tab" id="micSetBtn" href="#settings">Settings</a></nav>
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
-    <a class="btn sm icon quiet" id="micSetBtn" href="#settings" aria-label="Settings" title="Settings"></a>
+    <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
-    <div class="pop" id="jobsPop" role="dialog" aria-label="Songs being added" hidden><div class="jobs-head"><b class="pop-title">Adding songs</b><button class="btn sm" id="jobsAddBtn" type="button">Add song</button></div><p class="muted" id="jobsNone">Nothing being added.</p><div id="jobsList"></div><div id="jobsAdd" hidden></div>
-      <div class="menu" id="ytMenu" role="menu" aria-label="Add song" hidden><button id="ytImport" type="button" role="menuitem"><span class="yt-what"><span>Import from YouTube</span><small id="ytTitle"></small></span></button><button id="ytOther" type="button" role="menuitem"><span>Another link or a file…</span></button></div></div>
   </header>
 
   <main id="vPractice" aria-label="Practice" hidden>
     <div class="backbar"><nav class="crumbs" id="kCrumbs" aria-label="Where you are"></nav>
-      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b class="pop-title">Headphones</b><div id="earRows"></div></div></span><button class="btn sm quiet sync-btn" id="syncGo" type="button" aria-live="polite"><span id="syncNow"></span></button><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
+      <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b class="pop-title">Headphones</b><div id="earRows"></div></div></span><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
     <div class="pr-cols" id="prCols">
     <div class="pr-main">
     <div class="songbar" id="songBar">
@@ -138,8 +143,8 @@ const EMPTY_LIBRARY = false;
         </div>
       </div>
     </section>
-    <div class="keys-wrap" id="keysWrap"><div class="keys" id="keys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
-    <p class="credit">Piano samples: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> · Alexander Holm, CC-BY 3.0</p>
+    <!-- the piano's credit in its card, in the room beside the keys at the bottom right -->
+    <div class="keys-wrap" id="keysWrap"><div class="keys" id="keys" aria-label="Piano keyboard (tap to hear a note)"></div><p class="credit">Piano samples: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> · Alexander Holm, CC-BY 3.0</p></div>
     </div>
     <section class="takes" id="takes" aria-labelledby="tkTitle" hidden>
       <div class="tk-head">
@@ -157,12 +162,12 @@ const EMPTY_LIBRARY = false;
     </div>
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
-    <div class="backbar"><button class="btn sm back" id="vcBack" type="button">Back</button>
-      <div class="bb-acts"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="true">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="false">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div></div>
+    <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div>
     <div class="vc">
-      <section class="vc-spec" aria-label="Spectrogram" hidden><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
+      <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
       <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false" title="Keep this moment faintly behind, to sing against (an onion skin): the spectrum, the vowel's shape, the formants, and the dot on the pad. Pressed again, it goes">Freeze</button></section>
-      <section class="vc-pad" aria-label="Where your voice is">
+      <section class="vc-pad" aria-label="Where your voice is" hidden>
         <canvas id="vcPad" aria-hidden="true"></canvas>
         <span class="vc-ax up">Forward · bright</span><span class="vc-ax down">Back · dark</span><span class="vc-ax left">Chest</span><span class="vc-ax right">Head</span>
         <div class="overlay" id="vcOff" hidden><p>Use headphones, so the speakers don’t leak in.</p><button class="btn primary" id="vcMic" type="button">Turn the mic on</button></div>
@@ -176,11 +181,6 @@ const EMPTY_LIBRARY = false;
           <div><dt>Level</dt><dd id="vcLvl">–</dd></div>
           <div title="Formants, the vowel's shape: F1 rises as the mouth opens, F2 as the tongue comes forward. Less sure on high notes, where the harmonics are far apart"><dt>F1 · F2</dt><dd id="vcF12">–</dd></div>
         </dl>
-        <div class="vc-step">
-          <div class="vc-step-head"><b title="Set a note, then go up a semitone at a time">Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button" title="Play it">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
-          <label title="Hold the note on pitch for a second and the next one plays">Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
-          <p class="muted">Tap a key to start there.</p>
-        </div>
         <div class="vc-cal">
           <b>Set it to your voice</b>
           <p class="muted">Turn one on and sing in it. A few notes and vowels of each, the same notes in both.</p>
@@ -189,13 +189,19 @@ const EMPTY_LIBRARY = false;
         </div>
       </aside>
     </div>
-    <div class="keys-wrap"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div></div>
+    <!-- the keyboard, and beside it Step up: the note to sing (lit on it, a key tapped sets it) and a semitone up at a time -->
+    <div class="keys-wrap vc-keys"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div>
+      <div class="vc-step">
+        <div class="vc-step-head"><b title="Set a note, then go up a semitone at a time">Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button" title="Play it">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
+        <label title="Hold the note on pitch for a second and the next one plays">Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
+        <p class="muted">Tap a key to start there.</p>
+      </div></div>
   </main>
   <main id="vSettings" aria-label="Settings" hidden>
     <!-- left from the onboarding's color step for here (welcome()): in the crumbs' place, the steps again from there -->
     <div class="backbar"><nav class="crumbs" id="setCrumbs" aria-label="Where you are"></nav><section class="panel-card ob-back" id="obBack" hidden><div class="setup-line"><p class="muted">You have a few steps left.</p><button class="btn sm primary" id="obBackBtn" type="button">Back to onboarding</button></div></section></div>
     <div class="set-layout">
-      <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Microphone</button><button type="button" data-to="setMore">Advanced</button></nav>
+      <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Microphone</button><button type="button" data-to="setRec">Recording</button><button type="button" data-to="setMore">Advanced</button></nav>
       <div class="settings" id="micSet">
         <section class="set-group" aria-labelledby="setGeneral">
           <h2 class="group-label" id="setGeneral">General</h2>
@@ -203,25 +209,35 @@ const EMPTY_LIBRARY = false;
             <div class="set-row"><div class="set-what"><b>Language</b><small>The app’s words</small></div><button class="pick" id="lang" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Note names</b><small>On the stage and the keyboard</small></div><button class="pick" id="names" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Accent color</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent color"></div></div>
+            <label class="set-row"><span class="set-what"><b>Aurora</b><small>The glow behind Practice, as the song plays</small></span><input type="checkbox" class="switch" id="auroraOn"></label>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMic">
           <h2 class="group-label" id="setMic">Microphone</h2>
           <div class="set-list">
             <div class="set-row"><div class="set-what"><b>Input</b><small>What you sing into</small></div><button class="pick" id="micDev" type="button"></button></div>
-            <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button" title="Hold your headphones close to the mic, then press">Measure</button></div></div>
             <div class="set-row gate-sec">
-              <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button><button class="btn sm" id="hearMe" type="button" aria-pressed="false" title="Through headphones: through speakers it can howl">Hear yourself</button></div></div>
+              <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon quiet mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button></div></div>
               <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>
             </div>
             <label class="set-row"><span class="set-what"><b>Filter out speaker sound</b><small>For speakers; leave it off with headphones</small></span><input type="checkbox" class="switch" id="echo"></label>
           </div>
         </section>
+        <section class="set-group" aria-labelledby="setRec">
+          <h2 class="group-label" id="setRec">Recording</h2>
+          <div class="set-list">
+            <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button" title="Hold your headphones close to the mic, then press">Measure</button></div></div>
+          </div>
+        </section>
         <section class="set-group" aria-labelledby="setMore">
           <h2 class="group-label" id="setMore">Advanced</h2>
           <div class="set-list">
+            <!-- the song tools (paintTools): how they are, Install (missing) or Update, and Check, a report of each one to copy -->
+            <div class="set-row set-tools" id="sInstall"><div class="set-what"><b>Song tools</b><small id="sInstallState"></small></div><div class="set-acts"><button class="btn sm" id="setToolsCheck" type="button">Check</button><button class="btn sm primary" id="sInstallBtn" type="button"><span>Install</span></button></div>
+              <div class="set-tools-out"><div class="bar" hidden id="sInstallBar"><i></i></div><pre class="log" id="sInstallLog" hidden></pre></div></div>
             <div class="set-row" id="setImport" hidden><div class="set-what"><b>Import beta library</b><small id="setImportWhy">Copy songs and settings from the beta folder</small></div><button class="btn sm" id="setImportGo" type="button" title="The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own">Choose folder</button></div>
             <label class="set-row"><span class="set-what"><b>Developer tools</b><small>Mark where Practice’s phrases should split or join</small></span><input type="checkbox" class="switch" id="devTools"></label>
+            <div class="set-row"><div class="set-what"><b>Onboarding</b><small>The first steps again: your mic, your color, a song</small></div><button class="btn sm" id="setOnboard" type="button">Visit</button></div>
           </div>
         </section>
       </div>
@@ -232,20 +248,15 @@ const EMPTY_LIBRARY = false;
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
-    <!-- the tools to add songs, in the library and on Add song while they're missing (an update can add one) -->
-    <section class="panel-card" id="sInstall" hidden>
-      <div class="setup-line"><p class="muted">First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.</p><span class="muted" id="sInstallState"></span><button class="btn sm primary" id="sInstallBtn" type="button">Install</button></div>
-      <div class="bar" hidden id="sInstallBar"><i></i></div>
-      <pre class="log" id="sInstallLog" hidden></pre>
-    </section>
 
     <div id="libMast" aria-hidden="true"></div>
     <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
     <div id="addVeil" aria-hidden="true"></div>
-    <!-- Add song's panel (#sAddBtn opens it): in the middle of the window, over the veil, so it's here, not by its button -->
-    <div class="pop" id="addPop" role="dialog" aria-label="Add a song" hidden>
+    <!-- the drawer (Add song, and the + by the mic, open it): at the window's right, over the veil; both moved out to the body
+         (studio.js, practice.js), over the list's blur. The form at its top, the songs being added under it (paintJobs) -->
+    <div class="pop" id="jobsPop" role="dialog" aria-label="Add a song" hidden>
+      <div class="add-title"><b class="pop-title">Add a song</b><button class="btn sm icon ghost" id="sAddClose" type="button" aria-label="Close" title="Close"></button></div>
       <div class="add-form" id="sAdd" hidden>
-        <div class="add-title"><b class="pop-title">Add a song</b><button class="btn sm icon ghost" id="sAddClose" type="button" aria-label="Close" title="Close"></button></div>
         <form class="yt" id="sYtForm">
           <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links or a playlist" title="YouTube links, one per line, or a YouTube or Spotify playlist link" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
           <button class="btn sm primary" type="submit">Add</button>
@@ -263,20 +274,23 @@ const EMPTY_LIBRARY = false;
         </div>
         <p class="muted" id="sAddMsg" hidden></p>
       </div>
-      <p class="muted" id="sAddSetup" hidden>Install the tools first, from the banner above.</p>
+      <p class="muted" id="sAddSetup" data-html hidden>Install the song tools first, in <a href="#settings">Settings</a>.</p>
+      <div id="jobsList"></div>
     </div>
-    <section class="group" id="sLibPage" aria-labelledby="sLibTitle">
+    <section class="group" id="sLibPage" aria-label="Library">
       <div class="lib-head">
         <span class="ln-pull" id="sNewPull" aria-hidden="true"></span>
-        <h2 class="group-label lib-title" id="sLibTitle">Library</h2>
+        <!-- the list's view, in the name's place: its songs, or them under each artist or album (arrangeRows) -->
+        <div class="seg lib-title lib-view" id="sLibView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="song" aria-checked="true">Song</button><button type="button" role="radio" data-v="artist" aria-checked="false">Artist</button><button type="button" role="radio" data-v="album" aria-checked="false">Album</button></div>
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
         <button class="btn sm" id="sUpdate" type="button" hidden>Update</button>
-        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="addPop">Add song</button></span></div>
+        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="jobsPop">Add song</button></span></div>
       <section class="lib-new" id="sNew" aria-labelledby="sNewTitle" hidden>
         <div class="ln-head"><h2 class="group-label" id="sNewTitle">New <span class="ln-n" id="sNewCount"></span></h2><span class="ln-arrows"><button class="btn sm icon ghost" id="sNewPrev" type="button" aria-label="Back" title="Back"></button><button class="btn sm icon ghost" id="sNewNext" type="button" aria-label="More" title="More"></button></span></div>
         <div class="ln-track" id="sNewTrack"></div>
       </section>
       <div class="rows" id="sLib"></div>
+      <div class="al-grid" id="sAlbums" aria-label="Albums"></div>
     </section>
 
     <section class="ts" id="sTakesStudio" aria-label="Takes Studio" hidden>
@@ -352,7 +366,9 @@ const EMPTY_LIBRARY = false;
 <div id="welcome"><div class="pages" aria-hidden="true"><div class="book"></div></div><span class="word" aria-hidden="true">Pitchroom</span>
   <!-- the first steps (onboard()), once the pages are back to black and the name's gone to the header -->
   <!-- the right half beside the steps: a photo of flowers, and over it in characters what its mask outlines (obArt) -->
-  <div class="ob-visual" id="obVisual" aria-hidden="true"><img src="img/onboard-flowers.jpg" alt="" decoding="async"><canvas id="obAscii"></canvas><canvas id="obScope"></canvas><div class="ob-hero" id="obHero" hidden><span class="cover"><img alt=""></span><b></b><small></small></div></div><!-- beside the mic's step: what the mic hears (obScope) -->
+  <div class="ob-visual" id="obVisual" aria-hidden="true"><img src="img/onboard-flowers.jpg" alt="" decoding="async"><canvas id="obAscii"></canvas><canvas id="obScope"></canvas><div class="ob-hero" id="obHero" hidden><span class="cover"><img alt=""></span><b></b><small></small></div><div class="ob-floats" id="obFloats"></div></div><!-- beside the mic's step: what the mic hears (obScope) -->
+  <!-- the steps visited again (Settings' Onboarding, once through them): out of them at once, at their column's bottom left -->
+  <button class="btn sm ob-exit" id="obExit" type="button" hidden>Exit</button>
   <div class="onboard" id="onboard" hidden>
     <!-- the goo the link's field melts through into the found song's cover (obGoo): blurred, its edge drawn back hard, filled one colour -->
     <svg class="ob-goo-def" width="0" height="0" aria-hidden="true"><filter id="ob-goo" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="7"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 24 -10" result="goo"/><feFlood class="ob-goo-ink"/><feComposite in2="goo" operator="in"/></filter></svg>
@@ -404,6 +420,9 @@ const EMPTY_LIBRARY = false;
       <!-- the song tools offered: what they are, and how big -->
       <p class="ob-small" id="obGetsNote" hidden>The song tools split songs into voice and band and read their melody and lyrics.</p>
       <p class="ob-small ob-err" id="obSongErr" hidden></p>
+      <!-- or a library from the beta, in the desktop app (it picks the folder): its covers float on the water as they come in (obLib) -->
+      <p class="ob-small ob-lib" id="obLib" hidden><span id="obLibWhy">Have a library already?</span><button class="btn sm" id="obLibGo" type="button" title="The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own">Choose folder</button></p>
+      <p class="ob-small" id="obLibState" role="status" hidden></p>
       <div class="ob-acts"><button class="btn primary" id="obSongGo" type="button" hidden></button><button class="btn ghost" id="obSongAgain" type="button" hidden>Another link</button></div>
     </section>
     <section class="ob-step" data-step="tools" aria-labelledby="obDlT" hidden>

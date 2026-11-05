@@ -217,10 +217,9 @@ function findClicks(chunks, from, sr, click) {
   if (near.length < 5) throw new Error("The clicks came back unevenly. Keep quiet and try again.");
   return near.reduce((a, b) => a + b, 0) / near.length;
 }
-// Sync, in Practice beside Record and in the settings under the input: what new takes allow for, from the input
-// chosen; a press measures it. In Practice's tooltip the browser's part as it reports it now and the part measured,
-// when and on what, and how to measure (the settings' delay has the parts in its own). syncErr: a measurement that
-// didn't work (English), said on both in red until the next.
+// Sync, in Settings (Recording): what new takes allow for, from the input chosen; Measure measures it. Its delay's
+// tooltip has the browser's part as it reports it now and the part measured, when and on what. syncErr: a
+// measurement that didn't work (English), said in red in its line until the next.
 let syncErr = "";
 function paintSync() {
   if (!ac) return;
@@ -228,25 +227,18 @@ function paintSync() {
   const t = m ? Math.max(0, Math.min(1000, b + inMs(m.s))) : b;
   const parts = m ? ["Browser {b} ms + measured {e} ms · {on} · {when}", { b, e: keySign(inMs(m.s)), on: m.label || tr("System default"), when: longDate(new Date(m.at)) }]
     : ["The browser’s {b} ms only: not measured yet", { b }];
-  const go = $("#syncGo"), now = $("#syncNow");
-  go.disabled = syncBusy; go.classList.toggle("err", !!syncErr && !syncBusy);
-  if (syncBusy) say(now, "Listening…");
-  else if (syncErr) say(now, "Couldn’t measure");
-  else say(now, "{t} ms", { t });
-  if (syncErr) say(go, "{why} Press to try again.", { why: tr(syncErr) }, "title");
-  else if (m) say(go, "Sync: browser {b} ms + measured {e} ms · {on} · {when}. Hold your headphones close to the mic and press to measure again.", parts[1], "title");
-  else say(go, "Sync: the browser’s {b} ms only, not measured yet. Hold your headphones close to the mic and press to measure.", { b }, "title");
-  // the settings' row: the delay, Measure, and what went wrong in its line under Sync
+  // its row in Settings (Recording): the delay, Measure, and what went wrong in its line under Sync
   const sNow = $("#setSyncNow"), sGo = $("#setSyncGo"), why = $("#setSyncWhy");
   say(sNow, syncBusy ? "Listening…" : "{t} ms", { t }); say(sNow, parts[0], parts[1], "title");
   sGo.disabled = syncBusy; say(sGo, syncBusy ? "Measuring…" : "Measure");
+  say(sGo, "Hold your headphones close to the mic and press to measure.", null, "title");
   if (syncErr && !syncBusy) say(why, syncErr); else say(why, "How late your voice reaches the app; new takes allow for it");
   why.classList.toggle("err", !!syncErr && !syncBusy);
 }
 async function runSync() {
   if (syncBusy) return;
   syncBusy = true; syncErr = ""; paintSync();
-  pauseSong(); listenStop(); tsStop(); hearMe(false); // nothing else playing while it listens (the mic back in your ears neither)
+  pauseSong(); listenStop(); tsStop(); // nothing else playing while it listens
   try {
     const r = await measureDelay();
     syncExtras = { ...syncExtras, [syncKey()]: { s: Math.round(Math.max(-1, Math.min(1, r.s - r.browser)) * 1e4) / 1e4, label: r.label, at: Date.now() } };
@@ -259,7 +251,7 @@ function openSync() {
   ensureCtx(); paintSync();
   setTimeout(() => { if (view === "practice" || view === "settings") paintSync(); }, 500); // the sound system's delay, which the browser knows once its audio runs
 }
-function initSync() { $("#syncGo").prepend(icon("timer")); $("#syncGo").onclick = runSync; $("#setSyncGo").onclick = runSync; }
+function initSync() { $("#setSyncGo").onclick = runSync; }
 
 // The takes of the song in Practice, newest first (ones being saved, or that couldn't be, on top), and the one playing
 // (play) or paused (at: {id, pos}). mix: how takes sound, played here and downloaded; Your voice works on top of the

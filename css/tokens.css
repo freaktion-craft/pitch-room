@@ -36,7 +36,7 @@
      full white, the toning down being for what isn't one (set with --voice, by setAccent) */
   --voice-act: var(--ink);
   --voice: var(--voice-white); --on-voice: oklch(0.165 0 0);
-  --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --bad: oklch(0.66 0.2 25);
+  --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --orange: oklch(0.74 0.17 55); --bad: oklch(0.66 0.2 25);
   --solo: oklch(0.84 0.14 85); --on-solo: oklch(0.3 0.06 85); /* a soloed track's S, lit */
   --note-bg: oklch(0.27 0.03 75); --note-ink: oklch(0.86 0.09 80); --warn-ink: oklch(0.8 0.13 80);
   --key-w: oklch(0.87 0 0); --key-b: oklch(0.22 0 0); --key-w-on: oklch(0.72 0 0); --key-b-on: oklch(0 0 0);

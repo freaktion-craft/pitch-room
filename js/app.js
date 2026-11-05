@@ -149,6 +149,22 @@ async function openSongById(id) {
 }
 // #stems… for the library and its pages, #practice for Practice, which needs its song open, so a reload there (or
 // an old link to a page that's gone) lands in the library; #voice for Chest & head voice.
+// The stroke under the section you're in: one for both tabs, sliding from one to the other (its place and width, the
+// lit tab's word's); in neither, it fades where it is, and comes back in place, not sliding in from there. Placed again
+// as the tabs' size changes (the font in, the other language).
+const tabLine = el("i", "tab-line");
+$("#app > header .tabs").append(tabLine);
+function paintTabLine() {
+  const on = $("#app > header .tab.on");
+  if (!on) { tabLine.classList.remove("on"); return; }
+  const pad = parseFloat(getComputedStyle(on).paddingLeft) || 0, was = tabLine.classList.contains("on");
+  if (!was) tabLine.style.transition = "none"; // (appearing: where it's going, at once, then faded in)
+  tabLine.style.transform = `translateX(${on.offsetLeft + pad}px)`; tabLine.style.width = on.offsetWidth - pad * 2 + "px";
+  if (!was) { void tabLine.offsetWidth; tabLine.style.transition = ""; }
+  tabLine.classList.add("on");
+}
+new ResizeObserver(() => { const t = tabLine.style.transition; tabLine.style.transition = "none"; paintTabLine(); void tabLine.offsetWidth; tabLine.style.transition = t; })
+  .observe($("#app > header .tabs"));
 function route() {
   const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
   const singing = v === "practice" && K.on && P.song && K.song.id === P.song.id;
@@ -162,8 +178,11 @@ function route() {
   }
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems"; $("#vVoice").hidden = view !== "voice";
   $("#vSettings").hidden = view !== "settings";
-  $("#voiceBtn").classList.toggle("on", view === "voice"); $("#micSetBtn").classList.toggle("on", view === "settings");
-  showMicSet(view === "settings"); showEars(false);
+  for (const [t, on] of [[$("#tabLib"), view === "stems" || view === "practice"], [$("#tabLab"), view === "voice"], [$("#micSetBtn"), view === "settings"]]) { // the section you're in
+    t.classList.toggle("on", on); if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
+  }
+  paintTabLine();
+  showMicSet(view === "settings"); showEars(false); if (view !== "stems") showAdd(false); // (its drawer is out of the library's page)
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra);
@@ -179,7 +198,7 @@ function route() {
     openSync(); // beside Record: the delay as it is now
     renderStart();
     // size and draw the stage now, so the view's first frame is complete rather than an empty stage
-    paintTakesShown(); resize(); centerKeys();
+    paintTakesShown(); fitStage(); resize(); centerKeys();
     if (K.on) practiceFrame();
   }
   if (view === "voice") voiceShow();
@@ -231,6 +250,12 @@ async function boot() {
   const root = document.documentElement;
   let from = 0; // the bar's sweep is timed from when it shows
   if (root.classList.contains("asking")) { await askUpdate(); from = performance.now(); }
+  if (root.classList.contains("coming") && !root.classList.contains("booting")) { // a reload: no bar, the page rising in as it's drawn, a part after another
+    await Promise.race([Promise.all([libDrawn, document.fonts.ready]), sleep(1500)]);
+    clearTimeout(window.COMING_TIMER); root.classList.remove("coming");
+    return reveal(0);
+  }
+  root.classList.remove("coming");
   if (!root.classList.contains("booting")) return;
   if (root.classList.contains("welcome")) return welcome();
   await Promise.race([Promise.all([libDrawn, document.fonts.ready]), sleep(5000)]);
@@ -256,7 +281,8 @@ function reveal(at, nameThere = false) {
     t += 90;
   }
   rise($("#sLib .lib-cols"), t); // the column heads on their own: they're sticky, and one in a rising list isn't drawn till it's risen, then shows at once
-  [...$("#sLib").querySelectorAll(".row")].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6));
+  const items = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums").querySelectorAll(".al-card") : $("#sLib").querySelectorAll(".row, .lib-group, .al-bar");
+  [...items].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6)); // (the rows, the Artist view's headings with them, or the Album view's cards)
   const rising = document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity);
   Promise.all(rising.map((a) => a.finished)).then(pinLibTop, pinLibTop); // measured where it rose to
 }
@@ -272,6 +298,9 @@ const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06
 // the steps again, where they were left
 const obResume = () => { $("#obBack").hidden = true; document.documentElement.classList.remove("ob-left"); welcome(OB.left); };
 $("#obBackBtn").onclick = obResume;
+// Settings' Onboarding: the steps again from the first, over the page as it is (as the banner brings them back), the
+// library after them
+$("#setOnboard").onclick = () => { $("#obBack").hidden = true; document.documentElement.classList.remove("ob-left"); welcome(0); };
 $("#micSetBtn").addEventListener("click", (e) => { if (OB.left == null) return; e.preventDefault(); obResume(); });
 async function welcome(resume) { // resume: a step to come back to (Settings' banner), without the riffle
   const root = document.documentElement, w = $("#welcome"), pages = w.querySelector(".pages"), book = w.querySelector(".book"), word = w.querySelector(".word");
@@ -321,13 +350,15 @@ async function welcome(resume) { // resume: a step to come back to (Settings' ba
   await word.animate([{ transform: place(...mid()) }, { transform: place(brand.left, brand.top, brand.width / from.width) }],
     { duration: still ? 1 : R.slide, easing: R.slideEase, fill: "forwards" }).finished;
   w.classList.add("onboarding");
-  const left = await onboard(resume ?? 0);
+  let left = await onboard(resume ?? 0);
+  const exited = !!left?.exit; // out by Exit (visited again, through them before): back where you were, as you were
+  if (exited) left = null;
   w.classList.remove("onboarding");
   OB.left = left ? left.at : null; $("#obBack").hidden = !left; root.classList.toggle("ob-left", !!left); // left for Settings: its banner brings the steps back
   if (left) { location.hash = "#settings"; route(); } // the page comes in as Settings
   else {
     store.set("welcomed", true); // only once they're through: a first time left half-way is a first time again
-    if (resume != null && view === "settings") { location.hash = "#stems"; route(); } // through from Settings: to the library, the first song in it
+    if (resume != null && view === "settings" && !exited) { location.hash = "#stems"; route(); } // through from Settings: to the library, the first song in it
   }
   // then the page round the name: it shows under the black (its parts held back by the rises), which goes
   root.classList.remove("booting");
@@ -417,7 +448,7 @@ document.addEventListener("keydown", (e) => {
   if (view === "practice" && K.on) {
     if (e.repeat && /^(Space|KeyL|KeyR|KeyM)$/.test(e.code)) { e.preventDefault(); return; }
     const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
-      Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: !e.repeat ? () => dropNote(e) : null,
+      Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: S.dev && !e.repeat ? () => dropNote(e) : null,
       BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }
   }

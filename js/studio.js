@@ -52,7 +52,8 @@ function paintMeta() {
 function closeSong() {
   pauseSong();
   P.song = null; P.buffers = {}; P.peaks = P.trackPeaks = null; P.keep = {}; P.tsel = P.mark = null; // waveforms flat until the next song's peaks are in
-  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.rate = P.rateWant = 1; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null;
+  clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.rate = P.rateWant = 1; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null; P.keyWarnAt = 0;
+  paintBusy();
   const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
   $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
 }
@@ -168,7 +169,7 @@ const FADE = 0.05;
 const fadeIn = (g, at, to = 1) => { g.setValueAtTime(0, at); g.linearRampToValueAtTime(to, at + FADE); };
 const fadeOut = (g, now) => { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + FADE); };
 function playSong() {
-  if (!P.song || !Object.keys(P.buffers).length) return;
+  if (!P.song || !Object.keys(P.buffers).length || songBusy()) return;
   ensureCtx();
   listenStop(); // a take that's playing gives way to the song
   if (P.offset >= songDur() - 0.05) P.offset = 0;
@@ -543,7 +544,17 @@ const rateOf = (x) => Math.round(Math.max(RATE_MIN, Math.min(RATE_MAX, x)) * 100
 const rateMap = () => { const r = store.get("tempos", {}); return r && typeof r === "object" ? r : {}; }; // song id -> speed
 const savedRate = (id) => (Number.isFinite(+rateMap()[id]) ? rateOf(+rateMap()[id]) : 1);
 function saveRate(id, s) { const r = rateMap(); if (s !== 1) r[id] = s; else delete r[id]; store.set("tempos", r); }
-const KEYS = 6, KEY_WARN = 4; // from KEY_WARN semitones on, the processing can be heard
+const KEYS = 6, KEY_WARN = 4, KEY_WARN_FOR = 3000; // from KEY_WARN semitones on, the processing can be heard (said beside the control for KEY_WARN_FOR ms once such a key's chosen)
+// A version being made (its render, then its files loading): the song held still till it's in, its controls out of
+// reach (html.song-busy), but for the key and tempo themselves, to choose again
+const songBusy = () => P.keyProg != null;
+const BUSY_PARTS = "#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl, #stage";
+function paintBusy() {
+  const busy = songBusy();
+  if (busy && P.playing) pauseSong();
+  document.documentElement.classList.toggle("song-busy", busy);
+  document.querySelectorAll(BUSY_PARTS).forEach((n) => { n.inert = busy; });
+}
 const keySign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n); // +2, −3, 0
 const keyAfter = (k, n) => k && { pc: (((k.pc + n) % 12) + 12) % 12, mode: k.mode };
 // the open song's key as it plays: its own, moved n semitones (P.key, or a take's), for the note names (absName)
@@ -578,8 +589,10 @@ const setRate = (s) => setVersion(P.keyWant, rateOf(s));
 function setVersion(n, s) {
   const m = P.song;
   if (!m || (n === P.keyWant && s === P.rateWant)) return;
+  if (n !== P.keyWant) P.keyWarnAt = Math.abs(n) >= KEY_WARN ? performance.now() : 0; // its warning: a while after it's chosen (paintKey)
   P.keyWant = n; P.rateWant = s; saveKey(m.id, n); saveRate(m.id, s); P.keyProg = keyHere(n, s) ? null : 0; P.keyNote = ""; P.keyErr = false;
   paintKey();
+  clearTimeout(P.keyWarnT); if (P.keyWarnAt) P.keyWarnT = setTimeout(paintKey, KEY_WARN_FOR + 20);
   clearTimeout(P.keyTimer);
   P.keyTimer = setTimeout(() => loadKey(m, n, s), 0); // picked from a list or typed in, so no steps on the way to wait out
 }
@@ -653,7 +666,9 @@ function keyItems(m, want) {
 }
 function paintKey() {
   const n = P.keyWant, items = keyItems(P.song, n);
-  const note = P.keyErr ? tr(P.keyNote) : Math.abs(n) >= KEY_WARN ? tr("{n} or more semitones can sound processed.", { n: KEY_WARN }) : "";
+  const warn = Math.abs(n) >= KEY_WARN && performance.now() - (P.keyWarnAt || -1e9) < KEY_WARN_FOR; // (only just chosen)
+  const note = P.keyErr ? tr(P.keyNote) : warn ? tr("{n} or more semitones can sound processed.", { n: KEY_WARN }) : "";
+  paintBusy();
   document.querySelectorAll(".keyctl").forEach((box) => {
     box.pick.set(items, n);
     box.note.textContent = box.note.title = note; box.note.classList.toggle("err", P.keyErr); box.note.classList.toggle("warn", !P.keyErr && !!note);
@@ -876,21 +891,46 @@ function initWave() {
   });
   wave.addEventListener("pointercancel", () => { down = false; endScrub(); });
 }
+// Check's report (stems.check_tools), plain text to read or copy when something's wrong: the Python and the device,
+// each tool's version and whether it loads (why not, if not), the others' versions, the models downloaded
+const TOOL_LOADS = [["torch", "torch"], ["torchaudio", "torchaudio"], ["demucs", "demucs"], ["audio_separator", "audio-separator"],
+  ["librosa", "librosa"], ["whisper", "openai-whisper"], ["stable_whisper", "stable-ts"]];
+function toolsReport(r) {
+  const v = r.versions || {}, loads = r.loads || {}, out = [];
+  out.push(`Python ${r.python} · ${r.device}${r.deviceName ? ` (${r.deviceName})` : ""}${r.gpuUnused ? " · NVIDIA card not used" : ""}${r.driverOld ? " · NVIDIA driver too old" : ""}${r.restartNeeded ? " · restart needed" : ""}`);
+  if (loads.python) out.push(`Couldn’t check them: ${loads.python}`);
+  for (const [mod, dist] of TOOL_LOADS) {
+    const err = loads[mod];
+    out.push(`${(dist + " " + (v[dist] || "—")).padEnd(30)} ${!v[dist] ? "not installed" : err == null ? "" : err ? `✗ ${err}` : "✓"}`);
+  }
+  for (const d of ["numpy", "yt-dlp"]) out.push(`${(d + " " + (v[d] || "—")).padEnd(30)}`);
+  out.push(`Models: ${(r.models || []).map((m) => `${m.name} (${m.mb} MB)`).join(", ") || "none"}`);
+  return out.map((l) => l.trimEnd()).join("\n");
+}
 function initStems() {
-  $("#sInstallBtn").onclick = async () => { $("#sInstallBtn").disabled = true; try { watchJob(await postJob("/api/stems/install"), "install"); } catch (e) { say($("#sInstallState"), e.message); $("#sInstallBtn").disabled = false; } };
+  // Settings' Song tools: Install, Update (start_install's update), or Restart; and Check, the report in its log
+  $("#sInstallBtn").onclick = async () => {
+    const b = $("#sInstallBtn"), mode = b.dataset.mode || "install";
+    if (mode === "restart") return window.pitchroom.restart();
+    b.disabled = true; $("#sInstallLog").textContent = "";
+    try { watchJob(await postJob("/api/stems/install" + (mode === "update" ? "?update=1" : "")), "install"); }
+    catch (e) { say($("#sInstallState"), e.message); b.disabled = false; }
+  };
+  $("#setToolsCheck").onclick = async () => {
+    const b = $("#setToolsCheck"), log = $("#sInstallLog");
+    b.disabled = true; log.hidden = false; log.textContent = tr("Checking…");
+    try { log.textContent = toolsReport(await (await fetch("/api/stems/check", { cache: "no-store" })).json()); }
+    catch (e) { log.textContent = e instanceof TypeError ? tr("Couldn’t reach the server.") : e.message; }
+    finally { b.disabled = false; }
+  };
   $("#sGpuBtn").onclick = async () => { $("#sGpuBtn").disabled = true; try { watchJob(await postJob("/api/stems/install?gpu=1"), "gpu"); } catch (e) { say($("#sGpuState"), e.message); $("#sGpuBtn").disabled = false; } };
   $("#sYtForm").onsubmit = submitYoutube;
-  // the Add song panel: its button toggles it; a click elsewhere or Escape closes it; files dragged over the library open it
-  const addPop = $("#addPop");
-  // the close by the title: whichever panel the form is in (the ring's has it too), the focus back to what opened it
+  // Add song: its button opens the drawer (the + by the mic's: practice.js closes it on a click beside it or Escape);
+  // files dragged over the library open it too
+  document.body.append($("#addVeil")); // over all the page, the list's blurred edges too (they're outside #app)
   $("#sAddClose").append(icon("close"));
-  $("#sAddClose").onclick = (e) => {
-    e.stopPropagation();
-    if (addPop.contains($("#sAdd"))) { showAdd(false); $("#sAddBtn").focus(); } else showJobsAdd(false);
-  };
-  $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd(addPop.hidden); };
-  document.addEventListener("click", (e) => { if (!addPop.hidden && !e.composedPath().includes(addPop)) showAdd(false); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !addPop.hidden) { showAdd(false); if (!$("#sAddAt").hidden) $("#sAddBtn").focus(); } });
+  $("#sAddClose").onclick = (e) => { e.stopPropagation(); closeDrawer(); }; // the close by the title, the drawer's
+  $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd($("#jobsPop").hidden); };
   $("#pGetVideo").onclick = async () => {
     const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
     videoWait("Getting the video…");
@@ -900,7 +940,7 @@ function initStems() {
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
   $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
   // text buttons with an icon in front of the label
-  [["#sAddBtn", "plus"], ["#jobsAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
+  [["#sAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
     ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   $("#pSave").onclick = saveMix;
   document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page

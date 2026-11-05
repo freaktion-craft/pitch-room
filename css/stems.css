@@ -10,14 +10,13 @@
 .panel-card a:not(.btn) { text-decoration: underline; text-decoration-color: var(--ring); text-underline-offset: 2px; }
 .row-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .inline-field { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); }
-/* the one-time setup: a banner, its line and its button; once it's started, how it's going in the line's place */
-#sInstall, #obBack { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
+/* a banner, its line and its button (the steps left half-way: Settings'); the song tools' Installed tick (Settings' Song tools) */
+#obBack { padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
 /* Settings' one, the steps again (welcome()): in the crumbs' place while they're unfinished */
 #obBack { flex: 1; min-width: 0; margin: 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); } /* room round its button */
 .backbar:has(#obBack:not([hidden])) .crumbs { display: none; }
-#sInstall .setup-line, #obBack .setup-line { display: flex; align-items: center; gap: var(--space-4); }
-#sInstall .setup-line > :not(.btn), #obBack .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
-#sInstallState:empty, #sInstall .setup-line:has(#sInstallState:not(:empty)) p { display: none; }
+#obBack .setup-line { display: flex; align-items: center; gap: var(--space-4); }
+#obBack .setup-line > :not(.btn) { flex: 1; min-width: 0; max-width: none; }
 #sInstallState .ico { width: var(--icon-sm); height: var(--icon-sm); margin-right: 6px; vertical-align: -3px; color: var(--good); } /* Installed's tick */
 .gpu-row { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--note-bg); color: var(--note-ink); font-size: var(--text-sm); }
 .gpu-row .btn { justify-self: start; }
@@ -47,34 +46,78 @@
    one's name, how it's going (or how many are ahead of it in line), and a button to stop it; at its top right, Add
    song, which opens the Add song form in the panel, from any page */
 #jobsBtn .ring { width: var(--icon-sm); height: var(--icon-sm); transform: rotate(-90deg); }
-#jobsBtn.idle .ring, #jobsBtn:not(.idle) > .ico { display: none; } /* idle, a + in the ring's place */
-html.lib-top #jobsBtn.idle { display: none; } /* …but not in the library, where Add song is (the first in the bar's row: nothing beside it moves) */
+#jobsBtn.idle, #jobsBtn > .ico { display: none; } /* there only while songs are being added, or are in (till they're seen): the ring */
 #jobsBtn .ring circle + circle { transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #jobsBtn.err .ring circle + circle { stroke: var(--bad); } /* one couldn't be added: it says why in the panel */
 #jobsBtn[data-await] { visibility: hidden; } /* in its place, unseen, until the Add song panel has drawn into it (tuckAway) */
-.jobs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 28px; }
 #jobsPop > p { margin: 0; }
-#jobsPop.adding { width: min(420px, calc(100vw - 32px)); font-size: var(--text-md); } /* the form, as in its own panel */
-#jobsList { display: grid; gap: var(--space-4); }
-#jobsList:empty { display: none; }
+#jobsPop { font-size: var(--text-md); }
+#jobsList { display: grid; gap: var(--space-8); margin-top: var(--space-4); }
+#jobsList:not(:has(> .jobs-sec:not([hidden]))) { display: none; }
+/* its sections (JOB_SECS): a name and how many, then the songs */
+.jobs-sec { display: grid; gap: var(--space-3); }
+.jobs-sec h3 { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--muted); line-height: 18px; }
+.jobs-sec h3 .n { color: var(--faint); font-variant-numeric: tabular-nums; }
+.jobs-rows { display: grid; gap: var(--space-4); }
 /* a YouTube link copied: Add song (or a paste) offers it, named by its video's title */
-#ytMenu { width: max-content; max-width: min(340px, calc(100vw - 32px)); }
-#ytImport { height: auto; min-height: 36px; padding-block: var(--space-2); }
-.yt-what { display: grid; min-width: 0; }
-.yt-what small { color: var(--muted); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.yt-what small:empty { display: none; }
-.job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-2); align-items: center; }
-.job > .top, .job > .bar { grid-column: 1; }
+/* a YouTube link copied, offered (showClip): its picture, "From your clipboard" over its title, Add and its x */
+.clip-card { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-lg); background: var(--fill); }
+.clip-card .cc-pic { flex: none; width: 64px; height: 36px; border-radius: var(--radius-sm); overflow: hidden; background: var(--fill); display: grid; place-items: center; color: var(--muted); }
+.clip-card .cc-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.clip-card .cc-pic .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.clip-card .cc-what { display: grid; flex: 1; min-width: 0; }
+.clip-card .cc-what small { color: var(--muted); font-size: var(--text-xs); line-height: 16px; }
+.clip-card .cc-what b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip-card .cc-add .ico { width: var(--icon-sm); height: var(--icon-sm); }
+.clip-card .cc-x .ico { width: var(--icon-sm); height: var(--icon-sm); }
+/* sent: a copy of it flying to the song's row (sendClip), over the drawer */
+.cc-fly { position: fixed; z-index: calc(var(--z-modal) + 1); margin: 0; pointer-events: none; transform-origin: 0 0; }
+.job { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; row-gap: var(--space-2); align-items: center; }
+.job > .top { grid-column: 2; margin-right: var(--space-3); }
+/* its cover, once found (jobCover): its place opening at the left, the picture in, blurred to clear */
+.job > .job-cover { grid-column: 1; grid-row: 1; width: 0; height: 38px; margin-right: 0; border-radius: var(--radius-sm); overflow: hidden; opacity: 0; filter: blur(6px);
+  transition: width var(--duration-slower) var(--ease), margin-right var(--duration-slower) var(--ease), opacity var(--duration-slower) var(--ease), filter var(--duration-slowest) var(--ease); }
+.job > .job-cover.on { width: 38px; margin-right: var(--space-3); opacity: 1; filter: none; }
+.job > .job-cover img { width: 38px; height: 38px; object-fit: cover; display: block; }
+/* its name: the record's title, its artist after it; wiped in when it changes (wipeTo) */
+.job .top b { -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent 60%); mask-image: linear-gradient(90deg, #000 40%, transparent 60%); mask-size: 250% 100%; -webkit-mask-size: 250% 100%; mask-position: 0% 0; -webkit-mask-position: 0% 0; mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat; }
+.job .top b .who { margin-left: var(--space-2); color: var(--muted); font-weight: var(--weight-regular); font-size: var(--text-sm); }
+.job .top b .who:empty { display: none; }
+.job > .px { grid-column: 1 / -1; } /* the row's whole width, under its title and its buttons alike, the same in every row */
+.job > .lyr-form { grid-column: 1 / -1; }
+/* its buttons on its title's line, at the right: Paste lyrics (one stopped for them), then the x (the 32 px buttons centred on the 20 px line) */
+.job > .row-acts { grid-column: 3; grid-row: 1; display: flex; align-items: center; gap: var(--space-2); align-self: start; margin-top: -6px; }
 .job .top { display: grid; min-width: 0; }
 .job .top b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.job .top span { color: var(--muted); font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* cancel (or, once it has failed, clear away): beside both rows */
-.job .x { grid-column: 2; grid-row: 1 / span 2; }
+.job .top .st { color: var(--muted); font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* cancel (or, once it has failed, clear away): on its name's line (the 32 px button centred on the 20 px line) */
 .job .x > .ico { width: var(--icon-sm); height: var(--icon-sm); }
-.job.err .top span { color: var(--bad); white-space: normal; }
-.job.err .bar, .job.done .bar { display: none; }
-.job.err .x, .job.done .x { grid-row: 1; }
+.job.err .top .st { color: var(--bad); white-space: normal; }
+.job.err .px { display: none; }
 #jobsBtn.ready .ring circle + circle { stroke: var(--ink); } /* all in */
+#jobsBtn.warn .ring circle + circle { stroke: var(--orange); } /* one stopped, wanting its lyrics */
+/* a song's progress in pixels (pixBar): 3 rows, filled a column at a time from the left; the next one blinking while it goes */
+.px { display: grid; grid-template-rows: repeat(5, auto); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+.px i { aspect-ratio: 1; border-radius: 1px; background: var(--fill); transition: background-color var(--duration-base); }
+.px i.on { background: var(--ink); }
+.px i.next { animation: px-blink 1s steps(1, end) infinite; }
+/* the empty ones while it's going: a faint glow passing over them on the diagonal, like a wave (--d: column + row) */
+.job:not(.done):not(.need):not(.err) .px i:not(.on):not(.next) { animation: px-wave 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * 40ms); }
+@keyframes px-wave { 0%, 62%, 100% { background: var(--fill); } 74% { background: var(--fg-16); } }
+@media (prefers-reduced-motion: reduce) { .px i { animation: none !important; } }
+@keyframes px-blink { 50% { background: var(--fg-30); } }
+/* stopped for its lyrics (none found, or finding them failed): orange where it stopped, and the way to paste them */
+.job.need .px i.ly.on { background: var(--orange); } /* only its lyrics' part, the rest done as it was */
+.job.need .px i.ly:not(.on) { background: color-mix(in oklab, var(--orange) 22%, transparent); }
+.job.need .top .st { color: var(--orange); white-space: normal; }
+.lyr-form { display: grid; gap: var(--space-2); }
+.lyr-open.on { background: var(--hover-2); } /* its box open */
+.lyr-form textarea { min-height: 120px; max-height: 280px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--fill); padding: var(--space-2) var(--space-3);
+  font: var(--text-md)/20px var(--font); color: inherit; resize: vertical; transition: border-color var(--duration-fast), background-color var(--duration-fast); }
+.lyr-form textarea::placeholder { color: var(--placeholder); }
+.lyr-form textarea:hover { background: var(--hover-2); }
+.lyr-form textarea:focus { outline: none; background: var(--surface-2); border-color: var(--ink); }
+.lyr-acts { display: flex; justify-content: flex-end; }
 
 .player { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */
@@ -237,14 +280,24 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
    typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
    to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. At the
    right, just before Add song. */
-/* Add song: a panel in the middle of the window (links, files, the options), the page dimmed behind it; not a page of its own */
+/* Add song, and the songs being added (the + by the mic): a drawer against the window's top, right and bottom, the
+   page dimmed beside it (#addVeil); in from the right and back out (display kept for the slide). On the desktop app
+   what's in it starts under the strip that moves the window, which goes on over its top. */
 .add-at { position: relative; display: inline-flex; }
-#addPop { position: fixed; inset: 0; margin: auto; width: min(520px, calc(100vw - 32px)); height: fit-content;
-  max-height: calc(100dvh - 2 * var(--space-4)); overflow-y: auto; animation: add-in var(--duration-slow) var(--ease); }
-@keyframes add-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
-@media (prefers-reduced-motion: reduce) { #addPop { animation: none; } }
+/* its title row on the header's line (the name's): the page's padding over the header, less the title row's -6 px
+   margin, plus half of what the 32 px header has over the row's 20 px */
+#jobsPop { --drawer-top: 0px; --head-top: var(--space-6); position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: min(520px, 100vw); margin: 0;
+  padding-top: calc(var(--head-top) + 6px); border-radius: 0; z-index: var(--z-modal); align-content: start; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-app-region: no-drag; transition: translate var(--duration-slow) var(--ease), display var(--duration-slow) allow-discrete; }
+html.desktop-win #jobsPop { --drawer-top: var(--titlebar); --head-top: calc(var(--titlebar) + var(--space-3)); }
+html.desktop-mac #jobsPop { --drawer-top: var(--space-6); --head-top: calc(var(--space-6) + var(--space-3)); }
+:is(html.desktop-win, html.desktop-mac) #jobsPop::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: var(--drawer-top); -webkit-app-region: drag; }
+#jobsPop[hidden] { translate: 100% 0; pointer-events: none; }
+@starting-style { #jobsPop:not([hidden]) { translate: 100% 0; } }
+@media (prefers-reduced-motion: reduce) { #jobsPop { transition: none; } }
+#jobsPop .pop-title { font-size: 16px; } /* a drawer's name: a little over a panel's 14 px (its line the same, on the header's) */
 .add-form { display: grid; gap: var(--space-3); }
-.add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0; } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
+.add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0 0; } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
 .add-form p, #sAddSetup { margin: 0; }
 /* a playlist's songs, to pick from before any is added: ticked unless in the library already (or gone from YouTube) */
 .pl { display: grid; gap: var(--space-2); }
@@ -330,6 +383,38 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
    search taking what's left, the name left out */
 .lib-head { min-width: 0; }
 @media (max-width: 560px) { .lib-title { display: none; } .lib-head .search { flex: 1 1 auto; width: auto; min-width: 0; } }
+/* the view in the name's place (#sLibView, a .seg): its left edge where the name's was; and in the Artist or Album
+   view, a heading over each one's songs: its name, and how many (an album's, whose they are) */
+.lib-view { margin-left: calc(-1 * var(--space-half)); }
+#sLib .lib-group { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; padding: var(--space-8) var(--space-3) var(--space-2); }
+#sLib .lib-cols + .lib-group { padding-top: var(--space-4); }
+#sLib .lib-group b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--text-lg); color: var(--ink); }
+#sLib .lib-group small { flex: none; color: var(--muted); font-size: var(--text-sm); }
+/* the Album view: a grid of the albums in the list's place (the list under it out of sight, its column heads too),
+   each its cover, its name, whose and how many; one opened, its songs as the list, under a bar back to them */
+#sAlbums { display: none; }
+#sLibPage.album-grid #sLib { display: none; }
+#sLibPage.album-grid #sAlbums { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--space-6) var(--space-5); padding-top: var(--space-2); }
+#sAlbums .lib-none { grid-column: 1 / -1; }
+.al-card { display: grid; gap: 2px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.al-card .cover { position: relative; width: 100%; aspect-ratio: 1; margin-bottom: var(--space-2); border-radius: var(--radius-md); overflow: hidden;
+  background: var(--fill) center / cover; transition: filter var(--duration-fast); }
+.al-card .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 0.25px var(--fg-30); }
+.al-card .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-slow); }
+.al-card .cover img.in { opacity: 1; }
+.al-card .cover img.now { transition: none; }
+.al-card:hover .cover { filter: brightness(1.08); }
+.al-card.none .cover { display: grid; place-items: center; color: var(--faint); }
+.al-card.none .cover .ico { width: 36px; height: 36px; }
+.al-card:focus-visible { outline: none; }
+.al-card:focus-visible .cover { outline: 2px solid var(--ink); outline-offset: 2px; }
+.al-card b, .al-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-card b { font-weight: var(--weight-medium); font-size: var(--text-md); line-height: 20px; color: var(--ink); }
+.al-card small { font-size: var(--text-sm); line-height: 18px; color: var(--muted); }
+#sLib .al-bar { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: 0 var(--space-3) var(--space-4); }
+#sLib .al-what { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+#sLib .al-what b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--text-lg); color: var(--ink); }
+#sLib .al-what small { flex: none; color: var(--muted); font-size: var(--text-sm); }
 .ln-pull { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: grid; opacity: 0; pointer-events: none; transition: opacity var(--duration-fast); }
 .ln-pull.on { opacity: 1; }
 .ln-pull .ring { width: var(--icon-lg); height: var(--icon-lg); transform: rotate(-90deg); }
@@ -373,8 +458,6 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .add-first:hover .plus { border-color: var(--faint); color: var(--ink); }
 #sLib .add-first .plus .ico { width: var(--icon-lg); height: var(--icon-lg); }
 #sLib .add-first small { color: var(--muted); font-size: var(--text-sm); }
-/* one step at a time: with the tools still to install, an empty library waits under their banner */
-#sInstall:not([hidden]) ~ #sLibPage:has(.add-first) { display: none; }
 /* the album art (covers.py), as tall as the title and its details beside it: a square the row has from the start, so
    nothing moves when the picture comes in (fading); a quiet tile until then, or for good when there's none. A hairline
    inside, for a white cover on the white list. */
