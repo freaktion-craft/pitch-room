@@ -11,7 +11,6 @@
     "python": "node scripts/fetch-python.mjs",
     "code": "node scripts/prepare-code.mjs",
     "start": "electron .",
-    "wip": "electron . --wip",
     "dist": "node scripts/prepare-code.mjs && electron-builder --publish never",
     "release": "node scripts/prepare-code.mjs && electron-builder --publish always"
   },

@@ -19,14 +19,11 @@ const BG = "#0e0e0e"; // --bg, oklch(0.165 0 0): the window before the page pain
 const win32 = process.platform === "win32";
 const TITLEBAR = 32; // Windows: the window's buttons' strip over the page, px (--titlebar, base.css)
 
-// Pitchroom WIP: run from the repo with --wip (npm run wip, or the "Pitchroom WIP" shortcut, scripts/wip-shortcut.ps1):
-// the window on the copy run from the repo, as in a browser (launch.py with the project's .venv: localhost 5178 on, the
-// repo's library and settings), so what isn't released yet can be tried in the app, nothing built. Its own name and
-// folder (window size, its own lock), so the installed Pitchroom's untouched; no updates. That copy's started if none's
-// running (and stopped with the window then); one running already is used as it is, and left running.
-const WIP = !app.isPackaged && process.argv.includes("--wip");
-const REPO = path.resolve(__dirname, "..");
-if (WIP) { app.setName("Pitchroom WIP"); app.setPath("userData", path.join(app.getPath("appData"), "Pitchroom WIP")); }
+// Pitchroom WIP (scripts/wip.ps1): the app as the repo has it at that moment, unreleased work and all, made into a
+// folder of its own (no installer) under another name, so it's an app apart: its own folder for what's yours (the
+// library, the tools, the settings: %APPDATA%\Pitchroom WIP), its own lock; never updated to a release. package.json's
+// "wip" (put in as it's made): which commit it was made from.
+const WIP = app.isPackaged ? require("./package.json").wip || "" : "";
 
 const DATA = app.getPath("userData");
 const CODE = app.isPackaged ? path.join(process.resourcesPath, "app-code") : path.resolve(__dirname, "..");
@@ -94,26 +91,7 @@ async function pickPort() {
 async function healthy(p) {
   try { const r = await fetch(`http://127.0.0.1:${p}/api/health`); return r.ok && (await r.json()).app === "stem"; } catch { return false; }
 }
-// WIP: the copy run from the repo, as launch.py runs it (its port the first free one from 5178)
-const LOCAL = [5178, 5198];
-async function localPort() { for (let p = LOCAL[0]; p < LOCAL[1]; p++) if (await healthy(p)) return p; return 0; }
-async function startLocal() {
-  if ((port = await localPort())) return; // running already: used as it is
-  const py = win32 ? path.join(REPO, ".venv", "Scripts", "python.exe") : path.join(REPO, ".venv", "bin", "python");
-  if (!fs.existsSync(py)) throw new Error(`No project Python at ${py}.`);
-  fs.mkdirSync(LOGS, { recursive: true });
-  const log = fs.openSync(LOG, "a");
-  server = spawn(py, [path.join(REPO, "launch.py"), "--no-browser"], { cwd: REPO, windowsHide: true, detached: !win32, stdio: ["ignore", log, log] });
-  server.once("exit", (code) => { server = null; if (!quitting) serverStopped(code); });
-  for (let i = 0; i < 200; i++) { // ≤ 60 s: launch.py may install the base packages first
-    if ((port = await localPort())) return;
-    if (!server) throw new Error("The server stopped as it started.");
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  throw new Error("The server didn't answer within 60 s.");
-}
 async function startServer() {
-  if (WIP) return startLocal();
   await ensureEnv();
   port = await pickPort();
   fs.mkdirSync(LOGS, { recursive: true });
@@ -165,7 +143,6 @@ function createWindow() {
   win = new BrowserWindow({
     width: b.width || Math.min(room.width, 1520), height: b.height || Math.min(room.height, 960), x: b.x, y: b.y,
     title: app.name, backgroundColor: BG, show: false, autoHideMenuBar: true,
-    ...(WIP ? { icon: path.join(__dirname, "build", "icon-win.png") } : {}), // (a release has its own, in the exe)
     // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
     // Windows: no title bar of the system's either, its three buttons drawn over the page's top right corner, on the
     // page's black, as tall as the strip along the top that moves the window (html.desktop-win, base.css)
@@ -175,7 +152,7 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });
   fitMinimum(win); win.on("moved", () => fitMinimum(win)); // (another screen, another room)
-  if (WIP) win.on("page-title-updated", (e) => { e.preventDefault(); win.setTitle("Pitchroom WIP"); }); // told apart from the release in the taskbar
+  if (WIP) win.on("page-title-updated", (e) => { e.preventDefault(); win.setTitle(`Pitchroom WIP · ${WIP}`); }); // told apart from the release in the taskbar, and which it is
   if (b.maximized) win.maximize();
   const ours =(url) => { try { const u = new URL(url); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
@@ -231,7 +208,7 @@ function permissions() {
 // Windows and the Linux AppImage update themselves, in the splash before the engine starts: the latest release's
 // latest.yml looked up (≤ 5 s, or it's skipped this time), a newer version downloaded, installed silently and opened.
 // macOS can't till the app's signed (Squirrel.Mac checks the signature): a newer release is offered as a download.
-const SELF_UPDATES = app.isPackaged && (win32 || (process.platform === "linux" && !!process.env.APPIMAGE));
+const SELF_UPDATES = app.isPackaged && !WIP && (win32 || (process.platform === "linux" && !!process.env.APPIMAGE)); // (WIP: never a release over it)
 const within = (ms, p) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(`no answer in ${ms / 1000} s`)), ms))]);
 async function updateFirst() { // true: it's installing, the app's about to quit
   autoUpdater.autoDownload = false;
@@ -285,7 +262,7 @@ function menu() {
   const help = [
     { label: "Show Log", click: () => shell.showItemInFolder(LOG) },
     { label: "Third-Party Notices", click: () => shell.openPath(app.isPackaged ? path.join(process.resourcesPath, "THIRD-PARTY-NOTICES.md") : path.join(__dirname, "THIRD-PARTY-NOTICES.md")) },
-    { label: "Open Data Folder", click: () => shell.openPath(WIP ? REPO : DATA) },
+    { label: "Open Data Folder", click: () => shell.openPath(DATA) },
     { type: "separator" },
     { label: "Pitchroom Releases", click: () => shell.openExternal(`https://github.com/${RELEASES}/releases`) },
   ];
