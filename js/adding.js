@@ -49,6 +49,15 @@ function jobSection(key, name) {
   }
   return sec;
 }
+// How long a song has still to go, in s, from how fast it's been going since it started (or was sent its lyrics):
+// its progress over that time; null till there's enough to tell (ETA_WAIT s, ETA_GOT of the way)
+const ETA_WAIT = 8, ETA_GOT = 0.01;
+function etaLeft(j) {
+  const a = j.etaAt;
+  if (!a || j.status !== "running") return null;
+  const dt = (performance.now() - a.t) / 1000, dp = (j.progress || 0) - a.p;
+  return dt < ETA_WAIT || dp < ETA_GOT ? null : (1 - (j.progress || 0)) * (dt / dp);
+}
 function paintJobs() {
   const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !j.needLyrics && j.status !== "error"), ready = jobs.filter((j) => j.done);
   const need = jobs.filter((j) => j.needLyrics);
@@ -89,7 +98,7 @@ function paintJobs() {
       row.append(pic, top, acts, pixBar(), ask.form);
     }
     rowOf.set(id, row);
-    const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err, at = Math.round((j.progress || 0) * 100);
+    const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err;
     const need = !!j.needLyrics, lyr = j.phase === "lyrics" && !need && !j.done; // (its lyrics' part can't be stopped: the song's in)
     row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need);
     // what it is: its link, then its video's title, then the record it was found to be (its title, its artist), each
@@ -105,7 +114,7 @@ function paintJobs() {
     else if (stopping) say(state, "Cancelling…");
     else if (j.status === "queued" && secOf.get(id) === "processing") say(state, "Starting…"); // (the first: none before it)
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
-    else say(state, "{stage} · {pct}%", { stage: () => tr(j.stage || ""), pct: at });
+    else { const left = etaLeft(j); say(state, left == null ? "{stage}" : left < 60 ? "{stage} · under a minute left" : "{stage} · about {n} min left", { stage: () => tr(j.stage || ""), n: Math.round(left / 60) }); }
     paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, !j.done && !need && !err && !stopping && !stillMotion());
     const open = row.querySelector(".lyr-open");
     open.hidden = !need;
@@ -304,8 +313,10 @@ function watchJob(id, kind, forSong) {
     } else if (j.status !== "cancelled") {
       const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError, song } = j;
       skip = status === "queued" && ahead > 1 ? 4 : 0;
+      const was = adding.get(id), now = performance.now(); // (its time left: timed from when it started going, again from where it is if it went back)
+      const etaAt = status !== "running" ? null : !was?.etaAt || progress < was.etaAt.p ? { t: now, p: progress } : was.etaAt;
       const arrive = status === "done" && !needLyrics && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
-      addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
+      addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), etaAt, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
         done: status === "done" && !needLyrics, ...(arrive ? { arrived: true } : {}) });
       if (arrive) songArrived(songId);
     }
