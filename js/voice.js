@@ -409,12 +409,9 @@ function voiceShow() {
   $("#vcOff").hidden = micOn || !!testOsc;
 }
 function initVoice() {
-  $("#voiceBtn").append(icon("voice")); $("#vcBack").prepend(icon("back"));
-  // the header's button: in, and the mic on with it (this click lets it start); pressed again, back where you were
-  $("#voiceBtn").onclick = (e) => {
-    if (view === "voice") { e.preventDefault(); location.hash = VC.from; return; }
-    startMic();
-  };
+  $("#vcBack").prepend(icon("back"));
+  // the header's Lab tab: in, and the mic on with it (this click lets it start)
+  $("#tabLab").onclick = () => { if (view !== "voice") startMic(); };
   addEventListener("hashchange", (e) => { if (location.hash === "#voice") { const was = new URL(e.oldURL).hash; if (was && was !== "#voice") VC.from = was; } });
   $("#vcBack").onclick = () => { location.hash = VC.from; };
   $("#vcMic").onclick = () => startMic();

@@ -149,7 +149,6 @@ async function openSongById(id) {
 }
 // #stems… for the library and its pages, #practice for Practice, which needs its song open, so a reload there (or
 // an old link to a page that's gone) lands in the library; #voice for Chest & head voice.
-$("#homeBtn").append(icon("home")); // the header's first button, back to the library (shown off it: route())
 function route() {
   const [v, sub, extra] = (location.hash || "#stems").slice(1).split("/");
   const singing = v === "practice" && K.on && P.song && K.song.id === P.song.id;
@@ -163,12 +162,14 @@ function route() {
   }
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems"; $("#vVoice").hidden = view !== "voice";
   $("#vSettings").hidden = view !== "settings";
-  $("#voiceBtn").classList.toggle("on", view === "voice"); $("#micSetBtn").classList.toggle("on", view === "settings");
+  $("#micSetBtn").classList.toggle("on", view === "settings");
+  for (const [t, on] of [[$("#tabLib"), view === "stems" || view === "practice"], [$("#tabLab"), view === "voice"]]) { // the section you're in
+    t.classList.toggle("on", on); if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
+  }
   showMicSet(view === "settings"); showEars(false);
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra);
-  $("#homeBtn").hidden = view === "stems" && stemsPage === "lib"; // the way back to the library, from anywhere but it
   paintCrumbs(); lastHash = location.hash || "#stems";
   pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
