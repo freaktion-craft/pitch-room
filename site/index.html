@@ -48,11 +48,12 @@ a { -webkit-user-drag: none; }
 .tip.on { opacity: 1; pointer-events: auto; }
 .tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
 
-/* The app's welcome (js/app.js, welcome(), and css/base.css, #welcome): a book in the middle (the screen less 20 % each
-   side), its right half turned over to the left like a page, one after another, each an accent colour; the name large in
-   the middle meanwhile. The last page, here, lands as a closed book does not: a dark spread stays open, the button on its
-   right page, there under the pages all along and shown as the last one lifts off it; the name goes. The pages are built
-   by riffle() */
+/* The app's welcome (js/app.js, welcome(), and css/base.css, #welcome): a book (the screen less 20 % each side), its
+   right half turned over to the left like a page, one after another, each an accent colour; the name large in the middle
+   meanwhile. Here it starts closed, its dark cover alone in the middle, and moves right as it opens (its spine to the
+   middle); the last page lands dark, and the right page under it, the button on it (there under the pages all along,
+   shown as the last one lifts off it), comes back to the middle on its own as the left one goes: a plain page, no book.
+   The pages are built by riffle() */
 .book { position: fixed; inset: 20%; }
 .book .half { position: absolute; top: 0; bottom: 0; width: 50%; }
 .book .leaf { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: 0 50%; transform-style: preserve-3d; }
@@ -64,10 +65,6 @@ a { -webkit-user-drag: none; }
    what's under it there; the last page's own back goes past it (riffle()), over the edge of the one it lands on */
 .book .leaf > .recto { left: -1px; width: calc(100% + 1px); }
 .book > .half:first-child { width: calc(50% + 1px); }
-/* once it's open: the spine's shade, as the app's colour book has it */
-.book::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% - 16px); width: 32px; z-index: 1000; pointer-events: none; opacity: 0;
-  background: linear-gradient(90deg, transparent, oklch(0 0 0 / 0.16) 40%, oklch(0 0 0 / 0.3) 50%, oklch(0 0 0 / 0.16) 60%, transparent); transition: opacity 0.6s var(--ease); }
-.book.open::after { opacity: 1; }
 /* the name, large in the middle while the pages turn; gone as the book opens */
 .word { position: fixed; left: 0; top: 0; z-index: 1001; transform-origin: 0 0; white-space: nowrap; color: var(--ink); visibility: hidden; pointer-events: none;
   font: 400 44px/1 var(--font-brand); letter-spacing: -0.01em; }
@@ -162,13 +159,16 @@ tip.addEventListener("click", () => tip.classList.remove("on"));
 // together; a beat (rest), and the last page on its own, slower (last), the name going as it starts (fade).
 const RIFFLE = { start: 450, span: 640, page: 440, bunch: 0.65, jitter: [0, 0.06, -0.04, 0.05, -0.06, 0.03, -0.05, 0.04],
   pageEase: "cubic-bezier(0.38, 0, 0.12, 1)", rest: 200, last: 700, lastEase: "cubic-bezier(0.55, 0, 0.2, 1)",
-  fade: 320, shade: 0.32 }; // fade: the name going, from the last page's start
+  fade: 320, shade: 0.32, // fade: the name going, from the last page's start
+  open: 520, openEase: "cubic-bezier(0.45, 0, 0.2, 1)", close: 640, closeEase: "cubic-bezier(0.65, 0, 0.25, 1)" }; // open: the closed book over to the right as its cover starts to lift; close: the right page back to the middle at the end
+const CLOSED = "translateX(-25%)"; // the book with its right half (its cover, then its right page) in the middle
 const ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "blue", "violet", "pink"]; // as the app has them (js/stage.js)
 async function riffle() {
   const R = RIFFLE, book = document.getElementById("book"), word = document.getElementById("word");
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches; // the open book at once, no name over it
-  // black, the colours, then the open book's (its last page dark, not black: the book stays)
-  const colours = ["var(--bg)", ...ACCENTS.map((k) => `var(--voice-${k})`), "var(--surface)"], n = colours.length - 1;
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches; // the plain page at once, no name over it
+  // the dark cover, the colours, then the dark last page
+  const colours = ["var(--surface)", ...ACCENTS.map((k) => `var(--voice-${k})`), "var(--surface)"], n = colours.length - 1;
+  book.style.transform = CLOSED;
   await Promise.race([document.fonts.load(`400 44px "Geist Serif"`), new Promise((r) => setTimeout(r, 1500))]);
   const place = (x, y, s = 1) => `translate(${x}px, ${y}px) scale(${s})`;
   const mid = () => { const r = word.getBoundingClientRect(); return [(innerWidth - r.width) / 2, (innerHeight - r.height) / 2]; };
@@ -179,7 +179,9 @@ async function riffle() {
     h.append(Object.assign(document.createElement("i"), { className: "shade" }));
     return h;
   };
-  book.replaceChildren(half(0, "", "0"), half(n, "", "50%"), document.getElementById("page")); // the right page's button on it, under the pages
+  const inside = half(0, "", "0"); inside.style.background = "transparent"; // nothing to the cover's left till it's turned
+  book.replaceChildren(inside, half(n, "", "50%"), document.getElementById("page")); // the right page's button on it, under the pages
+  if (!still) book.animate([{ transform: CLOSED }, { transform: "none" }], { delay: R.start - R.open / 2, duration: R.open, easing: R.openEase, fill: "both" }); // over to the right as the cover lifts
   const depth = `perspective(${Math.round(book.clientWidth * 2)}px)`; // a page's depth as it turns, for its size
   const turn = (k, delay, duration, easing) => { // page k: colour k on its front (the right), k + 1 on its back
     const leaf = document.createElement("div"); leaf.className = "leaf"; leaf.style.zIndex = 100 - k; leaf.dataset.k = k;
@@ -207,8 +209,13 @@ async function riffle() {
   // one under it, which would show through its own soft one; past the spine only the dark of the open book's right
   Object.assign(book.lastChild.querySelector(".verso").style, { left: "-2px", width: "calc(100% + 2px)" });
   await landed;
-  [...book.querySelectorAll(".leaf")].slice(0, -1).forEach((p) => p.remove()); // the open book: the last page over the left, the dark right under it
-  book.classList.add("open"); document.body.classList.add("shown"); // its spine's shade, and the line at the foot
+  const leaves = [...book.querySelectorAll(".leaf")], left = leaves.pop();
+  leaves.forEach((p) => p.remove()); // the last page over the left, the dark right page under it
+  document.body.classList.add("shown"); // the line at the foot
+  // the book away: the left page going, the right one (the button on it) back to the middle, a plain page on its own
+  const o = { duration: still ? 1 : R.close, easing: R.closeEase, fill: "forwards" };
+  left.animate([{ opacity: 1 }, { opacity: 0 }], { ...o, easing: "ease-out", duration: still ? 1 : R.close * 0.6 });
+  book.animate([{ transform: still ? CLOSED : "none" }, { transform: CLOSED }], o);
   await gone; word.remove();
 }
 riffle();
