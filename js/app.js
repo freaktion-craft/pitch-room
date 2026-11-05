@@ -292,14 +292,20 @@ async function welcome(resume) { // resume: a step to come back to (Settings' ba
   book.replaceChildren(half(0, "", "0"), half(n, "", "50%"));
   const depth = `perspective(${Math.round(book.clientWidth * 2)}px)`; // a page's depth as it turns, for its size
   const turn = (k, delay, duration, easing) => { // page k: colour k on its front (the right), k + 1 on its back
-    const leaf = document.createElement("div"); leaf.className = "leaf"; leaf.style.zIndex = 100 - k;
+    const leaf = document.createElement("div"); leaf.className = "leaf"; leaf.style.zIndex = 100 - k; leaf.dataset.k = k;
     const front = half(k, "recto"), back = half(k + 1, "verso");
     leaf.append(front, back); book.append(leaf);
     const o = { duration, delay, easing, fill: "both" };
     leaf.animate([{ transform: `${depth} rotateY(0deg)`, zIndex: 100 - k }, { transform: `${depth} rotateY(-90deg)`, zIndex: 100 - k, offset: 0.5 },
       { transform: `${depth} rotateY(-90deg)`, zIndex: 200 + k, offset: 0.5 }, { transform: `${depth} rotateY(-180deg)`, zIndex: 200 + k }], o); // over the spine, it lies on those turned before it
     front.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], o);
-    return back.lastChild.animate([{ opacity: R.shade }, { opacity: R.shade, offset: 0.5 }, { opacity: 0 }], o).finished;
+    return back.lastChild.animate([{ opacity: R.shade }, { opacity: R.shade, offset: 0.5 }, { opacity: 0 }], o).finished.then(() => {
+      // once it's down, those down under it go: all their edges at the spine, a soft one over them let theirs show as a
+      // line. Only those down (a page can land before one turned ahead of it, still in the air) and under the top one
+      leaf.dataset.down = "1"; book.firstChild.style.visibility = "hidden";
+      const down = [...book.querySelectorAll(".leaf[data-down]")], top = Math.max(...down.map((l) => +l.dataset.k));
+      down.forEach((l) => { if (+l.dataset.k < top) l.style.visibility = "hidden"; });
+    });
   };
   const onset = (k) => { const x = k / (n - 2); return R.start + R.span * (x + R.bunch * Math.sin(2 * Math.PI * x) / (2 * Math.PI)); };
   if (!still) for (let k = 0; k < n - 1; k++) turn(k, onset(k), Math.round(R.page * (1 + R.jitter[k % R.jitter.length])), R.pageEase);

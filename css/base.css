@@ -190,10 +190,10 @@ html.welcome #boot, html.asking #welcome { display: none; }
 #welcome .leaf > .half { left: 0; width: 100%; backface-visibility: hidden; }
 #welcome .leaf > .verso { transform: rotateY(180deg); } /* a page's back (its front, .recto); not .back, the back link's */
 /* each page a pixel over the spine, so a turning one's soft edge (antialiased, as it's in 3D) lies over the page beside it,
-   not over the black under the book: no line down the middle. A recto's spine side is its left; a verso's, turned over,
-   its right */
-#welcome .leaf > .recto { left: -1px; width: calc(100% + 1px); }
-#welcome .leaf > .verso { width: calc(100% + 1px); }
+   not over the black under the book: no line down the middle. Both faces from a pixel before it: a verso's turned over
+   twice (on its own, and with its leaf), so its spine side's where a recto's is. (And the pages down under another are
+   hidden, welcome()'s turn(): all their edges at the spine, the top one's soft edge let theirs show through as a line.) */
+#welcome .leaf > .half { left: -1px; width: calc(100% + 1px); }
 #welcome .book > .half:first-child { width: calc(50% + 1px); }
 #welcome .shade { position: absolute; inset: 0; background: #000; opacity: 0; }
 #welcome .word { position: absolute; z-index: 1; left: 0; top: 0; transform-origin: 0 0; white-space: nowrap; color: var(--ink); visibility: hidden;
