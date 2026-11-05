@@ -178,8 +178,7 @@ function route() {
   }
   $("#vPractice").hidden = view !== "practice"; $("#vStems").hidden = view !== "stems"; $("#vVoice").hidden = view !== "voice";
   $("#vSettings").hidden = view !== "settings";
-  $("#micSetBtn").classList.toggle("on", view === "settings");
-  for (const [t, on] of [[$("#tabLib"), view === "stems" || view === "practice"], [$("#tabLab"), view === "voice"]]) { // the section you're in
+  for (const [t, on] of [[$("#tabLib"), view === "stems" || view === "practice"], [$("#tabLab"), view === "voice"], [$("#micSetBtn"), view === "settings"]]) { // the section you're in
     t.classList.toggle("on", on); if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
   }
   paintTabLine();

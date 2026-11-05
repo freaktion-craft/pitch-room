@@ -63,7 +63,7 @@ header { display: flex; align-items: center; gap: var(--space-2); margin-bottom:
 html.desktop-mac .app { padding-top: calc(var(--space-6) + var(--space-3)); } /* room under the buttons, above the name */
 html.desktop-mac #app > header { -webkit-app-region: drag; }
 /* onboarding left for Settings, unfinished (welcome()): the header only the mic and Settings, which takes you back to it */
-html.ob-left #app > header > :not(.brand, #micBtn, #micSetBtn, .pop) { display: none; }
+html.ob-left #app > header > :not(.brand, #micBtn, .tabs, .pop), html.ob-left .tabs > :not(#micSetBtn) { display: none; } /* (of the tabs, Settings alone) */
 html.desktop-mac #app > header .brand { margin-left: -15px; } /* its left edge under the red button's (9 px from the window's) */
 html.desktop-mac .brand .egg { left: -9px; right: -9px; } /* the egg's box, kept inside the window */
 html.desktop-mac #app > header > * { -webkit-app-region: no-drag; }
@@ -566,7 +566,6 @@ input[type="range"]:disabled { opacity: 0.4; }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
 .btn.quiet:hover { background: var(--fg-8); }
 #app > header .btn.quiet:not(.mic) { color: var(--ink); } /* the header's buttons in ink, the mic's beside them: a grey one there reads as off */
-#micSetBtn.on { background: var(--hover-2); color: var(--ink); } /* the gear, on the settings' page */
 .btn.quiet > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .btn.ghost { background: transparent; color: var(--muted); }
 .btn.ghost:hover { background: var(--fill); color: var(--ink); }

@@ -1248,11 +1248,7 @@ function initSing() {
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
   });
   initTakes(); initEars(); initSync(); initLyEdit();
-  // settings: their page, under the gear beside the mic chip; the gear again goes back to where you were
-  const setBtn = $("#micSetBtn");
-  setBtn.append(icon("settings"));
-  setBtn.onclick = (e) => { if (view === "settings") { e.preventDefault(); location.hash = setFrom.hash; } };
-  initSetNav();
+  initSetNav(); // settings: their page, its tab in the header's (#micSetBtn)
   // the songs being added: their panel under their ring, the same way
   const jobsBtn = $("#jobsBtn"), jobsPop = $("#jobsPop");
   jobsBtn.onclick = (e) => { e.stopPropagation(); showJobs(jobsPop.hidden); };
