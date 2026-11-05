@@ -3,12 +3,22 @@
 # only; this repo is private): publish the draft there to put it out. RELEASES_TOKEN: a fine-grained token with
 # Contents read and write on that repo alone (this run's own token can't write to another repo).
 # Run by hand (Actions → Desktop app → Run workflow) to build without releasing: the files are the run's artifacts.
+# Called by release.yml, which bumps the version and tags it, then publishes the draft once this is done (ref: the tag;
+# publish: into its draft, as a tag pushed by hand is).
 name: Desktop app
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      publish:
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,6 +39,8 @@ jobs:
         working-directory: desktop
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -38,7 +50,7 @@ jobs:
       - run: node scripts/fetch-python.mjs   # the app's own Python, with the base packages
       - run: node scripts/prepare-code.mjs   # the code it ships: minified, the Python as bytecode
       - name: Build (and add to the tag's draft release)
-        run: npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+        run: npx electron-builder --publish ${{ (startsWith(github.ref, 'refs/tags/v') || inputs.publish) && 'always' || 'never' }}
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
       - uses: actions/upload-artifact@v4
