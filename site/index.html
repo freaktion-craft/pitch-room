@@ -43,7 +43,7 @@ a { -webkit-user-drag: none; }
 /* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (how far
    in, set by tipAt(); its arrow 38 px in from its right) */
 .tip { position: fixed; top: 14px; right: 58px; padding: 10px 14px; border-radius: 10px; background: var(--ink); color: var(--on-ink);
-  font: 500 14px/1.3 var(--font); white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  font: 400 13px/1.3 var(--font); white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32); /* (regular: a word in passing, not a button) */
   opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); } /* it fades in and out, and stays still */
 .tip.on { opacity: 1; pointer-events: auto; }
 .tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
