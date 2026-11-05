@@ -3,8 +3,8 @@
 
 // Songs being added, by job: {name, status, stage, progress, ahead, cancel, error, stopping, done, songId, seen, phase,
 // needLyrics, lyricsError, arrived}, in the order they were started. Adding one takes its lyrics too (the server's
-// _lyrics_phase): its progress is the whole of it; once it's in the library (arrived) its lyrics are found, and where
-// none are (needLyrics) it stops there in orange, for them to be pasted (or let go). The ring beside the mic is always there, empty while there are none: as full as they are
+// _lyrics_phase): its progress is the whole of it, and it's in the library (arrived) only once they are; where none
+// are found (needLyrics) it stops there in orange, back in Pending, for them to be pasted (or the song let go). The ring beside the mic is always there, empty while there are none: as full as they are
 // together, each counted whole once it's in; spinning while none has started; full and bright once all are in. Pressed, its
 // panel lists each one: its name (a link's video title once it's known, the song's own once it's in), what it's doing
 // or how many are ahead of it, and a button to stop it. One that's in has a button to open it instead, and stays until
@@ -24,11 +24,12 @@ function paintPix(bar, p, going) {
   [...bar.children].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", going && k === n); });
   bar.setAttribute("aria-valuenow", Math.round(p * 100));
 }
-// The drawer's songs in sections, each shown only while it has any: Pending (waiting their turn), Processing,
-// Stopped (wanting their lyrics pasted, or failed), Done; in each, in the order they were sent.
+// The drawer's songs in sections, each shown only while it has any: Pending (waiting their turn, or stopped wanting
+// their lyrics pasted: orange, the next going on meanwhile), Processing, Stopped (failed), Done; in each, in the order
+// they were sent.
 const JOB_SECS = [["pending", "Pending"], ["processing", "Processing"], ["stopped", "Stopped"], ["done", "Done"]];
 // (Pending: waiting behind another song still going; the first, with none before it, is Processing from the start)
-function jobSec(j, behind) { return j.done ? "done" : j.needLyrics || j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
+function jobSec(j, behind) { return j.done ? "done" : j.needLyrics ? "pending" : j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
 function jobSection(key, name) {
   const list = $("#jobsList");
   let sec = list.querySelector(`:scope > .jobs-sec[data-sec="${key}"]`);
@@ -74,7 +75,8 @@ function paintJobs() {
       row = el("div", "job"); row.id = "job-" + id;
       const top = el("div", "top"); top.append(el("b"), el("span"));
       const x = el("button", "btn sm icon ghost x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
-      row.append(top, pixBar(), x, lyricsAsk(id));
+      const acts = el("div", "row-acts"), ask = lyricsAsk(id); acts.append(ask.open, x); // Paste lyrics left of the x, its box under the pixels
+      row.append(top, acts, pixBar(), ask.form);
     }
     rowOf.set(id, row);
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err, at = Math.round((j.progress || 0) * 100);
@@ -91,12 +93,14 @@ function paintJobs() {
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
     else say(state, "{stage} · {pct}%", { stage: () => tr(j.stage || ""), pct: at });
     paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, !j.done && !need && !err && !stopping && !stillMotion());
-    row.querySelector(".lyr-ask").hidden = !need;
+    const open = row.querySelector(".lyr-open");
+    open.hidden = !need;
+    if (!need && !row.querySelector(".lyr-form").hidden) lyricsBox(row, false); // (pasted, or settled elsewhere)
     // cancel, or clear one that failed; once it's in, open it; one wanting its lyrics, let go without them
     const x = row.querySelector(".x"), kind = j.done ? "goTo" : "close";
     if (x.dataset.icon !== kind) { x.replaceChildren(icon(kind)); x.dataset.icon = kind; }
     x.classList.toggle("ghost", !j.done); x.classList.toggle("primary", !!j.done); // in: the way to it, the panel's one strong button
-    say(x, j.done ? "Open song" : need ? "Skip lyrics" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping || lyr; x.style.visibility = lyr ? "hidden" : ""; // (its room kept: the pixels as wide as the others')
+    say(x, j.done ? "Open song" : err ? "Clear" : "Cancel", null, "title"); x.disabled = stopping || lyr; x.style.visibility = lyr ? "hidden" : ""; // (its room kept: the pixels as wide as the others')
   }
   // into their sections (made in their order, the first time), in order; a row moved only when it's out of place (one moved loses its hover and focus)
   for (const [key, name] of JOB_SECS) {
@@ -106,14 +110,29 @@ function paintJobs() {
     sec.hidden = !want.length; sec.querySelector(".n").textContent = want.length;
   }
 }
-// Under a song stopped for its lyrics: Paste lyrics, which opens a box for them (a line of the song to each line) and
-// Add lyrics, that sends them; the song goes on from where it stopped, its lyrics timed to it (stems.resume_lyrics).
+// A song stopped for its lyrics: Paste lyrics, on its title's line left of the x, opens a box under its pixels for
+// them (a line of the song to each line; pressed again, it folds away) and Add lyrics, that sends them; the song goes
+// on from where it stopped, its lyrics timed to it (stems.resume_lyrics).
+function lyricsBox(row, on) {
+  const form = row.querySelector(".lyr-form"), open = row.querySelector(".lyr-open");
+  if (on === !form.hidden) return;
+  open.setAttribute("aria-expanded", String(on)); open.classList.toggle("on", on);
+  if (!on) { form.hidden = true; return; }
+  form.hidden = false;
+  if (!stillMotion()) {
+    const h = form.offsetHeight;
+    form.style.overflow = "hidden";
+    form.animate([{ height: "0px", opacity: 0 }, { height: h + "px", opacity: 1 }], { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" })
+      .finished.then(() => { form.style.overflow = ""; }, () => { form.style.overflow = ""; });
+  }
+  form.querySelector("textarea").focus({ preventScroll: true });
+}
 function lyricsAsk(id) {
-  const box = el("div", "lyr-ask"), open = el("button", "btn sm"), form = el("div", "lyr-form"), text = el("textarea"), acts = el("div", "lyr-acts"), go = el("button", "btn sm primary");
-  box.hidden = true; form.hidden = true;
-  open.type = go.type = "button"; say(open, "Paste lyrics"); say(go, "Add lyrics");
+  const open = el("button", "btn sm lyr-open"), form = el("div", "lyr-form"), text = el("textarea"), acts = el("div", "lyr-acts"), go = el("button", "btn sm primary");
+  open.hidden = true; form.hidden = true;
+  open.type = go.type = "button"; say(open, "Paste lyrics"); say(go, "Add lyrics"); open.setAttribute("aria-expanded", "false");
   text.rows = 6; text.spellcheck = false; say(text, "A line of the song to each line", null, "placeholder"); say(text, "Lyrics", null, "aria-label");
-  open.onclick = () => { open.hidden = true; form.hidden = false; text.focus({ preventScroll: true }); };
+  open.onclick = (e) => { e.stopPropagation(); const row = open.closest(".job"); lyricsBox(row, row.querySelector(".lyr-form").hidden); };
   text.oninput = () => { go.disabled = !text.value.trim(); };
   go.onclick = async () => {
     go.disabled = true;
@@ -126,12 +145,12 @@ function lyricsAsk(id) {
       renderLibrary(); // (as the server has it now: given them in another tab, or let go)
       return;
     }
-    text.value = ""; form.hidden = true; open.hidden = false;
-    addingJob(id, { needLyrics: false, lyricsError: null, done: false, status: "running", stage: "Lining the lyrics up with the voice" });
+    text.value = "";
+    addingJob(id, { needLyrics: false, lyricsError: null, done: false, status: "running", stage: "Lining the lyrics up with the voice" }); // (its box folds away with it)
     watchJob(id, "separate");
   };
-  go.disabled = true; acts.append(go); form.append(text, acts); box.append(open, form);
-  return box;
+  go.disabled = true; acts.append(go); form.append(text, acts);
+  return { open, form };
 }
 // An added song, opened from the panel: it leaves the panel, which closes.
 function openAdded(id) {
@@ -184,7 +203,7 @@ async function cancelJob(id) {
   const j = adding.get(id);
   if (!j) return;
   if (j.status === "error") return dropJob(id);
-  if (j.needLyrics) { await fetch(`/api/jobs/${id}/cancel`, { method: "POST" }).catch(() => {}); return dropJob(id); } // in without them (told first: the list read again after it)
+  if (j.needLyrics) { await fetch(`/api/jobs/${id}/cancel`, { method: "POST" }).catch(() => {}); return dropJob(id); } // the song let go: it's deleted (told first: the list read again after it)
   addingJob(id, { stopping: true });
   try {
     const r = await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
@@ -249,7 +268,7 @@ function watchJob(id, kind, forSong) {
     } else if (j.status !== "cancelled") {
       const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError } = j;
       skip = status === "queued" && ahead > 1 ? 4 : 0;
-      const arrive = songId && !adding.get(id)?.arrived; // in the library (meta written): unfolds there, its lyrics still coming
+      const arrive = status === "done" && !needLyrics && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
       addingJob(id, { ...(name ? { name } : {}), status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError,
         done: status === "done" && !needLyrics, ...(arrive ? { arrived: true } : {}) });
       if (arrive) songArrived(songId);

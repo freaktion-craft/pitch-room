@@ -153,8 +153,11 @@ def cancel_job(job_id: str) -> str:
         job = _jobs.get(job_id)
         if job is None or job["kind"] not in ("separate", "key"):
             raise ValueError("Unknown job.")
-        if job.get("phase") == "lyrics":  # the song's in: its lyrics' part isn't stopped, and one wanting them is let go
-            job["needLyrics"] = False
+        if job.get("phase") == "lyrics":  # its lyrics' part isn't stopped; one stopped wanting them is let go, song and all
+            if job.get("needLyrics") and job["status"] == "done":
+                job.update(needLyrics=False, status="cancelled", stage="Cancelled")
+                if job.get("songId"):
+                    shutil.rmtree(os.path.join(LIB, job["songId"]), ignore_errors=True)
             return job["status"]
         if job["status"] in ("queued", "running"):
             job["cancel"] = True
@@ -741,6 +744,12 @@ def library() -> list[dict]:
             except (OSError, ValueError) as e:  # one damaged song shouldn't hide the others
                 print(f"Skipped library/{d}: its meta.json can't be read ({e})", file=sys.stderr)
                 continue
+            if meta.get("adding"):
+                with _jobs_lock:
+                    going = any(j.get("songId") == d and j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics")) for j in _jobs.values())
+                if going:
+                    continue
+                meta.pop("adding", None)  # (cut off: the app closed meanwhile; in as it is)
             meta["split"] = _has_split(folder)
             if _upgrading["id"] == d:  # being brought up to date (start_upgrades): how far it's got
                 up = get_job(_upgrading["job"]) or {"status": "queued"}  # (no job yet: it's next, giving way)
@@ -1114,7 +1123,7 @@ def playlist(url: str) -> dict:
     found = playlists.read(url)
     songs = library()
     with _jobs_lock:
-        adding = [j for j in _jobs.values() if j["kind"] == "separate" and j["status"] in ("queued", "running")]
+        adding = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or j.get("needLyrics"))]
     ids = {v for s in [m.get("source") or "" for m in songs] + [j["link"] or "" for j in adding] if (v := _video_id(s))}
     known = [(_words_of(playlists._base(m.get("title") or "")), _words_of(m.get("artist") or ""), _words_of(f"{m.get('title')} {m.get('sourceTitle') or ''}"),
               _words_of(f"{m.get('artist') or ''} {m.get('channel') or ''} {m.get('sourceTitle') or ''}")) for m in songs]
@@ -1434,7 +1443,8 @@ def _pipeline(job, src: dict, model_name: str):
                 _set(job, progress=0.9 + 0.09 * (i + 1) / len(order))
             _check(job)  # the last chance: once meta.json is written the song is in the library
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
-                    "beatsV": BEATS_VERSION, "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video}
+                    "beatsV": BEATS_VERSION, "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video,
+                    "adding": True}  # (out of the library till its lyrics are in: _lyrics_phase)
             if channel:
                 meta["channel"] = channel  # who put the video up: a cover's singer, often
             _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
@@ -1447,9 +1457,10 @@ def _pipeline(job, src: dict, model_name: str):
 
 
 def _lyrics_phase(job, song_id: str, how):
-    """A song being added's last part, once it's in the library: its lyrics found and timed (start_lyrics, how as
-    there), that job's steps shown as this one's (phase "lyrics"). None found, or it failed: this one stops there
-    (needLyrics, with why in lyricsError when it failed), for them to be pasted (resume_lyrics) or let go (cancel_job)."""
+    """A song being added's last part: its lyrics found and timed (start_lyrics, how as there), that job's steps shown
+    as this one's (phase "lyrics"); only then is it in the library (its meta's "adding" taken off). None found, or it
+    failed: this one stops there (needLyrics, with why in lyricsError when it failed), the song still out of the
+    library, for them to be pasted (resume_lyrics), or the song let go (cancel_job: it's deleted)."""
     _set(job, phase="lyrics", stage="Finding the lyrics" if how is None else "Lining the lyrics up with the voice", progress=0.0, needLyrics=False, lyricsError=None)
     try:
         lid = start_lyrics(song_id, how, low=bool(job.get("low")), front=True)
@@ -1468,8 +1479,15 @@ def _lyrics_phase(job, song_id: str, how):
         time.sleep(0.4)
     base = job.get("lyricsFrom", 0.0)
     held = base + (1 - base) * seen  # where it stopped, of its lyrics' part
-    if not os.path.isfile(os.path.join(LIB, song_id, "meta.json")):
+    folder = os.path.join(LIB, song_id)
+    if not os.path.isfile(os.path.join(folder, "meta.json")):
         return  # deleted meanwhile: nothing to ask for
+    if lj is not None and lj["status"] == "done" and _lyrics_data(folder):  # in, lyrics and all: into the library now
+        with _meta_lock:
+            meta = _read_meta(folder)
+            meta.pop("adding", None)
+            _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
+        return
     if lj is None or lj["status"] != "done":
         _set(job, needLyrics=True, lyricsError=(lj or {}).get("error") or "That didn’t work.", stoppedAt=held)
     elif not _lyrics_data(_song_dir(song_id)):

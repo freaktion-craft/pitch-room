@@ -73,13 +73,15 @@
 /* sent: a copy of it flying to the song's row (sendClip), over the drawer */
 .cc-fly { position: fixed; z-index: calc(var(--z-modal) + 1); margin: 0; pointer-events: none; transform-origin: 0 0; }
 .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: var(--space-2); align-items: center; }
-.job > .top, .job > .px { grid-column: 1; }
-.job > .lyr-ask { grid-column: 1 / -1; }
+.job > .top { grid-column: 1; }
+.job > .px { grid-column: 1 / -1; } /* the row's whole width, under its title and its buttons alike, the same in every row */
+.job > .lyr-form { grid-column: 1 / -1; }
+/* its buttons on its title's line, at the right: Paste lyrics (one stopped for them), then the x (the 32 px buttons centred on the 20 px line) */
+.job > .row-acts { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: var(--space-2); align-self: start; margin-top: -6px; }
 .job .top { display: grid; min-width: 0; }
 .job .top b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .job .top span { color: var(--muted); font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* cancel (or, once it has failed, clear away): on its name's line (the 32 px button centred on the 20 px line) */
-.job .x { grid-column: 2; grid-row: 1; align-self: start; margin-top: -6px; }
 .job .x > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .job.err .top span { color: var(--bad); white-space: normal; }
 .job.err .px { display: none; }
@@ -94,8 +96,8 @@
 /* stopped for its lyrics (none found, or finding them failed): orange where it stopped, and the way to paste them */
 .job.need .px i.on { background: var(--orange); }
 .job.need .top span { color: var(--orange); white-space: normal; }
-.lyr-ask { display: grid; gap: var(--space-2); justify-items: start; }
-.lyr-form { display: grid; gap: var(--space-2); justify-self: stretch; }
+.lyr-form { display: grid; gap: var(--space-2); }
+.lyr-open.on { background: var(--hover-2); } /* its box open */
 .lyr-form textarea { min-height: 120px; max-height: 280px; border: 1px solid transparent; border-radius: var(--radius-md); background: var(--fill); padding: var(--space-2) var(--space-3);
   font: var(--text-md)/20px var(--font); color: inherit; resize: vertical; transition: border-color var(--duration-fast), background-color var(--duration-fast); }
 .lyr-form textarea::placeholder { color: var(--placeholder); }

@@ -101,7 +101,7 @@ async function drawLibrary() {
   if (adding.size) paintJobs();
   for (const j of jobs) {
     if (pollers[j.id] || adding.has(j.id)) continue;
-    addingJob(j.id, { ...j, arrived: !!j.songId, done: j.status === "done" && !j.needLyrics }); // (one in already is in this list)
+    addingJob(j.id, { ...j, arrived: false, done: j.status === "done" && !j.needLyrics }); // (none of these is in the list yet)
     if (j.status !== "done") watchJob(j.id, "separate");
   }
   box.innerHTML = "";
