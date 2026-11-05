@@ -123,8 +123,11 @@ async function serverStopped(code) {
 function savedBounds() { try { return JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { return {}; } }
 function createWindow() {
   const b = savedBounds();
+  // no smaller than the first steps' water beside them needs (it goes under 900 px wide, base.css), every step in its
+  // height, and still inside a 1366 × 768 laptop's screen; a size kept from smaller comes up to it
+  const MIN_W = 960, MIN_H = 640;
   win = new BrowserWindow({
-    width: b.width || 1280, height: b.height || 860, x: b.x, y: b.y, minWidth: 720, minHeight: 560,
+    width: Math.max(MIN_W, b.width || 1280), height: Math.max(MIN_H, b.height || 860), x: b.x, y: b.y, minWidth: MIN_W, minHeight: MIN_H,
     title: "Pitchroom", backgroundColor: BG, show: false, autoHideMenuBar: true,
     // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
     ...(process.platform === "darwin" ? { titleBarStyle: "hidden" } : {}),
