@@ -27,6 +27,7 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
       moving = true;
       // through, from the song's tools with its cover out in the right half (or from the song's step with a library
       // brought in, its covers on the water): the steps' end played first (obFinale); not when left by Exit
+      if (i >= steps.length && !out?.exit && OB.lib && OB.floats.length) await obRingsOut(); // a library's covers, turning till now: blurred away, then the page
       const finale = i >= steps.length && !out?.exit && obFinaleCovers(steps[at]?.dataset.step);
       if (finale) await obFinale(finale);
       // going on to allowing the mic when it's allowed already (asked here before, or in the browser): on past it
@@ -589,7 +590,6 @@ function obFinaleCovers(step) {
   if (getComputedStyle($("#obVisual")).display === "none") return null;
   const hero = $("#obHero");
   if (step === "tools" && !hero.hidden) return [{ el: hero.querySelector(".cover"), art: OB.first?.art || hero.querySelector("img").src }];
-  if ((step === "song" || step === "tools") && OB.lib?.st?.status === "done" && OB.floats.length) return OB.floats.map((f) => ({ el: f.el.firstChild, art: f.src }));
   return null;
 }
 
@@ -602,7 +602,8 @@ function obFinaleCovers(step) {
 // RING.grow more on each one out, as many rings as fit, evenly round each and lined up from one ring to the next (5,
 // 10, 15: every other one, every third, on the inner's spokes), upright; each blurring in as its song's copied, and
 // the whole turning slowly as one, as long as it goes on. More songs than places: the
-// oldest blurs out for the next. All in: they blur out, one after another, and the step says so (obRingsOut).
+// oldest blurs out for the next. All in, the step says so, and they go on turning till it's left: through (Continue),
+// they blur out one after another (obRingsOut), then the page.
 // size: a cover's side; r0: the inner ring's radius; step: from a ring to the next; spin: the turn, rad/s
 const RING = { first: 5, grow: 5, size: 76, r0: 100, step: 150, spin: 0.1 };
 const FLOAT = { every: 140 }; // ms between several coming in at once
@@ -687,9 +688,7 @@ async function obLibPoll(paint, st) {
     if (st.songs || st.settings) obLibIn();
     lib.tools = !!(await obStatus())?.installed; // not in: on to their download, as with a first song (obSong)
     if (OB.lib !== lib) return;
-    await new Promise((ok) => setTimeout(ok, fresh.length * FLOAT.every + 700)); // (the last ones in, and seen a moment)
-    if (OB.lib !== lib) return;
-    await obRingsOut(); // blurred away, then the step says it's in
+    await new Promise((ok) => setTimeout(ok, fresh.length * FLOAT.every)); // (the last ones in; they go on turning till Continue)
     if (OB.lib !== lib) return;
   }
   lib.st = st;
@@ -1288,7 +1287,9 @@ if (new URLSearchParams(location.search).get("demo") === "rings") (async () => {
   const intro = $('#onboard .ob-step[data-step="intro"]'); if (intro) intro.hidden = true; // (jumped over: not left showing)
   await sleep(600);
   $("#obLibGo").click();
-  while (!(OB.lib?.st?.status === "done" && !OB.floats.length)) await sleep(300);
-  await sleep(3000); // (the step saying it's in, a moment)
+  while (OB.lib?.st?.status !== "done") await sleep(300);
+  await sleep(4000); // (in, the rings turning on, a while)
+  if (!$("#obSongGo").hidden) $("#obSongGo").click(); // Continue: they blur out, the page comes
+  await sleep(3500);
   location.reload(); // and again
 })();
