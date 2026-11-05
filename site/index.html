@@ -224,7 +224,8 @@ async function riffle() {
   Object.assign(recto.style, { left: "0", width: "100%" }); // its front no longer a pixel past the spine: under the right page, that pixel showed at its edge
   // on round the same way, through the back of the book (away from you, smaller in its depth, so none of it shows round
   // the right page), to lie flat under it
-  left.animate([{ transform: `${depth} rotateY(-180deg)`, zIndex: -1 }, { transform: `${depth} rotateY(-360deg)`, zIndex: -1 }], b);
+  left.animate([{ transform: `${depth} rotateY(-180deg)`, zIndex: -1 }, { transform: `${depth} rotateY(-360deg)`, zIndex: -1 }], b)
+    .finished.then(() => left.remove()); // gone once it's under: lying there just its size, its edges showed round the page
   verso.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], b);
   recto.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], b);
   verso.lastChild.animate([{ opacity: 0 }, { opacity: R.shade, offset: 0.5 }, { opacity: R.shade }], b); // darker as it stands up
