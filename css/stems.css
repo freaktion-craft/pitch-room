@@ -71,12 +71,11 @@
 .job .top { display: grid; min-width: 0; }
 .job .top b { font-weight: var(--weight-medium); line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .job .top span { color: var(--muted); font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* cancel (or, once it has failed, clear away): beside both rows */
-.job .x { grid-column: 2; grid-row: 1 / span 2; }
+/* cancel (or, once it has failed, clear away): beside its name, over the pixels */
+.job .x { grid-column: 2; grid-row: 1; }
 .job .x > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .job.err .top span { color: var(--bad); white-space: normal; }
 .job.err .px { display: none; }
-.job.err .x, .job.done .x { grid-row: 1; }
 #jobsBtn.ready .ring circle + circle { stroke: var(--ink); } /* all in */
 #jobsBtn.warn .ring circle + circle { stroke: var(--orange); } /* one stopped, wanting its lyrics */
 /* a song's progress in pixels (pixBar): 3 rows, filled a column at a time from the left; the next one blinking while it goes */
@@ -273,6 +272,7 @@ html.desktop-mac :is(#addPop, #jobsPop) { --drawer-top: var(--space-6); --head-t
 #addPop[hidden], #jobsPop[hidden] { translate: 100% 0; pointer-events: none; }
 @starting-style { #addPop:not([hidden]), #jobsPop:not([hidden]) { translate: 100% 0; } }
 @media (prefers-reduced-motion: reduce) { #addPop, #jobsPop { transition: none; } }
+:is(#addPop, #jobsPop) .pop-title { font-size: var(--text-xl); } /* a drawer's name: a size up from a panel's (its line the same, on the header's) */
 .add-form { display: grid; gap: var(--space-3); }
 .add-title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: -6px 0; } /* the close at the right edge, in line with what's under it; its 32 px in the title's 20 px line */
 .add-form p, #sAddSetup { margin: 0; }
