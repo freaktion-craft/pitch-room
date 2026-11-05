@@ -246,7 +246,7 @@ function paintSync() {
 async function runSync() {
   if (syncBusy) return;
   syncBusy = true; syncErr = ""; paintSync();
-  pauseSong(); listenStop(); tsStop(); hearMe(false); // nothing else playing while it listens (the mic back in your ears neither)
+  pauseSong(); listenStop(); tsStop(); // nothing else playing while it listens
   try {
     const r = await measureDelay();
     syncExtras = { ...syncExtras, [syncKey()]: { s: Math.round(Math.max(-1, Math.min(1, r.s - r.browser)) * 1e4) / 1e4, label: r.label, at: Date.now() } };

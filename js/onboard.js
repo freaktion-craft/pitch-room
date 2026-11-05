@@ -376,11 +376,15 @@ const TOOL_BOXES = [
   { pkg: "torch", name: "PyTorch", what: "Runs the models", to: 0.45 }, { pkg: "torchaudio", name: "torchaudio", what: "Reads the audio", to: 0.5 },
   { pkg: "demucs", name: "Demucs", what: "Voice from band", to: 0.6 }, { pkg: "audio-separator", name: "audio-separator", what: "Lead from backing", to: 0.7 },
   { pkg: "librosa", name: "librosa", what: "Beat and key", to: 0.75 }, { pkg: "openai-whisper", name: "Whisper", what: "Hears the lyrics", to: 0.83 },
-  { pkg: "stable-ts", name: "stable-ts", what: "Times each word", to: 0.9 }, { name: "Lyrics model", what: "Whisper’s, for the words", to: 0.99 },
-  { name: "Melody model", what: "RMVPE, for the pitch", to: 1 },
+  { pkg: "stable-ts", name: "stable-ts", what: "Times each word", to: 0.9 }, { key: "lyrics-model", name: "Lyrics model", what: "Whisper’s, for the words", to: 0.99 },
+  { key: "melody-model", name: "Melody model", what: "RMVPE, for the pitch", to: 1 },
 ];
-function obToolStates(st) { // each box: waiting | getting | setting (being set up) | done
+// each box: waiting | getting | got (down, waiting to be put in) | setting (being set up) | done | later (a model left
+// for the first song). From the install's own account of each (stems.py, job.pkgs), so each says done as it is; a
+// server from before that kept, read off the log's last lines and the progress as it was
+function obToolStates(st) {
   const job = st?.install, all = !!st?.installed || job?.status === "done", p = job?.progress || 0, log = (job?.log || []).join("\n").toLowerCase();
+  if (job?.pkgs) return TOOL_BOXES.map((b) => job.pkgs[b.pkg || b.key] || (all ? "done" : "waiting"));
   const setup = /installing collected packages/.test(log);
   return TOOL_BOXES.map((b, i) => {
     if (all) return "done";
@@ -397,7 +401,7 @@ async function obTools() {
   OB.toolsStep = true; clearTimeout(OB.dlT);
   song.hidden = true; // (its cover's in the middle of the right half, or its box below)
   $("#obDlNote").hidden = true;
-  const word = { waiting: "Waiting", getting: "Getting it", setting: "Setting up", done: "✓" };
+  const word = { waiting: "Waiting", getting: "Getting it", got: "Downloaded", setting: "Setting up", done: "✓", later: "With your first song" };
   const box = (cls) => { const d = el("div", "ob-box" + (cls ? " " + cls : "")); d.append(el("b"), el("small"), el("span", "st")); boxes.append(d); return d; };
   boxes.replaceChildren();
   const tb = TOOL_BOXES.map((t) => { const d = box(); say(d.querySelector("b"), t.name); say(d.querySelector("small"), t.what); return d; });

@@ -67,6 +67,7 @@ const EMPTY_LIBRARY = false;
 <div class="app" id="app">
   <header>
     <a class="brand" href="#stems">Pitchroom</a>
+    <a class="btn sm icon quiet" id="homeBtn" href="#stems" aria-label="Library" title="Library" hidden></a>
     <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <a class="btn sm icon quiet" id="voiceBtn" href="#voice" aria-label="Lab" title="Lab: chest and head voice, the spectrum, formants"></a>
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
@@ -203,6 +204,7 @@ const EMPTY_LIBRARY = false;
             <div class="set-row"><div class="set-what"><b>Language</b><small>The app’s words</small></div><button class="pick" id="lang" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Note names</b><small>On the stage and the keyboard</small></div><button class="pick" id="names" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Accent color</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent color"></div></div>
+            <label class="set-row"><span class="set-what"><b>Aurora</b><small>The glow behind Practice, as the song plays</small></span><input type="checkbox" class="switch" id="auroraOn"></label>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMic">
@@ -211,7 +213,7 @@ const EMPTY_LIBRARY = false;
             <div class="set-row"><div class="set-what"><b>Input</b><small>What you sing into</small></div><button class="pick" id="micDev" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button" title="Hold your headphones close to the mic, then press">Measure</button></div></div>
             <div class="set-row gate-sec">
-              <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button><button class="btn sm" id="hearMe" type="button" aria-pressed="false" title="Through headphones: through speakers it can howl">Hear yourself</button></div></div>
+              <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button></div></div>
               <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>
             </div>
             <label class="set-row"><span class="set-what"><b>Filter out speaker sound</b><small>For speakers; leave it off with headphones</small></span><input type="checkbox" class="switch" id="echo"></label>

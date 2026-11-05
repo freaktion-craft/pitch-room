@@ -221,7 +221,6 @@ function splitInput(label) {
 }
 function stopMic() {
   recOff(); // no recording without the mic
-  hearMe(false); // nor hearing yourself
   if (micNode) micNode.disconnect();
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
   micNode = null; micStream = null; micOn = false; renderMic();

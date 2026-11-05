@@ -89,6 +89,8 @@ def get_job(job_id: str) -> dict | None:
         if job is None:
             return None
         out = {k: v for k, v in job.items() if k != "log"} | {"log": job["log"][-6:]}
+        if "pkgs" in job:
+            out["pkgs"] = dict(job["pkgs"])  # (a copy: the install's thread goes on changing it)
         if job["kind"] == "separate" and job["status"] == "queued" and job_id in _line:
             out["ahead"] = sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate")
         return out
@@ -272,6 +274,42 @@ def start_install(gpu_only: bool = False) -> str:
     return _run(_install_job, _install, gpu_only)
 
 
+# The song tools the first steps show a box each for (onboard.js, TOOL_BOXES), and how each is going, as pip says it:
+# getting (being collected, its files coming down), got (down: pip's on to the next), setting (pip putting them in),
+# done (installed, or there already). job["pkgs"], by the name as pip writes it, lower case, _ as -. The models after
+# them are lyrics-model and melody-model (_install). Read from each line whole: the log keeps only its last 160
+# characters, and the page sees only its last 6 lines
+TOOL_PKGS = ("torch", "torchaudio", "demucs", "audio-separator", "librosa", "openai-whisper", "stable-ts")
+
+
+def _pkg_name(s: str) -> str:
+    return re.split(r"[\[<>=!~;\s(]", s.strip(), maxsplit=1)[0].lower().replace("_", "-")
+
+
+def _pip_line(job, line: str):
+    pkgs = job.get("pkgs")
+    if pkgs is None:
+        return
+    def put(name, state):
+        if name in TOOL_PKGS and pkgs.get(name) != "done":
+            pkgs[name] = state
+    if m := re.match(r"Collecting (\S+)", line):
+        name = _pkg_name(m.group(1))
+        for k, v in pkgs.items():  # what came before it is down
+            if v == "getting" and k != name:
+                pkgs[k] = "got"
+        put(name, "getting")
+    elif m := re.match(r"Requirement already satisfied: (\S+)", line):
+        put(_pkg_name(m.group(1)), "done")
+    elif line.startswith("Installing collected packages:"):
+        for k, v in pkgs.items():
+            if v in ("getting", "got"):
+                pkgs[k] = "setting"
+    elif line.startswith("Successfully installed "):
+        for spec in line[len("Successfully installed "):].split():
+            put(spec.rsplit("-", 1)[0].lower().replace("_", "-"), "done")  # name-version
+
+
 def _pip(job, args: list[str], share: tuple[float, float]) -> int:
     p = subprocess.Popen([sys.executable, "-m", "pip", *args, "--disable-pip-version-check", "--progress-bar", "off"],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -282,6 +320,7 @@ def _pip(job, args: list[str], share: tuple[float, float]) -> int:
             continue
         n += 1
         with _jobs_lock:
+            _pip_line(job, line)
             job["log"].append(line[-160:])
             job["progress"] = share[0] + (share[1] - share[0]) * min(1.0, n / 120)
     return p.wait()
@@ -326,6 +365,11 @@ def _install_cuda_torch(job, replace: bool) -> bool:
 def _install(job, gpu_only: bool = False):
     global _restart_needed
     _set(job, status="running", stage="Downloading and installing (≈3–4 GB, a few minutes)…")
+    with _jobs_lock:
+        job["pkgs"] = {}  # how each tool's going (_pip_line), and the two models (below)
+    def model(name, state):
+        with _jobs_lock:
+            job["pkgs"][name] = state
     torch_was_loaded = "torch" in sys.modules
     if has_nvidia():
         ok = _install_cuda_torch(job, replace=gpu_only)
@@ -341,13 +385,19 @@ def _install(job, gpu_only: bool = False):
     importlib.invalidate_caches()
     if not gpu_only:
         try:  # the lyrics model now rather than at the first song (it's fetched then if this fails)
+            model("lyrics-model", "getting")
             _fetch_whisper(job, (0.9, 0.99))
+            model("lyrics-model", "done")
         except Exception as e:  # noqa: BLE001
+            model("lyrics-model", "later")
             with _jobs_lock:
                 job["log"].append(f"The lyrics model will be downloaded with the first song ({e}).")
         try:  # and the melody's pitch tracker (≈180 MB)
+            model("melody-model", "getting")
             _fetch_rmvpe(job, (0.99, 1.0))
+            model("melody-model", "done")
         except Exception as e:  # noqa: BLE001
+            model("melody-model", "later")
             with _jobs_lock:
                 job["log"].append(f"The melody model will be downloaded with the first song ({e}).")
     if torch_was_loaded:  # the old PyTorch is already in memory; a fresh start picks up the new one

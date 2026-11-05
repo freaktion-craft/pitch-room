@@ -1036,9 +1036,9 @@ async function singSong(m, btn) {
   await loadTakes(m); // in first, so Practice opens with its takes beside it, rather than them pushing in after
   go("practice");
 }
-// Settings: a page of their own (#settings, route): going out, their lists closed and Hear yourself off
+// Settings: a page of their own (#settings, route): going out, their lists closed
 function showMicSet(on) {
-  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); hearMe(false); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
+  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
 }
 // Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
 // and models beside them, copied in by the server (stems.start_import). Its line says how it's going, then how it went;
@@ -1086,18 +1086,6 @@ function initSetNav() {
   btns.forEach((b, i) => { b.onclick = () => { setGroups[i].scrollIntoView({ behavior: stillMotion() ? "auto" : "smooth", block: "start" }); paintSetNav(i); }; });
   addEventListener("scroll", () => paintSetNav(), { passive: true }); addEventListener("resize", () => paintSetNav());
   paintSetNav(); // a reload on the page: shown before this was set up
-}
-// Hear yourself: the mic back through the speakers (headphones, really), while the settings are open, to set the
-// sensitivity by ear; the mic comes on for it.
-let monitor = null, monitorOn = false;
-async function hearMe(on) {
-  if (on === monitorOn) return;
-  if (on && !micOn && !(await startMic())) return;
-  monitorOn = on;
-  if (on && !monitor) { monitor = ac.createGain(); monitor.gain.value = 0; micBus.connect(monitor); monitor.connect(master); }
-  if (monitor) monitor.gain.setTargetAtTime(on ? 1 : 0, ac.currentTime, 0.02);
-  const b = $("#hearMe");
-  b.setAttribute("aria-pressed", String(on)); say(b, on ? "Stop hearing" : "Hear yourself");
 }
 // Headphones, in Practice (S.ears): which ear the band, the guide vocal and the metronome (its count-in too) play in,
 // "l", "r" or "both"; and, when a take is compared, what each ear hears (left, right: "orig", the song as it is, or
@@ -1257,8 +1245,9 @@ function initSing() {
   $("#gate").value = Math.round(20 * Math.log10(S.gate)); $("#echo").checked = S.echo;
   $("#gate").oninput = (e) => { S.gate = 10 ** (+e.target.value / 20); save(); };
   resetOnDblClick($("#gate"), -40);
-  $("#hearMe").onclick = () => hearMe(!monitorOn);
   $("#setImportGo").onclick = runImport;
+  $("#auroraOn").checked = S.aurora;
+  $("#auroraOn").onchange = (e) => { S.aurora = e.target.checked; save(); };
   $("#devTools").checked = S.dev;
   $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); };
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };

@@ -133,8 +133,6 @@ label.set-row { cursor: pointer; }
 .gate-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
 .gate-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .gate-acts { display: flex; gap: var(--space-2); }
-#hearMe { min-width: 112px; justify-content: center; } /* one width, whichever it says */
-#hearMe[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
 /* the mic, on and off, as the header's chip: tinted red while it's off */
 #micBtn2:not(.on) { background: color-mix(in oklab, var(--bad) 14%, var(--surface-2)); color: color-mix(in oklab, var(--bad) 80%, var(--ink)); }
 #micBtn2:not(.on):hover { background: color-mix(in oklab, var(--bad) 22%, var(--surface-2)); }
@@ -358,7 +356,7 @@ html.welcome #boot, html.asking #welcome { display: none; }
 .ob-box b { font-weight: var(--weight-medium); font-size: var(--text-sm); line-height: 18px; color: var(--muted); transition: color var(--duration-base); }
 .ob-box small { font-size: var(--text-xs); line-height: 16px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ob-box .st { position: absolute; top: 7px; right: var(--space-2); font-size: var(--text-xs); line-height: 18px; color: var(--faint); }
-.ob-box[data-st="getting"] b, .ob-box[data-st="setting"] b, .ob-box[data-st="done"] b { color: var(--ink); }
+.ob-box[data-st="getting"] b, .ob-box[data-st="got"] b, .ob-box[data-st="setting"] b, .ob-box[data-st="done"] b { color: var(--ink); } /* (got: down, still, no running line: pip's at another) */
 .ob-box[data-st="getting"]::after, .ob-box[data-st="setting"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
   background: linear-gradient(90deg, transparent, var(--voice), transparent) 0 0 / 50% 100% no-repeat; animation: ob-run 1.2s linear infinite; }
 @keyframes ob-run { from { background-position: -100% 0; } to { background-position: 200% 0; } }
