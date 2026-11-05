@@ -425,13 +425,28 @@ function groupOf(m) {
   const by = mainArtist(m.artist);
   return { key: `${folded(m.album)}\u0000${folded(by)}`, name: m.album, by };
 }
+// An album's heading has its cover (its songs share it: theirs left out under it, #sLib.by-album), the first of its
+// songs' that has one, as a row's is (up close when clicked); an artist's, its name alone
 function groupHead(g, songs) {
-  const key = `${libView}:${g.key}`;
+  const key = `${libView}:${g.key}`, album = libView === "album" && !!g.name;
   let h = libGroups.get(key);
-  if (!h) { h = el("div", "lib-group"); h.append(el("b"), el("small")); libGroups.set(key, h); }
+  if (!h) {
+    h = el("div", "lib-group" + (album ? " album" : ""));
+    if (album) { const c = el("span", "cover"); c.setAttribute("aria-hidden", "true"); h.append(c); }
+    const what = el("span", "lg-what"); what.append(el("b"), el("small")); h.append(what);
+    libGroups.set(key, h);
+  }
   const n = songs.length === 1 ? tr("1 song") : tr("{n} songs", { n: songs.length });
   h.querySelector("b").textContent = g.name || tr(libView === "artist" ? "Unknown artist" : "Unknown album");
   h.querySelector("small").textContent = [g.by, n].filter(Boolean).join(" · ");
+  const tile = h.querySelector(".cover"), m = album && songs.find((s) => s.cover && s.cover.at);
+  if (tile && m && putCover(tile, m, coverSrc(m, true))) {
+    tile.dataset.full = coverSrc(m, false);
+    tile.removeAttribute("aria-hidden"); tile.setAttribute("role", "button"); tile.tabIndex = 0;
+    tile.setAttribute("aria-label", tr("Album art of {title}", { title: g.name }));
+    tile.onclick = (e) => { e.stopPropagation(); showCover(tile); };
+    tile.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showCover(tile); } };
+  }
   return h;
 }
 function paintLibView() {
@@ -453,6 +468,7 @@ function arrangeRows() {
     if (want.every((w) => text.includes(w))) found.push(m); else libRows.get(m.id).remove();
   }
   const heads = new Set();
+  box.classList.toggle("by-album", libView === "album");
   if (libView === "song") for (const m of found) box.append(libRows.get(m.id));
   else {
     const groups = new Map(); // key -> {g (as most of its songs spell it), songs}
