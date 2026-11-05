@@ -51,6 +51,13 @@ a { -webkit-user-drag: none; }
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 .get, .word { grid-area: 1 / 1; } /* one over the other, in the middle */
 .word { color: var(--ink); font: 400 44px/1 "Geist Serif", var(--font); letter-spacing: -0.01em; visibility: hidden; }
+/* coming in, wiped on from the left: a mask, ink to clear across a soft band, drawn over it from left to right (its band
+   off to the left of the name at the start, past its right at the end), the blur going as it does */
+.word.in { visibility: visible; -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent 60%); mask-image: linear-gradient(90deg, #000 40%, transparent 60%);
+  -webkit-mask-size: 250% 100%; mask-size: 250% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  animation: wipe 1s cubic-bezier(0.4, 0, 0.2, 1) both, unblur 1s cubic-bezier(0.2, 0, 0, 1) both; }
+@keyframes wipe { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
+@keyframes unblur { from { filter: blur(10px); } }
 /* as the page comes in: the button up out of a blur, the line at the foot fading in a little after */
 @keyframes reveal { from { opacity: 0; filter: blur(12px); } }
 @keyframes rise { from { opacity: 0; } }
@@ -145,7 +152,7 @@ const showTip = () => {
 // the button gone up to where the download is: its words going as it draws in round its logo, a circle, then off up to
 // the browser's downloads icon (where the tip points), smaller, into the toolbar; the tip as it gets there, and in the
 // button's place the name, out of a blur. A copy flies (the button itself, its link and its download, as they are)
-const FLY = { shrink: 280, fly: 620, name: 800, size: 40 };
+const FLY = { shrink: 280, fly: 620, size: 40 };
 document.fonts.load('400 44px "Geist Serif"').catch(() => {}); // the name's typeface in ahead of a click
 let flying = false;
 async function fly(get) {
@@ -169,10 +176,8 @@ async function fly(get) {
     { transform: `translate(${tx - cx}px, ${ty - cy - 8}px) scale(0.2)`, opacity: 0 }], { duration: FLY.fly, easing: "cubic-bezier(0.55, 0, 0.25, 1)", fill: "forwards" }).finished;
   ghost.remove();
   showTip();
-  // the button gone for good (its download's begun), the name in its place, out of a blur as the button first came
-  const word = document.getElementById("word");
-  word.style.visibility = "visible";
-  word.animate([{ opacity: 0, filter: "blur(12px)" }, { opacity: 1, filter: "blur(0px)" }], { duration: FLY.name, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "both" });
+  // the button gone for good (its download's begun), the name in its place, wiped on from the left out of a blur
+  document.getElementById("word").classList.add("in");
 }
 document.getElementById("get").addEventListener("click", (e) => {
   if (!/\/releases\/download\//.test(e.currentTarget.href)) return;
