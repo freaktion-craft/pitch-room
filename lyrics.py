@@ -56,9 +56,15 @@ def _get(path: str, params: dict | None = None, tries: int = 6):
     return None
 
 
-# Words in a video's title that aren't the song's: what kind of video it is, and where it's from
-NOISE = re.compile(r"(?i)\b(official|(music |lyric )?video|official audio|lyrics?|visualizer|m/?v|karaoke|remaster(ed)?|가사|노래방|tj|금영)\b")
-TAG = re.compile(r"(?i)가사|노래방|lyric|karaoke|official|m/?v\b|\btj|금영")  # a bracket that only says what kind of video it is
+# The languages a lyric video's words are in, two or more, as its title lists them: "Han|Rom|Eng", "Han/Rom/Eng", "ENG/ROM"
+LANGS = r"(?:han(?:gul)?|rom(?:anized|anization)?|eng(?:lish)?|kor(?:ean)?|jpn|jap|kan(?:ji)?|chn|chi|indo|esp|spa|viet|thai)"
+LANG_RUN = re.compile(rf"(?i)(?<![^\W_]){LANGS}(?:\s*[/|,&+_]\s*{LANGS})+(?![^\W_])")  # (and "Kan_Rom_Eng")
+# Words in a video's title that aren't the song's: what kind of video it is, and where it's from ("Color Coded
+# Lyrics", "한국어 가사": the lyrics, and in what language)
+NOISE = re.compile(r"(?i)\b(official|oficial|(music |lyric )?video|official audio|lyrics?|visualizer|m/?v|karaoke|remaster(ed)?|colou?r[- ]coded|"
+                   r"(?:한국어|한글|영어|일본어|중국어)\s*가사|가사|노래방|tj|금영)\b")
+# a bracket that only says what kind of video it is, or what's in it ("sub. español + letra", 【中文日文歌詞字幕】)
+TAG = re.compile(r"(?i)가사|노래방|lyric|karaoke|official|oficial|m/?v\b|\btj|금영|letra|\bsub\b|vietsub|자막|해석|번역|字幕|歌詞|歌词")
 FEAT = re.compile(r"(?i)\b(feat|ft)\b\.?.*?(?=\s-\s|$)")
 # where a channel's own tags start: a bar (or the Korean ㅣ, or a lone small l, typed for one), " / "
 CUT = re.compile(r"[|ㅣᅵ]|\s/\s|\sl\s")
@@ -66,13 +72,28 @@ CUT = re.compile(r"[|ㅣᅵ]|\s/\s|\sl\s")
 LEAD = re.compile(r"^\s*[\[【]+\s*([^\[\]【】]+?)\s*[\]】]+(?=\s*-\s)")
 
 
+# a bar or slash left at an end ("UN Village /" from "UN Village Lyrics/가사"), or a dash on its own ("YOASOBI -" from
+# "YOASOBI - Lyrics Video"); not one that's part of a name ("Hello, Again ~昔からある場所~", "Song -Subtitle-")
+EDGE = re.compile(r"^[\s/|\\·•]+|[\s/|\\·•]+$|\s+[-–—]+\s*$|^\s*[-–—]+\s+")
+
+
 def _clean(s: str) -> str:
-    return " ".join(NOISE.sub(" ", FEAT.sub(" ", re.sub(r"[\"“”‘’'`]", "", s))).split())
+    return EDGE.sub("", " ".join(NOISE.sub(" ", FEAT.sub(" ", re.sub(r"[\"“”‘’'`]", "", s))).split()))
+
+
+def _parts(title: str) -> list[str]:
+    """A video's title cut where the channel's tags start, its first part the song's. A bar between the languages of
+    its words ("UN Village (Han|Rom|Eng)", "OMEGA Han|Rom|Eng Lyrics") or inside brackets isn't a cut: the languages
+    go, and a bar left in brackets is a space."""
+    t = LANG_RUN.sub(" ", unicodedata.normalize("NFKC", title))
+    t = re.sub(r"『([^』]*)』", lambda m: " " if TAG.search(m.group(1)) else m.group(0), t)  # (『sub. español + letra/ lyrics』)
+    t = re.sub(r"\([^()]*\)|\[[^\[\]]*\]|【[^【】]*】", lambda m: CUT.sub(" ", m.group(0)), t)
+    return CUT.split(t)
 
 
 def _head(title: str) -> str:
     """A video's title up to the channel's tags, its artist out of square brackets."""
-    return LEAD.sub(r"\1", CUT.split(unicodedata.normalize("NFKC", title))[0])
+    return LEAD.sub(r"\1", _parts(title)[0])
 
 
 def split_title(title: str) -> tuple[str, str]:
@@ -96,7 +117,24 @@ def queries(title: str) -> list[str]:
     artist, song = clean(artist), clean(song)
     alts = [a for a in map(clean, alts) if a and not FEAT.match(a)]
     out = [f"{artist} {song}", song, *(f"{artist} {a}" for a in alts), *(f"{a} {song}" for a in alts if not artist), *alts]
+    # then an "artist - song" after a bar where the part before it has none (later_split): searched last
+    if later := later_split(title):
+        out += [" ".join(later), later[1]]
     return list(dict.fromkeys(q.strip() for q in out if q.strip()))
+
+
+def later_split(title: str) -> tuple[str, str] | None:
+    """An "artist - song" after a bar, the part before it having none: "9년째 완벽한 이별소설 노래 | 에픽하이 - 연애소설"
+    gives ("에픽하이", "연애소설"). Both sides something once the tags are gone, so "Song | Artist - Lyrics" doesn't
+    count (split_title keeps the first part's song: this is only for searching it, and naming it from a record)."""
+    parts = _parts(title)
+    if " - " in parts[0]:
+        return None
+    for p in parts[1:]:
+        a, _, s = re.sub(r"\[[^\]]*\]|【[^】]*】|\([^)]*\)", " ", p).partition(" - ")
+        if _clean(a) and _clean(s):
+            return _clean(a), _clean(s)
+    return None
 
 
 def _found(q: str) -> list[dict]:
