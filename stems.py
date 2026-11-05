@@ -918,6 +918,8 @@ def find(url: str) -> dict:
     import lyrics
     import yt_dlp
     os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")  # its deno, beside this Python
+    if vid := _video_id(url):  # the video alone: a link from a mix or a playlist (&list=…&index=…) is read as the playlist, with no title
+        url = "https://www.youtube.com/watch?v=" + vid
     try:
         with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}) as ydl:
             info = ydl.extract_info(url, download=False, process=False)
