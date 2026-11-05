@@ -378,6 +378,13 @@ const EMPTY_LIBRARY = false;
       <p class="ob-note" data-html>Sing any song from YouTube, one phrase at a time, with a few tools to help. Everything stays on your computer.</p>
       <div class="ob-acts"><button class="btn primary" type="button" data-next>Get started</button></div>
     </section>
+    <section class="ob-step" data-step="colour" aria-labelledby="obColourT" hidden>
+      <h2 class="ob-title" id="obColourT">What color is closer to your fav?</h2>
+      <p class="ob-note" data-html>This color will be used as point color in your experience. Can be changed from <a href="#settings" data-ob-leave>Settings</a>.</p>
+      <!-- a book of the colours, open at yours: its pages turned to choose one, the bookmarks along its edges to go straight to one (obColour) -->
+      <div class="ob-book" id="obBook" role="group" aria-label="Accent color"><div class="ob-tabs" id="obTabs" role="radiogroup" aria-label="Accent color"></div><button class="pg l" type="button" aria-label="Previous color"></button><button class="pg r" type="button" aria-label="Next color"></button><span class="ob-book-name" aria-live="polite"></span></div>
+      <div class="ob-acts"><button class="btn primary" type="button" data-next>Continue</button></div>
+    </section>
     <section class="ob-step" data-step="allow" aria-labelledby="obAllowT" hidden>
       <h2 class="ob-title" id="obAllowT">Allow your mic</h2>
       <p class="ob-note" id="obAllowNote">Pitchroom needs your microphone.</p>
@@ -400,13 +407,6 @@ const EMPTY_LIBRARY = false;
       <!-- no mic to use: why (in the note's place), what to do, and to try again (it's tried again by itself when one's plugged in) -->
       <div class="ob-fix" id="obMicFix" hidden><p class="ob-small" id="obMicHow"></p></div>
       <div class="ob-acts"><button class="btn primary" id="obMicGo" type="button" data-next>Continue</button><button class="btn primary" id="obMicRetry" type="button" hidden>Try again</button><button class="btn ghost" type="button" data-next>Skip for now</button></div>
-    </section>
-    <section class="ob-step" data-step="colour" aria-labelledby="obColourT" hidden>
-      <h2 class="ob-title" id="obColourT">What color is closer to your fav?</h2>
-      <p class="ob-note" data-html>This color will be used as point color in your experience. Can be changed from <a href="#settings" data-ob-leave>Settings</a>.</p>
-      <!-- a book of the colours, open at yours: its pages turned to choose one, the bookmarks along its edges to go straight to one (obColour) -->
-      <div class="ob-book" id="obBook" role="group" aria-label="Accent color"><div class="ob-tabs" id="obTabs" role="radiogroup" aria-label="Accent color"></div><button class="pg l" type="button" aria-label="Previous color"></button><button class="pg r" type="button" aria-label="Next color"></button><span class="ob-book-name" aria-live="polite"></span></div>
-      <div class="ob-acts"><button class="btn primary" type="button" data-next>Continue</button></div>
     </section>
     <section class="ob-step" data-step="song" aria-labelledby="obSongT" hidden>
       <h2 class="ob-title" id="obSongT">What song do you want to sing now?</h2>

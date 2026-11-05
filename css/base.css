@@ -397,6 +397,7 @@ html.welcome #boot, html.asking #welcome { display: none; }
 .ob-float img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .ob-lib { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); } /* the question, then the button Settings has for it */
 .ob-lib[hidden] { display: none; }
+.ob-lib .btn { padding-top: 1px; } /* its label on the button's middle (Pretendard sits it a little high) */
 #obLibState { font-variant-numeric: tabular-nums; }
 /* what the tools' download is bringing, a box each (obTools): its name, what it's for, how it's going; waiting dim,
    coming (in or being set up) a light running under it, in with a tick; the song being split by them last, the width of two */
