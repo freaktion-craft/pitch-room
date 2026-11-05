@@ -250,6 +250,12 @@ async function boot() {
   const root = document.documentElement;
   let from = 0; // the bar's sweep is timed from when it shows
   if (root.classList.contains("asking")) { await askUpdate(); from = performance.now(); }
+  if (root.classList.contains("coming") && !root.classList.contains("booting")) { // a reload: no bar, the page rising in as it's drawn, a part after another
+    await Promise.race([Promise.all([libDrawn, document.fonts.ready]), sleep(1500)]);
+    clearTimeout(window.COMING_TIMER); root.classList.remove("coming");
+    return reveal(0);
+  }
+  root.classList.remove("coming");
   if (!root.classList.contains("booting")) return;
   if (root.classList.contains("welcome")) return welcome();
   await Promise.race([Promise.all([libDrawn, document.fonts.ready]), sleep(5000)]);

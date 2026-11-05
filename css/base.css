@@ -198,6 +198,7 @@ label.set-row { cursor: pointer; }
 html.song-busy :is(#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl) { opacity: 0.4; cursor: default; }
 html.booting #boot { display: grid; }
 html.booting #app { visibility: hidden; }
+html.coming #app { visibility: hidden; } /* a reload: held back till it rises in (boot) */
 #boot .bar { width: 160px; }
 #boot .bar i { width: 40%; transition: none; animation: boot-sweep 0.8s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
 @keyframes boot-sweep { to { transform: translateX(150%); } }

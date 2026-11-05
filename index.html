@@ -13,7 +13,12 @@
     const nav = performance.getEntriesByType("navigation")[0];
     let again = false;
     try { again = sessionStorage.getItem("stem:opened") === "1"; sessionStorage.setItem("stem:opened", "1"); } catch (e) { again = false; }
-    if (again || (nav && nav.type !== "navigate") || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (again || (nav && nav.type !== "navigate")) { // a reload (Ctrl R) or a step back: no bar, the page only rising in (boot())
+      document.documentElement.classList.add("coming");
+      window.COMING_TIMER = setTimeout(() => document.documentElement.classList.remove("coming"), 3000);
+      return;
+    }
     document.documentElement.classList.add("booting");
     window.BOOT_TIMER = setTimeout(() => document.documentElement.classList.remove("booting"), 8000); // (the welcome stops it: its steps take longer)
   })();
