@@ -204,8 +204,11 @@ function drawAurora() {
   if (!any) { a.cv.getContext("2d").clearRect(0, 0, a.cv.width, a.cv.height); return; }
   if (a.voice !== C.voice) { // your colour, all of it in its own hue: as it is, a little lighter and softer, a little deeper
     a.voice = C.voice;
-    const m = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(C.voice) || [0, 0.68, 0.17, 262];
-    a.hues = [[+m[1], +m[2], +m[3]], [+m[1] + 0.05, +m[2] * 0.8, +m[3]], [+m[1] - 0.04, +m[2], +m[3]]];
+    // (as written in tokens.css, or as the desktop app's minified copy has it: lightness and chroma as percentages,
+    // oklch(87% 0 0); a hue "none". Not read at all: a neutral grey, not some colour of its own)
+    const m = /oklch\(\s*([\d.]+)(%?)\s+([\d.]+)(%?)\s+([\d.]+|none)/.exec(C.voice);
+    const L = m ? +m[1] / (m[2] ? 100 : 1) : 0.87, Ch = m ? +m[3] * (m[4] ? 0.004 : 1) : 0, H = m && m[5] !== "none" ? +m[5] : 0;
+    a.hues = [[L, Ch, H], [L + 0.05, Ch * 0.8, H], [L - 0.04, Ch, H]];
   }
   const c = a.cv.getContext("2d"), cw = a.cv.width, ch = a.cv.height, t = performance.now() / 1000;
   c.clearRect(0, 0, cw, ch); c.globalCompositeOperation = "lighter"; c.filter = "blur(1.5px)"; // curtains run into each other
