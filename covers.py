@@ -15,6 +15,7 @@ import re
 import secrets
 import subprocess
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -43,8 +44,48 @@ def fetch(url: str, tries: int = 3) -> bytes | None:
     return None
 
 
+SMALL = {"the", "a", "an", "of", "and", "to", "in", "on", "at", "for", "with"}  # words any two names can share
+# ...and the words of a title that name no one: what kind of video it is, its languages
+NAMELESS = SMALL | {"official", "lyrics", "lyric", "mv", "m", "v", "video", "audio", "music", "live", "cover", "ver", "version",
+                    "feat", "ft", "prod", "han", "rom", "eng", "color", "colour", "coded", "full", "hd", "4k", "ost", "part", "pt", "가사"}
+
+
+def _fold(s: str) -> str:  # a name without its accents ("DÁKITI" is "dakiti"), Hangul and kana as they are
+    s = "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c))
+    return unicodedata.normalize("NFC", s).casefold()
+
+
+def _w(s: str) -> set[str]:
+    return set(re.findall(r"\w+", _fold(s)))
+
+
+def _compact(s: str) -> str:  # a name with no spaces or marks: "DDU-DU DDU-DU" is "ddududdudu", "Baek-hyun" "baekhyun"
+    return re.sub(r"[\W_]+", "", _fold(s))
+
+
+def _own_words(track: str) -> set[str]:
+    """A record's own name's words: not its "(feat. …)" or other brackets ("Cherish (My Love) [Sped Up]" is
+    "cherish"), nor words like "the"; all of it, if that's all brackets; none, for a name of such words alone ("ON")."""
+    core = _w(BRACKETS.sub(" ", FEAT.sub(" ", track))) - SMALL
+    return core or _w(track) - SMALL
+
+
+def _names_it(track: str, tw: set[str], whole: str) -> bool:
+    """A record's own name in the title: a word of it (tw: the title's), or all of it with the spaces gone (whole: the
+    title, _compact), as "Ddududdudu" is "DDU-DU DDU-DU"; a name with no word of its own can't say otherwise."""
+    own = _own_words(track)
+    name = _compact(BRACKETS.sub(" ", FEAT.sub(" ", track)))
+    return not own or bool(tw & own) or (len(name) >= 3 and name in whole)
+
+
+# Marks that come with a name, not part of it: iTunes has "‎Good Night Good Dream" (left-to-right marks, the other
+# direction marks, a byte-order mark). Not the joiners, which are (an emoji's, a Persian word's).
+INVISIBLE = re.compile("[​‎‏‪-‮⁠⁦-⁩﻿]")
+
+
 def _record(artist: str, track: str, album: str, duration: float, art: str) -> dict:
-    return {"artist": artist or "", "track": track or "", "album": album or "", "duration": duration, "art": art}
+    clean = lambda s: " ".join(INVISIBLE.sub("", s or "").split())  # noqa: E731
+    return {"artist": clean(artist), "track": clean(track), "album": clean(album), "duration": duration, "art": art}
 
 
 def _itunes(q: str) -> list[dict]:
@@ -83,15 +124,24 @@ def channel_artist(channel: str) -> str:
     return " ".join(CHANNEL_NOISE.sub(" ", channel or "").split())
 
 
-def own_name(title: str, track: str) -> str:
+def own_name(title: str, track: str, artist: str = "") -> str:
     """A song is named in its own language: the name its video or file gives it, where that's in Korean (or another
     CJK script) and the record's is in another. iTunes and Deezer have the US store's names, so 난춘 comes back as
     "Nan Chun" and 인생네컷 as "Photo Booth". The name is what's outside brackets: "신호는 잘 지켜 (signs)" is
-    신호는 잘 지켜, its English in brackets. "" otherwise (the record's name stands), and for a cover (named for the
-    song it covers)."""
+    신호는 잘 지켜, its English in brackets. "" otherwise (the record's name stands), for a cover (named for the
+    song it covers), and where what the title gives as the song has the record's artist in it too (artist): a title
+    with no " - " to part them ("Aimer 「残響散歌」 … Opening") is more than the song's name."""
     if is_cover(title):
         return ""
-    song = " ".join(BRACKETS.sub(" ", FEAT.sub(" ", lyrics.split_title(title)[1] or "")).split())
+    before, song = lyrics.split_title(title)
+    if not before and (later := lyrics.later_split(title)):  # "a line about it | artist - song": the song's that one
+        song = later[1]
+    song = " ".join(BRACKETS.sub(" ", FEAT.sub(" ", song or "")).split())
+    if artist and _w(artist) and _w(artist) <= _w(song):
+        return ""
+    twice = _spellings(" ".join(BRACKETS.sub(" ", FEAT.sub(" ", track or "")).split()))  # "NAN CHUN 난춘": the record's name in both scripts
+    if twice and song and lyrics._words(twice[0]) == lyrics._words(song):  # ...the title's one of them: the title's stands
+        return f"{song} {_feat(track)}".strip()
     if not CJK.search(song) or CJK.search(track or ""):
         return ""
     # The title giving the record's name too: as the Korean's translation, in brackets just after it ("신호는 잘 지켜
@@ -102,12 +152,62 @@ def own_name(title: str, track: str) -> str:
         alias = re.search(re.escape(song) + r"[\"'”’」』]?\s*[(\[]([^)\]]*)[)\]]", title)
         if not (alias and lyrics._words(FEAT.sub(" ", alias.group(1))) == tw):
             return ""
-    feat = FEAT.search(track or "")  # the record's "(feat. …)" kept, as the rest of the library has it
-    return f"{song} {feat.group(0).strip()}" if feat else song
+    return f"{song} {_feat(track)}".strip()  # the record's "(feat. …)" kept, as the rest of the library has it
 
 
 FEAT = re.compile(r"(?i)[(\[]?\s*(?<![a-z])(?:feat\.?|ft\.|featuring)(?![a-z])[^)\]]*[)\]]?")
 BRACKETS = re.compile(r"[(\[{【][^)\]}】]*[)\]}】]")
+
+
+def _feat(track: str) -> str:
+    """A record's "(feat. …)", whole: the bracket it's in, though it opens with something else ("eight (Prod. & Feat.
+    SUGA of BTS)" keeps "(Prod. & Feat. SUGA of BTS)", not "Feat. SUGA of BTS)"); "" for none."""
+    m = re.search(r"(?i)[(\[][^)\]]*(?<![a-z])(?:feat\.?|ft\.|featuring)(?![a-z])[^)\]]*[)\]]", track or "")
+    if m:
+        return m.group(0)
+    m = FEAT.search(track or "")
+    return m.group(0).strip() if m else ""
+
+
+# A record that's another version than the video's (a karaoke track, an MR, a piano or music-box cover, a lullaby, a
+# live take, a remix, sped up): not it, unless the video's title says it's that too, in either language ("밤편지
+# 라이브" for "(Live)"). These are often as long as the song and named the same, the song's name in its own script
+# and all ("주저하는 연인들을 위해 (MR)", "밤편지 (Piano)"). Each kind, its words in English, Korean, Japanese:
+KINDS = {
+    "karaoke": r"karaoke|노래방|カラオケ",
+    "inst": r"instrumental|(?<![a-z])inst(?![a-z])|반주|(?-i:(?<![A-Za-z])MR(?![a-z.]))|off ?vocal|オフボーカル",  # (MR in capitals: not "Mr.")
+    "versioned": r"originally performed|in the style of|made famous|tribute",
+    "box": r"music ?box|오르골|オルゴール",
+    "chip": r"8[- ]?bit",
+    "live": r"(?<![a-z])live(?![a-z])|라이브|ライブ",
+    "remix": r"remix|리믹스",
+    "speed": r"sped|slowed|reverb|nightcore|(?<![a-z0-9])8d(?![a-z])",
+    "acoustic": r"acoustic|어쿠스틱",
+    "piano": r"piano|피아노|ピアノ|연주",
+    "lullaby": r"lullab|자장가",
+    "cover": r"(?<![a-z])covers?(?![a-z])|커버|カバー",
+}
+# where each counts: the first five anywhere in the record's name or album; the rest, which can be part of a song's own
+# name ("Live My Life", MAMAMOO's "Piano Man"), only in the name's own brackets (not its "(feat. …)") or after its " - ",
+# or in an album's name as one of these:
+ANYWHERE = ("karaoke", "inst", "versioned", "box", "chip")
+ALBUMS = {
+    "live": r"(?<![a-z])live (?:album|at|in|from)(?![a-z])|라이브 앨범",
+    "piano": r"piano (?:collection|covers?|version|ver|solo|edition)|피아노 (?:연주|커버|모음|버전)|연주곡",
+    "lullaby": r"lullab\w* (?:versions?|renditions?|covers?)",
+    "cover": r"(?<![a-z])covers? (?:of|album|collection)",
+    "speed": r"sped up|slowed",
+}
+
+
+def other_version(r: dict, title: str) -> bool:
+    has = lambda kind, s: re.search("(?i)" + KINDS[kind], s)  # noqa: E731
+    track, album = r["track"], r["album"]
+    marks = " ".join(b for b in BRACKETS.findall(track) if not FEAT.search(b) and not re.search(r"(?i)^[(\[]\s*with\b", b))
+    marks += " " + (track.split(" - ", 1)[1] if " - " in track else "")
+    kinds = {k for k in ANYWHERE if has(k, f"{track} {album}")} | {k for k in KINDS if has(k, marks)}
+    kinds |= {k for k, rx in ALBUMS.items() if re.search("(?i)" + rx, album)}
+    return any(not has(k, title) for k in kinds)
 
 
 def _spellings(name: str) -> list[str]:
@@ -127,33 +227,70 @@ def online(title: str, duration: float, hint: str = "", cover: bool = False, cha
     shorter, so for one the record's whole title has to be in the video's, within 30 s or 20 %.
     Many songs share a name ("Zombie", "Love Again"), so a record by someone neither the title, the hint nor the
     channel names has to be within 2 s of the song. A title that's the song's name alone says nothing of whose it is:
-    the channel's name (channel; an artist's own, often) is searched with it first."""
+    the channel's name (channel; an artist's own, often) is searched with it first.
+    Of the records that count, best: one by an artist the title (hint, channel) names and named as the title has it;
+    then one by the artist named (an artist has many songs: Beenzino's "Always Awake" isn't "Aqua Man", YOASOBI's
+    "夜に駆ける" isn't "群青"); then one named as the title has it; then the most words shared; then the nearest in
+    length. The first kind ends the search; the rest are kept while it goes on through the searches (and on to Deezer,
+    unless one's named as the title has it and shares words), and the best of them is taken at the end. Named as the
+    title has it: its own name in it (_names_it), where that can be told, the title having words in the name's script
+    besides the artist's; 난춘's "Nan Chun" can't be told, and isn't held against it.
+    A record on its length alone, sharing no word, is the last resort: another song about as long turns up in many
+    searches (EXO's "Baby Don't Cry", 0.02 s from Baekhyun's "UN Village"), but a record named in another script
+    ("Nan Chun" for 난춘) is that.
+    Not counted: another version than the video's (other_version: an MR, a piano cover…), and, for a title all in Latin
+    letters, a record named in them too whose own name isn't in the title (another of the artist's songs: "Always
+    Awake" for Beenzino's "Aqua Man"). Its own name: not its brackets (Bieber's "Unstable (feat. The Kid LAROI)" isn't
+    "STAY", nor "Cherish (My Love) [Sped Up]" "Magnetic (sped up)"), nor words like "the"; in the title as a word, or
+    with the spaces and accents gone ("DÁKITI", "DDU-DU DDU-DU": _names_it). Even by the artist named, as long as
+    the song: an artist has many songs (Bad Bunny's "LA NOCHE DE ANOCHE", 2 s from "Dakiti", when the store brings
+    up Dakiti's karaoke and lullaby versions but not it). A name romanized in the title and translated in the store
+    ("Bam Pyeonji", "Through the Night") is left to the title's own name.
+    Words that name no one ("the", "Official", "Lyrics": NAMELESS) don't make a record the title's artist's, nor
+    count as shared; an artist's name of 5 letters or more in the title with its spaces gone does ("Baek-hyun")."""
     if cover:
         title = COVER.sub(" ", COVER_BY.sub(" ", title))
     artist, song = lyrics.split_title(title)
     who = "" if artist or hint else channel_artist(channel)
-    tw = named_by = lyrics._words(f"{title} {hint} {who}")
+    tw = _w(f"{title} {hint} {who}")
+    named_by, whole = tw - NAMELESS, _compact(f"{title} {hint} {who}")
     by = [f"{n} {song or title}" for n in ([who, *_spellings(who)] if who else [])]
     qs = list(dict.fromkeys(by + ([hint] if hint else []) + lyrics.queries(title)))
-    failed = None
-    for site, search in (("itunes", _itunes), ("deezer", _deezer)):
-        for q in qs:
+    latin = not cover and bool(song) and not CJK.search(f"{artist} {song}")  # the title all in Latin letters
+    failed, kept = None, []
+    for s, (site, search) in enumerate((("itunes", _itunes), ("deezer", _deezer))):
+        for k, q in enumerate(qs):
             try:
                 found = search(q)
             except RuntimeError as e:  # one site busy or out of reach: the other may answer
                 failed = e
                 break
-            ok = []
             for i, r in enumerate(found):
-                off, shared = abs(r["duration"] - duration), len(tw & lyrics._words(f"{r['artist']} {r['track']} {r['album']}"))
-                named = bool(lyrics._words(r["track"])) and lyrics._words(lyrics.split_title(r["track"])[1] or r["track"]) <= tw
+                if other_version(r, title):
+                    continue
+                off, shared = abs(r["duration"] - duration), len(named_by & _w(f"{r['artist']} {r['track']} {r['album']}"))
+                ca = _compact(r["artist"])
+                theirs = bool(named_by & (_w(r["artist"]) - NAMELESS)) or (len(ca) >= 5 and ca in whole)
+                # its name in the title, where that can be told: the title has words in the name's script, besides the
+                # artist's (else "Nan Chun" for 난춘, unknown, isn't held against it)
+                cjk = bool(CJK.search(r["track"]))
+                told = {w for w in named_by - _w(r["artist"]) if bool(CJK.search(w)) == cjk}
+                names = _names_it(r["track"], tw, whole) if told else True
+                if latin and not cjk and not names:
+                    continue
+                named = bool(_w(r["track"])) and _w(lyrics.split_title(r["track"])[1] or r["track"]) <= tw
                 fits = off <= max(30.0, 0.2 * duration) and named if cover else off <= max(10.0, 0.08 * duration) and (shared or off <= 3)
-                if not cover and not lyrics._words(r["artist"]) & named_by:
+                if not cover and not theirs:
                     fits = fits and off <= 2
                 if r["duration"] and fits:
-                    ok.append((-shared, off, i))
-            if ok:
-                return found[min(ok)[2]] | {"site": site}
+                    kept.append(((-(theirs and names), -theirs, -names, -shared, off, s, k, i), r | {"site": site}))
+            if kept and min(kept, key=lambda c: c[0])[0][0] < 0:  # by the artist named, named as in the title: that's it
+                return min(kept, key=lambda c: c[0])[1]
+        best = min(kept, key=lambda c: c[0])[0] if kept else None
+        if best and best[2] < 0 and best[3] < 0:  # one named as in the title and sharing words: no need of the other site
+            break
+    if kept:
+        return min(kept, key=lambda c: c[0])[1]
     if failed:
         raise failed  # not "none found": that's only said once both have answered
     return None

@@ -47,7 +47,7 @@ a { -webkit-user-drag: none; }
 .note { position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
   margin: 0; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 13px/1.45 var(--font); }
 /* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (how far
-   in, set by tipAt(); its arrow 38 px in from its right) */
+   in, set by tipAt()) */
 /* the installer's icon (the app's, in its folder) at its left, inset the same on its three sides (6 px), 8 px to the
    words, the words 14 px from the right */
 .tip { position: fixed; top: 14px; right: 58px; display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 12px; background: var(--ink); color: var(--on-ink);
@@ -55,7 +55,6 @@ a { -webkit-user-drag: none; }
   opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); } /* it fades in and out, and stays still */
 .tip.on { opacity: 1; pointer-events: auto; }
 .tip img { width: 28px; height: 28px; flex: none; display: block; } /* the installer's own icon (desktop/build/installer-icon.png, cut to its folder, 96 px for a sharp 28 at 3x) */
-.tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
 /* the name, as the app's welcome has it (Geist Serif, 44 px), where the button was, once it's gone up to the download */
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 .get, .word { grid-area: 1 / 1; } /* one over the other, in the middle */

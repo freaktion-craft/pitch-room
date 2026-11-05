@@ -935,7 +935,7 @@ def find(url: str) -> dict:
         song = lyrics.split_title(covers.COVER.sub(" ", covers.COVER_BY.sub(" ", own)))[1] or own
         name = (f"{(record or {}).get('track') or song} (Cover)", covers.cover_by(own) or channel)
     elif record:
-        name = (covers.own_name(own, record["track"]) or record["track"], record["artist"])
+        name = (covers.own_name(own, record["track"], record["artist"]) or record["track"], record["artist"])
     else:
         artist, song = lyrics.split_title(own)
         name = (song or own, artist or channel)
@@ -980,7 +980,7 @@ def _look_up(song_id: str):
     except RuntimeError as e:
         failed = e
     if record and not name:
-        name = (covers.own_name(own, record["track"]) or record["track"], record["artist"])
+        name = (covers.own_name(own, record["track"], record["artist"]) or record["track"], record["artist"])
     if cover and not tagged:  # the song it covers, sung by: whoever the title says, or the artist before " - " if
         # that isn't the record's, or the channel
         song = name[0] if name else lyrics.split_title(covers.COVER.sub(" ", covers.COVER_BY.sub(" ", own)))[1] or own
