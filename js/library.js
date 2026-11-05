@@ -244,7 +244,7 @@ const NEW_FADE = 72;
 function paintNew() {
   const box = $("#sNew"), track = $("#sNewTrack");
   if (newMove && newMove !== "pull") return; // opening or folding: that says
-  box.hidden = !newIds.size || !!$("#sSearch").value.trim() || !newOpen;
+  box.hidden = !newIds.size || !!$("#sSearch").value.trim() || !newOpen || libView !== "song"; // (the Song view's alone)
   if (newWaiting) { revealNew(); return; }
   if (!box.hidden) paintNewEnds();
 }
@@ -290,7 +290,7 @@ const keepShut = (on) => { try { if (on) sessionStorage.setItem(NEW_SHUT, "1"); 
 let newOpen = (() => { try { return sessionStorage.getItem(NEW_SHUT) !== "1"; } catch (e) { return true; } })();
 let newMove = null; // "shut", "open" or "pull" while one's under way
 const pull = { p: 0, last: 0, t: 0, raf: 0 };
-const canNew = () => view === "stems" && stemsPage === "lib" && newIds.size > 0 && !$("#sSearch").value.trim() && !CV.tile;
+const canNew = () => view === "stems" && stemsPage === "lib" && libView === "song" && newIds.size > 0 && !$("#sSearch").value.trim() && !CV.tile;
 // Folded, the list goes up into the page's gap after it too (a grid row can't be less than nothing, so New's own
 // margin can't take it back), and it's where it is with New gone
 const NEW_TUCK = "calc(var(--space-3) * -1)";
