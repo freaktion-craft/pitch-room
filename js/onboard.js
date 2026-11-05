@@ -75,19 +75,14 @@ function onboard(start = 0) { // start: a step's name (data-step) or place; reso
       if (!e.target.closest("[data-ob-leave]")) return;
       e.preventDefault(); go(steps.length, { at: steps[at].dataset.step });
     };
-    // been through them before (visited again from Settings): Exit, at the header's right end just left of the mic (its
-    // chip, out over the black from the mic's step, widening as it's on: followed), or Esc, out at once, back where you
-    // were. (Left half-way the first time, Settings' banner brings them back: no Exit then.)
-    const exit = $("#obExit"), micEl = $("#micBtn"), micSizes = new ResizeObserver(() => placeExit());
-    const placeExit = () => { // (by its left: a fixed box's right is the scrollbar's strip short)
-      const r = micEl.getBoundingClientRect();
-      Object.assign(exit.style, { top: r.top + (r.height - exit.offsetHeight) / 2 + "px", left: r.left - floatGap() - exit.offsetWidth + "px" });
-    };
+    // been through them before (visited again from Settings): Exit, at the steps' column's bottom left (.ob-exit), or
+    // Esc, out at once, back where you were. (Left half-way the first time, Settings' banner brings them back: no Exit then.)
+    const exit = $("#obExit");
     const onKey = (e) => { if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector(".pick-list:not([hidden]), .menu:not([hidden])")) { e.preventDefault(); exit.click(); } };
-    const exitOff = () => { exit.hidden = true; micSizes.disconnect(); removeEventListener("resize", placeExit); removeEventListener("keydown", onKey); };
+    const exitOff = () => { exit.hidden = true; removeEventListener("keydown", onKey); };
     exit.hidden = !store.get("welcomed", false);
     if (!exit.hidden) {
-      placeExit(); micSizes.observe(micEl); addEventListener("resize", placeExit); addEventListener("keydown", onKey);
+      addEventListener("keydown", onKey);
       exit.onclick = () => go(steps.length, { exit: true });
       exit.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
     }
