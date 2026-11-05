@@ -47,6 +47,10 @@ a { -webkit-user-drag: none; }
   opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); } /* it fades in and out, and stays still */
 .tip.on { opacity: 1; pointer-events: auto; }
 .tip::before { content: ""; position: absolute; top: -6px; right: 32px; width: 12px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(45deg); }
+/* the name, as the app's welcome has it (Geist Serif, 44 px), where the button was, once it's gone up to the download */
+@font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+.get, .word { grid-area: 1 / 1; } /* one over the other, in the middle */
+.word { color: var(--ink); font: 400 44px/1 "Geist Serif", var(--font); letter-spacing: -0.01em; visibility: hidden; }
 /* as the page comes in: the button up out of a blur, the line at the foot fading in a little after */
 @keyframes reveal { from { opacity: 0; filter: blur(12px); } }
 @keyframes rise { from { opacity: 0; } }
@@ -60,6 +64,7 @@ a { -webkit-user-drag: none; }
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
   <span id="getLabel">Download</span>
 </a>
+<span class="word" id="word" aria-hidden="true">Pitchroom</span>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
 <div class="tip" id="tip" role="status"></div>
 
@@ -138,9 +143,10 @@ const showTip = () => {
   tipTimer = setTimeout(() => tip.classList.remove("on"), 12000);
 };
 // the button gone up to where the download is: its words going as it draws in round its logo, a circle, then off up to
-// the browser's downloads icon (where the tip points), smaller, into the toolbar; the tip as it gets there, and the
-// button back in its place after. A copy flies (the button itself, its link and its download, as they are)
-const FLY = { shrink: 280, fly: 620, back: 900, size: 40 };
+// the browser's downloads icon (where the tip points), smaller, into the toolbar; the tip as it gets there, and in the
+// button's place the name, out of a blur. A copy flies (the button itself, its link and its download, as they are)
+const FLY = { shrink: 280, fly: 620, name: 800, size: 40 };
+document.fonts.load('400 44px "Geist Serif"').catch(() => {}); // the name's typeface in ahead of a click
 let flying = false;
 async function fly(get) {
   const r = get.getBoundingClientRect(), s = get.querySelector("svg").getBoundingClientRect(), t = get.querySelector("span").getBoundingClientRect(), D = FLY.size;
@@ -163,9 +169,10 @@ async function fly(get) {
     { transform: `translate(${tx - cx}px, ${ty - cy - 8}px) scale(0.2)`, opacity: 0 }], { duration: FLY.fly, easing: "cubic-bezier(0.55, 0, 0.25, 1)", fill: "forwards" }).finished;
   ghost.remove();
   showTip();
-  await new Promise((ok) => setTimeout(ok, FLY.back));
-  get.style.visibility = "";
-  get.animate([{ opacity: 0, filter: "blur(12px)" }, { opacity: 1, filter: "blur(0px)" }], { duration: 700, easing: "cubic-bezier(0.2, 0, 0, 1)" }); // back as it first came
+  // the button gone for good (its download's begun), the name in its place, out of a blur as the button first came
+  const word = document.getElementById("word");
+  word.style.visibility = "visible";
+  word.animate([{ opacity: 0, filter: "blur(12px)" }, { opacity: 1, filter: "blur(0px)" }], { duration: FLY.name, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "both" });
 }
 document.getElementById("get").addEventListener("click", (e) => {
   if (!/\/releases\/download\//.test(e.currentTarget.href)) return;
