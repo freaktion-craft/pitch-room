@@ -17,6 +17,8 @@ html.drawer-open { overflow-y: hidden; }
 html.welcome { overflow-y: hidden; } /* the first steps over all of it: no scrollbar's strip down their right edge (the page under them as it was: its margin's from 100vw) */
 html.drawer-open body { padding-right: var(--sbw, 0px); }
 @supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: var(--fg-8) transparent; } }
+html.theming *, html.theming *::before, html.theming *::after { transition: none !important; } /* the theme switched (applyTheme): at once, not faded over */
+.theme-dark { color: var(--ink); } /* its own ink, as its tokens are (tokens.css): not the page's, handed down */
 body { background: var(--bg); color: var(--ink); font: var(--text-lg)/1.6 var(--font); -webkit-font-smoothing: antialiased; }
 [hidden] { display: none !important; }
 /* Interface text can't be selected (a stray drag highlights nothing); what someone might copy can: song titles and
@@ -35,7 +37,7 @@ a { color: inherit; text-decoration: none; }
    tiny and stretched, then blurred, so it's all glow; it spills past the window's edges so the blur doesn't fade them. */
 #aurora { position: fixed; left: -48px; right: -48px; bottom: -48px; width: calc(100% + 96px); height: calc(40vh + 48px); z-index: 0;
   pointer-events: none; opacity: 0; filter: blur(28px); transition: opacity 0.8s; }
-#aurora.on { opacity: 0.4; } /* there, not looked at */
+#aurora.on { opacity: var(--aurora); } /* there, not looked at */
 #app { position: relative; z-index: 1; }
 /* One width for every page, so the header and column edges don't jump when switching views. In the middle of the
    window, not of what's left of it beside the scrollbar's room (100vw has it): as much either side, the scrollbar's
@@ -278,8 +280,9 @@ html.welcome #boot, html.asking #welcome { display: none; }
    mac: an alert, the icon and the words centred over two buttons side by side
    win: a dialog, the words from the left, the buttons along a footer, Allow first
    web: a browser's bubble, the icon beside the words, the buttons at the right */
-.ob-ask { --a-bg: oklch(0.27 0 0); --a-ink: var(--ink); --a-muted: var(--muted); --a-btn: var(--fg-8); --a-btn-ink: var(--ink);
-  --a-yes: var(--ink); --a-yes-ink: var(--on-ink); --a-foot: oklch(0.22 0 0); --a-line: var(--fg-8); --a-shadow: var(--shadow-float);
+.ob-ask { --a-bg: oklch(0.27 0 0); --a-ink: oklch(0.94 0 0); --a-muted: rgba(255, 255, 255, 0.55); --a-btn: rgba(255, 255, 255, 0.08); --a-btn-ink: oklch(0.94 0 0);
+  --a-yes: oklch(0.94 0 0); --a-yes-ink: oklch(0.165 0 0); --a-foot: oklch(0.22 0 0); --a-line: rgba(255, 255, 255, 0.08);
+  --a-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.32); /* the system's dark, not the page's: its own */
   display: grid; gap: var(--space-3); width: min(300px, 100%); padding: var(--space-5) var(--space-4) var(--space-4); border-radius: 14px;
   background: var(--a-bg); color: var(--a-ink); box-shadow: var(--a-shadow), inset 0 0 0 1px var(--a-line); text-align: center; justify-items: center; }
 .ob-ask[data-theme="light"] { --a-bg: oklch(0.97 0 0); --a-ink: oklch(0.2 0 0); --a-muted: oklch(0.47 0 0); --a-btn: oklch(0.2 0 0 / 0.07); --a-btn-ink: oklch(0.2 0 0);

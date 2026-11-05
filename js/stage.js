@@ -47,15 +47,55 @@ readColors();
 // accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked from the
 // swatches in the settings.
 // in the order of their hues round the wheel (coral's 32° to pink's 353°), white before them
-const ACCENTS = { white: "White", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal", blue: "Blue", violet: "Violet", pink: "Pink" };
+// ("white" is Mono: white in the dark theme, near-black in the light; its key kept, as settings have it)
+const ACCENTS = { white: "Mono", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal", blue: "Blue", violet: "Violet", pink: "Pink" };
 let accent = store.get("accent", "white");
 if (!(accent in ACCENTS)) accent = "white";
+// on <html>, and on each part that stays dark (.theme-dark), so it's that theme's shade of it there
+function paintAccent() {
+  for (const n of [document.documentElement, ...document.querySelectorAll(".theme-dark")]) {
+    n.style.setProperty("--voice", `var(--voice-${accent})`);
+    n.style.setProperty("--voice-act", accent === "white" ? "var(--ink)" : `var(--voice-${accent})`); // a button in it: Mono at full
+  }
+}
 function setAccent(k) {
   accent = k; store.set("accent", k);
-  document.documentElement.style.setProperty("--voice", `var(--voice-${k})`);
-  document.documentElement.style.setProperty("--voice-act", k === "white" ? "var(--ink)" : `var(--voice-${k})`); // a button in it: white at full
+  paintAccent();
   readColors(); // the canvas takes it from here
   for (const b of $("#swatches").children) b.setAttribute("aria-pressed", String(b.dataset.k === k));
+}
+paintAccent();
+
+// The theme (Settings): "system" (the system's light or dark, followed as it changes), "light" or "dark", remembered
+// as "theme". The script in <head> sets it on <html> (data-theme) before first paint, as it does the accent; the
+// desktop app's window follows it too (its title bar, its colour before the page paints: desktop/main.js).
+const THEMES = ["system", "light", "dark"];
+let theme = store.get("theme", "system");
+if (!THEMES.includes(theme)) theme = "system";
+const sysLight = matchMedia("(prefers-color-scheme: light)");
+function applyTheme() {
+  const t = theme === "system" ? (sysLight.matches ? "light" : "dark") : theme, root = document.documentElement;
+  if (root.dataset.theme === t) return;
+  root.classList.add("theming"); // at once: no colour fading over from the other theme (base.css)
+  root.dataset.theme = t;
+  readColors(); repaintCanvases(); // (readColors reads the styles: they're worked out with the switch in)
+  root.classList.remove("theming");
+}
+function setTheme(v) {
+  theme = THEMES.includes(v) ? v : "system"; store.set("theme", theme); themePick?.set(themeItems(), theme);
+  window.pitchroom?.setTheme?.(theme); // (an older desktop app hasn't this: its window stays as it was)
+  applyTheme();
+}
+sysLight.addEventListener("change", applyTheme);
+window.pitchroom?.setTheme?.(theme); // the window as the page has it, should they differ (the settings changed in a browser meanwhile)
+const themeItems = () => [{ v: "system", t: tr("System") }, { v: "light", t: tr("Light") }, { v: "dark", t: tr("Dark") }];
+// the canvases drawn only when something changes (not every frame), drawn again in the colours as they are now
+function repaintCanvases() {
+  if (P.song) drawWave();
+  if (ED.on) edPaint(true);
+  if (location.hash.endsWith("/takes") && TS.id) tsRender();
+  if (K.song) paintListen();
+  if (K.on && view === "practice") practiceFrame();
 }
 (function initAccent() {
   for (const [k, name] of Object.entries(ACCENTS)) {

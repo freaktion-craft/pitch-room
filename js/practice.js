@@ -1046,7 +1046,7 @@ async function singSong(m, btn) {
 // Settings: a page of their own (#settings, route): going out, their lists closed
 function showMicSet(on) {
   document.documentElement.classList.toggle("set-view", on); fitSettings();
-  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
+  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); themePick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
 }
 // Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
 // and models beside them, copied in by the server (stems.start_import). Its line says how it's going, then how it went;
@@ -1278,6 +1278,8 @@ function initSing() {
   micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); syncErr = ""; paintSync(); }); // Sync's is the new input's
   micPick.set([{ v: "", t: "System default" }], "");
   if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
+  themePick = makePick($("#theme"), "Theme", setTheme);
+  themePick.set(themeItems(), theme);
   namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); labelKeys(); });
   namesPick.set([{ v: "en", t: "C D E (C4)" }, { v: "ko", t: "Do Re Mi" }], S.names);
   // kept once picked; until then the browser's language decides (initLang)

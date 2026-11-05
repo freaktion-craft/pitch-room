@@ -15,7 +15,9 @@ const { autoUpdater } = require("electron-updater");
 
 const RELEASES = "freaktion-craft/pitchroom-releases"; // public, the installers only (the code's repo is private)
 const PORTS = [5278, 5298]; // a range of its own, so a copy started from the repo (5178…) is never taken for this one
-const BG = "#0e0e0e"; // --bg, oklch(0.165 0 0): the window before the page paints
+// the page's theme (its Theme setting: shade()): the window before the page paints in its --bg (oklch(0.165 0 0), oklch(0.965 0 0)),
+// the Windows title bar's buttons in its --ink (oklch(0.94 0 0), oklch(0.2 0 0))
+const BG = { dark: "#0e0e0e", light: "#f3f3f3" }, SYMBOL = { dark: "#ebebeb", light: "#161616" };
 const win32 = process.platform === "win32";
 const TITLEBAR = 32; // Windows: the window's buttons' strip over the page, px (--titlebar, base.css)
 
@@ -26,6 +28,22 @@ const TITLEBAR = 32; // Windows: the window's buttons' strip over the page, px (
 const WIP = app.isPackaged ? require("./package.json").wip || "" : "";
 
 const DATA = app.getPath("userData");
+// the Theme setting, as the page keeps it (settings.json, beside the library: stems.get_settings): "system" (the default),
+// "light" or "dark". As the system's own theme for the window (nativeTheme.themeSource), so the title bar, the page's
+// prefers-color-scheme and the window's colours all go with it; the page says when it's changed (setTheme, preload.js)
+const THEMES = ["system", "light", "dark"];
+function savedTheme() {
+  try { const t = JSON.parse(fs.readFileSync(path.join(DATA, "settings.json"), "utf8")).theme; return THEMES.includes(t) ? t : "system"; } catch (e) { return "system"; }
+}
+const shade = () => (nativeTheme.shouldUseDarkColors ? "dark" : "light");
+function paintWindows() { // the theme changed (the setting, or the system's with it on System): the open windows with it
+  const s = shade();
+  for (const w of [win, splash]) {
+    if (!w || w.isDestroyed()) continue;
+    w.setBackgroundColor(BG[s]); w.setAccentColor?.(BG[s]);
+    if (w === win && win32) w.setTitleBarOverlay({ color: "#00000000", symbolColor: SYMBOL[s], height: TITLEBAR });
+  }
+}
 const CODE = app.isPackaged ? path.join(process.resourcesPath, "app-code") : path.resolve(__dirname, "..");
 const RUNTIME = app.isPackaged ? path.join(process.resourcesPath, "runtime") : path.join(__dirname, "runtime");
 const BASE_PY = win32 ? path.join(RUNTIME, "python.exe") : path.join(RUNTIME, "bin", "python3");
@@ -41,13 +59,13 @@ let shown = { text: "Starting…" };
 function showSplash() {
   splash = new BrowserWindow({
     width: 360, height: 220, frame: false, resizable: false, maximizable: false, minimizable: false, fullscreenable: false,
-    center: true, show: false, title: "Pitchroom", backgroundColor: BG, accentColor: BG,
+    center: true, show: false, title: "Pitchroom", backgroundColor: BG[shade()], accentColor: BG[shade()],
     webPreferences: { contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });
   splash.webContents.on("did-finish-load", () => status(shown.text, shown.percent));
   splash.once("ready-to-show", () => splash?.show());
   splash.on("closed", () => { splash = null; });
-  splash.loadFile(path.join(__dirname, "splash.html"));
+  splash.loadFile(path.join(__dirname, "splash.html"), { query: { theme: shade() } });
 }
 function status(text, percent) {
   shown = { text, percent };
@@ -142,13 +160,13 @@ function createWindow() {
   const b = savedBounds(), room = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
     width: b.width || Math.min(room.width, 1520), height: b.height || Math.min(room.height, 960), x: b.x, y: b.y,
-    title: app.name, backgroundColor: BG, show: false, autoHideMenuBar: true,
-    accentColor: BG, // Windows 11: its edge the page's black (in light mode a pale line round the window otherwise)
+    title: app.name, backgroundColor: BG[shade()], show: false, autoHideMenuBar: true,
+    accentColor: BG[shade()], // Windows 11: its edge the page's own colour (a pale line, or a dark one, round the window otherwise)
     // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
     // Windows: no title bar of the system's either, its three buttons drawn over the page's top right corner, on the
-    // page's black, as tall as the strip along the top that moves the window (html.desktop-win, base.css)
+    // page, in its ink, as tall as the strip along the top that moves the window (html.desktop-win, base.css)
     ...(process.platform === "darwin" ? { titleBarStyle: "hidden" }
-      : win32 ? { titleBarStyle: "hidden", titleBarOverlay: { color: "#00000000", symbolColor: "#ebebeb", height: TITLEBAR } } : {}), // (clear: on what's there, the first steps' picture too)
+      : win32 ? { titleBarStyle: "hidden", titleBarOverlay: { color: "#00000000", symbolColor: SYMBOL[shade()], height: TITLEBAR } } : {}), // (clear: on what's there, the first steps' picture too)
     // DevTools in development only: a released app has no way into its page
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
   });
@@ -283,7 +301,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   ipcMain.on("relaunch", () => { quitting = true; app.relaunch(); app.quit(); });
-  // the system's own light or dark (the window's forced dark, so the page can't see it), for what's laid out as the
+  // the system's own light or dark (the window's set to the page's theme, so the page can't see it), for what's laid out as the
   // system's own is (the mic's ask): macOS's appearance; Windows' apps' theme, light unless it's set dark
   ipcMain.handle("system-theme", () => new Promise((ok) => {
     if (process.platform === "darwin") return ok(systemPreferences.getUserDefault("AppleInterfaceStyle", "string") === "Dark" ? "dark" : "light");
@@ -308,7 +326,9 @@ else {
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", (e) => { if (!quitting && win) { e.preventDefault(); requestQuit(); return; } quitting = true; stopServer(); });
   app.whenReady().then(async () => {
-    nativeTheme.themeSource = "dark"; // the title bar with the page, which is dark only
+    nativeTheme.themeSource = savedTheme(); // the title bar, and the splash, with the page from the first
+    nativeTheme.on("updated", paintWindows);
+    ipcMain.on("theme", (e, t) => { nativeTheme.themeSource = THEMES.includes(t) ? t : "system"; paintWindows(); });
     app.setAboutPanelOptions({ applicationName: "Pitchroom", applicationVersion: app.getVersion(), copyright: "© freaktion" });
     menu();
     showSplash();
