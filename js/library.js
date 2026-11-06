@@ -961,6 +961,5 @@ function songRenamed(id, title) {
   for (const s of [libCache.get(id), P.song, K.song]) if (s && s.id === id) s.title = title;
   const card = $(`#sNewTrack .ln-card[data-id="${id}"]`);
   if (card && libCache.get(id)) paintNewCard(card, libCache.get(id));
-  if (P.song && P.song.id === id) $("#pTitle").textContent = title;
   paintCrumbs(); // the song's name in them too
 }

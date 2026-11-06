@@ -133,7 +133,7 @@ function stemsRoute(sub, extra) {
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
   if (stemsPage === "song" && (!P.song || P.song.id !== sub || P.song.stale)) openSongById(sub);
-  else if (stemsPage === "song") { const c = libCache.get(sub); if (c) { P.song.title = c.title; P.song.artist = c.artist; $("#pTitle").textContent = c.title; } renderTracks(); } // the mix as it was before Practice; the name as found since
+  else if (stemsPage === "song") { const c = libCache.get(sub); if (c) { P.song.title = c.title; P.song.artist = c.artist; } renderTracks(); } // the mix as it was before Practice; the name as found since
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
 // The song as the library list last read it opens at once, so its page appears whole. Otherwise (a reload, a link,

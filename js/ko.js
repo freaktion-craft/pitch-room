@@ -266,7 +266,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
 "In the song · {t}": "곡에서 · {t}", "Piano": "피아노",
   // Studio
   "Save": "저장",
-  "Volume": "볼륨", "Export what you hear (MP3)": "들리는 그대로 내보내기 (MP3)", "Get video": "영상 받기", "Hide video": "영상 숨기기", "Show video": "영상 보기",
+  "Volume": "볼륨", "Get video": "영상 받기", "Hide video": "영상 숨기기", "Show video": "영상 보기",
   "Loading video…": "영상 불러오는 중…", "Getting the video…": "영상 받는 중…", "Couldn’t load the video.": "영상을 불러오지 못했어요.",
   "Song overview — click to jump": "곡 전체 파형: 클릭하면 그 위치로 이동", "Play": "재생", "Pause": "일시정지",
   "Move through the song": "곡 안에서 이동", "Go to start": "처음으로", "Go to start (Home)": "처음으로 (Home)", "Go to end": "끝으로", "Go to end (End)": "끝으로 (End)",

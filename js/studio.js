@@ -17,7 +17,7 @@ async function openSong(m) {
   ensureCtx();
   P.song = m; P.offset = 0; P.ph = null; labelKeys();
   $("#pSing").hidden = !m.stems.includes("vocals");
-  $("#pTitle").textContent = m.title; paintCrumbs();
+  paintCrumbs();
   paintMeta(); keyOf(m).then(() => { if (P.song === m) { paintMeta(); paintKey(); } });
   P.tracks = {};
   const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
@@ -940,10 +940,10 @@ function initStems() {
     catch (err) { b.disabled = false; if (P.song && P.song.id === songId) videoWait(err.message, true); }
   };
   $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
-  $(".mix-ico").append(icon("volume")); $("#pExport").append(icon("download"));
+  $(".mix-ico").append(icon("volume"));
   // text buttons with an icon in front of the label
   [["#sAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
-    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
+    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"], ["#pExport", "download"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   $("#pSave").onclick = saveMix;
   document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyS" && view === "stems" && stemsPage === "song") { e.preventDefault(); if (!$("#pSave").disabled) saveMix(); }

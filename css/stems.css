@@ -155,10 +155,8 @@
 .player { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */
 .player-title { display: grid; gap: var(--space-1); min-width: 0; }
-#sPlayer .player-title { gap: var(--space-2); } /* the title (the song's volume and export at its end), then the key, the facts and the buttons */
+#sPlayer .player-title { gap: var(--space-2); } /* play and the rest (the song's volume at the end), then the key, the facts and the buttons: as Practice has them */
 .title-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; min-height: 40px; } /* as tall as Practice's play row, so the key under it is where Practice has it */
-.title-row b { min-width: 0; }
-.player-title b { font-weight: var(--weight-medium); font-size: var(--text-lg); overflow-wrap: anywhere; }
 .player-title .muted { font-size: var(--text-sm); }
 /* the song's video, muted: the stems carry the sound, the picture is for following lyrics */
 /* the box holds its size while the video loads, so nothing below it jumps */
@@ -190,8 +188,8 @@
 @media (hover: none) { .tparts .x { opacity: 1; } }
 .tparts .selbar { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; gap: var(--space-1); pointer-events: auto; }
 .tparts .selbar .btn { white-space: nowrap; box-shadow: var(--shadow-raised); }
-.transport-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.transport-row output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-left: var(--space-1); }
+.transport-row { display: flex; align-items: center; gap: var(--space-2) var(--space-4); flex-wrap: wrap; } /* spaced as Practice's (.sb-main), so each button's where it is there */
+.transport-row output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .transport-row .ptracks { font-size: var(--text-sm); color: var(--muted); } /* how many tracks, after the time */
 /* Key change, in the Studio's header and in Practice's bar: a dropdown of the keys, then a note in whatever room is
    left on the line (that big shifts can sound processed, or why a change failed). The dropdown has a fixed width and
@@ -284,8 +282,6 @@
 .ms .tog.m[aria-pressed="true"] { color: var(--dim); }
 .ms .tog.s[aria-pressed="true"] { color: var(--solo); text-shadow: var(--glow-solo); }
 .track input[type="range"] { width: 100%; }
-/* downloads, the song's (what you hear) and each track's: one size, one look; the song's in full ink */
-#pExport { color: var(--ink); }
 /* the click's options sit beside its name, so its slider lines up with the others */
 .name-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); flex-wrap: wrap; min-width: 0; }
 .clickopts { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-xs); color: var(--muted); }
@@ -305,7 +301,7 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
 .crumb.name { min-width: 0; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }
 .crumb[aria-current] { color: var(--ink); } /* where you are: only its colour differs */
 .crumb-sep { color: var(--faint); }
-.bb-acts { display: flex; align-items: center; gap: var(--space-2); } /* the song's own: Save, then Practice */
+.bb-acts { display: flex; align-items: center; gap: var(--space-2); } /* the song's own: Save, Download (what you hear, an MP3), then Practice */
 #pSave:not(:disabled) { background: var(--ink); color: var(--on-ink); }
 #pSave:not(:disabled):hover { background: var(--ink-strong); }
 .lib-head { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-bottom: var(--space-4); } /* 28 px to what's next (New, or the list) with the group's 12; search and Add song together at the right */
