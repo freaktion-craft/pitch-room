@@ -385,8 +385,8 @@ async function welcome(resume) { // resume: a step to come back to (Settings' ba
 }
 // The name's easter egg: clicked on the library, the welcome's riffle in small and flat, behind it (.brand .egg): the
 // right half, a colour, shrinks into the middle, then the left grows out of it in the next, each a little after the
-// one before, so several are on the move at once; the colours alone (no Mono, no page black at the ends), the box
-// fading in on the first and out on the last. Elsewhere
+// one before, so several are on the move at once; the page's colour at both ends (stripes going by), the box fading in
+// and out round them. The accents but Mono (white or black, as the theme has it). Elsewhere
 // the name is the way back to the library, as before. Not with reduced motion; a click while it runs does nothing.
 const EGG = { span: 560, half: 190, bunch: 0.6, fade: 140, in: "cubic-bezier(0.55, 0, 0.75, 0.2)", out: "cubic-bezier(0.2, 0.7, 0.35, 1)" };
 let egging = false;
@@ -397,11 +397,11 @@ $("#app > header .brand").addEventListener("click", (e) => {
 });
 async function riffleName(brand) {
   egging = true;
-  const E = EGG, colours = Object.keys(ACCENTS).filter((k) => k !== "white").map((k) => `var(--voice-${k})`), n = colours.length - 1;
+  const E = EGG, colours = ["var(--bg)", ...Object.keys(ACCENTS).filter((k) => k !== "white").map((k) => `var(--voice-${k})`), "var(--bg)"], n = colours.length - 1;
   const box = Object.assign(document.createElement("span"), { className: "egg" }); box.setAttribute("aria-hidden", "true");
   const half = (i, side, z = 0) => {
     const h = document.createElement("i"); h.className = side; h.style.background = colours[i]; h.style.zIndex = z;
-    h.dataset.dark = ""; // every accent is light (L 0.68 and up): black on it
+    if (i > 0 && i < n) h.dataset.dark = ""; // every accent is light (L 0.68 and up): black on it, white on the page's black
     return h;
   };
   box.append(half(0, "l"), half(n, "r"));
@@ -410,14 +410,14 @@ async function riffleName(brand) {
   const word = brand.textContent, light = document.createElement("span"), dark = document.createElement("span");
   light.textContent = dark.textContent = word; dark.className = "egg-ink"; dark.setAttribute("aria-hidden", "true");
   brand.replaceChildren(light, dark, box);
-  const ink = () => { // (white while the box is still mostly faded: the page's black under it)
-    const o = brand.getBoundingClientRect().left, shown = +getComputedStyle(box).opacity > 0.5, under = [...box.children].filter((p) => getComputedStyle(p).visibility !== "hidden")
+  const ink = () => {
+    const o = brand.getBoundingClientRect().left, under = [...box.children].filter((p) => getComputedStyle(p).visibility !== "hidden")
       .map((p) => ({ r: p.getBoundingClientRect(), z: +p.style.zIndex, dark: "dark" in p.dataset })).filter((p) => p.r.width > 0.1);
     const xs = [...new Set(under.flatMap((p) => [p.r.left, p.r.right]))].sort((a, b) => a - b), stops = [];
     for (let i = 0; i + 1 < xs.length; i++) { // each stretch between two edges: dark if the top band there is a colour
       const mid = (xs[i] + xs[i + 1]) / 2; let top = null;
       for (const p of under) if (mid >= p.r.left && mid < p.r.right && (!top || p.z > top.z)) top = p;
-      if (shown && top && top.dark) stops.push(`transparent ${xs[i] - o}px, #000 ${xs[i] - o}px, #000 ${xs[i + 1] - o}px, transparent ${xs[i + 1] - o}px`);
+      if (top && top.dark) stops.push(`transparent ${xs[i] - o}px, #000 ${xs[i] - o}px, #000 ${xs[i + 1] - o}px, transparent ${xs[i + 1] - o}px`);
     }
     const m = stops.length ? `linear-gradient(to right, transparent 0, ${stops.join(", ")}, transparent 100%)` : "linear-gradient(transparent, transparent)";
     dark.style.maskImage = dark.style.webkitMaskImage = m;
