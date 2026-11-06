@@ -41,7 +41,7 @@ if (SAVED_UPDATE) document.documentElement.classList.add("asking");
 (() => { let t = null; try { t = SAVED && SAVED.theme != null ? SAVED.theme : JSON.parse(localStorage.getItem("stem:theme")); } catch (e) {}
   document.documentElement.dataset.theme = t === "light" || t === "dark" ? t : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; })();
 /* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
-try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) { document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-white))`); document.documentElement.style.setProperty("--voice-act", a === "white" ? "var(--ink)" : `var(--voice-${a}, var(--ink))`); } } catch (e) {}
+try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) { document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-white))`); document.documentElement.style.setProperty("--voice-act", a === "white" ? "var(--ink)" : `var(--voice-${a}, var(--ink))`); if (a === "white") document.documentElement.style.setProperty("--on-voice", "var(--on-voice-mono)"); } } catch (e) {}
 /* the welcome (welcome()): the first time Pitchroom opens, its pages riffle through the accent colours under the name, back
    to black, and the name goes to its place in the header; then the first steps there (onboard(): what it is, the mic, a
    colour, a first song), and the page comes in round the name. WELCOME_ALWAYS: on every load, reloads too, while it's being made; false once it's done. With

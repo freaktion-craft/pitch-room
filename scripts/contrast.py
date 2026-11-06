@@ -154,11 +154,30 @@ def resolve(t, v, depth=0):
 
 
 def colour(t, name, p3):
+    if name.startswith("mix:"):  # an accent as small text: as --voice-ink has it (a color-mix with the ink, or itself)
+        return parse_colour(ink_mix(t, name[4:]), p3)
     v = resolve(t, t[name]) if name.startswith("--") else name
     c = parse_colour(v, p3)
     if c is None:
         raise ValueError(f"{name}: can't read {v!r}")
     return c
+
+
+def ink_mix(t, accent):
+    """--voice-ink for this accent: "color-mix(in oklab, var(--voice) N%, var(--ink))" worked out (in oklab), or the
+    accent itself where it's var(--voice)."""
+    v = t.get("--voice-ink", "var(--voice)")
+    m = re.match(r"color-mix\(in oklab, var\(--voice\) ([\d.]+)%, var\(--ink\)\)", v.strip())
+    acc = resolve(t, t[accent])
+    if not m:
+        return acc
+    w = float(m[1]) / 100
+    def lab(s):
+        L, c, h = (num(x) for x in re.findall(r"[\d.]+%?", s.split("(", 1)[1])[:3])
+        return L, c * math.cos(math.radians(h)), c * math.sin(math.radians(h))
+    A, B = lab(acc), lab(resolve(t, t["--ink"]))
+    L, x, y = (A[i] * w + B[i] * (1 - w) for i in range(3))
+    return f"oklch({L} {math.hypot(x, y)} {math.degrees(math.atan2(y, x)) % 360})"
 
 
 # ---------- the pairs ----------
@@ -169,14 +188,15 @@ PAIRS = []
 for bg in ["--bg", "--surface"]:
     for fg in ["--ink", "--muted", "--faint", "--bad", "--orange", "--warn-ink", "--good"]:
         PAIRS.append((fg, bg, 4.5))
-    for k in ACCENTS:  # your colour as text (a sung word, an option's side note) and as a line
-        PAIRS.append((f"--voice-{k}", bg, 4.5))
+    for k in ACCENTS:  # your colour as a line, a dot, a fill and large text (a sung word): 3:1; as small text, mixed
+        PAIRS.append((f"--voice-{k}", bg, 3))  # with the ink as --voice-ink is (its mix, MIX below): 4.5:1
+        PAIRS.append((f"mix:--voice-{k}", bg, 4.5))
 PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--hover-2", 4.5),
           ("--on-ink", "--ink", 4.5), ("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
           ("--on-solo", "--solo", 4.5), ("--solo", "--ms-sunk-bg", 3), ("--muted", "--ms-top", 4.5),
           ("--placeholder", "--surface-2", 3), ("--on-media", "oklch(0.25 0 0)", 4.5)]
 for k in ACCENTS:
-    PAIRS.append(("--on-voice", f"--voice-{k}", 4.5))
+    PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5))
 
 
 def chip_pairs(t, p3):
