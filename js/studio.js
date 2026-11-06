@@ -25,10 +25,11 @@ async function openSong(m) {
   if (m.video) v.src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
   showVideo = false; paintVideo();
   $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
-  for (const name of trackNames(m)) P.tracks[name] = { mute: false, solo: false, vol: 1, gain: null };
-  P.tracks.click = { mute: true, solo: false, vol: 0.7, gain: null, offset: 0, bpb: 4 };
+  for (const name of trackNames(m)) P.tracks[name] = { gain: null };
+  P.tracks.click = { gain: null };
+  freshMix(false);
   P.keep = keepOf(m); P.tsel = P.mark = null;
-  applyMix(m.mix); savedMix = JSON.stringify(mixNow()); // the saved mix, which Save compares with
+  // (the mix starts fresh each time: every track up and playing, nothing muted or soloed, the click off)
   renderTracks(); autoSplit(m);
   P.keyWant = savedKey(m.id); P.rateWant = savedRate(m.id); paintKey();
   if (P.keyWant || P.rateWant !== 1) loadKey(m, P.keyWant, P.rateWant); // alongside the originals, so a version already made is there as they are
@@ -73,7 +74,9 @@ async function videoFetched(songId, ok) {
   $("#pVideo").src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
   paintVideo();
 }
-let stemVol = store.get("stemVol", 1); // the whole song's volume, on top of each track's
+// The whole song's volume, on top of each track's: every song opens at the one set in Settings (startVol, kept), and the
+// Studio's slider moves it for that visit only (stemVol), as the rest of the mix.
+let startVol = store.get("stemVol", 1), stemVol = startVol;
 let showVideo = false; // hidden whenever a song opens; Show video brings it up (it loads in the background meanwhile)
 function paintVideo() {
   const has = !!(P.song && P.song.video);
@@ -160,7 +163,6 @@ function applyGains() {
       g.setValueAtTime(t.vol, Math.max(now, at(b))); g.linearRampToValueAtTime(0, at(b) + KEEP_FADE);
     }
   }
-  paintSave(); // a change to the mix makes Save live
 }
 // The song's tracks come in over FADE when they start, and go out over it when they stop: no click where a wave is cut
 // off mid-swing, and too short to hear as a fade, so the first beat after a seek or a loop is as crisp as ever. The
@@ -246,11 +248,36 @@ function seekSong(t, lead = false) {
 // Go to end: the playhead at the very end, stopped there as when the song runs out (Play then starts it over).
 // Go to start is seekSong(0), which keeps playing if it was.
 function seekEnd() { pauseSong(); seekSong(songDur()); }
-function clickTick(at, accent) {
+function clickTick(at, accent, into = P.tracks.click.gain) {
   const o = ac.createOscillator(), g = ac.createGain();
   o.frequency.value = accent ? 1760 : 1175;
   g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(accent ? 0.9 : 0.6, at + 0.001); g.gain.setTargetAtTime(0, at + 0.002, 0.012);
-  o.connect(g); g.connect(P.tracks.click.gain); o.start(at); o.stop(at + 0.08);
+  o.connect(g); g.connect(into); o.start(at); o.stop(at + 0.08);
+}
+// Settings › Volume: where every song starts. While it's moved, the metronome plays a 4/4 bar after bar at that level
+// (as loud as a song's click starts, 0.7 of it), and stops a moment after it's let go.
+const CLICK_START = 0.7, PREVIEW_BPM = 100;
+const VP = { gain: null, next: 0, beat: 0, timer: 0, stopT: 0 };
+function volPreview() {
+  ensureCtx(); if (ac.state === "suspended") ac.resume();
+  if (!VP.gain) { VP.gain = ac.createGain(); VP.gain.connect(master); }
+  VP.gain.gain.setTargetAtTime(startVol * CLICK_START, ac.currentTime, 0.02);
+  clearTimeout(VP.stopT); VP.stopT = setTimeout(volPreviewStop, 1200);
+  if (VP.timer) return;
+  VP.next = ac.currentTime + 0.05; VP.beat = 0;
+  VP.timer = setInterval(() => {
+    while (VP.next < ac.currentTime + 0.12) { clickTick(VP.next, VP.beat % 4 === 0, VP.gain); VP.beat++; VP.next += 60 / PREVIEW_BPM; }
+  }, 25);
+}
+function volPreviewStop() { clearInterval(VP.timer); VP.timer = 0; clearTimeout(VP.stopT); }
+function initStartVol() {
+  const s = $("#setVol");
+  s.value = startVol;
+  s.oninput = () => {
+    startVol = +s.value; store.set("stemVol", startVol); volPreview();
+    if (!P.playing) { stemVol = startVol; $("#pVol").value = stemVol; } // (not under a song as it plays)
+  };
+  resetOnDblClick(s, 1);
 }
 function stemsTick() {
   if (!P.playing || !P.song) return;
@@ -442,7 +469,7 @@ function renderTracks() {
     if (grouped && (name === "lead" || name === "backing")) { if (open) box.append(trackRow(name, [name], true)); continue; }
     box.append(trackRow(name, [name]));
   }
-  paintKeeps(); paintSave();
+  paintKeeps();
 }
 const VOCAL_TRACKS = ["vocals", "lead", "backing"];
 function trackRow(name, members, sub, open) {
@@ -477,7 +504,7 @@ function trackRow(name, members, sub, open) {
     last = el("span"); // no download for the click alone
     const bpb = bpbButton(); bpb.set([2, 3, 4, 6].map((k) => ({ v: k, t: k + "/4" })), t.bpb);
     const accentOn = () => tr("Accent on {n}", { n: t.offset + 1 });
-    const sh = mkBtn(tr("Shift accent"), () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = accentOn(); paintSave(); });
+    const sh = mkBtn(tr("Shift accent"), () => { t.offset = (t.offset + 1) % t.bpb; sh.textContent = accentOn(); });
     sh.className = "tog"; sh.textContent = t.offset ? accentOn() : tr("Shift accent");
     opts.append(bpb.btn, sh);
     if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = tr("no steady beat found"); }
@@ -774,9 +801,17 @@ async function saveKeep(next) {
     if (P.song === m) { P.keep = j.keep; applyGains(); paintKeeps(); }
   } catch (e) { say($("#pExportState"), e.message); }
 }
-// The song's mix as you've set it: each track's volume, mute and solo, and the click's. Save (or Ctrl+S) keeps it with
-// the song and it's put back when the song opens; the button is live while there's something new to save.
+// The song's mix as you've set it: each track's volume, mute and solo, and the click's. Not kept: a song opens with
+// a fresh one. (Practice sets its own mix over it, and puts this one back when you leave.)
 const r2 = (v) => Math.round(v * 100) / 100;
+// A fresh mix, as every song opens with and the Studio shows again when you come back to it (not from Practice, which
+// puts back the one you left it with): every track up and playing, the click off at its starting level, in 4/4, and the
+// song at the volume set in Settings. live: on a song that's loaded (its gains and rows painted again).
+function freshMix(live = true) {
+  for (const [n, t] of Object.entries(P.tracks)) Object.assign(t, n === "click" ? { mute: true, solo: false, vol: CLICK_START, offset: 0, bpb: 4 } : { mute: false, solo: false, vol: 1 });
+  stemVol = startVol; $("#pVol").value = stemVol;
+  if (live) { if (P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); applyGains(); renderTracks(); }
+}
 function mixNow() {
   const tracks = {}, c = P.tracks.click || {};
   for (const [n, t] of Object.entries(P.tracks)) if (n !== "click") tracks[n] = { vol: r2(t.vol), mute: t.mute, solo: t.solo };
@@ -785,20 +820,6 @@ function mixNow() {
 function applyMix(mix) {
   for (const [n, t] of Object.entries((mix && mix.tracks) || {})) if (n !== "click" && P.tracks[n]) Object.assign(P.tracks[n], { vol: +t.vol, mute: !!t.mute, solo: !!t.solo });
   if (mix && mix.click && P.tracks.click) Object.assign(P.tracks.click, mix.click);
-}
-let savedMix = "";
-function paintSave() { $("#pSave").disabled = !P.song || JSON.stringify(mixNow()) === savedMix; }
-async function saveMix() {
-  const m = P.song, mix = mixNow();
-  $("#pSave").disabled = true;
-  try {
-    const r = await fetch(`/api/library/${m.id}/mix`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mix }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || "Couldn’t save the mix.");
-    m.mix = j.mix;
-    if (P.song === m) savedMix = JSON.stringify(mix);
-  } catch (e) { say($("#pExportState"), e.message); }
-  paintSave();
 }
 // Over each track's waveform: an × on each kept part (shown while you point at it) that lets it go, and over a stretch
 // being picked, a button that keeps it. The parts themselves are drawn on the waveform (drawTrackWaves).
@@ -943,19 +964,16 @@ function initStems() {
   $(".mix-ico").append(icon("volume"));
   // text buttons with an icon in front of the label
   [["#sAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
-    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pSave", "save"], ["#pExport", "download"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
-  $("#pSave").onclick = saveMix;
-  document.addEventListener("keydown", (e) => { // Ctrl+S (⌘S) in the Studio saves the mix rather than the page
-    if ((e.ctrlKey || e.metaKey) && e.code === "KeyS" && view === "stems" && stemsPage === "song") { e.preventDefault(); if (!$("#pSave").disabled) saveMix(); }
-  });
+    ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pExport", "download"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   initSongMenu();
   initCoverView();
   initTakesStudio();
   initLibSearch();
   initNew();
   $("#pVol").value = stemVol;
-  $("#pVol").oninput = (e) => { stemVol = +e.target.value; store.set("stemVol", stemVol); if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); };
-  resetOnDblClick($("#pVol"), 1);
+  $("#pVol").oninput = (e) => { stemVol = +e.target.value; if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); }; // (this visit only)
+  $("#pVol").ondblclick = () => { $("#pVol").value = startVol; $("#pVol").dispatchEvent(new Event("input")); }; // back to where songs start
+  initStartVol();
   const v = $("#pVideo");
   v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
   v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));

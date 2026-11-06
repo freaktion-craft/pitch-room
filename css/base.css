@@ -176,6 +176,7 @@ html.set-top .set-nav { top: var(--top-nav); z-index: 6; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); min-height: 68px; padding: var(--space-3) 0; }
 .set-row + .set-row { border-top: 1px solid var(--line); }
 .set-what { display: grid; gap: 2px; min-width: 0; }
+.set-vol { flex: none; width: 200px; } /* Settings › Volume: as wide as the Studio's */
 .set-what b { font-weight: var(--weight-regular); font-size: var(--text-md); line-height: 20px; color: var(--ink); }
 .set-what small { font-size: var(--text-sm); line-height: 18px; color: var(--muted); }
 label.set-row { cursor: pointer; }

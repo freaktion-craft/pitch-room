@@ -218,6 +218,8 @@ const EMPTY_LIBRARY = false;
             <div class="set-row"><div class="set-what"><b>Theme</b><small>Light or dark</small></div><button class="pick" id="theme" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Accent color</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent color"></div></div>
             <label class="set-row"><span class="set-what"><b>Aurora</b><small>The glow behind Practice, as the song plays</small></span><input type="checkbox" class="switch" id="auroraOn"></label>
+            <!-- where every song starts (studio.js, initStartVol): a 4/4 click plays while it's moved -->
+            <div class="set-row"><div class="set-what"><b>Volume</b><small>Where every song starts; a click plays while you set it</small></div><input type="range" class="set-vol" id="setVol" min="0" max="1" step="0.01" aria-label="Volume every song starts at"></div>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMic">
@@ -260,7 +262,7 @@ const EMPTY_LIBRARY = false;
     </div>
   </main>
   <main id="vStems" aria-label="Stems" hidden>
-    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button">Save</button><button class="btn sm" id="pExport" type="button">Download</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
+    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pExport" type="button">Download</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
