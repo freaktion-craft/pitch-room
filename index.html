@@ -84,6 +84,9 @@ const EMPTY_LIBRARY = false;
     <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
   </header>
+  <!-- the band behind a pinned top and the fade under it: the library's and Settings' (outside both, so either can show them) -->
+  <div id="libMast" aria-hidden="true"></div>
+  <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
 
   <main id="vPractice" aria-label="Practice" hidden>
     <div class="backbar"><nav class="crumbs" id="kCrumbs" aria-label="Where you are"></nav>
@@ -262,8 +265,6 @@ const EMPTY_LIBRARY = false;
     <p class="server-off" id="sErr" hidden></p>
 
 
-    <div id="libMast" aria-hidden="true"></div>
-    <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
     <div id="addVeil" aria-hidden="true"></div>
     <!-- the drawer (Add song, and the + by the mic, open it): at the window's right, over the veil; both moved out to the body
          (studio.js, practice.js), over the list's blur. The form at its top, the songs being added under it (paintJobs) -->
