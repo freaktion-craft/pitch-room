@@ -80,8 +80,6 @@ async function paintUpdate(force) {
   let u = null;
   try { u = await (await fetch("/api/upgrades", { cache: "no-store" })).json(); } catch (e) { u = null; }
   b.hidden = !u || !u.songs || u.running;
-  if (!b.hidden) say(b, u.songs === 1 ? "Re-time your song with the new lyrics and melody timing, about a minute, in the background"
-    : "Re-time {n} songs with the new lyrics and melody timing, about {m} min, in the background", { n: u.songs, m: u.min }, "title");
 }
 // The first drawing is from what came with the page (SAVED_LIB), at once, before the page is first shown; a reload
 // then shows the list as it was rather than an empty page filling in. Later ones ask the server.
@@ -557,20 +555,18 @@ function paintUpgrade(tile, m) {
   const on = m.upgrade != null || !!m.pending;
   let ring = tile.querySelector(".ring");
   tile.classList.toggle("upgrading", on);
-  if (!on) { ring?.remove(); tile.removeAttribute("title"); return; }
+  if (!on) { ring?.remove(); return; }
   if (!ring) tile.append((ring = progRing(0)));
   ring.classList.toggle("spin", !m.pending && !m.upgrade);
   ring.lastChild.style.visibility = m.pending ? "hidden" : ""; // empty: only its track
   ring.lastChild.setAttribute("stroke-dasharray", `${Math.max(6, (m.upgrade || 0) * 100)} 100`);
-  tile.title = tr(m.pending ? "Waiting for its update" : "Updating for the new version…");
 }
 // a song's row (and its card in New) while its update's to come: not to be opened meanwhile, the cursor says so
 function paintPending(row, m) {
   const on = !!m.pending;
   row.classList.toggle("pending", on);
-  if (on) row.title = tr("Waiting for its update"); else row.removeAttribute("title");
   const card = document.querySelector(`#sNewTrack .ln-card[data-id="${m.id}"]`);
-  if (card) { card.classList.toggle("pending", on); if (on) card.title = tr("Waiting for its update"); }
+  if (card) card.classList.toggle("pending", on);
 }
 // A cover into its box once it's decoded, so the box is never empty: meanwhile it's a blur of it (its BlurHash), or its
 // colour. One in sight then fades up out of the blur, later the lower and further right it is (REVEAL ms across the
@@ -830,9 +826,8 @@ const camelot = (k) => ((((k.mode === "major" ? k.pc : k.pc + 3) * 7) % 12) + 7)
 function paintKeyCell(cell, k) {
   cell.textContent = keyShort(k);
   cell.classList.toggle("keyed", !!k); cell.classList.toggle("minor", k?.mode === "minor");
-  if (!k) { cell.style.removeProperty("--key-h"); cell.removeAttribute("title"); return; }
+  if (!k) { cell.style.removeProperty("--key-h"); return; }
   cell.style.setProperty("--key-h", CAMELOT_HUE[camelot(k) - 1]);
-  cell.title = `${keyName(k)} · Camelot ${camelot(k)}${k.mode === "major" ? "B" : "A"}`; // in full, and its code for DJs
 }
 const songFacts = (m) => [fmtTime(m.duration), m.bpm ? m.bpm + " BPM" : tr("no steady beat"), keyName(m.key)].filter(Boolean);
 const libLine = (m) => [m.title, m.artist, ...songFacts(m)].filter(Boolean).join(" · "); // read out for a row

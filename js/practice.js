@@ -409,7 +409,6 @@ function notesText() {
 // off, they're kept, out of sight, and back as they were once it's on again
 function paintCopy() {
   $("#kMarks").hidden = $("#kNotesClear").hidden = $("#kPins").hidden = !S.dev;
-  say($("#kTl"), S.dev ? "Click or drag to move through the song · T leaves a note here" : "Click or drag to move through the song", null, "title");
   $("#kMarks").disabled = !NOTE.list.length && !(S.dev && K.marks.length); $("#kNotesClear").disabled = !NOTE.list.length;
 }
 // Clear: the song's notes off, for a new round (asked twice; the server keeps the old round beside them, set_notes)
@@ -549,7 +548,7 @@ function lyricsFor(m, lyr) {
   const data = lyr && lyr.lyrics;
   K.lyRaw = (data && data.lines) || null;
   K.lyrics = K.lyRaw && nudged(K.lyRaw, m.lyricNudge, m.lyricEdits);
-  say($("#stage .plot"), K.lyrics ? "Lyrics off? , . move this line, [ ] all of them, 50 ms a press\nShift+, Shift+. put its start on the voice" : "", null, "title");
+  say($("#stage .plot"), K.lyrics ? "Lyrics off? , . move this line, [ ] all of them, 50 ms a press\nShift+, Shift+. put its start on the voice" : "", null, "aria-description"); // not a title: one over the whole plot gets in the way
   K.lyrNone = !!data && !data.lines && !data.dropped; // none on LRCLIB: looking again finds none again, so they're pasted in
   K.tick = null; K.lyrOff = (data && data.offLines) || 0; // a good share of them not sung here (stems._off_lines): said, nothing moved
   // none (not found, or never looked for), and none on the way: said, with where they're found (no Find button here)
@@ -771,7 +770,6 @@ function renderLyric() {
   const note = $("#kLyNote");
   note.replaceChildren();
   const off = K.lyrics && K.lyrOff;
-  say(note, off ? "About {n} lines look unsung here, maybe another version’s lyrics. Try Search LRCLIB on the song’s Info page." : "", { n: off }, "title");
   if (off) { const a = el("a", null, tr("Some lines may not be sung here")); a.href = `#stems/${K.song.id}/info`; note.append(a); return; }
   if (K.lyrics || !K.lyricMsg) return;
   note.append(tr(K.lyricMsg.t, K.lyricMsg.v));

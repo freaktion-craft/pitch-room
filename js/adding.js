@@ -263,7 +263,7 @@ function pickItem(id, c, on) {
   t.textContent = c.title; who.textContent = c.artist || ""; if (c.own) say(sub, "Video’s own name"); else sub.textContent = c.sub || ""; // (say: in the language picked, should it change)
   words.append(t, who, sub);
   const pct = el("span", "cand-pct"), num = el("span", "n");
-  num.textContent = c.pct + "%"; pct.append(num); say(pct, "{pct}% sure", { pct: c.pct }, "title");
+  num.textContent = c.pct + "%"; pct.append(num);
   b.append(pic, words, pct);
   if (on) b.append(icon("tick"));
   b.onclick = () => choosePick(id, c, b);
@@ -531,7 +531,6 @@ function showPlaylist(found) {
   $("#plName").textContent = found.title || tr(found.from === "spotify" ? "Spotify playlist" : "YouTube playlist");
   const n = found.items.length, count = $("#plCount");
   say(count, found.more ? "First {n}" : n === 1 ? "1 song" : "{n} songs", { n });
-  say(count, found.more ? "Only the first {n} are listed" : "", { n }, "title");
   $("#plPick").hidden = false; list.scrollTop = 0; countPicked();
   $("#plGo").focus();
 }

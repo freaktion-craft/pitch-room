@@ -231,7 +231,6 @@ function paintSync() {
   const sNow = $("#setSyncNow"), sGo = $("#setSyncGo"), why = $("#setSyncWhy");
   say(sNow, syncBusy ? "Listening…" : "{t} ms", { t }); say(sNow, parts[0], parts[1], "title");
   sGo.disabled = syncBusy; say(sGo, syncBusy ? "Measuring…" : "Measure");
-  say(sGo, "Hold your headphones close to the mic and press to measure.", null, "title");
   if (syncErr && !syncBusy) say(why, syncErr); else say(why, "How late your voice reaches the app; new takes allow for it");
   why.classList.toggle("err", !!syncErr && !syncBusy);
 }

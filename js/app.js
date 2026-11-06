@@ -508,7 +508,6 @@ function setLang(v) {
   for (const p of picks) p.relabel();
   countPick.set(countItems(), S.countIn); themePick.set(themeItems(), theme); paintKey(); listMics();
   if (K.song) recPick.set(recItems(), recMode);
-  document.querySelectorAll('input[type="range"]').forEach((s) => { if (s.ondblclick) s.title = tr("Double-click to reset"); });
   renderMic(); paintRec(); paintPlay($("#pPlay"), P.playing); renderStart();
   if (P.song) { paintMeta(); renderTracks(); paintVideoBtn(); }
   if (K.song) { renderPhrases(); renderTakes(); }
