@@ -125,9 +125,9 @@ header { position: relative; }
 .pop .hint { margin: 0; }
 .pop-title { font-size: var(--text-md); font-weight: var(--weight-medium); line-height: 20px; color: var(--ink); } /* a panel's name: one size in all of them */
 /* Settings, a page (#vSettings): groups under their headings, each a card of rows (what it is and what it does at the
-   left, its control at the right) with hairlines between; as wide as reads well */
+   left, its control at the right) with hairlines between; as wide as the page */
 /* …beside a list of the groups that stays in view, the one being read lit (initSetNav); a narrow window has the groups alone */
-.set-layout { display: grid; grid-template-columns: 180px minmax(0, 760px); gap: var(--space-8); align-items: start; }
+.set-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: var(--space-8); align-items: start; } /* the groups out to the page's right edge, as the library's list goes */
 /* as the library's rows: the names in line with the page, their hover a little out past them */
 .set-nav { position: sticky; top: var(--space-6); display: grid; gap: 2px; margin-inline-start: calc(var(--space-3) * -1); }
 .set-nav button { height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: none; color: var(--muted);
