@@ -47,8 +47,8 @@ const store = (() => {
 // names: note names (en | ko); echo: the browser's echo cancellation on the mic; gate: the level below which the mic is
 // treated as silent; vol: the keyboard's piano; mic: the input's deviceId ("" = the system default); countIn: the beats
 // Practice counts in before a phrase, a loop or a play after a pause (0: none); dev: Developer tools (phrase marks);
-// aurora: Practice's glow behind the page (drawAurora)
-const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4, ears: null, dev: false, aurora: true };
+// aurora: Practice's glow behind the page (drawAurora); live: where Live sends to and its levels (liveSettings)
+const S = { names: "en", echo: false, gate: 0.01, vol: 0.7, mic: "", countIn: 4, ears: null, dev: false, aurora: true, live: null };
 for (const [k, v] of Object.entries(store.get("settings", {}))) if (k in S) S[k] = k === "names" && v !== "ko" ? "en" : v;
 // ears: which ear each part plays in, in Practice (EARS)
 const EAR_DEFAULT = { band: "both", guide: "both", click: "both", left: "orig", right: "yours" };
