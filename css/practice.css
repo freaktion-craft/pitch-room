@@ -286,6 +286,7 @@
 /* the timeline with the notes' copy and clear at its right */
 .tl-row { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); }
 .tl-row .tl { flex: 1; min-width: 0; margin: 0; }
+.songbar > .tl-row { flex-basis: 100%; margin: 0; } /* in the card, the whole width, under the play controls */
 
 /* Lyrics timing by hand (Edit, lyedit.js): over the pitch display, a track of the song with each line's words as clips in two
    rows (alternate lines, so a line's end and the next's start can overlap), each line's bar above its words, and the lead voice's

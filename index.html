@@ -109,6 +109,15 @@ const EMPTY_LIBRARY = false;
         </div>
         <div class="keyctl" role="group" aria-label="Key"><span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span></div>
       </div>
+      <!-- the song's timeline, in the card under the play controls -->
+      <div class="tl-row">
+      <div class="tl" id="kTl" aria-label="Timeline">
+        <div class="tl-bar"><i class="tl-fill"></i></div><i class="tl-head"></i><div class="tl-pins" id="kPins"></div><span class="tl-tip" id="kTlTip" hidden></span>
+        <div class="pop tl-note" id="kNote" role="dialog" aria-label="Note" hidden><input id="kNoteText" type="text" placeholder="What’s off here?" autocomplete="off" spellcheck="false" aria-label="Note"><button class="btn sm icon ghost" id="kNoteDel" type="button" aria-label="Delete note" title="Delete note"></button></div>
+      </div>
+      <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy notes" title="Copy notes"></button>
+      <button class="btn sm icon" id="kNotesClear" type="button" aria-label="Clear notes" title="Clear this song’s notes"></button>
+      </div>
       <div class="phrase-row">
         <label class="kfield">Count-in <button class="pick" id="kCount" type="button"></button></label>
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
@@ -117,14 +126,6 @@ const EMPTY_LIBRARY = false;
         <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
         <button class="btn sm" id="kEdit" type="button" aria-pressed="false"><span class="txt">Edit</span></button>
       </div>
-    </div>
-    <div class="tl-row">
-    <div class="tl" id="kTl" aria-label="Timeline">
-      <div class="tl-bar"><i class="tl-fill"></i></div><i class="tl-head"></i><div class="tl-pins" id="kPins"></div><span class="tl-tip" id="kTlTip" hidden></span>
-      <div class="pop tl-note" id="kNote" role="dialog" aria-label="Note" hidden><input id="kNoteText" type="text" placeholder="What’s off here?" autocomplete="off" spellcheck="false" aria-label="Note"><button class="btn sm icon ghost" id="kNoteDel" type="button" aria-label="Delete note" title="Delete note"></button></div>
-    </div>
-    <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy notes" title="Copy notes"></button>
-    <button class="btn sm icon" id="kNotesClear" type="button" aria-label="Clear notes" title="Clear this song’s notes"></button>
     </div>
 
     <section class="stage" id="stage" aria-label="Pitch display">
