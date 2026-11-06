@@ -143,9 +143,15 @@ header { position: relative; }
 .set-tools-out { flex: 1 1 100%; display: grid; gap: var(--space-2); }
 .set-tools-out:not(:has(> :not([hidden]))) { display: none; }
 .set-tools-out .log { max-height: 260px; white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
-/* their list the only thing that scrolls (fitSettings: its height), so the page itself doesn't: no room under it */
-html.set-view .app { padding-bottom: 0; }
-html.set-view #micSet { overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-16); }
+/* Settings scroll with the page (pinSetTop): the app's bar and the crumbs held where they stand over the band
+   (#libMast), the list of groups beside them where it starts, over the fade under the band (it's beside the groups,
+   not over them) */
+html.set-top #libMast { display: block; }
+html.set-top { scroll-padding-top: var(--mast); } /* (a group gone to, or a row reached with Tab, isn't left under it) */
+html.set-top body::-webkit-scrollbar-track { margin-top: var(--mast); }
+html.set-top #app > header { position: sticky; top: var(--top-header); z-index: 6; }
+html.set-top #vSettings .backbar { position: sticky; top: var(--top-crumbs); z-index: 4; }
+html.set-top .set-nav { top: var(--top-nav); z-index: 6; }
 .settings { display: grid; gap: var(--space-8); align-content: start; } /* (packed at the top: as tall as the window now, a grid would stretch its groups, and their cards, into the room under them) */
 .set-group { display: grid; gap: var(--space-3); align-content: start; scroll-margin-top: var(--space-6); }
 .set-group > h2 { margin: 0; }
