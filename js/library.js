@@ -619,7 +619,8 @@ function paintCover(tile, m) {
 const TILT = 16, NEAR = 1.2, CV_DEPTH = 900; // px: the eye's distance for the tilt (about twice the cover's size)
 const CV = { tile: null, x: 0, y: 0, tx: 0, ty: 0, raf: 0, closing: false };
 const stillMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-const CV_FLAT = "0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 1px rgba(255, 255, 255, 0.06)"; // its shadow, none: as it leaves and lands on the tile
+// its shadow, none, its edge as it is (the theme's: --fg-6, .cv-card): as it leaves and lands on the tile
+const cvFlat = () => `0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 1px ${getComputedStyle(document.documentElement).getPropertyValue("--fg-6").trim()}`;
 // the transform that puts the big cover over the tile: the step between them, as a FLIP animation's first frame
 function overTile(tile, fly) {
   const a = tile.getBoundingClientRect(), b = fly.getBoundingClientRect(), s = a.width / b.width;
@@ -635,7 +636,7 @@ function showCover(tile) {
   tile.style.visibility = "hidden";
   const from = overTile(tile, fly), ms = stillMotion() ? 0 : 420, ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
   fly.animate([{ transform: from.t }, { transform: "none" }], { duration: ms, easing: ease });
-  card.animate([{ borderRadius: from.r, boxShadow: CV_FLAT }, { borderRadius: "12px" }], { duration: ms, easing: ease });
+  card.animate([{ borderRadius: from.r, boxShadow: cvFlat() }, { borderRadius: "12px" }], { duration: ms, easing: ease });
   card.querySelectorAll("i").forEach((i) => i.animate([{ opacity: 0 }, {}], { duration: ms, easing: "ease-out" }));
   view.querySelector(".cv-back").animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms * 0.7, easing: "ease-out" });
   if (!stillMotion()) CV.raf = requestAnimationFrame(tiltTick);
@@ -647,7 +648,7 @@ async function hideCover() {
   const view = $("#coverView"), fly = view.querySelector(".cv-fly"), card = view.querySelector(".cv-card");
   const to = overTile(tile, fly), ms = stillMotion() ? 0 : 340, ease = "cubic-bezier(0.4, 0, 0.2, 1)";
   card.animate([{ transform: card.style.transform || "none" }, { transform: "none" }], { duration: ms * 0.6, easing: ease, fill: "forwards" });
-  card.animate([{ borderRadius: "12px" }, { borderRadius: to.r, boxShadow: CV_FLAT }], { duration: ms, easing: ease, fill: "forwards" });
+  card.animate([{ borderRadius: "12px" }, { borderRadius: to.r, boxShadow: cvFlat() }], { duration: ms, easing: ease, fill: "forwards" });
   card.querySelectorAll("i").forEach((i) => i.animate([{}, { opacity: 0 }], { duration: ms * 0.8, easing: ease, fill: "forwards" }));
   view.querySelector(".cv-back").animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "ease-in", fill: "forwards" });
   await fly.animate([{ transform: "none" }, { transform: to.t }], { duration: ms, easing: ease, fill: "forwards" }).finished.catch(() => {});

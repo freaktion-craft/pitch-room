@@ -185,7 +185,7 @@ async function restartMic() {
 }
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
-let micPick = null, namesPick = null, langPick = null, countPick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
+let micPick = null, namesPick = null, langPick = null, countPick = null, themePick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
 // The click's beats per bar, in the Studio's click row. One dropdown, made once and moved into each new row (every
 // makePick adds its own list and listeners for good).
 let bpbPick = null;

@@ -16,7 +16,13 @@
   .bar.busy .fill { width: 32%; transition: none; animation: slide 1.3s ease-in-out infinite; }
   @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
   @media (prefers-reduced-motion: reduce) { .bar.busy .fill { animation: none; width: 100%; opacity: 0.4; } }
+  /* the light theme (main.js: ?theme=light): the still turned over, light with its colours kept; the bar in the light ink */
+  html.light, html.light body { background: #f3f3f3; color: oklch(0.2 0 0); }
+  html.light .scene { filter: invert(1) hue-rotate(180deg); }
+  html.light .bar { background: rgba(0, 0, 0, 0.12); }
+  html.light .fill { background: oklch(0.32 0 0); }
 </style>
+<script>if (new URLSearchParams(location.search).get("theme") === "light") document.documentElement.classList.add("light");</script>
 </head>
 <body>
   <div class="scene"></div>

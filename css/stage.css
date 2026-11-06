@@ -37,7 +37,7 @@
 /* filled as it's sung, a soft edge running through the word (renderLyrics: --p, past either end of it when it's not on
    it); the line before keeps its fill, so it doesn't flash back to plain as it leaves, and stays lit while it's still
    being sung */
-@supports (color: oklch(from red l c h)) { .lylist { --sung: oklch(from var(--voice) min(l, 0.72) c h); } } /* the edge you follow: a pale accent goes deeper, or it hardly shows against the ink */
+@supports (color: oklch(from red l c h)) { .lylist { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) c h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi) */
 .lylist p:is(.now, .b1) span { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
 .lylist p.n1 { opacity: 0.55; } /* 5.3:1, read without effort like --muted */
@@ -49,7 +49,7 @@
 .lylist .bg { --un: var(--muted); font-size: 0.85em; font-weight: var(--weight-medium); color: var(--muted); }
 /* a syllable held a long time: a glow that grows as it's held (the letters stay still) */
 .lylist span { transition: filter var(--duration-slow); } /* let go of, it fades */
-.lylist .held { transition: none; filter: drop-shadow(0 0 calc(var(--g, 0) * 7px) color-mix(in oklab, var(--voice) 70%, transparent)); }
+.lylist .held { transition: none; filter: drop-shadow(0 0 calc(var(--g, 0) * 7px) color-mix(in oklab, var(--voice) var(--glow-mix), transparent)); }
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
    drawn there during an intro or break, while the coming bars arrive from the right */
