@@ -315,7 +315,8 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
    right, just before Add song. */
 /* Add song, and the songs being added (the + by the mic): a drawer against the window's top, right and bottom, the
    page dimmed beside it (#addVeil); in from the right and back out (display kept for the slide). On the desktop app
-   what's in it starts under the strip that moves the window, which goes on over its top. */
+   what's in it starts under the strip that moves the window: on a Mac the strip goes on over its top, on Windows (the
+   buttons' strip, frosted) the drawer starts under it. */
 .add-at { position: relative; display: inline-flex; }
 /* its title row on the header's line (the name's): the page's padding over the header, less the title row's -6 px
    margin, plus half of what the 32 px header has over the row's 20 px */
@@ -324,7 +325,7 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
   scrollbar-gutter: stable; padding-right: calc(var(--space-4) - 12px); /* its scrollbar's place kept (12 px, base.css), scrolling or not: nothing moves when it comes; the right as far in as the left */
   -webkit-app-region: no-drag; transition: translate var(--duration-slow) var(--ease), display var(--duration-slow) allow-discrete; }
 @supports not selector(::-webkit-scrollbar) { #jobsPop { padding-right: var(--space-4); } } /* (no 12 px scrollbar of ours there: the browser's own, its place kept as it has it) */
-html.desktop-win #jobsPop { --drawer-top: var(--titlebar); --head-top: calc(var(--titlebar) + var(--space-3)); }
+html.desktop-win #jobsPop { top: var(--titlebar); --head-top: var(--space-3); } /* under the window buttons' strip, not up behind it (the strip's frost over the drawer drew a line): its title still on the header's line */
 html.desktop-mac #jobsPop { --drawer-top: var(--space-6); --head-top: calc(var(--space-6) + var(--space-3)); }
 :is(html.desktop-win, html.desktop-mac) #jobsPop::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: var(--drawer-top); -webkit-app-region: drag; }
 #jobsPop[hidden] { translate: 100% 0; pointer-events: none; }
