@@ -2,9 +2,10 @@
    one .btn). Built from tokens.css. */
 * { box-sizing: border-box; }
 html, body { margin: 0; overscroll-behavior: none; } /* no rubber band past the top or the bottom (a trackpad's, on a Mac): the page stops where it ends */
-/* A scrollbar only while there's more to see than fits (no strip kept for one otherwise). The page is centred on the
-   window's width (100vw, .app), so one coming or going doesn't move it sideways. */
-html { overflow-y: auto; }
+/* The scrollbar's room always kept, scrolling or not (its thumb only while there's more to see than fits): a page
+   growing past the window (a part opened, a list filled) doesn't narrow it by a scrollbar and move what's right-aligned.
+   The page is centred on the window's width (100vw, .app), that room counted in its right. */
+html { overflow-y: auto; scrollbar-gutter: stable; }
 /* Scrollbars: a thin pill of the ink on nothing (the page's own background shows round it), brighter under the
    pointer and while held; no arrows. Where the standard properties are set (a dropdown's list), those win. */
 ::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
@@ -12,9 +13,10 @@ html { overflow-y: auto; }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--fg-16); }
 ::-webkit-scrollbar-thumb:active { background-color: var(--fg-30); }
 ::-webkit-scrollbar-corner, ::-webkit-scrollbar-track { background: transparent; }
-/* a drawer open (drawerEdge): no scrollbar, so the drawer meets the window's edge; its room kept as padding, so nothing moves */
-html.drawer-open { overflow-y: hidden; }
-html.welcome { overflow-y: hidden; } /* the first steps over all of it: no scrollbar's strip down their right edge (the page under them as it was: its margin's from 100vw) */
+/* a drawer open (drawerEdge): no scrollbar, nor its room, so the drawer meets the window's edge; that room kept as
+   padding instead, so nothing moves */
+html.drawer-open { overflow-y: hidden; scrollbar-gutter: auto; }
+html.welcome { overflow-y: hidden; scrollbar-gutter: auto; } /* the first steps over all of it: no scrollbar's strip down their right edge (the page under them as it was: its margin's from 100vw) */
 html.drawer-open body { padding-right: var(--sbw, 0px); }
 @supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: var(--fg-8) transparent; } }
 html.theming *, html.theming *::before, html.theming *::after { transition: none !important; } /* the theme switched (applyTheme): at once, not faded over */
