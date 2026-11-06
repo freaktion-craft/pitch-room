@@ -742,15 +742,15 @@ const newRoom = () => { // (down to the list, or to the albums' grid in its plac
   const n = $("#sNew"), next = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums") : $("#sLib");
   return n.hidden ? 0 : next.offsetTop - n.offsetTop;
 };
-// The foot's fade on a song's page too (the Studio), as its tracks go on below the window; the top's is the library's
-// alone (under its pinned top)
+// The foot's fade on a song's page too (the Studio), as its tracks go on below the window; the top's the library's and
+// Settings' (under their pinned tops), the foot's theirs too
 function paintFade(now) {
-  const lib = view === "stems" && stemsPage === "lib", song = view === "stems" && stemsPage === "song";
+  const set = view === "settings", lib = view === "stems" && stemsPage === "lib", song = view === "stems" && stemsPage === "song";
   const below = document.documentElement.scrollHeight - (scrollY + innerHeight);
   // the New row, over the band behind the pinned top while it goes up: cut off where it reaches the search's line
   const nw = $("#sNew");
   if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
-  for (const [f, px, here] of [[$("#listFade"), below, lib || song], [$("#listFadeTop"), scrollY - newRoom(), lib]]) {
+  for (const [f, px, here] of [[$("#listFade"), below, lib || song || set], [$("#listFadeTop"), set ? scrollY : scrollY - newRoom(), lib || set]]) {
     if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
     f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
     f.classList.toggle("on", here && px > 0);

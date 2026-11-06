@@ -1045,7 +1045,7 @@ async function singSong(m, btn) {
 }
 // Settings: a page of their own (#settings, route): going out, their lists closed
 function showMicSet(on) {
-  document.documentElement.classList.toggle("set-view", on); fitSettings();
+  document.documentElement.classList.toggle("set-view", on); pinSetTop(); requestAnimationFrame(() => { pinSetTop(); paintFade(true); paintSetNav(); }); // (again once it's shown)
   if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
 }
 // Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
@@ -1082,34 +1082,43 @@ let setGroups = [];
 function paintSetNav(at) {
   if (view !== "settings" || !setGroups.length) return;
   if (at == null) {
-    const box = $("#micSet"), r = box.getBoundingClientRect(), line = r.top + r.height * 0.4; // (40 % down what's shown of them)
-    if (box.scrollHeight <= box.clientHeight + 1) { // all in view, nothing to scroll: the one picked stays lit (the first, to begin with)
+    const root = document.documentElement, top = parseFloat(getComputedStyle(root).getPropertyValue("--mast")) || 0;
+    const line = top + (innerHeight - top) * 0.4; // (40 % down what's shown of them, under the pinned top)
+    if (root.scrollHeight <= innerHeight + 1) { // all in view, nothing to scroll: the one picked stays lit (the first, to begin with)
       at = Math.max(0, [...$("#setNav").querySelectorAll("button")].findIndex((b) => b.getAttribute("aria-current") === "true"));
     } else {
       at = setGroups.findIndex((g) => g.getBoundingClientRect().bottom > line);
-      if (at < 0 || (box.scrollTop > 0 && box.scrollTop + box.clientHeight >= box.scrollHeight - 2)) at = setGroups.length - 1;
+      if (at < 0 || (scrollY > 0 && scrollY + innerHeight >= root.scrollHeight - 2)) at = setGroups.length - 1;
     }
   }
   $("#setNav").querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-current", String(i === at)));
 }
-// The settings the only thing on their page that scrolls (html.set-view): their list as tall as leaves it in the
-// window, the header, the crumbs and the list of groups beside it still; the wheel anywhere on the page scrolls it
-function fitSettings() {
-  const box = $("#micSet");
-  if (view !== "settings") { box.style.height = ""; return; }
-  box.style.height = Math.max(240, Math.floor(innerHeight - (box.getBoundingClientRect().top + scrollY))) + "px";
+// Settings scroll with the page, as the library does (its scrollbar at the window's edge): the app's bar and the crumbs
+// held where they stand over a band of the page's colour (#libMast, as tall as both), the list of groups beside them
+// where it starts; the groups go under the band, through the library's fades (paintFade). Measured again when the
+// page changes or the window does.
+function pinSetTop() {
+  const root = document.documentElement;
+  root.classList.remove("set-top");
+  if (view !== "settings") return;
+  // where each sits in the page unpinned (measured with set-top off: none of them stuck yet)
+  const at = (n) => { if (!n || !n.getClientRects().length) return null; const r = n.getBoundingClientRect(); return { top: r.top + scrollY, bottom: r.bottom + scrollY }; };
+  const y = scrollY; scrollTo(0, 0); // (at the top, nothing's stuck)
+  const header = at($("#app > header")), crumbs = at($("#vSettings .backbar")), nav = at($("#setNav"));
+  scrollTo(0, y);
+  if (header) root.style.setProperty("--top-header", header.top + "px");
+  if (crumbs) root.style.setProperty("--top-crumbs", crumbs.top + "px");
+  if (nav) root.style.setProperty("--top-nav", nav.top + "px");
+  root.style.setProperty("--mast", Math.max(header?.bottom || 0, crumbs?.bottom || 0) + "px");
+  root.classList.add("set-top");
 }
 function initSetNav() {
-  const btns = [...$("#setNav").querySelectorAll("button")], box = $("#micSet");
+  const btns = [...$("#setNav").querySelectorAll("button")];
   setGroups = btns.map((b) => $("#" + b.dataset.to).closest(".set-group"));
   btns.forEach((b, i) => { b.onclick = () => { setGroups[i].scrollIntoView({ behavior: stillMotion() ? "auto" : "smooth", block: "start" }); paintSetNav(i); }; });
-  box.addEventListener("scroll", () => paintSetNav(), { passive: true });
-  addEventListener("resize", () => { fitSettings(); paintSetNav(); });
-  new ResizeObserver(() => fitSettings()).observe($("#vSettings .backbar")); // (the steps-left banner in it, or gone)
-  addEventListener("wheel", (e) => {
-    if (view !== "settings" || e.ctrlKey || box.contains(e.target) || e.target.closest?.(".pick-list, .pop, .menu, #welcome")) return;
-    box.scrollBy({ top: e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? box.clientHeight : 1) });
-  }, { passive: true });
+  addEventListener("scroll", () => paintSetNav(), { passive: true });
+  addEventListener("resize", () => { pinSetTop(); paintSetNav(); });
+  new ResizeObserver(() => { pinSetTop(); paintFade(); }).observe($("#vSettings .backbar")); // (the steps-left banner in it, or gone)
   paintSetNav(); // a reload on the page: shown before this was set up
 }
 // Headphones, in Practice (S.ears): which ear the band, the guide vocal and the metronome (its count-in too) play in,
