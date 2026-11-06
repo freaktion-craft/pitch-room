@@ -461,7 +461,6 @@ function trackRow(name, members, sub, open) {
     nm.append(tog);
   }
   nm.append(el("small", null, tr(note)));
-  if (isClick && bpm) nm.title = tr("Detected tempo {bpm} BPM", { bpm });
   const all = (k) => ts.every((x) => x[k]);
   const m = el("button", "tog m", "M"); m.type = "button"; m.title = tr(name === "click" ? "Click on/off" : "Mute"); m.setAttribute("aria-pressed", String(all("mute")));
   const s = el("button", "tog s", "S"); s.type = "button"; s.title = tr("Solo"); s.setAttribute("aria-pressed", String(all("solo")));
@@ -695,8 +694,6 @@ function paintTempo() {
     f.min = m.bpm ? Math.ceil(m.bpm * RATE_MIN) : RATE_MIN * 100; f.max = m.bpm ? Math.floor(m.bpm * RATE_MAX) : RATE_MAX * 100;
     t.classList.toggle("changed", s !== 1);
     f.style.background = busy ? `linear-gradient(90deg, var(--hover-2) ${Math.round(P.keyProg * 100)}%, var(--surface-2) 0)` : "";
-    f.title = (m.bpm ? tr("Originally {bpm} BPM", { bpm: Math.round(m.bpm) }) : tr("The song’s own speed is 100%"))
-      + (s !== 1 ? ` · ${Math.round(s * 100)}%` : "") + (busy ? ` · ${tr("Changing tempo… {pct}", { pct: Math.round(P.keyProg * 100) + "%" })}` : "");
     f.setAttribute("aria-label", tr(m.bpm ? "Tempo (BPM)" : "Speed (%)"));
   });
 }
@@ -819,7 +816,7 @@ function paintKeeps() {
     }
     if (P.tsel && P.tsel.name === name) {
       const bar = el("div", "selbar"), keep = el("button", "btn xs primary", tr("Keep playing here")), cut = el("button", "btn xs icon primary"), { a, b } = P.tsel;
-      keep.type = cut.type = "button"; keep.title = tr("This stretch plays even while the track is muted");
+      keep.type = cut.type = "button";
       keep.onclick = () => addKeep(name, a, b);
       cut.title = tr("Download {what}, {a}–{b} only (MP3)", { what: tr(name === "voices" ? "the vocals" : TRACK_TITLES[name] || name), a: fmtTime(a), b: fmtTime(b) });
       cut.setAttribute("aria-label", cut.title); cut.append(icon("download"));

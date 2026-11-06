@@ -59,7 +59,6 @@ function tsRender() {
       c.type = dl.type = "button"; c.dataset.id = t.id;
       box.style.left = (t.start / dur) * 100 + "%"; box.style.width = ((t.duration * sp) / dur) * 100 + "%";
       c.setAttribute("aria-pressed", String(TS.on.has(t.id)));
-      c.dataset.about = `${part.what} · ${part.more} · ${new Date(t.created * 1000).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" })}`;
       c.append(el("canvas"), el("span"), el("i", "ts-vol"));
       c.dataset.what = part.what;
       dl.append(icon("download")); dl.title = tr("Download as WAV, mixed as set above"); dl.setAttribute("aria-label", tr("Download this take as WAV"));
@@ -116,13 +115,13 @@ function tsClipVol(c, t) {
   };
   c.onclick = (e) => { e.stopPropagation(); if (!pressed) tsToggle(t); };
 }
-// The line at the take's volume, its sync after its name where it's moved, and both in the clip's tip
+// The line at the take's volume, and its sync after its name where it's moved; the name in full in the clip's tip (a
+// short clip cuts it off)
 function tsClipPaint(t, c = document.querySelector(`#tsLanes .ts-clip[data-id="${t.id}"]`)) {
   if (!c) return;
   const shift = keySign(inMs(takeShift(t)));
   c.style.setProperty("--v", takeVol(t) / TS_VOL);
-  c.querySelector("span").textContent = c.dataset.what + (takeSync(t) ? ` · ${shift} ms` : "");
-  c.title = `${c.dataset.about} · ${tr("Volume {n}% · drag the line, or ↑ ↓", { n: Math.round(takeVol(t) * 100) })} · ${tr("Sync {n} ms (automatic {a} ms) · ← →", { n: shift, a: keySign(inMs(takeAuto(t))) })}`;
+  c.title = c.querySelector("span").textContent = c.dataset.what + (takeSync(t) ? ` · ${shift} ms` : "");
 }
 // A take's own volume or sync, as set: heard at once, here and in Practice's Takes; what was saved kept (tsWas, by
 // "<take>/<what>") until it's saved again, to go back to if it can't be.
@@ -388,8 +387,7 @@ function initTakesStudio() {
     clearTimeout(slow);
     say(state, stuck && here() ? "Couldn’t line up every take with the singer." : "");
   };
-  sync.title = tr("Double-click to reset"); // to the automatic amount (again on a language switch: setLang)
-  sync.ondblclick = () => { for (const t of tsOnTakes()) { tsOwnSet(t, "sync", 0); tsOwnSave(t, "sync"); } };
+  sync.ondblclick = () => { for (const t of tsOnTakes()) { tsOwnSet(t, "sync", 0); tsOwnSave(t, "sync"); } }; // back to the automatic amount
   for (const [id, k] of [["#tsVoice", "voice"], ["#tsBand", "band"], ["#tsGuide", "guide"]]) {
     const s = $(id); s.value = T.mix[k];
     s.addEventListener("input", () => { T.mix[k] = +s.value; store.set("takeMix", T.mix); tsGains(); listenGains(); const o = $({ voice: "#tkVoice", band: "#tkBand", guide: "#tkGuide" }[k]); if (o) o.value = s.value; });

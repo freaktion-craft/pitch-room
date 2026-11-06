@@ -78,8 +78,8 @@ const EMPTY_LIBRARY = false;
   <header>
     <a class="brand" href="#stems">Pitchroom</a>
     <!-- the sections, right of the name, the one you're in lit (route()) -->
-    <nav class="tabs" aria-label="Sections"><a class="btn sm tab" id="tabLib" href="#stems">Library</a><a class="btn sm tab" id="tabLab" href="#voice" title="Lab: chest and head voice, the spectrum, formants">Lab</a><a class="btn sm tab" id="micSetBtn" href="#settings">Settings</a></nav>
-    <span class="live-at" id="liveAt" hidden><button class="btn sm quiet live-chip" id="liveBtn" type="button" aria-label="Live" aria-expanded="false" aria-controls="livePop" title="Live: send the song and your voice to Discord, VRChat or a stream"><span class="live-dot" aria-hidden="true"></span><span>Live</span></button><div class="pop" id="livePop" role="dialog" aria-label="Live" hidden><label class="live-head"><b class="pop-title">Live</b><input type="checkbox" class="switch" id="liveOn" aria-label="Send live"></label><p class="hint">The song and your voice, as one mic for Discord, VRChat or a stream.</p><div class="live-ready" id="liveReady" hidden><p class="hint" data-html>There, choose <b id="liveMicName">CABLE Output (VB-Audio Virtual Cable)</b> as your mic, and turn its noise suppression off.</p><label>Music <input type="range" id="liveMusic" min="0" max="1.5" step="0.01"></label><label>Voice <input type="range" id="liveVoice" min="0" max="1.5" step="0.01"></label></div><p class="hint live-err" id="liveDefault" hidden>Windows made the cable your default speaker, so other sound goes into it. Set your own speaker back in Windows’ Sound settings.</p><p class="hint live-err" id="liveErr" role="alert" hidden></p><p class="hint live-allow" id="liveAllow" hidden><span>Allow the mic, and Live finds its cable.</span><button class="btn sm" id="liveAllowBtn" type="button">Turn the mic on</button></p><p class="hint live-allow" id="liveNoCable" hidden><span>Pitchroom’s mic isn’t set up.</span><a class="btn sm" href="#settings" id="liveToSet">Settings</a></p></div></span>
+    <nav class="tabs" aria-label="Sections"><a class="btn sm tab" id="tabLib" href="#stems">Library</a><a class="btn sm tab" id="tabLab" href="#voice">Lab</a><a class="btn sm tab" id="micSetBtn" href="#settings">Settings</a></nav>
+    <span class="live-at" id="liveAt" hidden><button class="btn sm quiet live-chip" id="liveBtn" type="button" aria-label="Live" aria-expanded="false" aria-controls="livePop"><span class="live-dot" aria-hidden="true"></span><span>Live</span></button><div class="pop" id="livePop" role="dialog" aria-label="Live" hidden><label class="live-head"><b class="pop-title">Live</b><input type="checkbox" class="switch" id="liveOn" aria-label="Send live"></label><p class="hint">The song and your voice, as one mic other apps can use.</p><div class="live-ready" id="liveReady" hidden><p class="hint" data-html>There, choose <b id="liveMicName">CABLE Output (VB-Audio Virtual Cable)</b> as your mic, and turn its noise suppression off.</p><label>Music <input type="range" id="liveMusic" min="0" max="1.5" step="0.01"></label><label>Voice <input type="range" id="liveVoice" min="0" max="1.5" step="0.01"></label></div><p class="hint live-err" id="liveDefault" hidden>Windows made the cable your default speaker, so other sound goes into it. Set your own speaker back in Windows’ Sound settings.</p><p class="hint live-err" id="liveErr" role="alert" hidden></p><p class="hint live-allow" id="liveAllow" hidden><span>Allow the mic, and Live finds its cable.</span><button class="btn sm" id="liveAllowBtn" type="button">Turn the mic on</button></p><p class="hint live-allow" id="liveNoCable" hidden><span>Pitchroom’s mic isn’t set up.</span><a class="btn sm" href="#settings" id="liveToSet">Settings</a></p></div></span>
     <button class="btn sm quiet mic" id="micBtn" type="button" aria-label="Microphone" aria-pressed="false" title="Turn the mic on"><span class="mic-ico"></span><span class="spec" id="spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     <button class="btn sm icon quiet" id="jobsBtn" type="button" aria-label="Songs being added" aria-expanded="false" aria-controls="jobsPop"></button>
     <div class="pop" id="micNote" role="alert" hidden></div>
@@ -115,11 +115,11 @@ const EMPTY_LIBRARY = false;
         <button class="btn sm icon" id="kNext" type="button" aria-label="Next phrase" title="Next phrase (→)"></button>
         <button class="tog m icon" id="kLoop" type="button" aria-pressed="false" aria-label="Loop this phrase" title="Loop this phrase (L) · drag across phrases on the strip to loop a run of them"></button>
         <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
-        <button class="btn sm" id="kEdit" type="button" aria-pressed="false" title="Fix the lyrics’ timing word by word"><span class="txt">Edit</span></button>
+        <button class="btn sm" id="kEdit" type="button" aria-pressed="false"><span class="txt">Edit</span></button>
       </div>
     </div>
     <div class="tl-row">
-    <div class="tl" id="kTl" aria-label="Timeline" title="Click or drag to move through the song · T leaves a note here">
+    <div class="tl" id="kTl" aria-label="Timeline">
       <div class="tl-bar"><i class="tl-fill"></i></div><i class="tl-head"></i><div class="tl-pins" id="kPins"></div><span class="tl-tip" id="kTlTip" hidden></span>
       <div class="pop tl-note" id="kNote" role="dialog" aria-label="Note" hidden><input id="kNoteText" type="text" placeholder="What’s off here?" autocomplete="off" spellcheck="false" aria-label="Note"><button class="btn sm icon ghost" id="kNoteDel" type="button" aria-label="Delete note" title="Delete note"></button></div>
     </div>
@@ -140,12 +140,12 @@ const EMPTY_LIBRARY = false;
         <div class="overlay" id="overlay" hidden></div>
         <div class="lyed" id="lyEdit" role="group" aria-label="Lyrics timing" hidden>
           <div class="lyed-bar"><span class="muted lyed-hint" title="Drag a word’s mark to where you hear it start (the word before ends there) · a line’s bar moves the whole line, the mark at its end sets where it ends · click a word, a bar or the track to go there, drag the empty track to scroll · Ctrl+wheel zooms · Ctrl+Z undoes">Drag each word to where it starts · a line’s bar moves the line</span>
-            <span class="lyed-acts"><button class="btn sm" id="lySplit" type="button" title="Put the picked words on a line of their own" hidden>Split off</button><button class="btn sm" id="lyBacking" type="button" title="Mark the picked words as backing vocals (in brackets), or not" hidden>Backing</button>
-            <button class="btn sm" id="lyUndo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button><button class="btn sm" id="lyReset" type="button" title="Put the selected line back as it was timed" disabled>Reset line</button>
+            <span class="lyed-acts"><button class="btn sm" id="lySplit" type="button" hidden>Split off</button><button class="btn sm" id="lyBacking" type="button" hidden>Backing</button>
+            <button class="btn sm" id="lyUndo" type="button" disabled>Undo</button><button class="btn sm" id="lyReset" type="button" disabled>Reset line</button>
             <button class="btn sm icon" id="lyImport" type="button" aria-label="Import timing" title="Import timing from a file (or paste it: Ctrl+V)"></button><button class="btn sm icon" id="lyExport" type="button" aria-label="Export timing" title="This song’s edited lines, to the clipboard or a file"></button><input type="file" id="lyFile" accept=".json,application/json" hidden></span></div>
           <div class="menu" id="lyExportMenu" role="menu" aria-label="Export timing" hidden><button id="lyCopy" type="button" role="menuitem">Copy to clipboard</button><button id="lySave" type="button" role="menuitem">Save as a file</button></div>
           <div class="lyed-sub" id="lySub" aria-hidden="true"></div>
-          <div class="lyed-nav" id="lyNav" title="The whole song: drag the box to move through it, its edges to zoom; click to go there"><div class="nav-lines" id="lyNavLines"></div><i class="nav-head" id="lyNavHead"></i><div class="nav-win" id="lyNavWin"><i class="h l"></i><i class="h r"></i></div></div>
+          <div class="lyed-nav" id="lyNav" aria-label="The whole song: drag the box to move through it, its edges to zoom; click to go there"><div class="nav-lines" id="lyNavLines"></div><i class="nav-head" id="lyNavHead"></i><div class="nav-win" id="lyNavWin"><i class="h l"></i><i class="h r"></i></div></div>
           <div class="lyed-view" id="lyView"><canvas id="lyWave" aria-hidden="true"></canvas><div class="lyed-clips" id="lyClips"></div><i class="lyed-head" id="lyHead"></i></div>
         </div>
       </div>
@@ -170,10 +170,10 @@ const EMPTY_LIBRARY = false;
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
     <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
-    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false" title="The spectrum as an EQ shows it, with the formants: the vowel's shape">EQ</button></div></div>
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div></div>
     <div class="vc">
       <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
-      <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false" title="Keep this moment faintly behind, to sing against (an onion skin): the spectrum, the vowel's shape, the formants, and the dot on the pad. Pressed again, it goes">Freeze</button></section>
+      <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false">Freeze</button></section>
       <section class="vc-pad" aria-label="Where your voice is" hidden>
         <canvas id="vcPad" aria-hidden="true"></canvas>
         <span class="vc-ax up">Forward · bright</span><span class="vc-ax down">Back · dark</span><span class="vc-ax left">Chest</span><span class="vc-ax right">Head</span>
@@ -184,14 +184,14 @@ const EMPTY_LIBRARY = false;
         <div class="vc-cents" aria-hidden="true"><i id="vcNeedle"></i></div>
         <dl class="vc-stats">
           <div title="H1−H2: how much louder your lowest harmonic is than the next. Higher is heady, lower is chesty."><dt>H1−H2</dt><dd id="vcH12">–</dd></div>
-          <div title="Energy at 2–4 kHz against below 1 kHz. Higher sounds forward and bright."><dt>Brightness</dt><dd id="vcBright">–</dd></div>
+          <div><dt>Brightness</dt><dd id="vcBright">–</dd></div>
           <div><dt>Level</dt><dd id="vcLvl">–</dd></div>
           <div title="Formants, the vowel's shape: F1 rises as the mouth opens, F2 as the tongue comes forward. Less sure on high notes, where the harmonics are far apart"><dt>F1 · F2</dt><dd id="vcF12">–</dd></div>
         </dl>
         <div class="vc-cal">
           <b>Set it to your voice</b>
           <p class="muted">Turn one on and sing in it. A few notes and vowels of each, the same notes in both.</p>
-          <div class="vc-cal-acts"><button class="btn sm" id="vcChest" type="button" aria-pressed="false" title="While it’s on, what you sing is learned as chest voice">Chest</button><button class="btn sm" id="vcHead" type="button" aria-pressed="false" title="While it’s on, what you sing is learned as head voice">Head</button><button class="btn sm ghost" id="vcReset" type="button" hidden>Reset</button></div>
+          <div class="vc-cal-acts"><button class="btn sm" id="vcChest" type="button" aria-pressed="false">Chest</button><button class="btn sm" id="vcHead" type="button" aria-pressed="false">Head</button><button class="btn sm ghost" id="vcReset" type="button" hidden>Reset</button></div>
           <p class="muted vc-fit" id="vcFit"></p>
         </div>
       </aside>
@@ -199,8 +199,8 @@ const EMPTY_LIBRARY = false;
     <!-- the keyboard, and beside it Step up: the note to sing (lit on it, a key tapped sets it) and a semitone up at a time -->
     <div class="keys-wrap vc-keys"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div>
       <div class="vc-step">
-        <div class="vc-step-head"><b title="Set a note, then go up a semitone at a time">Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button" title="Play it">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
-        <label title="Hold the note on pitch for a second and the next one plays">Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
+        <div class="vc-step-head"><b>Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
+        <label>Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
         <p class="muted">Tap a key to start there.</p>
       </div></div>
   </main>
@@ -234,7 +234,7 @@ const EMPTY_LIBRARY = false;
         <section class="set-group" aria-labelledby="setRec">
           <h2 class="group-label" id="setRec">Recording</h2>
           <div class="set-list">
-            <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button" title="Hold your headphones close to the mic, then press">Measure</button></div></div>
+            <div class="set-row"><div class="set-what"><b>Sync</b><small id="setSyncWhy">How late your voice reaches the app; new takes allow for it</small></div><div class="set-sync"><span class="muted" id="setSyncNow"></span><button class="btn sm" id="setSyncGo" type="button">Measure</button></div></div>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setLive">
@@ -242,7 +242,7 @@ const EMPTY_LIBRARY = false;
           <div class="set-list">
             <!-- Pitchroom's mic (live.js, paintLiveSet): VB-CABLE, installed here if you want it; then Live, turned on -->
             <div class="set-row"><div class="set-what"><b>Pitchroom’s mic</b><small id="setCableWhy">VB-CABLE, a free virtual cable by VB-Audio. Its setup can make it Windows’ default speaker and mic: set yours back in Windows’ Sound settings after.</small></div><div class="set-acts"><button class="btn sm" id="setCableGo" type="button">Install VB-CABLE</button><a class="btn sm" id="setCableGet" href="https://vb-audio.com/Cable/" target="_blank" rel="noopener" hidden>Get VB-CABLE</a></div></div>
-            <label class="set-row"><span class="set-what"><b>Live</b><small id="setLiveWhy">Sing into Discord, VRChat or a stream with the song: a Live button by the mic</small></span><input type="checkbox" class="switch" id="setLiveOn"></label>
+            <label class="set-row"><span class="set-what"><b>Live</b><small id="setLiveWhy">Other apps can use Pitchroom as a mic: in them, pick CABLE Output (VB-Audio Virtual Cable)</small></span><input type="checkbox" class="switch" id="setLiveOn"></label>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMore">
@@ -251,7 +251,7 @@ const EMPTY_LIBRARY = false;
             <!-- the song tools (paintTools): how they are, Install (missing) or Update, and Check, a report of each one to copy -->
             <div class="set-row set-tools" id="sInstall"><div class="set-what"><b>Song tools</b><small id="sInstallState"></small></div><div class="set-acts"><button class="btn sm" id="setToolsCheck" type="button">Check</button><button class="btn sm primary" id="sInstallBtn" type="button"><span>Install</span></button></div>
               <div class="set-tools-out"><div class="bar" hidden id="sInstallBar"><i></i></div><pre class="log" id="sInstallLog" hidden></pre></div></div>
-            <div class="set-row" id="setImport" hidden><div class="set-what"><b>Import beta library</b><small id="setImportWhy">Copy songs and settings from the beta folder</small></div><button class="btn sm" id="setImportGo" type="button" title="The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own">Choose folder</button></div>
+            <div class="set-row" id="setImport" hidden><div class="set-what"><b>Import beta library</b><small id="setImportWhy">Copy songs and settings from the beta folder</small></div><button class="btn sm" id="setImportGo" type="button">Choose folder</button></div>
             <label class="set-row"><span class="set-what"><b>Developer tools</b><small>Mark where Practice’s phrases should split or join</small></span><input type="checkbox" class="switch" id="devTools"></label>
             <div class="set-row"><div class="set-what"><b>Onboarding</b><small>The first steps again: your mic, your color, a song</small></div><button class="btn sm" id="setOnboard" type="button">Visit</button></div>
           </div>
@@ -260,7 +260,7 @@ const EMPTY_LIBRARY = false;
     </div>
   </main>
   <main id="vStems" aria-label="Stems" hidden>
-    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button" title="Save this song’s mix: volumes, mute, solo and the click (Ctrl+S)">Save</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
+    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button">Save</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
@@ -272,13 +272,13 @@ const EMPTY_LIBRARY = false;
       <div class="add-title"><b class="pop-title">Add a song</b><button class="btn sm icon ghost" id="sAddClose" type="button" aria-label="Close" title="Close"></button></div>
       <div class="add-form" id="sAdd" hidden>
         <form class="yt" id="sYtForm">
-          <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links or a playlist" title="YouTube links, one per line, or a YouTube or Spotify playlist link" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
+          <textarea id="sYtUrl" rows="1" wrap="off" placeholder="Paste YouTube links or a playlist" autocomplete="off" spellcheck="false" aria-label="YouTube links"></textarea>
           <button class="btn sm primary" type="submit">Add</button>
         </form>
         <div class="pl" id="plPick" hidden>
           <div class="pl-head"><input type="checkbox" id="plAll" title="All or none" aria-label="All or none"><b id="plName"></b><span id="plCount"></span></div>
           <div class="pl-list" id="plList"></div>
-          <div class="pl-acts"><button class="btn sm ghost" id="plBack" type="button">Cancel</button><button class="btn sm primary" id="plGo" type="button" title="Added one at a time, at low priority, so the PC stays free">Add</button></div>
+          <div class="pl-acts"><button class="btn sm ghost" id="plBack" type="button">Cancel</button><button class="btn sm primary" id="plGo" type="button">Add</button></div>
         </div>
         <div class="gpu-row" id="sGpu" hidden>
           <span>This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).</span>
@@ -312,7 +312,7 @@ const EMPTY_LIBRARY = false;
       <div class="ts-bar">
         <button class="btn primary round" id="tsPlay" type="button" aria-label="Play" title="Play / pause (Space)"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
         <output id="tsTime">0:00 / 0:00</output>
-        <label class="kfield ts-sync" title="How far the takes that are on are moved against the band, left earlier: the delay the browser reports (the mark) plus what you add. Double-click to go back to the mark; ← → on a take moves it alone">Sync <span class="ts-sync-at"><i class="ts-sync-auto" id="tsSyncAuto" hidden></i><input type="range" id="tsSync" min="-400" max="100" step="5" value="0" data-tip="ms" aria-label="Sync of the takes that are on (ms)"></span><span class="ts-sync-val" id="tsSyncVal" aria-hidden="true">—</span></label><button class="btn sm" id="tsMatch" type="button" title="Move the takes that are on onto the singer. Double-click the Sync slider to go back to the mark.">Match</button>
+        <label class="kfield ts-sync">Sync <span class="ts-sync-at"><i class="ts-sync-auto" id="tsSyncAuto" hidden></i><input type="range" id="tsSync" min="-400" max="100" step="5" value="0" data-tip="ms" aria-label="Sync of the takes that are on (ms)"></span><span class="ts-sync-val" id="tsSyncVal" aria-hidden="true">—</span></label><button class="btn sm" id="tsMatch" type="button">Match</button>
         <label class="kfield">Your voice <input type="range" id="tsVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
         <label class="kfield">Band <input type="range" id="tsBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
         <label class="kfield">Guide vocal <input type="range" id="tsGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
@@ -435,7 +435,7 @@ const EMPTY_LIBRARY = false;
       <p class="ob-small" id="obGetsNote" hidden>The song tools split songs into voice and band and read their melody and lyrics.</p>
       <p class="ob-small ob-err" id="obSongErr" hidden></p>
       <!-- or a library from the beta, in the desktop app (it picks the folder): its covers float on the water as they come in (obLib) -->
-      <p class="ob-small ob-lib" id="obLib" hidden><span id="obLibWhy">Have a library already?</span><button class="btn sm" id="obLibGo" type="button" title="The Pitchroom folder you unzipped, or the library folder in it. It’s copied: the beta keeps its own">Choose folder</button></p>
+      <p class="ob-small ob-lib" id="obLib" hidden><span id="obLibWhy">Have a library already?</span><button class="btn sm" id="obLibGo" type="button">Choose folder</button></p>
       <p class="ob-small" id="obLibState" role="status" hidden></p>
       <div class="ob-acts"><button class="btn primary" id="obSongGo" type="button" hidden></button><button class="btn ghost" id="obSongAgain" type="button" hidden>Another link</button></div>
     </section>
@@ -451,7 +451,7 @@ const EMPTY_LIBRARY = false;
   </div>
 </div>
 <div class="boot-ask" id="bootAsk" role="dialog" aria-modal="true" aria-labelledby="bootAskT"><b id="bootAskT">Update your songs?</b><p class="muted" id="bootAskP"></p>
-  <div class="acts"><button class="btn sm" id="bootLater" type="button" title="Each song updates when you open it">Later</button><button class="btn sm primary" id="bootNow" type="button">Update now</button></div></div>
+  <div class="acts"><button class="btn sm" id="bootLater" type="button">Later</button><button class="btn sm primary" id="bootNow" type="button">Update now</button></div></div>
 
 <script src="icons.local.js"></script>
 <!-- The app's code, in the order it runs: plain scripts, not modules, so what each declares at its top level is the

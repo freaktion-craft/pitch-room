@@ -1,5 +1,5 @@
 "use strict";
-// Live: the song and your voice as one mic, to sing to people on Discord, VRChat or a stream. A page can't be a
+// Live: the song and your voice as one mic other apps can use (Discord, VRChat, a stream). A page can't be a
 // microphone itself (only a sound driver can be one), so Pitchroom's mic is VB-CABLE, VB-Audio's virtual cable: what
 // plays into its "CABLE Input" comes out of its "CABLE Output", a mic the other app picks. The desktop app carries
 // VB-CABLE's pack as it comes and runs its own setup when asked (main.js, cable-setup); in a browser, it's a link.
@@ -162,8 +162,8 @@ function paintLiveSet() {
   say(go, running ? "Installing…" : LIVE.hidden && !has ? "Turn the mic on" : LIVE.setup === "done" ? "Install again" : "Install VB-CABLE");
   get.hidden = has || LIVE.canSetup || LIVE.hidden; // a browser: where to get it
   sw.checked = S.live.enabled; sw.disabled = !has && !S.live.enabled; // (on already: it can be turned off whatever)
-  say(swWhy, has || S.live.enabled ? "Sing into Discord, VRChat or a stream with the song: a Live button by the mic"
-    : LIVE.hidden ? "Turn the mic on above first." : "Install VB-CABLE above first, then turn this on.");
+  say(swWhy, has || S.live.enabled ? "Other apps can use Pitchroom as a mic: in them, pick {mic}"
+    : LIVE.hidden ? "Turn the mic on above first." : "Install VB-CABLE above first, then turn this on.", { mic: LIVE.micName || "CABLE Output (VB-Audio Virtual Cable)" });
 }
 function showLive(on) {
   $("#livePop").hidden = !on; $("#liveBtn").setAttribute("aria-expanded", String(on));

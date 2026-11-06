@@ -10,7 +10,6 @@ function mkBtn(label, fn, primary) {
 }
 // Double-click a slider to put it back where it started (runs its own oninput, so everything that listens updates)
 function resetOnDblClick(input, def) {
-  input.title = tr("Double-click to reset"); // (again on a language switch: setLang)
   input.ondblclick = () => { input.value = def; input.dispatchEvent(new Event("input")); };
 }
 // Every slider: a press anywhere on it (its track too, not just the handle) moves the handle there and holds it; while it's

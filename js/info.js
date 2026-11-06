@@ -100,7 +100,7 @@ async function renderInfoLyrics(id) {
     const ol = el("ol", "ly-lines");
     for (const l of nudged(d.lines, infoShown.m.lyricNudge, infoShown.m.lyricEdits)) {
       if (!(l.t1 > l.t0)) continue;
-      const b = el("button"); b.type = "button"; b.title = tr("Play this line of the vocal track");
+      const b = el("button"); b.type = "button";
       b.append(el("span", null, fmtTime(l.t0)), el("div", null, l.text));
       b.onclick = () => hearAt(infoShown.s, l.t0, l.t1, b);
       const li = el("li"); li.append(b); ol.append(li);
@@ -126,7 +126,6 @@ function paintInfoLyrics() {
   else if (d) t = tr("None found on LRCLIB. Search for them, or paste them in.");
   else t = tr("Not looked for yet.");
   st.textContent = t; st.classList.toggle("warn", warn);
-  st.title = !job && d && d.offLines ? tr("About {n} lines look unsung here, maybe another version’s lyrics. Try Search LRCLIB on the song’s Info page.", { n: d.offLines }) : "";
   const busy = !!job && !job.err;
   $("#iLyrics").querySelectorAll(".ly-acts button, .ly-find *, .ly-found button, .ly-paste *").forEach((b) => { b.disabled = busy; });
 }
@@ -177,7 +176,7 @@ function renderInfoRange(s) {
     row.append(el("span", "lbl", tr(name)), el("b", null, absName(m, key)));
     if (at) {
       const hear = mkBtn("", () => hearAt(s, at[0], at[1], hear));
-      hear.title = tr("Play that moment of the vocal track"); hear.append(icon("play"), tr("In the song · {t}", { t: fmtTime(at[0]) }));
+      hear.append(icon("play"), tr("In the song · {t}", { t: fmtTime(at[0]) }));
       row.append(hear);
     }
     row.append(mkBtn(tr("Piano"), () => playKey(m)));
