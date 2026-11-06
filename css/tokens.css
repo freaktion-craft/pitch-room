@@ -81,9 +81,10 @@
    same contrast, so they're higher here (muted 6.0:1, faint 4.8 on the page).
    The accents are the dark ones' hues, as light as they can be and still 3:1 on the page and on white (lines, dots,
    fills, the sung words: L 0.63–0.67, near the dark ones' 0.68–0.77), each 95 % as vivid as sRGB has there (and P3
-   below), so they look like the same colours. Pink kept pink (a rose, toward red, not the magenta full colour goes
-   to); orange and amber a little deeper, as they must be on white. As small text they're mixed with the ink
-   (--voice-ink, 4.5:1); text on them is dark, as in the dark theme (Mono's, near-black, white). ---- */
+   below), so they look like the same colours. Pink is baby pink, as the dark theme's is (the owner's pick): a pastel
+   can't be 3:1 on white, so it's soft as a line (1.6:1), and deeper where it's read (the sung words, --sung-hi).
+   Orange and amber a little deeper, as they must be on white. As small text they're mixed half with the ink
+   (--voice-ink, 4.5:1, pink's too); text on them is dark, as in the dark theme (Mono's, near-black, white). ---- */
 :root[data-theme="light"] {
   --bg: oklch(0.965 0 0); --surface: oklch(1 0 0); --surface-2: oklch(0.935 0 0); --hover-2: oklch(0.9 0 0);
   --ink: oklch(0.2 0 0); --ink-strong: oklch(0 0 0); --on-ink: oklch(0.99 0 0); --knob: oklch(1 0 0); --knob-hot: oklch(0.5 0 0);
@@ -92,10 +93,10 @@
   --fill: var(--fg-6); --line: var(--fg-8); --ring: var(--fg-12); --track: var(--fg-12);
   --scrim: rgba(0, 0, 0, 0.16); --scrim-strong: rgba(0, 0, 0, 0.4);
   --voice-white: oklch(0.32 0 0);
-  --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.665 0.17 0); --voice-coral: oklch(0.667 0.21 32);
+  --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.82 0.095 355); --voice-coral: oklch(0.667 0.21 32);
   --voice-orange: oklch(0.654 0.149 58); --voice-amber: oklch(0.646 0.126 82); --voice-green: oklch(0.62 0.162 150); --voice-teal: oklch(0.631 0.102 195);
   --on-voice: oklch(0.165 0 0); --on-voice-mono: oklch(1 0 0);
-  --voice-ink: color-mix(in oklab, var(--voice) 75%, var(--ink));
+  --voice-ink: color-mix(in oklab, var(--voice) 50%, var(--ink));
   --good: oklch(0.52 0.13 155); --warn: oklch(0.68 0.15 75); --orange: oklch(0.55 0.15 50); --bad: oklch(0.55 0.2 27);
   --solo: oklch(0.56 0.12 80); --on-solo: oklch(1 0 0); --glow-solo: none; /* (a glow on a light key is a smudge) */
   --glow-mix: 45%;
@@ -105,7 +106,7 @@
   --ms-bevel: 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(0, 0, 0, 0.1); --ms-seam: inset 1px 0 0 rgba(0, 0, 0, 0.1);
   --ms-sunk-bg: oklch(0.89 0 0); --ms-sunk: 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.22);
   --chip-major-ink: 0.45 0.1; --chip-major-bg: 0.7 0.12; --chip-minor-ink: 0.5 0.06; --chip-minor-bg: 0.6 0.06; --chip-a: 0.14;
-  --sung-lo: 0.5; --sung-hi: 1; /* Mono (near-black) goes grey, or the sung part's the ink */
+  --sung-lo: 0.5; --sung-hi: 0.64; /* Mono (near-black) goes grey, or the sung part's the ink; baby pink deeper, so it reads (3.2:1) */
   --aurora: 0.55;
   --stem-backing: color-mix(in oklab, var(--voice) 55%, oklch(0.75 0 0)); --stem-band: oklch(0.55 0 0);
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -149,7 +150,7 @@
     --voice-orange: oklch(0.75 0.195 58); --voice-amber: oklch(0.77 0.174 82); --voice-green: oklch(0.73 0.266 150); --voice-teal: oklch(0.74 0.162 195);
   }
   :root[data-theme="light"] { /* (its own: the one above is at :root's specificity, under the light block's) */
-    --voice-blue: oklch(0.648 0.192 262); --voice-violet: oklch(0.662 0.208 295); --voice-pink: oklch(0.665 0.19 0); --voice-coral: oklch(0.667 0.265 32);
+    --voice-blue: oklch(0.648 0.192 262); --voice-violet: oklch(0.662 0.208 295); --voice-pink: oklch(0.82 0.095 355); --voice-coral: oklch(0.667 0.265 32);
     --voice-orange: oklch(0.654 0.17 58); --voice-amber: oklch(0.646 0.146 82); --voice-green: oklch(0.62 0.19 150); --voice-teal: oklch(0.631 0.105 195);
   }
 }
