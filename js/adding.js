@@ -210,7 +210,8 @@ function lyricsAsk(id) {
 // how sure it is (%), and its video's own name (with how sure it is that it's none of them). Other matches, on its
 // title's line beside Paste lyrics, opens them under its pixels as the lyrics' box opens; one picked, it's named so
 // (stems.pick_record: kept for when it's named, or named again with it) and they fold away. As tiles of their covers,
-// how sure on each, the one it is ringed and ticked.
+// how sure on each; none ticked till one's picked (the one it was taken for isn't: a tick that looked like an answer
+// left one stopped to be asked waiting, as if it had been told), then that one ringed and ticked.
 function foldBox(form, open, on, focus) {
   if (on === !form.hidden) return;
   open.setAttribute("aria-expanded", String(on)); open.classList.toggle("on", on);
@@ -244,7 +245,7 @@ function paintPicks(row, id, j) {
   if (open.dataset.keep !== String(keep)) { open.dataset.keep = String(keep); say(open, keep ? "Keep this name" : "Other matches"); }
   if (keep && !j.findAgain && (j.link || j.name) && YT_LINK.test(j.link || j.name)) { j.findAgain = true; findEarly(id, j.link || j.name); } // (asked once more)
   if (j.needPick && !open.hidden && !j.askShown) { j.askShown = true; requestAnimationFrame(() => foldBox(form, open, true)); } // (asked which song it is: its tiles open, once)
-  const chosen = j.picked ? j.picked.key : cands.findIndex((c) => c.pick) >= 0 ? "c" + cands.findIndex((c) => c.pick) : e?.own?.pick ? "own" : null;
+  const chosen = j.picked ? j.picked.key : null; // (picked here; not the one it was taken for)
   const key = JSON.stringify([cands.map((c) => [c.title, c.artist, c.pct]), e?.own?.pct, chosen, j.pickError || ""]);
   if (form.dataset.key === key) return;
   form.dataset.key = key;
