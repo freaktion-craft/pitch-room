@@ -6,7 +6,8 @@ contextBridge.exposeInMainWorld("pitchroom", {
   desktop: true,
   platform: process.platform,
   restart: () => ipcRenderer.send("relaunch"),
-  systemTheme: () => ipcRenderer.invoke("system-theme"), // the system's own "light" or "dark" (the window's always dark)
+  systemTheme: () => ipcRenderer.invoke("system-theme"), // the system's own "light" or "dark" (the window's the page's theme)
+  setTheme: (t) => ipcRenderer.send("theme", t), // the Theme setting changed ("system", "light", "dark"): the window with it
   micAccess: () => ipcRenderer.invoke("mic-access"), // what the system says of the mic: "not-determined", "granted", "denied" or "restricted"
   micSettings: () => ipcRenderer.send("mic-settings"),
   pickFolder: () => ipcRenderer.invoke("pick-folder"), // the beta's folder, for Import beta library: its path, or null

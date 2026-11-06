@@ -1028,7 +1028,7 @@ async function obArt() {
     grid = { g, glr, cols, rows, kind, ch, line, deep, cells: glr ? new Uint8Array(n * 4) : null };
   };
   build();
-  const t0 = performance.now(), root = document.documentElement, run = ++ART.gen; // this run's own: one started since stops it
+  const t0 = performance.now(), root = $("#obVisual"), run = ++ART.gen; // this run's own: one started since stops it; its colours the panel's (dark whatever the theme: .theme-dark)
   const frame = (now) => {
     if (!ART.run || run !== ART.gen) return;
     const { g, glr, cols, rows, kind, ch, line, deep, cells } = grid, t = (now - t0) / 1000, css = getComputedStyle(root);
@@ -1127,7 +1127,7 @@ function waterMark(v, gx, gy, ramp) {
   return gx * gy > 0 ? "/" : "\\"; // (down the page is +y: a slope down and to the right runs up to the right)
 }
 function obScope() {
-  const box = $("#obVisual"), cv = $("#obScope"), run = ++OB.scopeGen, { cell, scale: S } = RIPPLE, ramp = ".:-=+*#%@", root = document.documentElement;
+  const box = $("#obVisual"), cv = $("#obScope"), run = ++OB.scopeGen, { cell, scale: S } = RIPPLE, ramp = ".:-=+*#%@", root = box; // (its colours the panel's, dark whatever the theme: .theme-dark)
   OB.scope = true;
   let g = null, W = 0, H = 0, cols = 0, rows = 0, sc = 0, sr = 0, buf = null, level = 0, last = 0, since = 9, acc = 0;
   let tintAt = null; // the cover's colour at each mark, for the cover there now (tintMap)

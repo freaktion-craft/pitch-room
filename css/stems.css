@@ -149,8 +149,8 @@
 .cand-list .cand-pct { position: absolute; top: 10px; left: 10px; display: flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 999px; background: color-mix(in oklab, var(--bg) 78%, transparent);
   backdrop-filter: blur(6px); }
 .cand-list .cand.on .cand-pct { background: var(--ink); }
-.cand-list .cand.on .cand-pct .n { color: var(--bg); }
-.cand-list .cand > .ico { position: absolute; top: 10px; right: 10px; padding: 3px; border-radius: 50%; background: var(--ink); color: var(--bg); width: 20px; height: 20px; }
+.cand-list .cand.on .cand-pct .n { color: var(--on-ink); }
+.cand-list .cand > .ico { position: absolute; top: 10px; right: 10px; padding: 3px; border-radius: 50%; background: var(--ink); color: var(--on-ink); width: 20px; height: 20px; }
 
 .player { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */
@@ -276,13 +276,13 @@
    is pressed in: a muted track's M sinks back and dims (the track is out of the way), a soloed track's S lights up. */
 .ms { display: flex; justify-self: start; }
 .ms .tog { width: var(--c-btn); height: var(--control-sm); border-radius: 0; color: var(--muted);
-  background: linear-gradient(oklch(0.31 0 0), oklch(0.27 0 0)); box-shadow: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35); }
+  background: linear-gradient(var(--ms-top), var(--ms-bottom)); box-shadow: var(--ms-bevel); }
 .ms .tog:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.ms .tog:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; box-shadow: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35), inset 1px 0 0 rgba(0, 0, 0, 0.45); }
-.ms .tog:hover { background: linear-gradient(oklch(0.34 0 0), oklch(0.3 0 0)); color: var(--fg-80); }
-.ms .tog[aria-pressed="true"] { background: oklch(0.2 0 0); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6); }
+.ms .tog:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; box-shadow: var(--ms-bevel), var(--ms-seam); }
+.ms .tog:hover { background: linear-gradient(var(--ms-top-hot), var(--ms-bottom-hot)); color: var(--fg-80); }
+.ms .tog[aria-pressed="true"] { background: var(--ms-sunk-bg); box-shadow: var(--ms-sunk); }
 .ms .tog.m[aria-pressed="true"] { color: var(--dim); }
-.ms .tog.s[aria-pressed="true"] { color: var(--solo); text-shadow: 0 0 6px color-mix(in oklab, var(--solo) 60%, transparent); }
+.ms .tog.s[aria-pressed="true"] { color: var(--solo); text-shadow: var(--glow-solo); }
 .track input[type="range"] { width: 100%; }
 /* downloads, the song's (what you hear) and each track's: one size, one look; the song's in full ink */
 #pExport { color: var(--ink); }
@@ -516,8 +516,8 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .lib-cols .sort:hover .arrow, #sLib .lib-cols .sort:focus-visible .arrow, #sLib .lib-cols .sort.on .arrow { opacity: 1; }
 /* a key in a chip of its Camelot colour (paintKeyCell): one lightness and chroma for all, a minor key dimmer */
 #sLib .row > .song-key.keyed { justify-self: start; max-width: 100%; padding: 1px var(--space-2); border-radius: var(--radius-sm);
-  background: oklch(0.78 0.13 var(--key-h) / 0.16); color: oklch(0.86 0.09 var(--key-h)); }
-#sLib .row > .song-key.keyed.minor { background: oklch(0.64 0.11 var(--key-h) / 0.16); color: oklch(0.76 0.08 var(--key-h)); }
+  background: oklch(var(--chip-major-bg) var(--key-h) / var(--chip-a)); color: oklch(var(--chip-major-ink) var(--key-h)); }
+#sLib .row > .song-key.keyed.minor { background: oklch(var(--chip-minor-bg) var(--key-h) / var(--chip-a)); color: oklch(var(--chip-minor-ink) var(--key-h)); }
 #sLib .num { font-variant-numeric: tabular-nums; }
 #sLib .row > .c { color: var(--muted); font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #sLib .song a, #sLib .song b { display: block; min-width: 0; }
@@ -541,8 +541,8 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #sLib .row.pending, #sLib .row.pending a, .ln-card.pending { cursor: not-allowed; }
 #sLib .row.pending:hover { background: none; }
 .ln-card.pending .cover img { filter: brightness(0.38) saturate(0.6); }
-#sLib .cover .ring circle:first-child { stroke: var(--fg-30); }
-#sLib .cover .ring circle + circle { stroke: var(--ink); transition: stroke-dasharray var(--duration-slower) var(--ease); }
+#sLib .cover .ring circle:first-child { stroke: var(--on-media-dim); }
+#sLib .cover .ring circle + circle { stroke: var(--on-media); transition: stroke-dasharray var(--duration-slower) var(--ease); }
 #sLib .cover img.now { transition: none; }
 #sLib .cover[role="button"] { cursor: pointer; }
 #sLib .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -556,7 +556,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 #coverView[hidden] { display: none; }
 .cv-fly { width: min(72vmin, 480px); aspect-ratio: 1; transform-origin: 50% 50%; }
 .cv-card { position: relative; width: 100%; height: 100%; border-radius: var(--radius-xl); overflow: hidden; touch-action: none;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06); will-change: transform; }
+  box-shadow: var(--shadow-lift), 0 0 0 1px var(--fg-6); will-change: transform; }
 .cv-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .cv-card i { position: absolute; inset: 0; pointer-events: none; opacity: var(--glow, 0.5); }
 .cv-card .cv-light { background: radial-gradient(circle at var(--lx, 38%) var(--ly, 30%), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.15) 30%, rgba(255, 255, 255, 0) 60%); mix-blend-mode: overlay; }
