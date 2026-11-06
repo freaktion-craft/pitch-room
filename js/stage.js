@@ -56,6 +56,7 @@ function paintAccent() {
   for (const n of [document.documentElement, ...document.querySelectorAll(".theme-dark")]) {
     n.style.setProperty("--voice", `var(--voice-${accent})`);
     n.style.setProperty("--voice-act", accent === "white" ? "var(--ink)" : `var(--voice-${accent})`); // a button in it: Mono at full
+    if (accent === "white") n.style.setProperty("--on-voice", "var(--on-voice-mono)"); else n.style.removeProperty("--on-voice"); // (text on it)
   }
 }
 function setAccent(k) {

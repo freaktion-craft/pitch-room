@@ -211,7 +211,7 @@
 .tempo input:hover { background: transparent; }
 .tempo input::-webkit-inner-spin-button, .tempo input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .tempo input:focus { outline: none; }
-.tempo.changed input { color: var(--voice); } /* not the song's own tempo */
+.tempo.changed input { color: var(--voice-ink); } /* not the song's own tempo */
 /* up to two lines (32 px) where the line is short: within the height of the row's 40 px play button. With less room
    than its min-width for it, the control moves to the next line. */
 .knote { flex: 1 1 0; width: 0; min-width: 140px; font-size: var(--text-xs); line-height: 16px; max-height: 32px; overflow: hidden;
