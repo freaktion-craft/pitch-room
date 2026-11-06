@@ -270,17 +270,16 @@
 .tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
 .tog[aria-pressed="true"].s { background: var(--solo); color: var(--on-solo); }
 .tog:hover { background: var(--fg-8); }
-/* A track's mute and solo: one pair of keys, like a mixer channel's. Off, both sit raised and look the same; on, a key
-   is pressed in: a muted track's M sinks back and dims (the track is out of the way), a soloed track's S lights up. */
-.ms { display: flex; justify-self: start; }
-.ms .tog { width: var(--c-btn); height: var(--control-sm); border-radius: 0; color: var(--muted);
-  background: linear-gradient(var(--ms-top), var(--ms-bottom)); box-shadow: var(--ms-bevel); }
+/* A track's mute and solo: one pair, flat as the buttons beside them (the click's 4/4, Shift accent), a hairline of the
+   card between them. On, M steps back (no fill, an outline, its letter dim: the track's out of the way); S fills with
+   the solo colour. */
+.ms { display: flex; gap: 1px; justify-self: start; }
+.ms .tog { width: var(--c-btn); height: var(--control-sm); border-radius: 0; background: var(--surface-2); color: var(--muted); }
 .ms .tog:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.ms .tog:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; box-shadow: var(--ms-bevel), var(--ms-seam); }
-.ms .tog:hover { background: linear-gradient(var(--ms-top-hot), var(--ms-bottom-hot)); color: var(--fg-80); }
-.ms .tog[aria-pressed="true"] { background: var(--ms-sunk-bg); box-shadow: var(--ms-sunk); }
-.ms .tog.m[aria-pressed="true"] { color: var(--dim); }
-.ms .tog.s[aria-pressed="true"] { color: var(--solo); text-shadow: var(--glow-solo); }
+.ms .tog:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.ms .tog:hover { background: var(--hover-2); color: var(--ink); }
+.ms .tog.m[aria-pressed="true"] { background: transparent; box-shadow: inset 0 0 0 1px var(--ring); color: var(--dim); }
+.ms .tog.s[aria-pressed="true"] { background: var(--solo); color: var(--on-solo); }
 .track input[type="range"] { width: 100%; }
 /* the click's options sit beside its name, so its slider lines up with the others */
 .name-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); flex-wrap: wrap; min-width: 0; }

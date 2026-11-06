@@ -193,7 +193,7 @@ for bg in ["--bg", "--surface"]:
         PAIRS.append((f"mix:--voice-{k}", bg, 4.5))
 PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--hover-2", 4.5),
           ("--on-ink", "--ink", 4.5), ("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
-          ("--on-solo", "--solo", 4.5), ("--solo", "--ms-sunk-bg", 3), ("--muted", "--ms-top", 4.5),
+          ("--on-solo", "--solo", 4.5),
           ("--placeholder", "--surface-2", 3), ("--on-media", "oklch(0.25 0 0)", 4.5)]
 for k in ACCENTS:
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5))

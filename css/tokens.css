@@ -45,15 +45,9 @@
   --voice-ink: var(--voice); /* your colour as small text (a value changed, a step done): as it is here */
   --good: oklch(0.72 0.16 155); --warn: oklch(0.8 0.15 80); --orange: oklch(0.74 0.17 55); --bad: oklch(0.66 0.2 25);
   --solo: oklch(0.84 0.14 85); --on-solo: oklch(0.3 0.06 85); /* a soloed track's S, lit */
-  --glow-solo: 0 0 6px color-mix(in oklab, var(--solo) 60%, transparent); /* …glowing, as a lit key does in the dark */
   --glow-mix: 70%; /* a held syllable's glow: how much of your colour's in it */
   --note-bg: oklch(0.27 0.03 75); --note-ink: oklch(0.86 0.09 80); --warn-ink: oklch(0.8 0.13 80);
   --key-w: oklch(0.87 0 0); --key-b: oklch(0.22 0 0); --key-w-on: oklch(0.72 0 0); --key-b-on: oklch(0 0 0);
-  /* a track's M and S keys, like a mixer channel's: raised (a face lit from above: top to bottom; hot, pointed at),
-     their bevel (a light along the top, a shade along the bottom), the seam between them, and pressed in (sunk) */
-  --ms-top: oklch(0.31 0 0); --ms-bottom: oklch(0.27 0 0); --ms-top-hot: oklch(0.34 0 0); --ms-bottom-hot: oklch(0.3 0 0);
-  --ms-bevel: inset 0 1px 0 rgba(var(--fg), 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35); --ms-seam: inset 1px 0 0 rgba(0, 0, 0, 0.45);
-  --ms-sunk-bg: oklch(0.2 0 0); --ms-sunk: inset 0 1px 3px rgba(0, 0, 0, 0.6);
   /* a key in the library, in a chip of its Camelot hue (stems.css): its ink's and its chip's lightness and chroma,
      a minor key's dimmer, and how much of the chip shows */
   --chip-major-ink: 0.86 0.09; --chip-major-bg: 0.78 0.13; --chip-minor-ink: 0.76 0.08; --chip-minor-bg: 0.64 0.11; --chip-a: 0.16;
@@ -98,13 +92,10 @@
   --on-voice: oklch(0.165 0 0); --on-voice-mono: oklch(1 0 0);
   --voice-ink: color-mix(in oklab, var(--voice) 50%, var(--ink));
   --good: oklch(0.52 0.13 155); --warn: oklch(0.68 0.15 75); --orange: oklch(0.55 0.15 50); --bad: oklch(0.55 0.2 27);
-  --solo: oklch(0.56 0.12 80); --on-solo: oklch(1 0 0); --glow-solo: none; /* (a glow on a light key is a smudge) */
+  --solo: oklch(0.56 0.12 80); --on-solo: oklch(1 0 0);
   --glow-mix: 45%;
   --note-bg: oklch(0.95 0.035 85); --note-ink: oklch(0.42 0.07 70); --warn-ink: oklch(0.5 0.1 70);
   --key-w: oklch(1 0 0); --key-b: oklch(0.3 0 0); --key-w-on: oklch(0.86 0 0); --key-b-on: oklch(0.12 0 0);
-  --ms-top: oklch(0.995 0 0); --ms-bottom: oklch(0.95 0 0); --ms-top-hot: oklch(0.975 0 0); --ms-bottom-hot: oklch(0.93 0 0);
-  --ms-bevel: 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(0, 0, 0, 0.1); --ms-seam: inset 1px 0 0 rgba(0, 0, 0, 0.1);
-  --ms-sunk-bg: oklch(0.89 0 0); --ms-sunk: 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.22);
   --chip-major-ink: 0.45 0.1; --chip-major-bg: 0.7 0.12; --chip-minor-ink: 0.5 0.06; --chip-minor-bg: 0.6 0.06; --chip-a: 0.14;
   --sung-lo: 0.5; --sung-hi: 0.64; /* Mono (near-black) goes grey, or the sung part's the ink; baby pink deeper, so it reads (3.2:1) */
   --aurora: 0.55;
