@@ -165,7 +165,7 @@ async function micStart() {
   }
   stopTest();
   micNode = ac.createMediaStreamSource(micStream); micNode.connect(micBus); onMicEnd(micStream);
-  micOn = true; renderMic(); listMics(); liveOutputs(); return true; // (the outputs too: their names come with the mic's permission)
+  micOn = true; renderMic(); listMics(); liveCable(); return true; // (Live's cable too: the devices' names come with the mic's permission)
 }
 // The chosen input if it's still there, else the system default: an unplugged mic is no error. echo: the browser's echo
 // filter (Filter out speaker sound), as set unless asked otherwise.

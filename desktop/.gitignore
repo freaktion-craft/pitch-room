@@ -1,5 +1,6 @@
 node_modules/
 runtime/
+vbcable/
 dist/
 build-code/
 .python-*/

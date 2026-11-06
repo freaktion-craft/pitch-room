@@ -124,8 +124,10 @@ html.desktop-win::before { content: ""; position: fixed; top: 0; left: 0; right:
 .live-chip.on .live-dot { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in oklab, var(--bad) 28%, transparent); }
 .live-at .pop { width: min(340px, calc(100vw - 32px)); }
 .live-head { color: var(--ink); }
-.live-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.live-row .pick { max-width: 200px; }
+.live-ready, .live-setup { display: grid; gap: var(--space-3); }
+.live-ready[hidden], .live-setup[hidden] { display: none; }
+.live-setup .btn { justify-self: start; }
+.live-credit { font-size: var(--text-xs); }
 #livePop .live-err { color: var(--bad); } /* (over the hints' grey) */
 .live-allow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .live-allow[hidden] { display: none; }
