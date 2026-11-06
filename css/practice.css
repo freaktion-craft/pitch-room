@@ -300,8 +300,10 @@
 .lyed-clips { position: absolute; inset: 0; }
 .lyed-head { position: absolute; top: 0; bottom: 0; left: -10px; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
 .lyed .clip { --c0: color-mix(in oklab, var(--voice) 22%, var(--surface-2)); --c1: var(--voice);
-  position: absolute; height: 34px; padding: 0 var(--space-2); border-radius: var(--radius-sm); background: linear-gradient(to right, var(--c1) var(--f, 0%), var(--c0) var(--f, 0%)); /* filled as it's sung (edHead) */
-  color: var(--ink); font-size: var(--text-sm); line-height: 34px; white-space: nowrap; overflow: hidden; }
+  position: absolute; height: 34px; padding: 0 var(--space-2); border-radius: var(--radius-sm); /* filled as it's sung (edHead); its word dark where it's filled (on the accent, as text on it is), in ink where not, split at the same place */
+  background-image: linear-gradient(to right, var(--on-voice) var(--f, 0%), var(--ink) var(--f, 0%)), linear-gradient(to right, var(--c1) var(--f, 0%), var(--c0) var(--f, 0%));
+  -webkit-background-clip: text, padding-box; background-clip: text, padding-box; color: transparent;
+  font-size: var(--text-sm); line-height: 34px; white-space: nowrap; overflow: hidden; }
 /* a word is where it starts: its left edge is the mark you drag, and a line runs down from it through the waveform */
 .lyed .clip { border-left: 2px solid var(--ink); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; cursor: ew-resize; }
 .lyed .guide { position: absolute; width: 1px; background: color-mix(in oklab, var(--ink) 35%, transparent); pointer-events: none; }
