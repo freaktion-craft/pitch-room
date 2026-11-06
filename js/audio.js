@@ -206,7 +206,8 @@ async function listMics() {
   if (!micPick) return;
   let ins = [];
   try { ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput"); } catch (e) {}
-  const real = ins.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications"); // not the OS's aliases
+  const real = ins.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications" // not the OS's aliases
+    && !cableOut(d)); // nor Pitchroom's own mic (Live's cable, live.js): listening to it, it would hear itself
   const by = (a, b) => (a.g || "").localeCompare(b.g || "", undefined, { numeric: true }) || a.t.localeCompare(b.t, undefined, { numeric: true });
   const items = real.map((d, i) => {
     const [t, g] = d.label ? splitInput(d.label) : [tr("Microphone {n}", { n: i + 1 }), ""];
