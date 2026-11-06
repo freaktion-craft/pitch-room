@@ -9,9 +9,11 @@
 #   -Bg -Track -Fill   #AARRGGBB                          -Old    the Pitchroom that's quitting (its process id)
 #   -Dir   the app's folder (the installer's)             -App    the new one's process name (its window shown: this goes)
 #   -Ready   a file written once it's on screen
+#   -Text   the line under the bar (the splash's, as it is)   -Progress   the line once the new files go in ({0}: the %)
+#   -Ink    the line's colour, #AARRGGBB
 param([int]$X, [int]$Y, [int]$W, [int]$H, [double]$Scale = 1, [string]$Bg = "#FF0E0E0E", [string]$Track = "#1FFFFFFF",
-      [string]$Fill = "#FFD4D4D4", [int]$Old = 0, [string]$Dir = "", [int]$Ttl = 180, [string]$App = "Pitchroom",
-      [Parameter(Mandatory)][string]$Ready)
+      [string]$Fill = "#FFD4D4D4", [string]$Ink = "#80FFFFFF", [string]$Text = "", [string]$Progress = "{0}%", [int]$Old = 0,
+      [string]$Dir = "", [int]$Ttl = 180, [string]$App = "Pitchroom", [Parameter(Mandatory)][string]$Ready)
 $ErrorActionPreference = "Stop"
 # It's started with no console window; should one show all the same, it says what it is, so it isn't closed by mistake
 try { $Host.UI.RawUI.WindowTitle = "Pitchroom is updating"; Write-Host "Pitchroom is updating. This window closes by itself." } catch {}
@@ -69,10 +71,11 @@ public static class PRSplash {
   public static int Done() { return done; }
   // splash.html's bar, every frame: swinging by the clock (Date.now() % 1800 there: 0.9 s out, 0.9 s back), then
   // once the new files are going in, filling from the left (easing to where it's got to, as the splash's 0.2 s width)
-  public static void Run(FrameworkElement piece, double from, double span, double width) {
-    double shown = 0; bool filling = false;
+  public static void Run(FrameworkElement piece, double from, double span, double width, TextBlock line, string progress) {
+    double shown = 0; bool filling = false; int said = -1;
     CompositionTarget.Rendering += (s, e) => {
       int d = done;
+      if (d >= 0 && d / 10 != said) { said = d / 10; line.Text = string.Format(progress, said); }
       if (d < 0) {
         double ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1800, x = ms < 900 ? ms / 900 : (1800 - ms) / 900;
         Canvas.SetLeft(piece, from + span * Ease(x));
@@ -92,26 +95,34 @@ $brush = { param($c) $b = [Windows.Media.SolidColorBrush]([Windows.Media.ColorCo
 $win = New-Object Windows.Window -Property @{
   WindowStyle = "None"; ResizeMode = "NoResize"; ShowInTaskbar = $false; ShowActivated = $false; Title = "Pitchroom"
   Background = (& $brush $Bg); WindowStartupLocation = "Manual"; Left = 0; Top = 0; Width = 10; Height = 10
-  UseLayoutRounding = $true; SnapsToDevicePixels = $true
+  UseLayoutRounding = $true; SnapsToDevicePixels = $true; BorderBrush = (& $brush "#FF202020") # (the edge Windows gives the splash)
 }
 $canvas = New-Object Windows.Controls.Canvas
 $barTrack = New-Object Windows.Shapes.Rectangle -Property @{ Fill = (& $brush $Track) }
 $barFill = New-Object Windows.Shapes.Rectangle -Property @{ Fill = (& $brush $Fill) }
-[void]$canvas.Children.Add($barTrack); [void]$canvas.Children.Add($barFill)
+$line = New-Object Windows.Controls.TextBlock -Property @{ Text = $Text; Foreground = (& $brush $Ink); TextAlignment = "Center"; FontFamily = "Segoe UI"
+  LineStackingStrategy = "BlockLineHeight"; TextWrapping = "NoWrap" }
+[Windows.Documents.Typography]::SetNumeralAlignment($line, "Tabular") # (the % not jittering, as the splash's tabular-nums)
+[void]$canvas.Children.Add($barTrack); [void]$canvas.Children.Add($barFill); [void]$canvas.Children.Add($line)
 $win.Content = $canvas
 
 $win.Add_SourceInitialized({
   $hwnd = (New-Object Windows.Interop.WindowInteropHelper $win).Handle
-  $square = 1; [void][PRSplash]::DwmSetWindowAttribute($hwnd, 33, [ref]$square, 4) # square corners, as the splash's (its edge Windows' own, as the splash's)
+  $square = 1; [void][PRSplash]::DwmSetWindowAttribute($hwnd, 33, [ref]$square, 4) # square corners, as the splash's
   $d = [Windows.Media.VisualTreeHelper]::GetDpi($win).DpiScaleX # this window's units to pixels
+  $win.BorderThickness = New-Object Windows.Thickness (1 / $d) # its 1 px edge, as Windows draws the splash's
   $win.Left = $X / $d; $win.Top = $Y / $d; $win.Width = $W / $d; $win.Height = $H / $d # where the splash is (to the pixel once it's shown)
   # the splash's bar (splash.html): 168 x 2 px in the middle, its piece 32 % of it, from 0 to 68 % and back
   $u = $Scale / $d # a splash px in this window's units
-  $bw = 168 * $u; $bh = 2 * $u; $left = ($W / $d - $bw) / 2; $top = ($H / $d - $bh) / 2
+  $iw = ($W - 2) / $d; $ih = ($H - 2) / $d # inside the edge (where the canvas is), the same middle
+  $bw = 168 * $u; $bh = 2 * $u; $left = ($iw - $bw) / 2; $top = ($ih - $bh) / 2
   $barTrack.Width = $bw; $barTrack.Height = $bh; $barTrack.RadiusX = $barTrack.RadiusY = $bh / 2
   $barFill.Width = 0.32 * $bw; $barFill.Height = $bh
   [Windows.Controls.Canvas]::SetLeft($barTrack, $left); [Windows.Controls.Canvas]::SetTop($barTrack, $top); [Windows.Controls.Canvas]::SetTop($barFill, $top)
-  [PRSplash]::Run($barFill, $left, 0.68 * $bw, $bw)
+  # the line (splash.html's .line): 12 px on a 16 px line, its top 13 px under the middle, across the window
+  $line.FontSize = 12 * $u; $line.LineHeight = 16 * $u; $line.Width = $iw
+  [Windows.Controls.Canvas]::SetLeft($line, 0); [Windows.Controls.Canvas]::SetTop($line, $ih / 2 + 13 * $u + 1 / $d) # (+1 px: WPF sets its text a pixel higher than Chromium)
+  [PRSplash]::Run($barFill, $left, 0.68 * $bw, $bw, $line, $Progress)
 })
 $win.Add_ContentRendered({
   [void][PRSplash]::SetWindowPos((New-Object Windows.Interop.WindowInteropHelper $win).Handle, [IntPtr]::Zero, $X, $Y, $W, $H, 0x0014) # (no z-order change, not activated)

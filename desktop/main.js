@@ -264,7 +264,8 @@ async function updateFirst() { // true: it's installing, the app's about to quit
 // when the new one shows its splash there. Resolves once the double's up (true), or without it after 4 s (false): the
 // update goes on either way. Through conhost --headless: a console of its own that no one sees (no window, not even
 // Windows Terminal's), and detached, so it's no child of this app's (Node's children on Windows end with it).
-const SWING = { dark: ["#FF0E0E0E", "#1FFFFFFF", "#FFD4D4D4"], light: ["#FFF3F3F3", "#1F000000", "#FF333333"] }; // splash.html's colours, #AARRGGBB
+// splash.html's colours, #AARRGGBB; its line's 50 % ink as it comes out on the page (WPF draws see-through text lighter)
+const SWING = { dark: ["#FF0E0E0E", "#1FFFFFFF", "#FFD4D4D4", "#FF878787"], light: ["#FFF3F3F3", "#1F000000", "#FF333333", "#FF7A7A7A"] };
 function standIn() {
   return new Promise((ok) => {
     if (!win32 || !splash || splash.isDestroyed()) return ok(false);
@@ -273,10 +274,10 @@ function standIn() {
       fs.writeFileSync(script, fs.readFileSync(path.join(__dirname, "update-splash.ps1"))); // out of app.asar, where PowerShell can read it
       fs.rmSync(ready, { force: true });
       const dip = splash.getBounds(), px = screen.dipToScreenRect(splash, dip), scale = screen.getDisplayMatching(dip).scaleFactor;
-      const [bg, track, fill] = SWING[shade()], sys = path.join(process.env.SystemRoot || "C:\\Windows", "System32");
+      const [bg, track, fill, ink] = SWING[shade()], sys = path.join(process.env.SystemRoot || "C:\\Windows", "System32");
       spawn(path.join(sys, "conhost.exe"), ["--headless", path.join(sys, "WindowsPowerShell", "v1.0", "powershell.exe"), "-NoProfile", "-NonInteractive",
         "-ExecutionPolicy", "Bypass", "-File", script, "-X", px.x, "-Y", px.y, "-W", px.width, "-H", px.height, "-Scale", scale,
-        "-Bg", bg, "-Track", track, "-Fill", fill, "-Old", process.pid, "-Dir", path.dirname(process.execPath), "-Ready", ready].map(String),
+        "-Bg", bg, "-Track", track, "-Fill", fill, "-Ink", ink, "-Text", shown.text, "-Progress", "Installing · {0}%", "-Old", process.pid, "-Dir", path.dirname(process.execPath), "-Ready", ready].map(String),
         { detached: true, windowsHide: true, stdio: "ignore" }).unref();
       const t0 = Date.now(), iv = setInterval(() => {
         const up = fs.existsSync(ready);

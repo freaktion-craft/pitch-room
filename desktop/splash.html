@@ -14,11 +14,15 @@
   /* starting: a piece of it going left and right, end to end; an update coming in: the bar filling as it does */
   .bar.busy .fill { width: 32%; transition: none; animation: swing 0.9s ease-in-out infinite alternate; }
   @keyframes swing { from { left: 0; } to { left: 68%; } }
+  /* what's going on, in a line under the bar (main.js: status), the bar kept in the middle */
+  .line { position: absolute; left: 0; right: 0; top: calc(50% + 13px); text-align: center; font-size: 12px; line-height: 16px;
+    color: rgba(255, 255, 255, 0.5); font-variant-numeric: tabular-nums; white-space: nowrap; }
   @media (prefers-reduced-motion: reduce) { .bar.busy .fill { animation: none; width: 100%; opacity: 0.4; } }
   /* the light theme (main.js: ?theme=light): the bar in the light ink */
   html.light, html.light body { background: #f3f3f3; color: oklch(0.2 0 0); }
   html.light .bar { background: rgba(0, 0, 0, 0.12); }
   html.light .fill { background: oklch(0.32 0 0); }
+  html.light .line { color: rgba(0, 0, 0, 0.5); }
 </style>
 <script>if (new URLSearchParams(location.search).get("theme") === "light") document.documentElement.classList.add("light");</script>
 </head>
@@ -26,10 +30,12 @@
   <div class="mid">
     <div class="bar busy" id="bar"><div class="fill" id="fill"></div></div>
   </div>
+  <div class="line" id="line"></div>
 <script>
   // main.js: set({ text, percent }); no percent, the bar swings
   function set({ text, percent }) {
-    document.title = text; // no line on show: the bar alone
+    document.title = text;
+    document.getElementById("line").textContent = text;
     const bar = document.getElementById("bar"), fill = document.getElementById("fill");
     bar.classList.toggle("busy", percent == null);
     fill.style.width = percent == null ? "" : `${percent}%`;
