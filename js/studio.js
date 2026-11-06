@@ -180,10 +180,12 @@ function playSong() {
   recEnd(at); // a key change swaps the sources without a pause: the take so far ends where the new ones start
   P.sources = [];
   const tracks = ac.createGain(); tracks.gain.value = 0; fadeIn(tracks.gain, at); tracks.connect(P.bus);
+  // the band for Live (live.js), in both ears whatever Headphones says, at the tracks' own volumes (not the song's)
+  P.send = ac.createGain(); P.send.gain.value = 0; fadeIn(P.send.gain, at); P.send.connect(liveTap());
   P.ears = { band: earNode("band", tracks), guide: earNode("guide", tracks), click: earNode("click", P.bus) }; // which ear each plays in
   for (const [name, buf] of Object.entries(P.buffers)) {
     const g = ac.createGain(); g.gain.value = audible(name) ? P.tracks[name].vol : 0; g.connect(P.ears[isGuide(name) ? "guide" : "band"].in);
-    if (!isGuide(name)) g.connect(bandTap);
+    if (!isGuide(name)) { g.connect(bandTap); g.connect(P.send); }
     const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(at, P.offset / P.rate); // song time → its time in this version
     P.tracks[name].gain = g; P.sources.push(s);
   }
@@ -228,9 +230,11 @@ function pauseSong() {
   if (!P.playing) return;
   recEnd(ac.currentTime);
   P.offset = Math.max(0, heardPos()); P.playing = false; // where it was heard to: Play goes on from there, nothing skipped
-  const now = ac.currentTime, bus = P.bus;
+  const now = ac.currentTime, bus = P.bus, send = P.send;
   P.sources.forEach((s) => { try { s.stop(now + FADE); } catch (e) {} }); // out over FADE, then stopped
   if (bus) { fadeOut(bus.gain, now); setTimeout(() => bus.disconnect(), 200); }
+  if (send) { fadeOut(send.gain, now); setTimeout(() => send.disconnect(), 200); }
+  P.send = null;
   P.sources = []; P.ears = null; Object.values(P.tracks).forEach((t) => (t.gain = null));
   paintPlay($("#pPlay"), false); renderStart();
 }
@@ -638,13 +642,14 @@ function applyKey(n, s) {
 function swapSources(was) {
   // where the old sources will be when playSong starts the new ones, 0.06 s from now (not songPos(), which holds still
   // until a start has begun, so a swap right after Play would jump)
-  const oldBus = P.bus, old = P.sources, pos = P.offset + (ac.currentTime + 0.06 - P.startAt) * was;
+  const oldBus = P.bus, oldSend = P.send, old = P.sources, pos = P.offset + (ac.currentTime + 0.06 - P.startAt) * was;
   if (pos >= songDur() - 0.05) return; // the song is ending anyway
   P.playing = false; P.offset = pos;
   playSong();
   const at = P.startAt;
   oldBus.gain.setTargetAtTime(0, at, 0.015); old.forEach((s) => { try { s.stop(at + 0.2); } catch (e) {} });
-  setTimeout(() => oldBus.disconnect(), 600);
+  if (oldSend) oldSend.gain.setTargetAtTime(0, at, 0.015);
+  setTimeout(() => { oldBus.disconnect(); oldSend?.disconnect(); }, 600);
   P.bus.gain.setValueAtTime(0, ac.currentTime); P.bus.gain.setTargetAtTime(stemVol, at, 0.015);
 }
 // Both controls (Studio's header, Practice's bar): a list of the keys, under Higher +6 to +1, the original, then under

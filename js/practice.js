@@ -1174,7 +1174,7 @@ function renderEars() {
 }
 function showEars(on) {
   $("#earsPop").hidden = !on; $("#kEars").setAttribute("aria-expanded", String(on));
-  if (on) { showJobs(false); renderEars(); }
+  if (on) { showJobs(false); renderEars(); if (!$("#livePop").hidden) showLive(false); }
 }
 function initEars() {
   const btn = $("#kEars"), pop = $("#earsPop");
@@ -1263,7 +1263,7 @@ function initSing() {
     if (b) { phraseGo(+b.dataset.i); return; }
     seekWithin(((e.clientX - r.left) / r.width) * songDur());
   });
-  initTakes(); initEars(); initSync(); initLyEdit();
+  initTakes(); initEars(); initSync(); initLyEdit(); initLive();
   initSetNav(); // settings: their page, its tab in the header's (#micSetBtn)
   // the drawer (Add song, and the songs being added under it: showJobs), out of the page so it's over all of it
   const jobsBtn = $("#jobsBtn"), jobsPop = $("#jobsPop");

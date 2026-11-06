@@ -212,7 +212,7 @@ async function busy() { // a song being added, or the tools being installed
 // system's own question first, once (NSMicrophoneUsageDescription says why).
 function permissions() {
   const ours = (origin) => { try { const u = new URL(origin); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
-  const allowed = new Set(["media", "clipboard-read", "clipboard-sanitized-write", "fullscreen"]);
+  const allowed = new Set(["media", "clipboard-read", "clipboard-sanitized-write", "fullscreen", "speaker-selection"]); // (speaker-selection: Live's output, live.js)
   session.defaultSession.setPermissionCheckHandler((wc, perm, origin) => allowed.has(perm) && ours(origin));
   session.defaultSession.setPermissionRequestHandler(async (wc, perm, done, details) => {
     if (!allowed.has(perm) || !ours(details.requestingUrl || wc.getURL())) return done(false);
@@ -344,6 +344,17 @@ else {
     if (!w || w.isFocused()) return;
     if (process.platform === "darwin") app.dock?.bounce("informational"); else w.flashFrame(true);
   });
+  // Live's mic (live.js): VB-CABLE's own setup, from its pack carried as it comes (scripts/fetch-vbcable.mjs), run as
+  // administrator (Windows asks), the app waiting till its window's closed. "ok" once it's run (the cable shows then
+  // or after a restart, as its setup says), "cancelled" (Windows' question said no to), "none" (no pack in this copy)
+  const CABLE_SETUP = path.join(app.isPackaged ? process.resourcesPath : __dirname, "vbcable", "VBCABLE_Setup_x64.exe");
+  ipcMain.handle("cable-setup-there", () => win32 && fs.existsSync(CABLE_SETUP));
+  ipcMain.handle("cable-setup", () => new Promise((ok) => {
+    if (!win32 || !fs.existsSync(CABLE_SETUP)) return ok("none");
+    const ps = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    execFile(ps, ["-NoProfile", "-NonInteractive", "-Command", "try { Start-Process -FilePath $env:PR_CABLE_SETUP -WorkingDirectory (Split-Path $env:PR_CABLE_SETUP) -Verb RunAs -Wait -ErrorAction Stop; 'ok' } catch { 'cancelled' }"],
+      { windowsHide: true, env: { ...process.env, PR_CABLE_SETUP: CABLE_SETUP } }, (e, out) => ok(!e && /\bok\b/.test(String(out)) ? "ok" : "cancelled"));
+  }));
   ipcMain.handle("mic-access", () => (process.platform === "linux" ? "granted" : systemPreferences.getMediaAccessStatus("microphone"))); // (asked yet? allowed?)
   ipcMain.on("mic-settings", () => shell.openExternal(process.platform === "darwin" // where the mic's allowed for apps, once refused
     ? "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" : "ms-settings:privacy-microphone"));

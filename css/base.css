@@ -118,6 +118,22 @@ html.desktop-win::before { content: ""; position: fixed; top: 0; left: 0; right:
    ends into a dot) */
 .spec i { width: 2px; height: 4px; border-radius: var(--radius-pill); background: var(--dim); }
 .mic.on .spec i { background: var(--voice); } /* what it hears, in your accent colour */
+/* Live (live.js): a dot and the word, left of the mic; the dot red while it's sending, as on air. Its panel under it. */
+.live-at { position: relative; display: inline-flex; }
+.btn.quiet.live-chip { gap: var(--space-2); padding: 0 var(--space-3) 0 var(--space-2); }
+.live-dot { width: 8px; height: 8px; margin: 0 var(--space-1); border-radius: 50%; background: var(--dim); transition: background-color var(--duration-fast), box-shadow var(--duration-fast); }
+.live-chip.on { color: var(--ink); }
+.live-chip.on .live-dot { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in oklab, var(--bad) 28%, transparent); }
+.live-at .pop { width: min(340px, calc(100vw - 32px)); }
+.live-head { color: var(--ink); }
+.live-ready, .live-setup { display: grid; gap: var(--space-3); }
+.live-ready[hidden], .live-setup[hidden] { display: none; }
+.live-setup .btn { justify-self: start; }
+.live-credit { font-size: var(--text-xs); }
+#livePop .live-err { color: var(--bad); } /* (over the hints' grey) */
+.live-allow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.live-allow[hidden] { display: none; }
+.live-allow .btn { flex: none; }
 /* a panel under the button in the bar that opened it (the songs being added, why the mic didn't start) */
 header { position: relative; }
 .pop { position: absolute; right: 0; top: calc(100% + var(--gap-float)); z-index: var(--z-popover); width: min(340px, calc(100vw - 32px)); padding: var(--space-4); border-radius: var(--radius-xl);

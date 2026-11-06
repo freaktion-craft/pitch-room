@@ -68,7 +68,13 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon-win.png"
+      "icon": "build/icon-win.png",
+      "extraResources": [
+        {
+          "from": "vbcable",
+          "to": "vbcable"
+        }
+      ]
     },
     "nsis": {
       "artifactName": "pitchroom_install.${ext}",

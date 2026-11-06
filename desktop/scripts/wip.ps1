@@ -18,6 +18,7 @@ Push-Location $desktop
 try {
   if (-not (Test-Path "node_modules\electron\dist\electron.exe")) { npm ci --no-audit --no-fund; node node_modules/electron/install.js }
   if (-not (Test-Path "runtime\python.exe")) { node scripts/fetch-python.mjs; if ($LASTEXITCODE) { throw "fetch-python failed" } } # the app's own Python, once
+  if (-not (Test-Path "vbcable\VBCABLE_Setup_x64.exe")) { node scripts/fetch-vbcable.mjs; if ($LASTEXITCODE) { throw "fetch-vbcable failed" } } # Live's mic, once
   node scripts/prepare-code.mjs; if ($LASTEXITCODE) { throw "prepare-code failed" } # the code as it is now
   # which it's made from: the commit, + if there were edits not committed yet
   $stamp = (git -C $repo rev-parse --short HEAD).Trim()

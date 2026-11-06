@@ -145,8 +145,14 @@ function micBlocked() {
   return d.platform === "darwin" ? { how: "Allow Pitchroom in {link}, then try again.", link: "System Settings › Privacy & Security › Microphone" }
     : { how: "Allow desktop apps in {link}, then try again.", link: "Windows Settings › Privacy › Microphone" };
 }
-async function startMic() {
-  if (micOn) return true;
+// Asked again while it's starting (Play, Live and the chip can each ask while the permission's being asked): the same
+// start, not a second mic (which nothing would stop).
+let micStarting = null;
+function startMic() {
+  if (micOn) return Promise.resolve(true);
+  return (micStarting ??= micStart().finally(() => { micStarting = null; }));
+}
+async function micStart() {
   if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     notice(tr("The mic doesn’t work from this address. Open the app at http://localhost instead.")); return false;
   }
@@ -159,7 +165,7 @@ async function startMic() {
   }
   stopTest();
   micNode = ac.createMediaStreamSource(micStream); micNode.connect(micBus); onMicEnd(micStream);
-  micOn = true; renderMic(); listMics(); return true;
+  micOn = true; renderMic(); listMics(); liveCable(); return true; // (Live's cable too: the devices' names come with the mic's permission)
 }
 // The chosen input if it's still there, else the system default: an unplugged mic is no error. echo: the browser's echo
 // filter (Filter out speaker sound), as set unless asked otherwise.
@@ -200,7 +206,8 @@ async function listMics() {
   if (!micPick) return;
   let ins = [];
   try { ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput"); } catch (e) {}
-  const real = ins.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications"); // not the OS's aliases
+  const real = ins.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications" // not the OS's aliases
+    && !cableOut(d)); // nor Pitchroom's own mic (Live's cable, live.js): listening to it, it would hear itself
   const by = (a, b) => (a.g || "").localeCompare(b.g || "", undefined, { numeric: true }) || a.t.localeCompare(b.t, undefined, { numeric: true });
   const items = real.map((d, i) => {
     const [t, g] = d.label ? splitInput(d.label) : [tr("Microphone {n}", { n: i + 1 }), ""];
