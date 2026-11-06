@@ -233,6 +233,7 @@ async function updateFirst() { // true: it's installing, the app's about to quit
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.logger = null;
+  autoUpdater.disableDifferentialDownload = true; // the whole installer in one go: from GitHub, 244 MB took 3 s that way, the changed parts alone (216 ranges) 3 min
   try {
     status("Checking for updates…");
     const r = await within(5000, autoUpdater.checkForUpdates());
