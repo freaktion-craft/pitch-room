@@ -11,8 +11,9 @@
   .mid { position: absolute; inset: 0; justify-content: center; display: flex; flex-direction: column; align-items: center; }
   .bar { position: relative; width: 168px; height: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
   .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: oklch(0.87 0 0); transition: width 0.2s; }
-  .bar.busy .fill { width: 32%; transition: none; animation: slide 1.3s ease-in-out infinite; }
-  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
+  /* starting: a piece of it going left and right, end to end; an update coming in: the bar filling as it does */
+  .bar.busy .fill { width: 32%; transition: none; animation: swing 0.9s ease-in-out infinite alternate; }
+  @keyframes swing { from { left: 0; } to { left: 68%; } }
   @media (prefers-reduced-motion: reduce) { .bar.busy .fill { animation: none; width: 100%; opacity: 0.4; } }
   /* the light theme (main.js: ?theme=light): the bar in the light ink */
   html.light, html.light body { background: #f3f3f3; color: oklch(0.2 0 0); }
@@ -26,12 +27,15 @@
     <div class="bar busy" id="bar"><div class="fill" id="fill"></div></div>
   </div>
 <script>
-  // main.js: set({ text, percent }); no percent, the bar just moves
+  // main.js: set({ text, percent }); no percent, the bar swings
   function set({ text, percent }) {
     document.title = text; // no line on show: the bar alone
     const bar = document.getElementById("bar"), fill = document.getElementById("fill");
     bar.classList.toggle("busy", percent == null);
     fill.style.width = percent == null ? "" : `${percent}%`;
+    const swing = percent == null && fill.getAnimations()[0];
+    if (swing) swing.startTime = performance.now() - (Date.now() % 1800); // in step with the clock, as its double is (update-splash.ps1) and the next one's
+    // splash: one over the other, the bar doesn't jump
   }
 
 </script>

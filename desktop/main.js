@@ -248,14 +248,42 @@ async function updateFirst() { // true: it's installing, the app's about to quit
     status(`Updating to ${v}`, 0);
     await Promise.race([autoUpdater.downloadUpdate(), stall]);
     clearTimeout(idle);
-    status("Restarting…", 100);
+    status("Installing…"); // no percent: the bar swings while the installer works (it says nothing of how far it is)
     quitting = true;
+    await standIn(); // the splash left to its double while the installer has the app closed
     setImmediate(() => autoUpdater.quitAndInstall(true, true)); // silent, then the new one opens
     return true;
   } catch (e) {
     console.error("update skipped:", e.message); // and the app starts as it is
     return false;
   }
+}
+// The installer closes the app before it puts the new one in, and shows nothing of its own (about 40 s), so first the
+// splash is left to a double of it (update-splash.ps1, through Windows' own PowerShell: not the app, so not closed
+// with it). In the splash's place, its colours, its bar in step with it, then filling as the new one goes in; it goes
+// when the new one shows its splash there. Resolves once the double's up (true), or without it after 4 s (false): the
+// update goes on either way. Through conhost --headless: a console of its own that no one sees (no window, not even
+// Windows Terminal's), and detached, so it's no child of this app's (Node's children on Windows end with it).
+const SWING = { dark: ["#FF0E0E0E", "#1FFFFFFF", "#FFD4D4D4"], light: ["#FFF3F3F3", "#1F000000", "#FF333333"] }; // splash.html's colours, #AARRGGBB
+function standIn() {
+  return new Promise((ok) => {
+    if (!win32 || !splash || splash.isDestroyed()) return ok(false);
+    try {
+      const tmp = app.getPath("temp"), script = path.join(tmp, "pitchroom-update-splash.ps1"), ready = path.join(tmp, "pitchroom-update-splash.ready");
+      fs.writeFileSync(script, fs.readFileSync(path.join(__dirname, "update-splash.ps1"))); // out of app.asar, where PowerShell can read it
+      fs.rmSync(ready, { force: true });
+      const dip = splash.getBounds(), px = screen.dipToScreenRect(splash, dip), scale = screen.getDisplayMatching(dip).scaleFactor;
+      const [bg, track, fill] = SWING[shade()], sys = path.join(process.env.SystemRoot || "C:\\Windows", "System32");
+      spawn(path.join(sys, "conhost.exe"), ["--headless", path.join(sys, "WindowsPowerShell", "v1.0", "powershell.exe"), "-NoProfile", "-NonInteractive",
+        "-ExecutionPolicy", "Bypass", "-File", script, "-X", px.x, "-Y", px.y, "-W", px.width, "-H", px.height, "-Scale", scale,
+        "-Bg", bg, "-Track", track, "-Fill", fill, "-Old", process.pid, "-Dir", path.dirname(process.execPath), "-Ready", ready].map(String),
+        { detached: true, windowsHide: true, stdio: "ignore" }).unref();
+      const t0 = Date.now(), iv = setInterval(() => {
+        const up = fs.existsSync(ready);
+        if (up || Date.now() - t0 > 4000) { clearInterval(iv); ok(up); }
+      }, 50);
+    } catch (e) { console.error("no stand-in:", e.message); ok(false); }
+  });
 }
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 async function checkUpdates(asked) {
