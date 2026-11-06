@@ -121,7 +121,8 @@ function crumbsIn(nav, steps) {
 }
 // Stems pages: the library (#stems) and one song (#stems/<id>, its Info and its Takes Studio). Adding a song is a panel
 // in the library; an old link to #stems/add opens the library with it up.
-function stemsRoute(sub, extra) {
+function stemsRoute(sub, extra, from) {
+  const prev = stemsPage;
   if (sub === "add") { addOnShow = true; location.replace("#stems"); return; }
   stemsPage = !sub ? "lib" : extra === "info" ? "info" : extra === "takes" ? "takes" : "song";
   if (sub) forgetAdded(sub);
@@ -133,7 +134,10 @@ function stemsRoute(sub, extra) {
   $("#sInfo").hidden = stemsPage !== "info";
   stemsRefresh();
   if (stemsPage === "song" && (!P.song || P.song.id !== sub || P.song.stale)) openSongById(sub);
-  else if (stemsPage === "song") { const c = libCache.get(sub); if (c) { P.song.title = c.title; P.song.artist = c.artist; } renderTracks(); } // the mix as it was before Practice; the name as found since
+  else if (stemsPage === "song") { // the song still loaded: its name as found since; its mix as it was coming back from Practice
+    const c = libCache.get(sub); if (c) { P.song.title = c.title; P.song.artist = c.artist; } // (and its Takes Studio or Info), fresh from anywhere else
+    if (from !== "practice" && !(from === "stems" && ["song", "takes", "info"].includes(prev))) freshMix(); else renderTracks();
+  }
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
 // The song as the library list last read it opens at once, so its page appears whole. Otherwise (a reload, a link,
@@ -185,7 +189,7 @@ function route() {
   showMicSet(view === "settings"); showEars(false); if (view !== "stems") showAdd(false); // (its drawer is out of the library's page)
   applyEars(); // the headphones' ears are Practice's
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
-  if (view === "stems") stemsRoute(sub, extra);
+  if (view === "stems") stemsRoute(sub, extra, was);
   paintCrumbs(); lastHash = location.hash || "#stems";
   pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
@@ -381,7 +385,8 @@ async function welcome(resume) { // resume: a step to come back to (Settings' ba
 }
 // The name's easter egg: clicked on the library, the welcome's riffle in small and flat, behind it (.brand .egg): the
 // right half, a colour, shrinks into the middle, then the left grows out of it in the next, each a little after the
-// one before, so several are on the move at once; black at both ends, the box fading in and out round them. Elsewhere
+// one before, so several are on the move at once; the colours alone (no Mono, no page black at the ends), the box
+// fading in on the first and out on the last. Elsewhere
 // the name is the way back to the library, as before. Not with reduced motion; a click while it runs does nothing.
 const EGG = { span: 560, half: 190, bunch: 0.6, fade: 140, in: "cubic-bezier(0.55, 0, 0.75, 0.2)", out: "cubic-bezier(0.2, 0.7, 0.35, 1)" };
 let egging = false;
@@ -392,11 +397,11 @@ $("#app > header .brand").addEventListener("click", (e) => {
 });
 async function riffleName(brand) {
   egging = true;
-  const E = EGG, colours = ["var(--bg)", ...Object.keys(ACCENTS).map((k) => `var(--voice-${k})`), "var(--bg)"], n = colours.length - 1;
+  const E = EGG, colours = Object.keys(ACCENTS).filter((k) => k !== "white").map((k) => `var(--voice-${k})`), n = colours.length - 1;
   const box = Object.assign(document.createElement("span"), { className: "egg" }); box.setAttribute("aria-hidden", "true");
   const half = (i, side, z = 0) => {
     const h = document.createElement("i"); h.className = side; h.style.background = colours[i]; h.style.zIndex = z;
-    if (i > 0 && i < n) h.dataset.dark = ""; // every accent is light (L 0.68 and up): black on it, white on the page's black
+    h.dataset.dark = ""; // every accent is light (L 0.68 and up): black on it
     return h;
   };
   box.append(half(0, "l"), half(n, "r"));
@@ -405,14 +410,14 @@ async function riffleName(brand) {
   const word = brand.textContent, light = document.createElement("span"), dark = document.createElement("span");
   light.textContent = dark.textContent = word; dark.className = "egg-ink"; dark.setAttribute("aria-hidden", "true");
   brand.replaceChildren(light, dark, box);
-  const ink = () => {
-    const o = brand.getBoundingClientRect().left, under = [...box.children].filter((p) => getComputedStyle(p).visibility !== "hidden")
+  const ink = () => { // (white while the box is still mostly faded: the page's black under it)
+    const o = brand.getBoundingClientRect().left, shown = +getComputedStyle(box).opacity > 0.5, under = [...box.children].filter((p) => getComputedStyle(p).visibility !== "hidden")
       .map((p) => ({ r: p.getBoundingClientRect(), z: +p.style.zIndex, dark: "dark" in p.dataset })).filter((p) => p.r.width > 0.1);
     const xs = [...new Set(under.flatMap((p) => [p.r.left, p.r.right]))].sort((a, b) => a - b), stops = [];
     for (let i = 0; i + 1 < xs.length; i++) { // each stretch between two edges: dark if the top band there is a colour
       const mid = (xs[i] + xs[i + 1]) / 2; let top = null;
       for (const p of under) if (mid >= p.r.left && mid < p.r.right && (!top || p.z > top.z)) top = p;
-      if (top && top.dark) stops.push(`transparent ${xs[i] - o}px, #000 ${xs[i] - o}px, #000 ${xs[i + 1] - o}px, transparent ${xs[i + 1] - o}px`);
+      if (shown && top && top.dark) stops.push(`transparent ${xs[i] - o}px, #000 ${xs[i] - o}px, #000 ${xs[i + 1] - o}px, transparent ${xs[i + 1] - o}px`);
     }
     const m = stops.length ? `linear-gradient(to right, transparent 0, ${stops.join(", ")}, transparent 100%)` : "linear-gradient(transparent, transparent)";
     dark.style.maskImage = dark.style.webkitMaskImage = m;
