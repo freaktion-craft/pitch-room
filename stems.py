@@ -79,10 +79,12 @@ def _new_job(kind: str, name: str = "") -> dict:
 # A song being added: its stems and the rest (SPLIT_SHARE of its progress), then its lyrics found and timed (the rest;
 # _lyrics_phase). Their progress is shown as one (_shown).
 SPLIT_SHARE = 0.8
-# Below this sure of the record a link was taken for (covers.confidence), a song being added stops before its lyrics
-# to be asked which song it is (_lyrics_phase): of 140 titles, 60 % caught 74 % of the wrong ones, asking 28 % of
-# all (of the library's own, none: it was surer of them), right for 93 % of those it didn't ask
-PAUSE_BELOW = 0.6
+# At this sure or less of the record a link was taken for (covers.confidence, as the picker shows it: a whole %), a
+# song being added stops before its lyrics to be asked which song it is (_lyrics_phase). 40 %, the owner's pick: asked
+# less often than at 60 % (which, of 140 titles, caught 74 % of the wrong ones, asking 28 % of all).
+ASK_AT = 0.4
+def _ask(sure) -> bool:
+    return isinstance(sure, (int, float)) and round(sure * 100) <= round(ASK_AT * 100)
 
 
 def _shown(job: dict) -> float:
@@ -1137,7 +1139,7 @@ def _look_up_now(song_id: str, force: bool):
     channel = meta.get("channel") or ""
     if from_link and not cover and not hint and not lyrics.split_title(own)[0] and not channel:
         channel = _channel(meta["source"])
-    sure = None  # how sure it is of the record taken (or, none taken, that it's none of them): a link's, for PAUSE_BELOW
+    sure = None  # how sure it is of the record taken (or, none taken, that it's none of them): a link's, for ASK_AT
     if picked:  # picked from its candidates: that record, or its video's own name; nothing searched
         record = None if picked.get("own") else picked
     else:
@@ -1665,7 +1667,7 @@ def _lyrics_phase(job, song_id: str, how):
     as this one's (phase "lyrics"); only then is it in the library (its meta's "adding" taken off). None found, or it
     failed: this one stops there (needLyrics, with why in lyricsError when it failed), the song still out of the
     library, for them to be pasted (resume_lyrics), or the song let go (cancel_job: it's deleted).
-    A link not surely the record it was taken for (less than PAUSE_BELOW sure, its meta's "sure": _look_up) stops
+    A link not surely the record it was taken for (ASK_AT sure or less, its meta's "sure": _look_up) stops
     before them (needPick): they're found by its name, so it's asked which song it is first (its candidates, in the
     drawer), and goes on once it's picked (pick_record); a song picked already doesn't."""
     if how is None:
@@ -1675,7 +1677,7 @@ def _lyrics_phase(job, song_id: str, how):
             meta = _read_meta(_song_dir(song_id))
         except ValueError:
             return  # deleted meanwhile
-        if not job.get("noAsk") and not meta.get("picked") and not _job_pick(song_id) and isinstance(meta.get("sure"), (int, float)) and meta["sure"] < PAUSE_BELOW:
+        if not job.get("noAsk") and not meta.get("picked") and not _job_pick(song_id) and _ask(meta.get("sure")):
             _set(job, needPick=True, stoppedAt=0.0, stage="Which song is it?")
             return
     _set(job, phase="lyrics", stage="Finding the lyrics" if how is None else "Lining the lyrics up with the voice", progress=0.0, needLyrics=False, lyricsError=None)
