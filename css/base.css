@@ -126,14 +126,13 @@ html.desktop-win::before { content: ""; position: fixed; top: 0; left: 0; right:
 .live-chip.on .live-dot { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in oklab, var(--bad) 28%, transparent); }
 .live-at .pop { width: min(340px, calc(100vw - 32px)); }
 .live-head { color: var(--ink); }
-.live-ready, .live-setup { display: grid; gap: var(--space-3); }
-.live-ready[hidden], .live-setup[hidden] { display: none; }
-.live-setup .btn { justify-self: start; }
-.live-credit { font-size: var(--text-xs); }
+.live-ready { display: grid; gap: var(--space-3); }
+.live-ready[hidden] { display: none; }
 #livePop .live-err { color: var(--bad); } /* (over the hints' grey) */
 .live-allow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .live-allow[hidden] { display: none; }
 .live-allow .btn { flex: none; }
+.live-at[hidden] { display: none; } /* (till Live's turned on in Settings) */
 /* a panel under the button in the bar that opened it (the songs being added, why the mic didn't start) */
 header { position: relative; }
 .pop { position: absolute; right: 0; top: calc(100% + var(--gap-float)); z-index: var(--z-popover); width: min(340px, calc(100vw - 32px)); padding: var(--space-4); border-radius: var(--radius-xl);
