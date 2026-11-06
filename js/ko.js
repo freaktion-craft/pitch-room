@@ -328,7 +328,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Music": "반주", "Voice": "목소리", 
   "This browser can’t send sound to another output. The desktop app or a current Chrome or Edge can.": "이 브라우저는 다른 출력으로 소리를 보낼 수 없어요. 데스크톱 앱이나 최신 Chrome, Edge에서는 돼요.",
   
-  "There, choose CABLE Output (VB-Audio Virtual Cable) as your mic, and turn its noise suppression off.": "거기서 <b>CABLE Output (VB-Audio Virtual Cable)</b>을 마이크로 고르고, 소음 억제는 꺼 주세요.",
+  "There, choose CABLE Output (VB-Audio Virtual Cable) as your mic, and turn its noise suppression off.": "거기서 <b id=\"liveMicName\">CABLE Output (VB-Audio Virtual Cable)</b>을 마이크로 고르고, 소음 억제는 꺼 주세요.",
   "Allow the mic, and Live finds its cable.": "마이크를 허용하면 라이브가 케이블을 찾아요.",
   "Pitchroom’s mic is VB-CABLE, a free virtual cable. Windows asks first, then its setup opens: press Install Driver there.": "Pitchroom의 마이크는 무료 가상 케이블인 VB-CABLE이에요. Windows가 먼저 물어본 뒤 설치 창이 열려요. 거기서 Install Driver를 누르세요.",
   "Set up the mic": "마이크 설정", "Setting up…": "설정하는 중…",
@@ -336,6 +336,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Set up. Restart the PC to finish, then turn Live on.": "설정했어요. PC를 다시 시작해 마무리한 다음 라이브를 켜세요.",
   "VB-CABLE is by VB-Audio, donationware.": 'VB-CABLE은 <a href="https://vb-audio.com/Cable/" target="_blank" rel="noopener">VB-Audio</a>의 기부형 소프트웨어예요.',
   "Set up the mic first.": "먼저 마이크를 설정하세요.",
+  "Windows made the cable your default speaker, so other sound goes into it. Set your own speaker back in Windows’ Sound settings.": "Windows가 케이블을 기본 스피커로 바꿨어요. 다른 소리도 케이블로 들어가요. Windows 소리 설정에서 원래 스피커로 되돌리세요.",
   "The mic’s cable is gone. Set it up again to go on.": "마이크 케이블이 사라졌어요. 다시 설정해야 이어서 보낼 수 있어요.",
   "Your input is the cable itself. Choose your own mic in Settings › Input.": "입력이 케이블 자체예요. 설정 › 입력에서 내 마이크를 고르세요.",
   "Couldn’t play into the mic’s cable. Set it up again, or restart the PC if it was just set up.": "마이크 케이블로 소리를 보내지 못했어요. 다시 설정하거나, 방금 설정했다면 PC를 다시 시작하세요.",

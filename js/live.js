@@ -19,10 +19,11 @@ function liveSettings() {
   S.live = { music: lvl(v.music, LIVE_DEFAULT.music), voice: lvl(v.voice, LIVE_DEFAULT.voice) };
 }
 const liveLag = () => (ac ? recLatency() : 0); // how far behind the band your voice comes in
-// VB-CABLE's two ends, by the names its driver gives them: "CABLE Input" (where Live plays; "CABLE In 16 Ch" the same
-// cable's 16-channel side) and "CABLE Output" (the mic)
-const cableIn = (d) => /VB-Audio Virtual Cable/i.test(d.label) && /^CABLE In(put|\b)/i.test(d.label);
-const cableOut = (d) => /VB-Audio Virtual Cable/i.test(d.label) && /^CABLE Output/i.test(d.label);
+// VB-CABLE's two ends, by their device's name (Windows may name the ends otherwise: CABLE Input is "스피커" in Korean):
+// its playback ones (where Live plays: CABLE Input, or its 16-channel side) and its recording one (the mic)
+const CABLE = /VB-Audio Virtual Cable/i;
+const cableIn = (d) => d.kind === "audiooutput" && CABLE.test(d.label);
+const cableOut = (d) => d.kind === "audioinput" && CABLE.test(d.label);
 
 // The cable, if it's there: its playing end. Asked again as devices come and go, and once the mic's allowed (before
 // that, the browser holds back the devices' names).
@@ -32,8 +33,13 @@ async function liveCable() {
   try { all = await navigator.mediaDevices.enumerateDevices(); } catch (e) {}
   const outs = all.filter((d) => d.kind === "audiooutput");
   LIVE.hidden = !outs.some((d) => d.label);
-  const ins = outs.filter((d) => d.deviceId && cableIn(d));
-  LIVE.cable = ins.find((d) => /^CABLE Input/i.test(d.label)) || ins[0] || null;
+  const alias = (d) => !d.deviceId || d.deviceId === "default" || d.deviceId === "communications"; // Windows' "Default - …", not a device
+  const ins = outs.filter((d) => !alias(d) && cableIn(d));
+  // VB-CABLE's setup makes the cable Windows' default speaker (and mic): everything then plays into it, unheard
+  LIVE.isDefault = outs.some((d) => d.deviceId === "default" && cableIn(d));
+  LIVE.cable = ins.find((d) => !/16 ?Ch/i.test(d.label)) || ins[0] || null; // (its stereo side, not the 16-channel one)
+  const mic = all.find((d) => !alias(d) && cableOut(d));
+  LIVE.micName = mic ? mic.label.replace(/\s*\(/, " (") : "CABLE Output (VB-Audio Virtual Cable)"; // what the other app lists it as
   if (LIVE.cable && LIVE.setup) LIVE.setup = ""; // set up, and there
   // your input the cable's own mic end: what's sent would come straight back in, round and round
   const tk = micStream && micStream.getAudioTracks()[0], id = tk && tk.getSettings && tk.getSettings().deviceId;
@@ -123,6 +129,8 @@ function paintLive() {
   sw.checked = LIVE.on || LIVE.starting; sw.disabled = LIVE.starting || (!has && !LIVE.hidden);
   const err = $("#liveErr"); say(err, LIVE.err); err.hidden = !LIVE.err;
   $("#liveReady").hidden = !has; // what to pick there, the levels
+  const name = $("#liveMicName"); if (name) name.textContent = LIVE.micName || "CABLE Output (VB-Audio Virtual Cable)";
+  $("#liveDefault").hidden = !LIVE.isDefault;
   $("#liveAllow").hidden = !LIVE.hidden || micOn; // the devices' names held back till the mic's allowed
   const needs = !has && !LIVE.hidden;
   $("#liveSetup").hidden = !needs || !LIVE.canSetup || LIVE.setup === "done";
