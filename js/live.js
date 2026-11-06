@@ -9,14 +9,15 @@
 // through a limiter of its own. You sing to the band as you hear it, so your voice comes in that much later (the round
 // trip, recLatency, as the takes allow for it): the band in the mix is held back as much, and the people listening
 // hear the two together. Your headphones hear what they always do.
-// Kept (S.live): the two levels. Off at every start: nothing's sent till it's turned on.
-const LIVE = { on: false, starting: false, el: null, nodes: null, timer: 0, err: "", cable: null, hidden: false, loop: false, setup: "", canSetup: false };
-const LIVE_DEFAULT = { music: 0.8, voice: 1 };
+// It's an option (Settings › Live): VB-CABLE installed there if wanted, then Live turned on, and only then the header's
+// Live button. Kept (S.live): that (enabled), the two levels. Off at every start: nothing's sent till it's turned on.
+const LIVE = { on: false, starting: false, el: null, nodes: null, timer: 0, err: "", cable: null, hidden: false, loop: false, setup: "", setupErr: "", canSetup: false };
+const LIVE_DEFAULT = { enabled: false, music: 0.8, voice: 1 };
 let liveMusic = null; // where each play's band comes in (playSong: liveTap), there whether Live is on or not
 function liveTap() { if (!liveMusic) liveMusic = ac.createGain(); return liveMusic; }
 function liveSettings() {
   const v = S.live && typeof S.live === "object" ? S.live : {}, lvl = (x, d) => (Number.isFinite(+x) ? Math.max(0, Math.min(1.5, +x)) : d);
-  S.live = { music: lvl(v.music, LIVE_DEFAULT.music), voice: lvl(v.voice, LIVE_DEFAULT.voice) };
+  S.live = { enabled: v.enabled === true, music: lvl(v.music, LIVE_DEFAULT.music), voice: lvl(v.voice, LIVE_DEFAULT.voice) };
 }
 const liveLag = () => (ac ? recLatency() : 0); // how far behind the band your voice comes in
 // VB-CABLE's two ends, by their device's name (Windows may name the ends otherwise: CABLE Input is "스피커" in Korean):
@@ -40,7 +41,7 @@ async function liveCable() {
   LIVE.cable = ins.find((d) => !/16 ?Ch/i.test(d.label)) || ins[0] || null; // (its stereo side, not the 16-channel one)
   const mic = all.find((d) => !alias(d) && cableOut(d));
   LIVE.micName = mic ? mic.label.replace(/\s*\(/, " (") : "CABLE Output (VB-Audio Virtual Cable)"; // what the other app lists it as
-  if (LIVE.cable && LIVE.setup) LIVE.setup = ""; // set up, and there
+  if (LIVE.cable) { LIVE.setup = ""; LIVE.setupErr = ""; } // set up (however), and there: no "it didn't run" left
   // your input the cable's own mic end: what's sent would come straight back in, round and round
   const tk = micStream && micStream.getAudioTracks()[0], id = tk && tk.getSettings && tk.getSettings().deviceId;
   const input = all.find((d) => d.kind === "audioinput" && d.deviceId === (id || S.mic || "default"));
@@ -111,18 +112,26 @@ function liveLevel(which, v) {
 // it's done, the cable shows at once or after a restart (its setup says to restart).
 async function liveSetUp() {
   if (LIVE.setup === "running") return;
-  LIVE.setup = "running"; LIVE.err = ""; paintLive();
+  LIVE.setup = "running"; LIVE.setupErr = ""; paintLive();
   const r = await window.pitchroom.cableSetup().catch(() => "cancelled");
   LIVE.setup = r === "ok" ? "done" : "";
-  if (r !== "ok") LIVE.err = r === "none" ? "This copy of the app doesn’t have VB-CABLE in it. Get it from vb-cable.com." : "The setup didn’t run. Try again, and answer Yes when Windows asks.";
+  if (r !== "ok") LIVE.setupErr = r === "none" ? "This copy of the app doesn’t have VB-CABLE in it. Get it from vb-cable.com." : "The setup didn’t run. Try again, and answer Yes when Windows asks.";
   await liveCable();
 }
+// Live turned on or off in Settings: its button by the mic there or not (off: nothing sent, its panel shut)
+function liveEnable(on) {
+  S.live.enabled = on; save();
+  if (!on) { liveStop(); showLive(false); }
+  paintLive();
+}
 
-// The header's chip (a dot, red while it's sending) and its panel: with the cable, the switch, the levels and what to
-// pick in the other app; without it, how to set it up.
+// The header's chip (a dot, red while it's sending), there once Live's turned on, and its panel: with the cable, the
+// switch, the levels and what to pick in the other app; without it, the way to Settings. And Settings' Live rows.
 function paintLive() {
   const btn = $("#liveBtn");
   if (!btn) return;
+  paintLiveSet();
+  $("#liveAt").hidden = !S.live.enabled;
   btn.classList.toggle("on", LIVE.on);
   say(btn, LIVE.on ? "Live: sending" : "Live", null, "aria-label");
   const has = !!LIVE.cable, sw = $("#liveOn");
@@ -132,12 +141,29 @@ function paintLive() {
   const name = $("#liveMicName"); if (name) name.textContent = LIVE.micName || "CABLE Output (VB-Audio Virtual Cable)";
   $("#liveDefault").hidden = !LIVE.isDefault;
   $("#liveAllow").hidden = !LIVE.hidden || micOn; // the devices' names held back till the mic's allowed
-  const needs = !has && !LIVE.hidden;
-  $("#liveSetup").hidden = !needs || !LIVE.canSetup || LIVE.setup === "done";
-  $("#liveSetupBtn").disabled = LIVE.setup === "running";
-  say($("#liveSetupBtn"), LIVE.setup === "running" ? "Setting up…" : "Set up the mic");
-  $("#liveGet").hidden = !needs || LIVE.canSetup; // a browser: where to get it
-  $("#liveRestart").hidden = !needs || LIVE.setup !== "done"; // set up, not there yet
+  $("#liveNoCable").hidden = has || LIVE.hidden; // (gone since: set up again in Settings)
+}
+// Settings › Live: Pitchroom's mic (VB-CABLE: installed, or how to; what its setup can do to Windows' defaults), and
+// Live's switch, which waits for it. Once it's installed: "now turn on Live", till Live is.
+function paintLiveSet() {
+  const why = $("#setCableWhy"), go = $("#setCableGo"), get = $("#setCableGet"), sw = $("#setLiveOn"), swWhy = $("#setLiveWhy");
+  if (!why) return;
+  const has = !!LIVE.cable, running = LIVE.setup === "running";
+  const text = LIVE.setupErr ? LIVE.setupErr
+    : LIVE.hidden && !has ? "Turn the mic on, and Pitchroom checks whether VB-CABLE is installed."
+    : has && LIVE.isDefault && !S.live.enabled ? "Installed. Windows made it your default speaker: set yours back in Windows’ Sound settings, then turn on Live below."
+    : has && LIVE.isDefault ? "Installed. Windows made it your default speaker: set yours back in Windows’ Sound settings."
+    : has && !S.live.enabled ? "Installed. Now turn on Live below."
+    : has ? "VB-CABLE by VB-Audio (donationware): installed."
+    : LIVE.setup === "done" ? "Set up. Restart the PC if it doesn’t show here."
+    : "VB-CABLE, a free virtual cable by VB-Audio. Its setup can make it Windows’ default speaker and mic: set yours back in Windows’ Sound settings after.";
+  say(why, text); why.classList.toggle("err", !!LIVE.setupErr || (has && LIVE.isDefault));
+  go.hidden = has || (!LIVE.canSetup && !LIVE.hidden); go.disabled = running;
+  say(go, running ? "Installing…" : LIVE.hidden && !has ? "Turn the mic on" : LIVE.setup === "done" ? "Install again" : "Install VB-CABLE");
+  get.hidden = has || LIVE.canSetup || LIVE.hidden; // a browser: where to get it
+  sw.checked = S.live.enabled; sw.disabled = !has && !S.live.enabled; // (on already: it can be turned off whatever)
+  say(swWhy, has || S.live.enabled ? "Sing into Discord, VRChat or a stream with the song: a Live button by the mic"
+    : LIVE.hidden ? "Turn the mic on above first." : "Install VB-CABLE above first, then turn this on.");
 }
 function showLive(on) {
   $("#livePop").hidden = !on; $("#liveBtn").setAttribute("aria-expanded", String(on));
@@ -153,7 +179,12 @@ async function initLive() {
   pop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!pop.hidden && to && !pop.contains(to) && to !== btn) showLive(false); });
   $("#liveOn").onchange = async (e) => { if (e.target.checked) await liveStart(); else liveStop(); };
   $("#liveAllowBtn").onclick = async () => { await startMic(); liveCable(); };
-  $("#liveSetupBtn").onclick = liveSetUp;
+  $("#liveToSet").onclick = () => { // to Settings, at Live's group (once the page is there)
+    showLive(false);
+    setTimeout(() => $("#setLive").closest(".set-group").scrollIntoView({ block: "start", behavior: stillMotion() ? "auto" : "smooth" }), 120);
+  };
+  $("#setCableGo").onclick = async () => { if (LIVE.hidden && !LIVE.cable) { await startMic(); liveCable(); } else liveSetUp(); };
+  $("#setLiveOn").onchange = (e) => liveEnable(e.target.checked);
   for (const which of ["music", "voice"]) {
     const s = $(which === "music" ? "#liveMusic" : "#liveVoice");
     s.value = S.live[which];
