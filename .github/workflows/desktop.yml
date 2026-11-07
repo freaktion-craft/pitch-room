@@ -32,7 +32,6 @@ jobs:
           - { os: macos-15, name: mac-arm64 }       # Apple silicon
           - { os: macos-15-intel, name: mac-x64 }   # Intel Macs
           - { os: windows-latest, name: windows-x64 }
-          - { os: ubuntu-latest, name: linux-x64 }
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -62,5 +61,4 @@ jobs:
             desktop/dist/*.dmg
             desktop/dist/*.zip
             desktop/dist/*.exe
-            desktop/dist/*.AppImage
           if-no-files-found: ignore

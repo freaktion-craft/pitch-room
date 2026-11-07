@@ -13,7 +13,6 @@ Pitchroom as an app of its own: an installer, a window with its own icon, no ter
 | macOS (Apple silicon) | `Pitchroom-…-mac-arm64.dmg` |
 | macOS (Intel) | `Pitchroom-…-mac-x64.dmg` |
 | Windows | `pitchroom_install.exe` |
-| Linux | `Pitchroom-…-linux-….AppImage` |
 
 Python comes inside it, so there's nothing else to install. The first time a song is added, it downloads the tools that split songs and read their melody and lyrics (3–4 GB, once), as the web version does.
 
@@ -25,7 +24,7 @@ Python comes inside it, so there's nothing else to install. The first time a son
 
 **Updates:** it checks GitHub once it opens and offers a newer version as a download (also **Check for Updates…** in the menu).
 
-**Building it** (in `desktop/`, Node 20 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. To release a version: **Actions → Release → Run workflow** (or `gh workflow run release.yml -f bump=patch`), picking patch, minor or major. It bumps `"version"` in `desktop/package.json`, commits and tags it on `main`, builds macOS, Windows and Linux into a release in [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (public, the installers only), and publishes it once every build is in. A tag pushed by hand (`git tag v1.0.1 && git push origin v1.0.1`) still builds into a draft, published from its Releases page. It needs a `RELEASES_TOKEN` secret here: a fine-grained token with Contents read and write on that repo alone.
+**Building it** (in `desktop/`, Node 20 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. To release a version: **Actions → Release → Run workflow** (or `gh workflow run release.yml -f bump=patch`), picking patch, minor or major. It bumps `"version"` in `desktop/package.json`, commits and tags it on `main`, builds macOS and Windows into a release in [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (public, the installers only), and publishes it once every build is in. A tag pushed by hand (`git tag v1.0.1 && git push origin v1.0.1`) still builds into a draft, published from its Releases page. It needs a `RELEASES_TOKEN` secret here: a fine-grained token with Contents read and write on that repo alone.
 
 ## Get it
 
@@ -43,7 +42,6 @@ Double-click the launcher for your system:
 |---|---|
 | Windows | `start-windows.bat` |
 | macOS | `start-mac.command` |
-| Linux | `start-linux.sh` |
 
 The first run creates a private Python environment in `.venv` and installs the base tools (1–2 minutes). After that it starts in a couple of seconds and opens a tab in Chrome (or your default browser if Chrome isn't installed). Close the terminal window to stop it. Running the launcher again while it's already open just reopens the tab.
 
@@ -57,7 +55,7 @@ The page is in English or Korean (한국어): **Language** in the settings (the 
 
 ## Update it
 
-Close Pitchroom, then double-click the updater for your system in the `update` folder: `update-windows.bat`, `update-mac.command` or `update-linux.sh`. A git clone is pulled; a downloaded copy gets the latest version's files, written over the ones that changed. Your songs, takes, settings and downloaded models stay as they are. Start Pitchroom as usual afterwards. When a new version lines lyrics up, times their syllables or reads melodies better, the songs you have are brought up to date in the background once it starts, one at a time, none starting while a song plays: the one being done shows a ring over its cover in the library.
+Close Pitchroom, then double-click the updater for your system in the `update` folder: `update-windows.bat` or `update-mac.command`. A git clone is pulled; a downloaded copy gets the latest version's files, written over the ones that changed. Your songs, takes, settings and downloaded models stay as they are. Start Pitchroom as usual afterwards. When a new version lines lyrics up, times their syllables or reads melodies better, the songs you have are brought up to date in the background once it starts, one at a time, none starting while a song plays: the one being done shows a ring over its cover in the library.
 
 ## What's inside
 
@@ -85,7 +83,7 @@ Close Pitchroom, then double-click the updater for your system in the `update` f
 
 Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, audio-separator, Whisper, the melody's pitch tracker — about 3–4 GB, into `.venv` and `models/`). The first song with Korean or English lyrics adds a model that times their syllables (1.3 GB for Korean, 0.4 GB for English). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.
 
-**GPU:** on Windows and Linux the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
+**GPU:** on Windows the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
 
 ## Files
 

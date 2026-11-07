@@ -15,7 +15,7 @@ other people's work, each under its own licence:
 - **FFmpeg**, the program imageio-ffmpeg brings — GPL. It runs as a program of its own, not as part of Pitchroom.
   Its source: https://ffmpeg.org/download.html
 - **Hugeicons** (the icons) — MIT. https://hugeicons.com
-- **electron-updater** (the updates on Windows and Linux) — MIT. https://github.com/electron-userland/electron-builder
+- **electron-updater** (the updates on Windows) — MIT. https://github.com/electron-userland/electron-builder
 - **VB-CABLE** (Windows: Live's mic), the virtual audio cable by Vincent Burel / VB-Audio — donationware, all
   participations are welcome. From www.vb-cable.com, carried as it comes; installed only when you choose to, by its
   own setup and under its own licence.
