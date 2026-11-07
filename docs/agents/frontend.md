@@ -58,7 +58,10 @@ Each area keeps its state in one short capitalised object.
 | `takes.js` | `R` recording, latency Sync; `T` the take list |
 | `takes-studio.js` | `TS`: Takes Studio |
 | `stage.js` | Practice canvas; `C` (canvas colours); accent and theme; the main `loop()` |
-| `voice.js` | `VC`: the Lab. Being rebuilt as a "turn finder" on another branch; leave it alone here |
+| `turn.js` | `TN`: the Lab's Turn measures (harmonic levels, the turn, a pass's break or step). Pure, runs in Node |
+| `scale.js` | `SC`, `SC_PATS`: the Lab's Scales judging (`scAlign`, `scJudge`, `scStep`). Pure, runs in Node |
+| `voice.js` | `VC`: the Lab page, its mic and pitch frames (`VC.fr`), and the Turn view |
+| `voice-scale.js` | `SV`: the Lab's Scales view (call and response at the piano) |
 | `onboard.js` | `OB`: first-run steps |
 | `app.js` | Routing, header, keyboards, language switch, startup |
 

@@ -4,7 +4,7 @@ How to check a change without touching the owner's library, settings or speakers
 casually.
 
 There is no test suite, no JS test runner and no lint config. CI only builds. Don't invent a test suite unasked.
-Verification is: syntax checks, `scripts/contrast.py`, and looking at the page offscreen.
+Verification is: syntax checks, `scripts/contrast.py`, the Lab's two check scripts, and looking at the page offscreen.
 
 ## Quick checks (read-only, seconds)
 
@@ -27,6 +27,9 @@ Verification is: syntax checks, `scripts/contrast.py`, and looking at the page o
 
 - **Contrast**, after any change to `css/tokens.css`: `py -3 scripts/contrast.py` on Windows, `python3
   scripts/contrast.py` on macOS (`-v` prints every pair). Standard library only, so any Python 3 works. It exits non-zero on a failure. Quote the pass count in the commit or PR.
+- **The Lab's measures**, after any change to `js/turn.js` or `js/scale.js`: `node scripts/turn-check.js`,
+  `node scripts/scale-check.js`. Synthetic, seeded voices, no dependencies, a few seconds each; each line says pass or
+  FAIL and the last says "all passed". They check the measures only: look at the page too (`__autoSing`, below).
 - **Korean.** No checker exists. Check by hand that each new English string passed to `tr()`/`say()` or placed in
   `index.html` (text, `title`, `aria-label`, `placeholder`) is a key in `KO_TEXT`, and each new server message is in
   `KO_SERVER` (`js/ko.js`).
