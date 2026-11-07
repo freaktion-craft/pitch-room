@@ -514,7 +514,7 @@ function setLang(v) {
   countPick.set(countItems(), S.countIn); themePick.set(themeItems(), theme); paintKey(); listMics();
   if (K.song) recPick.set(recItems(), recMode);
   renderMic(); paintRec(); paintPlay($("#pPlay"), P.playing); renderStart();
-  if (P.song) { paintMeta(); renderTracks(); paintVideoBtn(); }
+  if (P.song) { paintMeta(); renderTracks(); }
   if (K.song) { renderPhrases(); renderTakes(); }
   if (!$("#earsPop").hidden) renderEars();
   if ($("#sLib").children.length) renderLibrary();

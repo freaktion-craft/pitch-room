@@ -20,11 +20,6 @@ async function openSong(m) {
   paintCrumbs();
   paintMeta(); keyOf(m).then(() => { if (P.song === m) { paintMeta(); paintKey(); } });
   P.tracks = {};
-  const v = $("#pVideo"), box = $("#pVideoBox"), wait = $("#pVideoWait");
-  box.classList.remove("ready"); box.style.aspectRatio = ""; wait.classList.remove("err"); say(wait, "Loading video…");
-  if (m.video) v.src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
-  showVideo = false; paintVideo();
-  $("#pGetVideo").hidden = !!m.video || !/^https?:\/\//.test(m.source || ""); $("#pGetVideo").disabled = false;
   for (const name of trackNames(m)) P.tracks[name] = { gain: null };
   P.tracks.click = { gain: null };
   freshMix(false);
@@ -55,52 +50,10 @@ function closeSong() {
   P.song = null; P.buffers = {}; P.peaks = P.trackPeaks = null; P.keep = {}; P.tsel = P.mark = null; // waveforms flat until the next song's peaks are in
   clearTimeout(P.keyTimer); P.orig = {}; P.shifted = null; P.key = P.keyWant = 0; P.rate = P.rateWant = 1; P.keyProg = null; P.keyNote = ""; P.keyErr = false; P.keyJob = null; P.keyWarnAt = 0;
   paintBusy();
-  const v = $("#pVideo"); v.pause(); v.removeAttribute("src"); v.load();
-  $("#pVideoBox").hidden = true; $("#pVideoBtn").hidden = true;
-}
-function videoWait(text, err, vars) {
-  const box = $("#pVideoBox"), wait = $("#pVideoWait");
-  box.hidden = false; box.classList.remove("ready"); say(wait, text, vars); wait.classList.toggle("err", !!err);
-}
-async function videoFetched(songId, ok) {
-  if (!P.song || P.song.id !== songId) return;
-  if (!ok) { $("#pGetVideo").disabled = false; return; }
-  let m = null;
-  try { m = (await (await fetch("/api/library", { cache: "no-store" })).json()).find((x) => x.id === songId); } catch (e) { m = null; }
-  if (!m || !m.video || !P.song || P.song.id !== songId) return;
-  P.song.video = m.video; $("#pGetVideo").hidden = true;
-  showVideo = true; // asked for it, so show it
-  videoWait("Loading video…");
-  $("#pVideo").src = `/library/${m.id}/${encodeURIComponent(m.video)}`;
-  paintVideo();
 }
 // The whole song's volume, on top of each track's: every song opens at the one set in Settings (startVol, kept), and the
 // Studio's slider moves it for that visit only (stemVol), as the rest of the mix.
 let startVol = store.get("stemVol", 1), stemVol = startVol;
-let showVideo = false; // hidden whenever a song opens; Show video brings it up (it loads in the background meanwhile)
-function paintVideo() {
-  const has = !!(P.song && P.song.video);
-  $("#pVideoBox").hidden = !has || !showVideo;
-  $("#pVideoBtn").hidden = !has;
-  paintVideoBtn();
-  if ($("#pVideoBox").hidden) $("#pVideo").pause();
-}
-const paintVideoBtn = () => $("#pVideoBtn").replaceChildren(icon(showVideo ? "videoOff" : "video"), tr(showVideo ? "Hide video" : "Show video"));
-// The video follows the stems player, which owns the clock: started, paused and nudged back whenever it drifts.
-function syncVideo() {
-  const v = $("#pVideo");
-  if ($("#pVideoBox").hidden || !v.getAttribute("src") || v.readyState < 1 || v.seeking) return;
-  const pos = heardPos(), past = pos >= v.duration - 0.05; // the picture with the sound as heard
-  if (v.playbackRate !== P.rate) v.playbackRate = P.rate; // the picture's own clock is song time
-  if (P.playing && !past) {
-    if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); }
-    else if (Math.abs(v.currentTime - pos) > 0.15) v.currentTime = pos;
-  } else {
-    if (!v.paused) v.pause();
-    if (!past && Math.abs(v.currentTime - pos) > 0.05) v.currentTime = pos;
-  }
-}
-setInterval(syncVideo, 100);
 function songDur() { return P.song ? P.song.duration : 0; }
 // Playback starts a moment after Play (startAt, 60 ms ahead); until then the song is still at its offset, so a pause
 // or seek that soon never stores a position before it (below 0:00, start() throws).
@@ -110,8 +63,8 @@ function songPos() { return P.playing ? Math.min(songDur(), P.offset + Math.max(
 function stageTime() { return P.playing ? Math.min(songDur(), P.offset + (ac.currentTime - P.startAt) * P.rate) : P.offset - leadAhead(); }
 // What's heard lags the audio clock: ac.currentTime is where the audio is being rendered, and the sound reaches the ears
 // later by the page's buffering (baseLatency), the sound system's (outputLatency: about 40-50 ms wired on Windows, more
-// over Bluetooth) and the limiter's look-ahead. Everything drawn (the bars, the playheads, the count-in, the times, the
-// video) follows what's heard; what's played and recorded keeps the audio clock. A start doesn't step the drawing back
+// over Bluetooth) and the limiter's look-ahead. Everything drawn (the bars, the playheads, the count-in, the times)
+// follows what's heard; what's played and recorded keeps the audio clock. A start doesn't step the drawing back
 // first: it holds where it was shown (P.shownFrom, set by playSong) until what's heard gets there.
 function heardLag() { return ac ? Math.max(0, (ac.baseLatency || 0) + (ac.outputLatency || 0) + limitDelay) : 0; }
 // The moment of the audio clock being heard right now. That clock moves in steps of about 10 ms, and what's drawn from it
@@ -578,7 +531,7 @@ const KEYS = 6, KEY_WARN = 4, KEY_WARN_FOR = 3000; // from KEY_WARN semitones on
 // A version being made (its render, then its files loading): the song held still till it's in, its controls out of
 // reach (html.song-busy), but for the key and tempo themselves, to choose again
 const songBusy = () => P.keyProg != null;
-const BUSY_PARTS = "#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl, #stage";
+const BUSY_PARTS = "#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl, #stage";
 function paintBusy() {
   const busy = songBusy();
   if (busy && P.playing) pauseSong();
@@ -980,16 +933,9 @@ function initStems() {
   $("#sAddClose").append(icon("close"));
   $("#sAddClose").onclick = (e) => { e.stopPropagation(); closeDrawer(); }; // the close by the title, the drawer's
   $("#sAddBtn").onclick = (e) => { e.stopPropagation(); showAdd($("#jobsPop").hidden); };
-  $("#pGetVideo").onclick = async () => {
-    const b = $("#pGetVideo"), songId = P.song.id; b.disabled = true;
-    videoWait("Getting the video…");
-    try { watchJob(await postJob(`/api/library/${songId}/video`), "video", songId); }
-    catch (err) { b.disabled = false; if (P.song && P.song.id === songId) videoWait(err.message, true); }
-  };
-  $("#pVideoBtn").onclick = () => { showVideo = !showVideo; paintVideo(); };
   $(".mix-ico").append(icon("volume"));
   // text buttons with an icon in front of the label
-  [["#sAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"], ["#pGetVideo", "download"],
+  [["#sAddBtn", "plus"], ["#sUpdate", "retry"],["#iOpen", "studio"], ["#iSing", "practice"], ["#pSing", "practice"],
     ["#sInstallBtn", "download"], ["#sGpuBtn", "gpu"], ["#sYtForm [type=submit]", "plus"], ["#pExport", "download"]].forEach(([sel, name]) => $(sel).prepend(icon(name)));
   initSongMenu();
   initCoverView();
@@ -1000,10 +946,6 @@ function initStems() {
   $("#pVol").oninput = (e) => { stemVol = +e.target.value; if (P.playing && P.bus) P.bus.gain.setTargetAtTime(stemVol, ac.currentTime, 0.02); }; // (this visit only)
   $("#pVol").ondblclick = () => { $("#pVol").value = startVol; $("#pVol").dispatchEvent(new Event("input")); }; // back to where songs start
   initStartVol();
-  const v = $("#pVideo");
-  v.addEventListener("loadedmetadata", () => { if (v.videoWidth) $("#pVideoBox").style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; });
-  v.addEventListener("loadeddata", () => $("#pVideoBox").classList.add("ready"));
-  v.addEventListener("error", () => { if (!v.getAttribute("src")) return; $("#pVideoWait").classList.add("err"); say($("#pVideoWait"), "Couldn’t load the video."); });
   $("#sYtUrl").addEventListener("input", fitLinks);
   $("#sYtUrl").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#sYtForm").requestSubmit(); } }); // Shift+Enter: another line
   $("#pPlay").onclick = () => (P.playing ? pauseSong() : playSong());

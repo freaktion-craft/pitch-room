@@ -158,13 +158,6 @@
 #sPlayer .player-title { gap: var(--space-2); } /* play and the rest (the song's volume at the end), then the key, the facts and the buttons: as Practice has them */
 .title-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; min-height: 40px; } /* as tall as Practice's play row, so the key under it is where Practice has it */
 .player-title .muted { font-size: var(--text-sm); }
-/* the song's video, muted: the stems carry the sound, the picture is for following lyrics */
-/* the box holds its size while the video loads, so nothing below it jumps */
-.video { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 62vh; border-radius: var(--radius-lg); background: oklch(0 0 0); overflow: hidden; }
-.video video { display: block; width: 100%; height: 100%; object-fit: contain; }
-.video-wait { position: absolute; inset: 0; display: grid; place-items: center; font-size: var(--text-sm); color: var(--muted); animation: blink 1.6s ease-in-out infinite; }
-.video-wait.err { animation: none; }
-.video.ready .video-wait { display: none; }
 #pWave { width: 100%; height: 96px; display: block; border-radius: var(--radius-lg); background: var(--bg); cursor: none; touch-action: pan-y; }
 /* the time under the pointer (timeTip), across the waveform's middle in the pointer's place, and a faint line where it
    points; both fade in (the tip from a little smaller) */

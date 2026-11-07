@@ -34,7 +34,7 @@
   `notes`, take `pitch`, `melody/<id>`.
 - POST routes (`_stems_post`): `jobs/singing` (heartbeat while a song plays), `upgrades`, `settings`, `import`,
   `stems/install`, `stems/youtube`, `stems/playlist`, job `cancel`/`pick`/`lyrics`, and per song `delete`, `rename`,
-  `video`, `split`, `mix`, `keep`, `truth`, `notes`, `marks`, `key`, `export`, `lyrics/...`, `takes...`.
+  `split`, `mix`, `keep`, `truth`, `notes`, `marks`, `key`, `export`, `lyrics/...`, `takes...`.
 - A `ValueError` becomes 422 `{error}` (shown by the page) in POST routes and the per-song GETs; in other GETs it's a
   500 `"ValueError: ..."`. Anything else is a 500 with a traceback in the terminal.
   Body limits are per route (`_body(limit)`).
@@ -56,7 +56,8 @@
 
 The `id` is 12 hex characters. The docstring at the top of `stems.py` gives a partial list; this one is fuller.
 
-- `source.<ext>` (downloaded audio), optional `video.<ext>` (picture only).
+- `source.<ext>` (downloaded audio; only the audio and the video's title and channel are fetched). Older songs may have
+  a `video.<ext>` that nothing uses any more.
 - Stems as mp3: vocals, drums, bass, other (plus guitar and piano with the 6-stem model); `lead.mp3` and `backing.mp3`
   when the lead-vocal model is installed.
 - `cover.jpg` and `cover-96.jpg`.
@@ -74,7 +75,7 @@ The `id` is 12 hex characters. The docstring at the top of `stems.py` gives a pa
 ## Jobs and the queue
 
 - Jobs live in memory (`_jobs`, lost on restart). `_new_job` creates one; `_run(job, fn)` runs it in a thread.
-  Kinds: separate (adding a song), install, video, split, lyrics, melody, key.
+  Kinds: separate (adding a song), install, split, lyrics, melody, key.
 - `Cancelled` is a `BaseException` raised at `_check` and `_stage` checkpoints, so `except Exception` around optional
   steps lets it through.
 - One GPU model at a time: `_work_lock`, and `_turn(job)` for an ordered queue. Call `_free_gpu()` after GPU work.
@@ -88,7 +89,7 @@ The `id` is 12 hex characters. The docstring at the top of `stems.py` gives a pa
 
 `start_youtube` → `_pipeline` → `_lyrics_phase`:
 
-1. Download audio and video (outside the queue).
+1. Download the audio (outside the queue).
 2. In its turn: decode, Demucs (`_separate`), lead vocal (`_lead_vocal`), melody, beats, key.
 3. Encode mp3s, write `meta.json` with `adding: true`. A failure deletes the folder.
 4. Background naming and covers start (`_want_lookup`).
