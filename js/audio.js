@@ -135,7 +135,8 @@ function synthPiano(m, at, dur, dest, vel) {
   const ng = ac.createGain(); ng.gain.value = vel * 0.18;
   nz.connect(bp); bp.connect(ng); ng.connect(dest); nz.start(at);
 }
-function playKey(m, dur = 1.2, delay = 0) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.vol; g.connect(master); piano(m, ac.currentTime + 0.01 + delay, dur, g, 0.55); }
+// (returns the note's gain: a note queued ahead can be hushed, scHush)
+function playKey(m, dur = 1.2, delay = 0) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.vol; g.connect(master); piano(m, ac.currentTime + 0.01 + delay, dur, g, 0.55); return g; }
 
 // Where a refused mic is allowed again: the system's own settings in the desktop app (it can't be asked twice there),
 // the mic in the address bar in a browser. how: what to do, {link} where the settings' path goes (obMic makes it a link)
@@ -232,13 +233,15 @@ function stopMic() {
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
   micNode = null; micStream = null; micOn = false; renderMic();
 }
-function stopTest() { if (testOsc) { try { testOsc.stop(); } catch (e) {} testOsc = null; } }
-// Test hook: a sawtooth "voice" that follows the current target, offset by N cents.
+function stopTest() { if (testOsc) { try { testOsc.stop(); } catch (e) {} testOsc = null; testGain = null; } }
+// Test hook: a sawtooth "voice" that follows the current target, offset by N cents (testGain: quiet where there's no
+// note to sing, as while Scales' piano plays)
+let testGain = null;
 window.__autoSing = (on, cents = 0) => {
   ensureCtx(); stopTest(); testOffset = cents;
   if (!on) return;
   const o = ac.createOscillator(); o.type = "sawtooth"; o.frequency.value = 220;
-  const g = ac.createGain(); g.gain.value = 0.3; o.connect(g); g.connect(micBus); o.start(); testOsc = o;
+  const g = ac.createGain(); g.gain.value = 0.3; o.connect(g); g.connect(micBus); o.start(); testOsc = o; testGain = g;
 };
 
 // ---------- pitch detection (YIN) ----------

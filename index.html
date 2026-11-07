@@ -171,7 +171,7 @@ const EMPTY_LIBRARY = false;
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
     <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
-    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Turn</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div></div>
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Turn</button><button type="button" role="radio" data-v="scale" aria-checked="false">Scales</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div></div>
     <div class="vc">
       <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
       <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false">Freeze</button></section>
@@ -183,6 +183,13 @@ const EMPTY_LIBRARY = false;
         <span class="vc-ax h2" id="vcAxH2" title="How far H2 stands out from H1 and H3. It peaks at your turn.">H2</span>
         <span class="vc-ax lane l" id="vcAxL" hidden>Loudness</span><span class="vc-ax lane u" id="vcAxT" hidden>Tone</span>
         <div class="overlay" id="vcOff" hidden><p>Use headphones, so the speakers don’t leak in.</p><button class="btn primary" id="vcMic" type="button">Turn the mic on</button></div>
+      </section>
+      <!-- Scales: a pattern played from the start note, then sung back, a key at a time up and back down (js/voice-scale.js) -->
+      <section class="vc-scale" aria-label="Scales" hidden>
+        <canvas id="scPad" aria-hidden="true"></canvas>
+        <div class="seg vc-mode" id="scPat" role="radiogroup" aria-label="Pattern"><button type="button" role="radio" data-p="p3">3 notes</button><button type="button" role="radio" data-p="p5">5 notes</button><button type="button" role="radio" data-p="arp">Arpeggio</button></div>
+        <button class="btn sm primary vc-go" id="scGo" type="button">Start</button>
+        <div class="vc-say"><p id="scSay" aria-live="polite"></p><p id="scDo"></p></div>
       </section>
       <aside class="vc-side">
         <div class="vc-note"><b id="vcNote">–</b><span id="vcCents"></span></div>
@@ -470,7 +477,9 @@ const EMPTY_LIBRARY = false;
 <script src="js/takes-studio.js"></script>
 <script src="js/stage.js"></script>
 <script src="js/turn.js"></script>
+<script src="js/scale.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/voice-scale.js"></script>
 <script src="js/onboard.js"></script>
 <script src="js/app.js"></script>
 </body>

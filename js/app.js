@@ -205,7 +205,7 @@ function route() {
     paintTakesShown(); fitStage(); resize(); centerKeys();
     if (K.on) practiceFrame();
   }
-  if (view === "voice") voiceShow();
+  if (view === "voice") voiceShow(); else if (was === "voice") voiceHide();
   // a new page from its top; a reload where it was (kept by this page, not the browser: its own comes back once the
   // page has loaded, after it's been shown at the top, and the fades follow a frame behind), the fades there with it
   const back = scrolledTo; scrolledTo = null;

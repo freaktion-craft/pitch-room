@@ -1,0 +1,336 @@
+"use strict";
+// Scales (the Lab's Scales view): the judging, pure (no page, no audio), so scripts/scale-check.js can run it in Node.
+// Call and response: the piano plays a short pattern from a root, then the singer sings it back on their own. The
+// response is cut into its notes by its own pitch (scAlign: no beat grid, so a late, slow or rubato singer and an unknown
+// DAW latency are all fine), each note's core (its start and end trimmed off) is judged in cents against its target, and
+// the key's result moves the set on (scStep). Every threshold is here, in SC, provisional, one for all voices.
+
+const SC = {
+  good: 25, close: 50,          // cents. 25: about where listeners hear a sung note as out of tune (20–35 c), ≥4× the
+                                //   tracker's ±5 c on a steady note; 50: past halfway to the next semitone = another note
+  clip: 2, skip: 250,           // st: an off sample costs at most clip² (a scoop, crack or slip can't drag a boundary);
+                                //   ms·st² for a note not sung (≈60 ms at the clip), or sung shorter than minNote. Under
+                                //   half of minNote × clip²: no run, nor two, is robbed to stand in for notes not sung
+                                //   (600 read "5 notes" stopped at the top as its way down)
+  edge: 50,                     // ms·st² off a run that starts where the pitch steps or breaks (per st of the step, or
+                                //   50 ms of break, to clip): a note's run as near one note as the next (a semitone between
+                                //   two, an octave off) is cut where the voice moved, not anywhere along it
+  onset: 150, onsetShare: 0.35, // ms / share of the note trimmed at its start: scoops (50–150 ms), the tracker's 5-frame
+                                //   median (~80 ms at 60 fps), stage.js's 50 ms leap hold
+  release: 80, releaseShare: 0.2, // trimmed at its end: anticipation of the next note, fall-offs
+  minHeard: 80,                 // ms voiced in a note's segment, else it's skipped (also absorbs a scoop passing through it)
+  minCore: 60,                  // ms pitched in the core, else unread (two frames at 30 fps, each the tracker's median of
+                                //   five; 80 lost short notes after a 4th, which stage.js holds ~100 ms at 30 fps)
+  minNote: 135,                 // ms: the shortest note whose core holds minCore (60 / (1 − 0.35 − 0.2) ≈ 133). A run
+                                //   shorter costs skip in scAlign and is skipped; a note heard but voiced shorter is short
+  hold: 0.5, holdHeard: 0.35,   // a run longer than its own notes' time by this share of a skipped neighbour's holds it
+                                //   too (midway: nearer both than one); sooner where a sliver of the neighbour was heard
+                                //   near its pitch (some sign it was sung there; 0.25 took 2% of dropped notes for misses)
+  squeeze: 0.5,                 // a run under this share of its note's time is a sliver (squeezed)
+  octSlip: 11,                  // st: a core this far from its target is an octave slip (sung or tracked): unread
+  start: 80, startWin: 120,     // ms pitched within ms: the response has begun
+  early: 150,                   // ms: voiced this near reading's start, the response begun with it: came in early
+  endGap: 500, lastHold: 700,   // ms: silence that ends it (a breath between notes is shorter); the last note held
+  capX: 2.5, capMin: 6000,      // the response's cap: max(capMin, capX × the call)
+  rest: 1200, along: 500, stall: 500, // ms
+  unread: 0.4, readMin: 0.6,    // a key with more than 40% of its notes unread is unread; clean needs ≥ 60% read
+  drift: 20, driftMin: 10, driftShare: 0.75, // whole key off one way: the median beyond 20 c, 75% of read notes past 10 c,
+  driftSpread: 20,              // and they're off by much the same: within 20 c of it (median), missed or not
+  turnNear: 1, tzMin: 4, tzGap: 15, // st; notes; percentage points
+  up: 12, past: 2, days: 60     // keys up at most; semitones past the best; day rows kept
+};
+// (turn.js's weighted medians; not declared again here: in the page every script shares one scope)
+const SCT = typeof module !== "undefined" ? require("./turn.js") : { wmed, tnMed };
+const scMedian = (a) => { const s = a.slice().sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+
+// The patterns: semitones from the root (all major), the degrees shown under them, a beat (s). No note repeats the one
+// before it, which the aligner relies on. Narrow to wide, the order a teacher warms up in.
+const SC_PATS = {
+  p3: { id: "p3", name: "3 notes", st: [0, 2, 4, 2, 0], deg: [1, 2, 3, 2, 1], beat: 0.5 },
+  p5: { id: "p5", name: "5 notes", st: [0, 2, 4, 5, 7, 5, 4, 2, 0], deg: [1, 2, 3, 4, 5, 4, 3, 2, 1], beat: 0.4 },
+  arp: { id: "arp", name: "Arpeggio", st: [0, 4, 7, 12, 7, 4, 0], deg: [1, 3, 5, 8, 5, 3, 1], beat: 0.5 }
+};
+const SC_ORDER = ["p3", "p5", "arp"];
+const scSpan = (p) => Math.max(...p.st);
+// the call's length (s): a beat a note, the last held two
+const scCallLen = (p) => (p.st.length + 1) * p.beat;
+
+// Where the response begins: the start of the first pitched sample after from with SC.start ms pitched within
+// SC.startWin ms of it; null if none yet
+function scOnset(xs, from) {
+  const P = xs.filter((s) => s.m != null && s.t > from);
+  let e = 0, sum = 0;
+  for (let i = 0; i < P.length; i++) {
+    if (e < i) { e = i; sum = 0; }
+    while (e < P.length && P[e].t <= P[i].t + SC.startWin) sum += P[e++].w;
+    if (sum >= SC.start) return P[i].t - P[i].w;
+    sum -= P[i].w;
+  }
+  return null;
+}
+// The last ms held on m: 80% of it pitched within tol st of m (on the note itself: not a median, which half of it carries)
+function scHeld(xs, now, m, ms, tol = 1) {
+  let on = 0;
+  for (let i = xs.length - 1; i >= 0 && xs[i].t > now - ms; i--) { const s = xs[i]; if (s.t <= now && s.m != null && Math.abs(s.m - m) <= tol) on += s.w; }
+  return on >= 0.8 * ms;
+}
+// Where a note's core sits: the time-weighted mean of its pitched samples (t in (a, b]) within clip st of their median (a
+// slip, a crack or a scoop's tail left out). A mean, not the median: a core is one or two vibrato cycles, and over a cycle
+// and a half a median sits up to 0.7 of the vibrato's width off its centre, a mean 0.2. wt: the time kept. Each sample
+// weighs the part of its time, (t − w, t], inside (a, b]: time, not frames (a core is two or three frames at 20 fps).
+function scCentre(xs, a, b) {
+  const pairs = [];
+  for (const s of xs) { if (s.m == null || s.t <= a || s.t - s.w >= b) continue; const w = Math.min(s.t, b) - Math.max(s.t - s.w, a); if (w > 0) pairs.push([s.m, w]); }
+  const med = SCT.tnMed(pairs);
+  if (med.v == null) return med;
+  let sw = 0, sm = 0;
+  for (const [m, w] of pairs) if (Math.abs(m - med.v) <= SC.clip) { sw += w; sm += w * m; }
+  return { v: sm / sw, wt: sw };
+}
+
+// The response cut into its notes, in order. P: the pitched samples {t, w, m}; T: the targets. Each note gets a run of
+// samples in a row, or none (not sung); every sample belongs to a note. Cost: each sample's w·min(d², clip²) against its
+// note, SC.skip for each note not sung, and SC.skip too for a note whose run is too short to read (under SC.minNote ms
+// pitched: it's skipped anyway). Otherwise a frame or two would stand in for a skipped note, and a note sung a semitone
+// towards its neighbour, or an octave off, could be swallowed by that neighbour. The cheapest cut (a segment DP, linear
+// in the samples). Returns, a note each, {i0, i1} (its first and last sample) or null.
+function scAlign(P, T) {
+  const n = P.length, K = T.length, cl = SC.clip * SC.clip, out = T.map(() => null);
+  if (!n) return out;
+  const S = T.map((tk) => { // S[k][i]: the cost of samples 0…i−1 against note k
+    const a = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) { const d = P[i].m - tk; a[i + 1] = a[i] + P[i].w * Math.min(d * d, cl); }
+    return a;
+  });
+  const Wt = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) Wt[i + 1] = Wt[i] + P[i].w;
+  // F[i·K+k]: the best cost with note k's run ending at sample i (Fj: where that run starts); G[j·K+k]: the best cost of
+  // all before note k's run starting at j (Gk: the note sung before it, −1 none)
+  const F = new Float64Array(n * K).fill(Infinity), Fj = new Int32Array(n * K), G = new Float64Array(n * K), Gk = new Int32Array(n * K);
+  const M = new Float64Array(K).fill(Infinity), Mj = new Int32Array(K), p = new Int32Array(K); // per note: the best long start so far
+  for (let i = 0; i < n; i++) {
+    for (let k = 0; k < K; k++) { // G at j = i
+      if (i === 0) { G[k] = k * SC.skip; Gk[k] = -1; continue; }
+      let b = F[(i - 1) * K + k - 1] ?? Infinity, bk = k - 1;
+      if (k === 0) { b = Infinity; bk = -1; }
+      else if (k > 1 && G[i * K + k - 1] + SC.skip < b) { b = G[i * K + k - 1] + SC.skip; bk = Gk[i * K + k - 1]; }
+      G[i * K + k] = b; Gk[i * K + k] = bk;
+    }
+    if (i > 0) { // (a run starting at a step or a break: SC.edge off)
+      const brk = SC.edge * Math.min(SC.clip, Math.abs(P[i].m - P[i - 1].m) + Math.max(0, P[i].t - P[i].w - P[i - 1].t) / 50);
+      for (let k = 0; k < K; k++) G[i * K + k] -= brk;
+    }
+    for (let k = 0; k < K; k++) {
+      const s = S[k];
+      while (p[k] <= i && Wt[i + 1] - Wt[p[k]] >= SC.minNote) { // runs from p[k] to i (and on) are long enough
+        const v = G[p[k] * K + k] - s[p[k]];
+        if (v < M[k]) { M[k] = v; Mj[k] = p[k]; }
+        p[k]++;
+      }
+      let best = M[k] + s[i + 1], bj = Mj[k];
+      for (let j = p[k]; j <= i; j++) { const v = G[j * K + k] + s[i + 1] - s[j] + SC.skip; if (v < best) { best = v; bj = j; } }
+      F[i * K + k] = best; Fj[i * K + k] = bj;
+    }
+  }
+  let k = -1, best = Infinity;
+  for (let q = 0; q < K; q++) { const v = F[(n - 1) * K + q] + (K - 1 - q) * SC.skip; if (v < best) { best = v; k = q; } }
+  let i = n - 1;
+  while (k >= 0 && i >= 0) {
+    const j = Fj[i * K + k];
+    out[k] = { i0: j, i1: i };
+    const kk = Gk[j * K + k];
+    i = j - 1; k = kk;
+  }
+  // Then in time. The cut above is by pitch alone, so a note sung on its neighbour's pitch (a half step lost, the 2 left on
+  // the root, the top left on the 5th) runs on as that neighbour: the neighbour's run gets both notes' time, and the note
+  // a sliver (SC.minNote ms a semitone off cost less than its whole length) or nothing (SC.skip: less than a whole step's
+  // clip² over a note). And two notes on one key, the note between them not sung, cost the same wherever their run's cut.
+  // But notes are sung in time: u, the singer's own note (the median run; the last, held till the end, left out). A run
+  // longer than its own notes' time by SC.hold of the skipped notes' beside it (u each, the last 2u: nearer the time of
+  // all of them than of its own) holds them too, and is shared out among them in proportion, each cut at the longest
+  // break in the pitch (a breath) near its place; a note given its time there is judged on what was sung in it.
+  const len = (g) => (g ? Wt[g.i1 + 1] - Wt[g.i0] : 0);
+  const pitch = (g) => SCT.tnMed(P.slice(g.i0, g.i1 + 1).map((s) => [s.m, s.w])).v;
+  const own = (j) => out[j] && Math.abs(pitch(out[j]) - T[j]) <= 0.5; // (a run on its own note)
+  // (u: from two runs at least, else 0 and nothing's measured in time)
+  let u = 0;
+  const mine = () => { const ds = []; for (let q = 0; q < K - 1; q++) if (out[q]) ds.push(len(out[q])); u = ds.length >= 2 ? scMedian(ds) : 0; };
+  const rel = (q) => (q === K - 1 ? 2 : 1), ex = (q) => rel(q) * u;
+  mine();
+  // a sliver (squeezed: under SC.squeeze of its note) on a neighbour's pitch is that neighbour's: given back, the note skipped
+  const back = new Set();
+  for (let q = 0; u && q < K; q++) {
+    const g = out[q];
+    if (!g || len(g) >= SC.squeeze * ex(q)) continue;
+    const gm = pitch(g);
+    let on = -1;
+    for (const j of [q - 1, q + 1]) if (j >= 0 && j < K && own(j) && Math.abs(gm - T[j]) <= 0.5 && (on < 0 || Math.abs(gm - T[j]) < Math.abs(gm - T[on]))) on = j;
+    if (on < 0) continue; // (a short note on its own pitch, or off both: as sung)
+    if (on < q) out[on].i1 = g.i1; else out[on].i0 = g.i0;
+    out[q] = null; back.add(q);
+  }
+  mine();
+  const share = (lo, hi, G) => { // samples lo…hi, cut among the notes G (in order)
+    if (hi - lo + 1 < G.length) return;
+    const tot = Wt[hi + 1] - Wt[lo], e = G.map(rel), sum = e.reduce((x, y) => x + y, 0);
+    let j0 = lo, acc = 0;
+    for (let q = 0; q < G.length - 1; q++) {
+      acc += e[q];
+      const aim = Wt[lo] + (tot * acc) / sum, slack = (0.5 * tot * Math.min(e[q], e[q + 1])) / sum, last = hi - (G.length - 2 - q);
+      let bj = -1, bs = -Infinity;
+      for (let j = j0 + 1; j <= last; j++) {
+        const off = Math.abs(Wt[j] - aim);
+        if (off > slack) continue;
+        const sc = Math.max(0, P[j].t - P[j].w - P[j - 1].t) * 1e3 - off;
+        if (sc > bs) { bs = sc; bj = j; }
+      }
+      if (bj < 0) { bj = j0 + 1; while (bj < last && Wt[bj] < aim) bj++; }
+      out[G[q]] = { i0: j0, i1: bj - 1 }; j0 = bj;
+    }
+    out[G[G.length - 1]] = { i0: j0, i1: hi };
+  };
+  // two runs on one key: shared out between the two (then u again: the cut above was anywhere), and with the notes between
+  // them where they hold their time too
+  const pairs = [];
+  let prev = null;
+  for (let q = 0; q < K; q++) {
+    if (!out[q]) continue;
+    if (prev != null && Math.abs(T[prev] - T[q]) < 0.5) { pairs.push([prev, q]); share(out[prev].i0, out[q].i1, [prev, q]); }
+    prev = q;
+  }
+  if (pairs.length) mine();
+  for (const [a, b] of pairs) {
+    if (!u || b - a < 2) continue;
+    const lo = out[a].i0, hi = out[b].i1, all = [];
+    let need = ex(a) + ex(b);
+    for (let r = a; r <= b; r++) { all.push(r); if (r !== a && r !== b) need += SC.hold * ex(r); }
+    if (Wt[hi + 1] - Wt[lo] >= need) share(lo, hi, all);
+  }
+  // a note skipped beside a neighbour's run (on its own note) holding both notes' time: it was sung there, on the wrong
+  // pitch (SC.holdHeard where its sliver was given back). (Not the last note's run: it lasts till listening stopped, so
+  // it measures nothing.)
+  for (let q = 0; u && q < K; q++) {
+    if (out[q]) continue;
+    let by = -1, br = 0;
+    for (const j of [q - 1, q + 1]) {
+      if (j < 0 || j >= K - 1 || !own(j) || len(out[j]) < ex(j) + (back.has(q) ? SC.holdHeard : SC.hold) * ex(q)) continue;
+      if (len(out[j]) / ex(j) > br) { br = len(out[j]) / ex(j); by = j; }
+    }
+    if (by >= 0) share(out[by].i0, out[by].i1, by < q ? [by, q] : [q, by]);
+  }
+  return out;
+}
+
+// One key's response, judged. xs: its samples {t, w, m, v} (m null: not pitched, or pitched an octave off; v: voiced);
+// N: the notes played (keys); opts.turn: the vowel's turn (or null); opts.early: the singer came in before reading began.
+// The whole response's octave o first (sung an octave from the piano is judged there); then each note's core (scCentre:
+// its voice's start and end trimmed off) against its target T: good within SC.good cents, close within SC.close, else a
+// miss; skip: not sung (under SC.minHeard ms voiced, or SC.minNote long); short: heard, but voiced under SC.minNote (too
+// brief to read: a fault, not an unknown); unread: voiced long enough but too little pitch in its core, or an octave off
+// (the tracker), or (early) sung before reading began. ok: 1 clean (no miss, skip or short, 60% read, the top note read),
+// 0 not, −1 too little read. top: a clean key's top where that note was good (the highest key sung cleanly), else null.
+function scJudge(xs, N, opts = {}) {
+  const K = N.length, P = xs.filter((s) => s.m != null);
+  const tz = { k: 0, n: 0 }, rs = { k: 0, n: 0 };
+  const res = { ok: -1, o: 0, T: N.slice(), notes: [], good: 0, close: 0, miss: 0, skip: 0, short: 0, unread: 0, judged: 0, heard: 0, clean: false, top: null, worst: null, drift: null, tz, rs };
+  if (P.reduce((u, s) => u + s.w, 0) < SC.minCore) {
+    res.notes = N.map((tgt, k) => ({ k, tgt, a: null, b: null, m: null, c: null, st: "unread" }));
+    res.unread = K;
+    return res;
+  }
+  const sung = SCT.tnMed(P.map((s) => [s.m, s.w])).v, ref = SCT.tnMed(N.map((m, k) => [m, k === K - 1 ? 2 : 1])).v;
+  const o = 12 * Math.max(-1, Math.min(1, Math.round((sung - ref) / 12)));
+  const T = N.map((m) => m + o);
+  res.o = o; res.T = T;
+  const seg = scAlign(P, T), vis = [];
+  seg.forEach((g, k) => { if (g) vis.push(k); });
+  const bounds = T.map(() => null);
+  vis.forEach((k, q) => {
+    const g = seg[k], pv = q > 0 ? seg[vis[q - 1]] : null, nx = q < vis.length - 1 ? seg[vis[q + 1]] : null;
+    const a = pv ? (P[pv.i1].t + P[g.i0].t) / 2 : P[g.i0].t - P[g.i0].w, b = nx ? (P[g.i1].t + P[nx.i0].t) / 2 : P[g.i1].t;
+    bounds[k] = [a, b];
+  });
+  for (let k = 0; k < K; k++) {
+    const note = { k, tgt: T[k], a: null, b: null, m: null, c: null, st: "skip" };
+    res.notes.push(note);
+    if (!bounds[k]) continue;
+    const [a, b] = bounds[k];
+    note.a = a; note.b = b;
+    // the voice in it: its start and end are trimmed from the voice's, not the segment's (a breath or a silence between
+    // notes isn't the note, and a scoop at a note's start after one is still its start)
+    let heard = 0, va = null, vb = null;
+    for (const s of xs) if (s.v && s.t > a && s.t <= b) { heard += s.w; if (va == null) va = Math.max(a, s.t - s.w); vb = s.t; }
+    if (heard < SC.minHeard || b - a < SC.minNote) continue;
+    const d = vb - va;
+    if (d < SC.minNote) { note.st = "short"; continue; } // (sung too briefly to be read: the singer's, not the tracker's)
+    const ca = va + Math.min(SC.onset, SC.onsetShare * d), cb = vb - Math.min(SC.release, SC.releaseShare * d);
+    const med = scCentre(xs, ca, cb);
+    if (med.v == null || med.wt < SC.minCore || Math.abs(med.v - T[k]) >= SC.octSlip) { note.st = "unread"; note.m = med.v; continue; }
+    note.m = med.v; note.c = Math.round(100 * (med.v - T[k]));
+    const ac = Math.abs(note.c);
+    note.st = ac <= SC.good ? "good" : ac <= SC.close ? "close" : "miss";
+  }
+  // heard: the notes heard at all (one or none: no response, a sound before it: scFalse); came in early: the notes before
+  // the first heard were sung while nothing was read (not skipped: not heard)
+  res.heard = res.notes.filter((nt) => nt.st !== "skip").length;
+  if (opts.early) for (const nt of res.notes) { if (nt.st !== "skip" && nt.st !== "short") break; nt.st = "unread"; }
+  for (const nt of res.notes) res[nt.st]++;
+  res.judged = res.good + res.close + res.miss + res.skip + res.short;
+  if (res.unread > SC.unread * K) { res.ok = -1; }
+  else {
+    const top = Math.max(...T), tops = res.notes.filter((nt) => nt.tgt === top);
+    res.clean = res.miss === 0 && res.skip === 0 && res.short === 0 && res.good + res.close >= Math.ceil(SC.readMin * K)
+      && tops.every((nt) => nt.st === "good" || nt.st === "close");
+    res.ok = res.clean ? 1 : 0;
+    res.top = res.clean && tops.every((nt) => nt.st === "good") ? top : null;
+  }
+  // the worst: the first note skipped, else the miss furthest off, else the first too short, else the close furthest off
+  const far = (st) => { let w = null; for (const nt of res.notes) if (nt.st === st && (w == null || Math.abs(nt.c) > Math.abs(res.notes[w].c))) w = nt.k; return w; };
+  const first = (st) => { const nt = res.notes.find((q) => q.st === st); return nt ? nt.k : null; };
+  res.worst = first("skip") ?? far("miss") ?? first("short") ?? far("close");
+  // the whole key off one way: the notes heard (close or missed alike) off by much the same amount the same way, so the
+  // key was sung out of tune, not a note got wrong (one note wrong leaves the median near 0; several wrong ones, a
+  // spread). Reported where nothing was skipped and not every note was good. (A note read short doesn't stop it: sung
+  // out of tune, a half step's two notes run together, and one of them reads short.)
+  const read = res.notes.filter((nt) => nt.st === "good" || nt.st === "close" || nt.st === "miss");
+  if (res.ok >= 0 && res.skip === 0 && res.good < K && read.length >= 3) {
+    const med = scMedian(read.map((nt) => nt.c)), sg = Math.sign(med);
+    const share = read.filter((nt) => Math.sign(nt.c) === sg && Math.abs(nt.c) > SC.driftMin).length / read.length;
+    const spread = scMedian(read.map((nt) => Math.abs(nt.c - med)));
+    if (sg && share >= SC.driftShare && Math.abs(med) > SC.drift && spread <= SC.driftSpread) res.drift = { dir: sg, c: Math.round(med) };
+  }
+  // at the turn and the rest (each note judged: an unread one isn't)
+  for (const nt of res.notes) {
+    if (nt.st === "unread") continue;
+    const z = opts.turn != null && Math.abs(nt.tgt - opts.turn) <= SC.turnNear ? tz : rs;
+    z.n++; if (nt.st === "good") z.k++;
+  }
+  return res;
+}
+
+// A response ended by silence (why: "gap") with one note heard or none isn't one: a sound before the singing (an "uh", a
+// throat cleared, "okay"). It's not judged; the response is waited for again.
+const scFalse = (res, why) => why === "gap" && res.heard <= 1;
+
+// The set's next key. st: {root, dir: 1 up | −1 down, retried, unread, start}; ok: the key's result; lim: the highest root
+// allowed. Up while clean; unclean, the same key once more ("retry"), then down; down a key at a time (no retries: the
+// cool-down) to below the start, where it ends. Two unread keys in a row end it. say: "up", "retry", "down" (turned
+// round), "same" (unread, again), or null (on down).
+function scStep(st, ok, lim) {
+  const s = { ...st };
+  if (ok === -1) {
+    s.unread++;
+    return s.unread >= 2 ? { st: s, say: null, end: "unread" } : { st: s, say: "same", end: false };
+  }
+  s.unread = 0;
+  const down = (say) => { s.dir = -1; s.root--; s.retried = false; return { st: s, say, end: s.root < s.start ? "done" : false }; };
+  if (s.dir < 0) return down(null);
+  if (ok === 1) {
+    if (s.root + 1 <= lim) { s.root++; s.retried = false; return { st: s, say: "up", end: false }; }
+    return down("down");
+  }
+  if (!s.retried) { s.retried = true; return { st: s, say: "retry", end: false }; }
+  return down("down");
+}
+
+if (typeof module !== "undefined") module.exports = { SC, SC_PATS, SC_ORDER, scSpan, scCallLen, scOnset, scHeld, scCentre, scAlign, scJudge, scFalse, scStep };
