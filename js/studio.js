@@ -18,7 +18,7 @@ async function openSong(m) {
   P.song = m; P.offset = 0; P.ph = null; labelKeys();
   $("#pSing").hidden = !m.stems.includes("vocals");
   paintCrumbs();
-  paintMeta(); keyOf(m).then(() => { if (P.song === m) { paintMeta(); paintKey(); } });
+  keyOf(m).then(() => { if (P.song === m) paintKey(); });
   P.tracks = {};
   for (const name of trackNames(m)) P.tracks[name] = { gain: null };
   P.tracks.click = { gain: null };
@@ -37,13 +37,7 @@ async function openSong(m) {
   P.orig = { ...P.buffers }; // as decoded, for key 0
   if (P.shifted && P.shifted.n === P.keyWant && P.shifted.s === P.rateWant) applyKey(P.keyWant, P.rateWant); // the remembered version came in first
   computePeaks(); P.peaksAt = performance.now(); // the waveform rises in from here
-  paintMeta();
   drawWave();
-}
-// after the Studio's time: how many tracks (the length is in the time)
-function paintMeta() {
-  const m = P.song;
-  if (m) $("#pMeta").textContent = Object.keys(P.buffers).length ? tr("{n} tracks", { n: trackNames(m).length }) : tr("loading tracks…");
 }
 function closeSong() {
   pauseSong();
@@ -307,7 +301,17 @@ function drawWave() {
     const half = flag.offsetWidth / 2;
     flag.style.left = Math.max(half, Math.min(W - half, prog * W)) + "px"; // kept over the waveform
   }
-  $("#pTime").textContent = `${fmtTime(heardPos())} / ${fmtTime(songDur())}`;
+  paintClock(prog, W);
+}
+// The time under the song's waveform: 0:00 and its length at the ends, where it is riding under the playhead (kept
+// inside); an end it would cover steps back
+function paintClock(prog, W) {
+  const now = $("#pClockNow"), end = $("#pClockEnd");
+  now.textContent = fmtTime(heardPos()); end.textContent = fmtTime(songDur());
+  const half = now.offsetWidth / 2, x = Math.max(half, Math.min(W - half, prog * W));
+  now.style.left = x + "px";
+  $("#pClock .wc-start").classList.toggle("covered", x - half < 40);
+  end.classList.toggle("covered", x + half > W - 40);
 }
 // A waveform's bars into canvas context x (cw × Hd device pixels, d of them per CSS px), each up to maxH CSS px: on whole
 // device pixels, 2 px wide and 1 px apart (at 1×), each the loudest of the peaks it covers, the ones before prog (0…1)

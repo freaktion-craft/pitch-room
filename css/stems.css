@@ -155,7 +155,7 @@
 .player { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */
 .player-title { display: grid; gap: var(--space-1); min-width: 0; }
-#sPlayer .player-title { gap: var(--space-2); } /* play, the seek buttons, the key and tempo (the song's volume at the end), then the time and the tracks */
+#sPlayer .player-title { gap: var(--space-2); } /* play, the seek buttons, the key and tempo (the song's volume at the end) */
 .title-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; min-height: 40px; } /* as tall as Practice's play row, so the key under it is where Practice has it */
 .player-title .muted { font-size: var(--text-sm); }
 #pWave { width: 100%; height: 96px; display: block; border-radius: var(--radius-lg); background: var(--bg); cursor: none; touch-action: pan-y; }
@@ -171,6 +171,17 @@
 .ph-flag { position: absolute; top: 0; z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 var(--space-2); display: grid; place-items: center;
   border-radius: var(--radius-xs); background: var(--voice); color: var(--on-voice); font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
 .wave-wrap { position: relative; }
+/* The time under the waveform (paintClock): 0:00 and the song's length under its ends, faint; where it is riding
+   under the playhead in its colour. An end the moving one would cover fades out. */
+#sPlayer .wave-wrap { margin-bottom: var(--space-6); }
+.wclock { position: absolute; top: calc(100% + var(--space-1)); left: 0; right: 0; height: 18px; pointer-events: none;
+  font: var(--text-xs)/18px var(--mono); font-variant-numeric: tabular-nums; }
+.wc-start { position: absolute; left: 0; }
+.wc-end { position: absolute; right: 0; }
+:is(.wc-start, .wc-end) { color: var(--faint); transition: opacity var(--duration-fast); }
+.wclock .covered { opacity: 0; }
+.wc-now { position: absolute; top: 0; transform: translateX(-50%); padding: 0 var(--space-2); border-radius: var(--radius-xs);
+  background: var(--voice); color: var(--on-voice); white-space: nowrap; }
 /* the playhead, over the waveform (its rounded corners would clip it at the ends); thicker while you can grab it, hanging
    from the flag while you drag it */
 .ph-line { position: absolute; left: 0; top: 0; bottom: 0; z-index: 2; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--voice); pointer-events: none; }
@@ -190,8 +201,6 @@
 .tparts .selbar { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; gap: var(--space-1); pointer-events: auto; }
 .tparts .selbar .btn { white-space: nowrap; box-shadow: var(--shadow-raised); }
 .transport-row { display: flex; align-items: center; gap: var(--space-2) var(--space-4); flex-wrap: wrap; } /* spaced as Practice's (.sb-main), so each button's where it is there */
-.song-facts output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.song-facts .ptracks { font-size: var(--text-sm); color: var(--muted); } /* how many tracks, after the time */
 /* Key change, in the Studio's header and in Practice's bar: a dropdown of the keys, then a note in whatever room is
    left on the line (that big shifts can sound processed, or why a change failed). The dropdown has a fixed width and
    the note takes no room of its own, so nothing moves as they change. */
@@ -217,9 +226,7 @@
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .knote.warn { color: var(--warn-ink); }
 .knote.err { color: var(--bad); }
-/* In the Studio the key and tempo sit after the seek buttons, their note after them; the time and the tracks go on
-   the line under */
-.song-facts { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; }
+/* In the Studio the key and tempo sit after the seek buttons, their note after them */
 .transport-row .keyctl { flex: none; }
 .meta-line { display: flex; flex: 1 1 120px; min-width: 0; white-space: nowrap; }
 #pKeyNote { flex: 1 1 0; width: auto; min-width: 0; height: auto; max-height: none; display: block; overflow: hidden; text-overflow: ellipsis; font-size: inherit; line-height: inherit; }

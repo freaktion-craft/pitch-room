@@ -358,9 +358,8 @@ const EMPTY_LIBRARY = false;
           <label class="mix-ico" for="pVol" title="Volume"></label>
           <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
         </div></div>
-        <div class="song-facts"><output id="pTime">0:00 / 0:00</output><span class="ptracks" id="pMeta"></span></div>
       </div>
-      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
+      <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output><div class="wclock" id="pClock" aria-hidden="true"><span class="wc-start">0:00</span><output class="wc-now" id="pClockNow">0:00</output><span class="wc-end" id="pClockEnd">0:00</span></div></div>
       <div class="tracks" id="pTracks"></div>
       <p class="muted export-state" id="pExportState"></p>
     </section>
