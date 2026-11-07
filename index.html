@@ -171,38 +171,35 @@ const EMPTY_LIBRARY = false;
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
     <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
-    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Pad</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div></div>
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Turn</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div></div>
     <div class="vc">
       <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
       <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false">Freeze</button></section>
-      <section class="vc-pad" aria-label="Where your voice is" hidden>
+      <section class="vc-pad" aria-label="Your turn" hidden>
         <canvas id="vcPad" aria-hidden="true"></canvas>
-        <span class="vc-ax up">Forward · bright</span><span class="vc-ax down">Back · dark</span><span class="vc-ax left">Chest</span><span class="vc-ax right">Head</span>
+        <div class="seg vc-mode" id="vcMode" role="radiogroup" aria-label="Mode"><button type="button" role="radio" data-m="find">Find</button><button type="button" role="radio" data-m="smooth">Smooth</button></div>
+        <button class="btn sm primary vc-go" id="vcGo" type="button">Start</button>
+        <div class="vc-say"><p id="vcSay" aria-live="polite"></p><p id="vcDo"></p></div>
+        <span class="vc-ax h2" id="vcAxH2" title="How far H2 stands out from H1 and H3. It peaks at your turn.">H2</span>
+        <span class="vc-ax lane l" id="vcAxL" hidden>Loudness</span><span class="vc-ax lane u" id="vcAxT" hidden>Tone</span>
         <div class="overlay" id="vcOff" hidden><p>Use headphones, so the speakers don’t leak in.</p><button class="btn primary" id="vcMic" type="button">Turn the mic on</button></div>
       </section>
       <aside class="vc-side">
         <div class="vc-note"><b id="vcNote">–</b><span id="vcCents"></span></div>
         <div class="vc-cents" aria-hidden="true"><i id="vcNeedle"></i></div>
         <dl class="vc-stats">
-          <div title="H1−H2: how much louder your lowest harmonic is than the next. Higher is heady, lower is chesty."><dt>H1−H2</dt><dd id="vcH12">–</dd></div>
-          <div><dt>Brightness</dt><dd id="vcBright">–</dd></div>
+          <div title="H1−H2: how much louder your lowest harmonic is than the next."><dt>H1−H2</dt><dd id="vcH12">–</dd></div>
           <div><dt>Level</dt><dd id="vcLvl">–</dd></div>
           <div title="Formants, the vowel's shape: F1 rises as the mouth opens, F2 as the tongue comes forward. Less sure on high notes, where the harmonics are far apart"><dt>F1 · F2</dt><dd id="vcF12">–</dd></div>
         </dl>
-        <div class="vc-cal">
-          <b>Set it to your voice</b>
-          <p class="muted">Turn one on and sing in it. A few notes and vowels of each, the same notes in both.</p>
-          <div class="vc-cal-acts"><button class="btn sm" id="vcChest" type="button" aria-pressed="false">Chest</button><button class="btn sm" id="vcHead" type="button" aria-pressed="false">Head</button><button class="btn sm ghost" id="vcReset" type="button" hidden>Reset</button></div>
-          <p class="muted vc-fit" id="vcFit"></p>
-        </div>
+        <div class="vc-vowels" id="vcVowels" role="radiogroup" aria-label="Vowel"></div>
       </aside>
     </div>
-    <!-- the keyboard, and beside it Step up: the note to sing (lit on it, a key tapped sets it) and a semitone up at a time -->
+    <!-- the keyboard, and beside it the Turn view's note: Find's first note, or Smooth's centre (lit on it; a key tapped or the
+         arrows set it, between runs) -->
     <div class="keys-wrap vc-keys"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div>
       <div class="vc-step">
-        <div class="vc-step-head"><b>Step up</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
-        <label>Move up by itself <input type="checkbox" class="switch" id="vcAuto"></label>
-        <p class="muted">Tap a key to start there.</p>
+        <div class="vc-step-head"><b id="vcStepLbl">Start note</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
       </div></div>
   </main>
   <main id="vSettings" aria-label="Settings" hidden>
@@ -472,6 +469,7 @@ const EMPTY_LIBRARY = false;
 <script src="js/takes.js"></script>
 <script src="js/takes-studio.js"></script>
 <script src="js/stage.js"></script>
+<script src="js/turn.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/onboard.js"></script>
 <script src="js/app.js"></script>

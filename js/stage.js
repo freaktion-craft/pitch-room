@@ -7,7 +7,7 @@ const cv = $("#cv"), g = cv.getContext("2d");
 let W = 0, H = 0, dpr = 1, C = {};
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ["surface","surface-2","ink","muted","line","voice","good","warn","bad"]) C[k] = cs.getPropertyValue("--" + k).trim();
+  for (const k of ["surface","surface-2","ink","muted","line","voice","good","warn","orange","bad"]) C[k] = cs.getPropertyValue("--" + k).trim();
   // the track colours through an element's computed colour, which works out the color-mix() of the backing vocals
   const probe = readColors.probe || (readColors.probe = document.body.appendChild(Object.assign(el("i"), { hidden: true })));
   for (const k of ["vocals","lead","backing","drums","bass","guitar","piano","other","click"]) { probe.style.color = `var(--stem-${k})`; C["stem-" + k] = getComputedStyle(probe).color; }
@@ -290,7 +290,8 @@ function loop() {
   let m = null;
   if (ac && (micOn || testOsc)) {
     if (testOsc) {
-      const tgt = activeNote(songPos()) || lastTarget;
+      // (in the Lab, its note; while a Smooth pass runs, left where it is, for a glide set by hand)
+      const tgt = view === "voice" ? (VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
       if (tgt) testOsc.frequency.setTargetAtTime(mf(tgt.midi + testOffset / 100), ac.currentTime, 0.03);
     }
     analyser.getFloatTimeDomainData(tbuf);

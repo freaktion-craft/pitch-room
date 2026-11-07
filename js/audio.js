@@ -135,7 +135,7 @@ function synthPiano(m, at, dur, dest, vel) {
   const ng = ac.createGain(); ng.gain.value = vel * 0.18;
   nz.connect(bp); bp.connect(ng); ng.connect(dest); nz.start(at);
 }
-function playKey(m) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.vol; g.connect(master); piano(m, ac.currentTime + 0.01, 1.2, g, 0.55); }
+function playKey(m, dur = 1.2, delay = 0) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.vol; g.connect(master); piano(m, ac.currentTime + 0.01 + delay, dur, g, 0.55); }
 
 // Where a refused mic is allowed again: the system's own settings in the desktop app (it can't be asked twice there),
 // the mic in the address bar in a browser. how: what to do, {link} where the settings' path goes (obMic makes it a link)
