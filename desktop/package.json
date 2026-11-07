@@ -24,6 +24,7 @@
     "appId": "com.freaktion.pitchroom",
     "productName": "Pitchroom",
     "artifactName": "Pitchroom-${version}-${os}-${arch}.${ext}",
+    "afterPack": "scripts/check-packed.js",
     "directories": {
       "output": "dist",
       "buildResources": "build"
