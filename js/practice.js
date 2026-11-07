@@ -868,7 +868,7 @@ function renderLyrics(now) {
   if (!K.lyrics) return;
   const list = $("#lyList");
   if (K.lyFor !== K.phrases) {
-    K.lyFor = K.phrases; K.lyAt = null; K.lyCountAt = null;
+    K.lyFor = K.phrases; K.lyAt = null; K.lyCountAt = null; K.lyFresh = true; list.classList.add("still"); // (new lines: shown where they are, not faded or slid in)
     K.lyLines = K.phrases.map((ph) => {
       const p = el("p"), words = ph.words, ws = words.map((w) => ({ a: w[0], b: w[1], parts: w[3] || null, s: el("span", w[4] ? "bg" : null, w[2].trim()) }));
       // backing vocals at the end of a line: a smaller row of their own, as the lines joined in a phrase each have theirs
@@ -894,9 +894,10 @@ function renderLyrics(now) {
   const cur = K.lyLines[i], cnt = lyCount(), at = row ? row.at : null;
   const key = `${i}|${at}|${row && row.state}|${!cnt.querySelector(".lbl").textContent}`; // (not the stage's height: read here it lays out mid-frame, and resize() clears K.lyAt)
   if (K.lyAt !== key && cur) {
+    if (!col.offsetHeight) return; // not on screen yet: placed once it is
     K.lyAt = key;
-    // a jump: straight there. Else a line's arrival is done by the time its first word comes, however soon that is
-    const far = K.lyI != null && Math.abs(i - K.lyI) > 1;
+    // a jump, or new lines: straight there. Else a line's arrival is done by the time its first word comes, however soon
+    const far = K.lyFresh || (K.lyI != null && Math.abs(i - K.lyI) > 1);
     const dur = far ? "0s" : P.playing || (T.play && T.play.srcs) ? Math.max(0.2, Math.min(0.6, (cur.ph.t0 - now) / P.rate)).toFixed(2) + "s" : "";
     K.lyI = i;
     list.style.transitionDuration = dur;
@@ -922,6 +923,7 @@ function renderLyrics(now) {
     const mid = col.offsetHeight * 0.42, centre = cur.p; // the line, the count-in over it: nothing moves as its first word comes
     K.lyY = Math.round(mid - centre.offsetTop - parseFloat(getComputedStyle(centre).lineHeight) / 2); // its first row: one height for every line, the eye goes back there
     list.style.transform = `translateY(${K.lyY}px)`;
+    if (K.lyFresh) { K.lyFresh = false; list.offsetHeight; list.classList.remove("still"); } // (laid out there first)
   }
   if (!cur) return;
   const t = now + (LYRIC_LEAD + frameDt) * P.rate, before = K.lyLines[i - 1], next = K.lyLines[i + 1];

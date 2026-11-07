@@ -40,6 +40,7 @@
 @supports (color: oklch(from red l c h)) { .lylist { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) c h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi) */
 .lylist p:is(.now, .b1) span { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
+.lylist.still, .lylist.still p { transition: none; } /* new lines (renderLyrics): there at once */
 .lylist p.n1 { opacity: 0.55; } /* 5.3:1, read without effort like --muted */
 .lylist p.n1.soon { opacity: 0.8; } /* its turn is coming: time to read it */
 .lylist p.n2 { opacity: 0.35; }
