@@ -108,9 +108,12 @@ function voiceFrame() {
 
 // ---------- what's said ----------
 // The status line and the one under it (what to do), each English with its {placeholders}. keep: it stays till something
-// else happens; else it's what's said while idle, said again on every change (paintTurn).
-function vcSay(st, sv, d, dv, keep = true) {
+// else happens; else it's what's said while idle, said again on every change (paintTurn). tone: the status in the colour
+// of what it reports, as it's marked on the canvas ("good": a turn found, a pass or a whole set even; "bad": a break; "step": a step in
+// loudness or tone), whatever your accent.
+function vcSay(st, sv, d, dv, keep = true, tone = "") {
   say($("#vcSay"), st, sv || undefined); say($("#vcDo"), d, dv || undefined);
+  if ($("#vcSay").dataset.tone !== tone) $("#vcSay").dataset.tone = tone;
   VC.msg = keep;
   vcTitles();
 }
@@ -130,11 +133,11 @@ function vcTurnSay(v) {
 function vcIdle() {
   const ts = vcTurnSay(VC.vowel);
   if (VC.mode === "find") {
-    if (ts) vcSay(ts[0], ts[1], "Start to find it again.", null, false);
+    if (ts) vcSay(ts[0], ts[1], "Start to find it again.", null, false, "good");
     else vcSay("No turn yet", null, "Start, then hold each lit note on “{v}”.", { v: vcV() }, false);
   } else if (vcBlind()) vcSay("No turn yet", null, "Find it first.", null, false);
   else {
-    const st = vcAtTurn(VC.centre) ? ts : ["Around {n}", { n: absName(VC.centre) }];
+    const at = vcAtTurn(VC.centre), st = at ? ts : ["Around {n}", { n: absName(VC.centre) }];
     vcSay(st[0], st[1], ...vcSlide(VC.centre), false);
   }
 }
@@ -216,7 +219,7 @@ function vcFindEnd(r, why) {
   else if (why === "lower") vcSetTarget(R.start - 4, false);
   else if (why === "higher") vcSetTarget(Math.max(R.start + 4, top - 4), false);
   else vcSetTarget(R.start, false);
-  if (r.state === "found") { const ts = vcTurnSay(VC.vowel); vcSay(ts[0], ts[1], "Now smooth it."); }
+  if (r.state === "found") { const ts = vcTurnSay(VC.vowel); vcSay(ts[0], ts[1], "Now smooth it.", null, true, "good"); }
   else if (why === "faint") vcSay("Too faint to read", null, "Louder, nearer the mic.");
   else if (why === "stop") vcSay("Stopped", null, "Start, then hold each lit note on “{v}”.", { v: vcV() });
   else if (why === "higher") vcSay("No turn up to {note}", { note: absName(top) }, "Start a few notes higher.");
@@ -265,11 +268,16 @@ function vcPassDone(res, xs) {
   VC.prev = VC.cur; VC.cur = { xs, res, T: R.T, fit: res.fL || res.fU ? { fL: res.fL, fU: res.fU } : null };
   if (res.ok >= 0) vcDay(res.ok === 1);
   const w = vcPassWords(res, R.T);
-  vcSay(...w);
+  vcSay(...w, true, vcTone(res));
   R.advice = res.ok === 1 ? null : [w[2], w[3]];
   if (VC.set.length < TN.set) { R.phase = "rest"; R.next = performance.now() + TN.rest; } else vcSetEnd();
   paintTurn();
 }
+// a pass's tone (vcSay), and the colour it's marked in: even, a break, a step (loudness or tone); not read: none
+const vcTone = (res) => (res.ok === 1 ? "good" : res.ok === 0 ? (res.kind === "break" ? "bad" : "step") : "");
+const vcToneC = (t) => ({ good: C.good, bad: C.bad, step: C.orange })[t] || C.muted;
+// your notes and passes: in your colour, unless it's as good as one of those (Green, Coral, Orange): then in ink
+const vcMine = () => (["green", "coral", "orange"].includes(accent) ? C.ink : C.voice);
 function vcPassWords(res, T) {
   const at = res.at != null ? { note: absName(res.at) } : null;
   if (res.ok === 1) return ["Even", null, "Again.", null];
@@ -294,7 +302,7 @@ function vcSetEnd() {
   if (M != null && firsts.filter((f) => Math.abs(f - M) <= 1).length >= 3 && Math.round(M) !== R.T) {
     VC.centre = Math.max(KEY_LO, Math.min(KEY_HI, Math.round(M))); VC.mine = true; vcGuide();
     vcSay(st[0], st[1], "Next set centres on {note}.", { note: absName(VC.centre) });
-  } else vcSay(st[0], st[1], k >= 4 ? "Next: try another vowel." : "Again, or rest a minute.", null);
+  } else vcSay(st[0], st[1], k >= 4 ? "Next: try another vowel." : "Again, or rest a minute.", null, true, k === n ? "good" : ""); // (all even: green)
 }
 // Smooth's days, a vowel's: [yyyymmdd, passes judged, even, the day's last set's even (null till a set ends)]
 const vcToday = () => { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); };
@@ -382,7 +390,7 @@ function paintTurn() {
     for (let i = 0; i < 8; i++) {
       const r = days[i - (8 - days.length)];
       bars[i].style.height = (r && r[1] ? Math.round((100 * r[2]) / r[1]) : 0) + "%";
-      bars[i].classList.toggle("thin", !!r && r[1] < 3);
+      bars[i].classList.toggle("thin", !!r && r[1] < 3); bars[i].classList.toggle("none", !(r && r[2]));
     }
   }
   if (!VC.run && !VC.msg) vcIdle();
@@ -430,30 +438,31 @@ function drawFind(g, now, H, P, font) {
   g.strokeStyle = C.line; g.lineWidth = 1;
   g.beginPath(); g.moveTo(P.l, Math.round(Y(0)) + 0.5); g.lineTo(P.r, Math.round(Y(0)) + 0.5); g.stroke();
   g.fillStyle = C.muted; g.font = font(11); g.textAlign = "right"; g.fillText("0", P.l - 6, Y(0) + 4);
-  if (VC.target >= lo && VC.target <= hi) { g.fillStyle = C.voice; g.globalAlpha = 0.06; g.fillRect(X(VC.target) - cw / 2, P.t, cw, P.b - P.t); g.globalAlpha = 1; }
+  if (VC.target >= lo && VC.target <= hi) { g.fillStyle = vcMine(); g.globalAlpha = 0.06; g.fillRect(X(VC.target) - cw / 2, P.t, cw, P.b - P.t); g.globalAlpha = 1; }
   g.save(); g.beginPath(); g.rect(P.l, 0, P.r - P.l, H); g.clip();
   g.font = font(12); g.textAlign = "center";
-  if (last) {
+  if (last && !(turn && (turn.lo != null && turn.hi != null ? last.t >= turn.lo - 0.5 && last.t <= turn.hi + 0.5 : Math.round(last.t) === Math.round(turn.t)))) {
+    // (last time's, unless it's this one's note: the status line says so)
     g.strokeStyle = C.muted; g.setLineDash([4, 5]); vcVline(g, X(last.t), P.t + 30, P.b); g.setLineDash([]);
     g.fillStyle = C.muted; g.fillText(tr("Last"), X(last.t), P.t + 26);
   }
-  if (turn) {
-    g.fillStyle = C.voice;
-    if (turn.lo != null && turn.hi != null) { g.globalAlpha = 0.12; g.fillRect(X(turn.lo - 0.5), P.t + 16, X(turn.hi + 0.5) - X(turn.lo - 0.5), P.b - P.t - 16); g.globalAlpha = 1; }
-    else { g.strokeStyle = C.voice; g.lineWidth = 2; vcVline(g, X(turn.t), P.t + 16, P.b); g.lineWidth = 1; }
+  if (turn) { // (the turn found: green, whatever your accent, as its status line is)
+    g.fillStyle = C.good;
+    if (turn.lo != null && turn.hi != null) { g.globalAlpha = 0.16; g.fillRect(X(turn.lo - 0.5), P.t + 16, X(turn.hi + 0.5) - X(turn.lo - 0.5), P.b - P.t - 16); g.globalAlpha = 1; }
+    else { g.strokeStyle = C.good; g.lineWidth = 2; vcVline(g, X(turn.t), P.t + 16, P.b); g.lineWidth = 1; }
     g.fillText(tr("Turn") + " " + vcTurnName(turn), X(turn.t), P.t + 12);
   }
-  // (P2 as the turn was read from it: F2's part out, where there was one: tnOwn)
+  // your notes, in your colour (P2 as the turn was read from it: F2's part out, where there was one: tnOwn)
   const own = R ? R.own || notes : shown ? vcOwnOf(shown, notes) : notes, sm = tnSmooth(own);
-  g.strokeStyle = C.muted; g.lineWidth = 1; g.beginPath();
-  sm.forEach((q, i) => (i ? g.lineTo(X(q.m), Y(q.s)) : g.moveTo(X(q.m), Y(q.s)))); g.stroke();
-  g.fillStyle = C.ink;
+  g.strokeStyle = vcMine(); g.globalAlpha = 0.5; g.lineWidth = 1.5; g.beginPath();
+  sm.forEach((q, i) => (i ? g.lineTo(X(q.m), Y(q.s)) : g.moveTo(X(q.m), Y(q.s)))); g.stroke(); g.globalAlpha = 1; g.lineWidth = 1;
+  g.fillStyle = vcMine();
   for (const q of sm) { g.beginPath(); g.arc(X(q.m), Y(q.p2), 3.5, 0, Math.PI * 2); g.fill(); }
   g.strokeStyle = C.muted;
   for (const q of notes) if (q.p2 == null) { g.beginPath(); g.arc(X(q.m), Y(-10), 3.5, 0, Math.PI * 2); g.stroke(); }
   const at = wmed(VC.fr, "m", now - TN.nearWin, now, "t", (q) => q.v); // (where it's being sung: P2 belongs to that note)
   if (VC.p2 != null && at.wt >= 100 && at.v >= lo - 0.5 && at.v <= hi + 0.5) { // P2 now, hollow once it's not fresh
-    g.fillStyle = g.strokeStyle = C.voice; g.lineWidth = 2; g.beginPath(); g.arc(X(at.v), Y(VC.p2), 6, 0, Math.PI * 2);
+    g.fillStyle = g.strokeStyle = vcMine(); g.lineWidth = 2; g.beginPath(); g.arc(X(at.v), Y(VC.p2), 6, 0, Math.PI * 2);
     if (now - VC.p2At > 300) g.stroke(); else g.fill();
   }
   g.restore();
@@ -472,8 +481,10 @@ function drawSmooth(g, now, W, H, P, font, mid) {
   const X = (m) => P.l + ((m - (T - 5)) / 10) * (P.r - P.l);
   const yL0 = (P.t + mid) / 2, yU0 = (mid + P.b) / 2, hl = (mid - P.t) / 2 - 4, hu = (P.b - mid) / 2 - 4;
   const yL = (v) => yL0 - Math.max(-1, Math.min(1, v / 12)) * hl, yU = (v) => yU0 - Math.max(-1, Math.min(1, v / 8)) * hu;
-  g.fillStyle = C.voice; g.globalAlpha = 0.1; g.fillRect(X(T - 0.5), P.t + 16, X(T + 0.5) - X(T - 0.5), P.b - P.t - 16); g.globalAlpha = 1;
-  g.font = font(12); g.textAlign = "center"; g.fillText(tr(vcAtTurn(T) ? "Turn" : "Centre"), X(T), P.t + 12);
+  // the centre: a place, so grey (green here is a pass that was even), named Turn when it's the vowel's
+  const atTurn = vcAtTurn(T);
+  g.fillStyle = C.ink; g.globalAlpha = 0.06; g.fillRect(X(T - 0.5), P.t + 16, X(T + 0.5) - X(T - 0.5), P.b - P.t - 16); g.globalAlpha = 1;
+  g.font = font(12); g.textAlign = "center"; g.fillText(tr(atTurn ? "Turn" : "Centre"), X(T), P.t + 12);
   if ($("#vcAxL").hidden !== !!S.echo) $("#vcAxL").hidden = !!S.echo; // (echo cancellation turned on or off meanwhile)
   g.strokeStyle = C.line; g.lineWidth = 1;
   for (const y of [yL0, yU0]) { g.beginPath(); g.moveTo(P.l, Math.round(y) + 0.5); g.lineTo(P.r, Math.round(y) + 0.5); g.stroke(); }
@@ -481,26 +492,31 @@ function drawSmooth(g, now, W, H, P, font, mid) {
   if (VC.prev) vcTrace(g, VC.prev, X, yL, yU, C.muted, 1.5, 0.35);
   const live = R && R.phase === "sing";
   const pass = live ? { xs: VC.fr.filter((s) => s.t >= R.t0), T: R.T, fit: R.fit } : VC.cur;
-  if (pass) vcTrace(g, pass, X, yL, yU, C.voice, 2, 1);
+  if (pass) vcTrace(g, pass, X, yL, yU, vcMine(), 2, 1);
   g.restore();
-  if (!live && VC.cur) for (const e of VC.cur.res.events) { // what was found, where
-    const x = X(e.at);
-    g.fillStyle = g.strokeStyle = C.ink; g.lineWidth = 1.5;
-    if (e.kind === "break") { g.font = font(16); g.textAlign = "center"; g.fillText("×", x, mid + 5); continue; }
-    const y = e.kind === "loud" ? yL0 : yU0;
-    g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.stroke();
-    g.fillStyle = C.muted; g.font = font(12); g.textAlign = "left";
-    g.fillText((e.d > 0 ? "+" : "−") + Math.abs(Math.round(e.d)) + (e.kind === "loud" ? " dB" : " dB/oct"), x + 9, y - 8);
+  // what was found, where: a break a red ×, a step an orange ring and its size; each on a ring of the card's colour, so it
+  // stands off the trace whatever your accent
+  if (!live && VC.cur) for (const e of VC.cur.res.events) {
+    const x = X(e.at), c = vcToneC(e.kind === "break" ? "bad" : "step"), halo = (draw) => { g.strokeStyle = C.surface; g.lineWidth = 5; draw(true); g.strokeStyle = g.fillStyle = c; g.lineWidth = 2; draw(false); };
+    g.lineJoin = "round";
+    if (e.kind === "break") { g.font = font(18); g.textAlign = "center"; halo((u) => (u ? g.strokeText("×", x, mid + 6) : g.fillText("×", x, mid + 6))); continue; }
+    const y = e.kind === "loud" ? yL0 : yU0, label = (e.d > 0 ? "+" : "−") + Math.abs(Math.round(e.d)) + (e.kind === "loud" ? " dB" : " dB/oct");
+    halo(() => { g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.stroke(); });
+    g.font = font(12); g.textAlign = "left";
+    halo((u) => (u ? g.strokeText(label, x + 9, y - 8) : g.fillText(label, x + 9, y - 8)));
   }
-  if (live && cur != null && Math.abs(cur - T) <= 5) { g.strokeStyle = C.voice; g.lineWidth = 1.5; vcVline(g, X(cur), P.t + 16, P.b); }
+  if (live && cur != null && Math.abs(cur - T) <= 5) { g.strokeStyle = vcMine(); g.lineWidth = 1.5; vcVline(g, X(cur), P.t + 16, P.b); }
   vcNames(g, H, T - 5, T + 5, X, font);
-  if (R || VC.set.length) { // the set: even filled, a problem ringed, unread dashed, to come faint
+  if (R || VC.set.length) { // the set: even filled green, a break a red ×, a step an orange ring (as on the plot), unread dashed, to come faint
     const gw = $("#vcGo").offsetWidth || 64, x1 = W - 12 - gw - 16, y = 12 + 16;
     for (let i = 0; i < TN.set; i++) {
-      const x = x1 - (TN.set - 1 - i) * 14, k = VC.set[i];
-      g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.lineWidth = 1.5;
-      if (k === 1) { g.fillStyle = C.voice; g.fill(); }
-      else { g.strokeStyle = k === 0 ? C.ink : k === -1 ? C.muted : C.line; if (k === -1) g.setLineDash([2, 2]); g.stroke(); g.setLineDash([]); }
+      const x = x1 - (TN.set - 1 - i) * 14, k = VC.set[i], tone = k === 0 ? vcTone(VC.sres[i]) : "";
+      g.beginPath(); g.lineWidth = 1.5;
+      if (tone === "bad") { g.moveTo(x - 3.5, y - 3.5); g.lineTo(x + 3.5, y + 3.5); g.moveTo(x + 3.5, y - 3.5); g.lineTo(x - 3.5, y + 3.5); g.strokeStyle = C.bad; g.lineWidth = 2; g.stroke(); continue; }
+      g.arc(x, y, 4, 0, Math.PI * 2);
+      if (k === 1) { g.fillStyle = C.good; g.fill(); }
+      else if (k === 0) { g.strokeStyle = vcToneC(tone); g.lineWidth = 2; g.stroke(); }
+      else { g.strokeStyle = k === -1 ? C.muted : C.line; if (k === -1) g.setLineDash([2, 2]); g.stroke(); g.setLineDash([]); }
     }
   }
 }
