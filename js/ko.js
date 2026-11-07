@@ -241,7 +241,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Search songs": "곡 검색", "New": "새로 추가한 곡", "No songs match “{q}”": "“{q}”에 맞는 곡이 없어요", "Sort by {col}": "{col} 순으로 정렬", "Sorted by {col}, {way}": "{col} 순, {way}",
   "ascending": "오름차순", "descending": "내림차순", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
   "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
-  "no steady beat": "일정한 박자 없음", "{n} tracks": "트랙 {n}개", "major": "장조", "minor": "단조",
+  "no steady beat": "일정한 박자 없음", "major": "장조", "minor": "단조",
   "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":
     "Python 서버가 필요해요. OS에 맞는 <code>start-…</code> 파일로 앱을 시작한 뒤 <b>http://localhost:5178</b>에서 다시 여세요.",
   "The server is running, but checking the stem tools failed: {err}. The terminal window has the details.": "서버는 실행 중이지만 스템 도구를 확인하지 못했어요: {err}. 자세한 내용은 터미널 창에 있어요.",
@@ -308,7 +308,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Volume": "볼륨", "Where every song starts; a click plays while you set it": "모든 곡이 이 볼륨으로 시작해요. 조절하는 동안 클릭이 들려요", "Volume every song starts at": "모든 곡이 시작하는 볼륨",
   "Song overview — click to jump": "곡 전체 파형: 클릭하면 그 위치로 이동", "Play": "재생", "Pause": "일시정지",
   "Move through the song": "곡 안에서 이동", "Go to start": "처음으로", "Go to start (Home)": "처음으로 (Home)", "Go to end": "끝으로", "Go to end (End)": "끝으로 (End)",
-  "Back 5 seconds": "5초 뒤로", "Forward 5 seconds": "5초 앞으로", "−5 s": "−5초", "+5 s": "+5초", "loading tracks…": "트랙 불러오는 중…",
+  "Back 5 seconds": "5초 뒤로", "Forward 5 seconds": "5초 앞으로", "−5 s": "−5초", "+5 s": "+5초",
   "Vocals": "보컬", "Lead": "리드", "Backing": "백킹", "Lead vocal": "리드 보컬", "Backing vocals": "백킹 보컬", "Drums": "드럼", "Bass": "베이스", "Guitar": "기타", "Other": "나머지", "Click": "메트로놈",
   "lead and backing": "리드와 백킹", "lead and backing voices": "리드와 백킹 보컬", "the main voice": "메인 보컬", "harmonies, doubles and chops": "화음, 더블링, 보컬 찹",
   "kit and percussion": "드럼 세트와 타악기", "bass line": "베이스 라인", "guitars": "기타 소리", "piano and keys": "피아노와 건반", "everything else": "그 밖의 모든 소리",

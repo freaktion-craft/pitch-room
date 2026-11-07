@@ -126,7 +126,7 @@
   /* controls: buttons and fields stand on these heights, their icons on these sizes */
   --control-xs: 24px; --control-sm: 28px; --control-md: 32px; --control-lg: 40px;
   --icon-xs: 14px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px;
-  --radius-xs: 4px; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px; --radius-xl: 12px; --radius-2xl: 14px; --radius-pill: 999px;
+  --radius-2xs: 2px; --radius-xs: 4px; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px; --radius-xl: 12px; --radius-2xl: 14px; --radius-pill: 999px;
 
   /* ---- depth (its shadows are with the colours) ---- */
   --radius-card: var(--radius-2xl); --pad-card: var(--space-4); /* a card: one corner and one inset for all of them, set off by its tone alone (no edge) */
