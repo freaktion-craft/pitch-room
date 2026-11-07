@@ -32,6 +32,11 @@ const js = async (code, name) => {
 for (const f of fs.readdirSync(path.join(repo, "js")).filter((f) => f.endsWith(".js"))) {
   fs.writeFileSync(path.join(out, "js", f), await js(fs.readFileSync(path.join(repo, "js", f), "utf8"), f));
 }
+// the Hugeicons Pro icons, where this copy has them (icons.local.js, out of git): in the app, as its own code, minified
+// (Pro may ship inside an app; its files may not be shared). Without it, the free set built into helpers.js.
+const pro = path.join(repo, "icons.local.js");
+if (fs.existsSync(pro)) fs.writeFileSync(path.join(out, "icons.local.js"), await js(fs.readFileSync(pro, "utf8"), "icons.local.js"));
+console.log(fs.existsSync(pro) ? "icons: Hugeicons Pro (icons.local.js)" : "icons: the free set");
 for (const f of fs.readdirSync(path.join(repo, "css")).filter((f) => f.endsWith(".css"))) {
   const { code } = transform({ filename: f, code: fs.readFileSync(path.join(repo, "css", f)), minify: true });
   fs.writeFileSync(path.join(out, "css", f), code);

@@ -109,6 +109,15 @@ const EMPTY_LIBRARY = false;
         </div>
         <div class="keyctl" role="group" aria-label="Key"><span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span></div>
       </div>
+      <!-- the song's timeline, in the card under the play controls -->
+      <div class="tl-row">
+      <div class="tl" id="kTl" aria-label="Timeline">
+        <div class="tl-bar"><i class="tl-fill"></i></div><i class="tl-head"></i><div class="tl-pins" id="kPins"></div><span class="tl-tip" id="kTlTip" hidden></span>
+        <div class="pop tl-note" id="kNote" role="dialog" aria-label="Note" hidden><input id="kNoteText" type="text" placeholder="What’s off here?" autocomplete="off" spellcheck="false" aria-label="Note"><button class="btn sm icon ghost" id="kNoteDel" type="button" aria-label="Delete note" title="Delete note"></button></div>
+      </div>
+      <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy notes" title="Copy notes"></button>
+      <button class="btn sm icon" id="kNotesClear" type="button" aria-label="Clear notes" title="Clear this song’s notes"></button>
+      </div>
       <div class="phrase-row">
         <label class="kfield">Count-in <button class="pick" id="kCount" type="button"></button></label>
         <button class="btn sm icon" id="kPrev" type="button" aria-label="Previous phrase" title="Previous phrase (←)"></button>
@@ -117,14 +126,6 @@ const EMPTY_LIBRARY = false;
         <div class="strip" id="kStrip" role="group" aria-label="Phrases"></div>
         <button class="btn sm" id="kEdit" type="button" aria-pressed="false"><span class="txt">Edit</span></button>
       </div>
-    </div>
-    <div class="tl-row">
-    <div class="tl" id="kTl" aria-label="Timeline">
-      <div class="tl-bar"><i class="tl-fill"></i></div><i class="tl-head"></i><div class="tl-pins" id="kPins"></div><span class="tl-tip" id="kTlTip" hidden></span>
-      <div class="pop tl-note" id="kNote" role="dialog" aria-label="Note" hidden><input id="kNoteText" type="text" placeholder="What’s off here?" autocomplete="off" spellcheck="false" aria-label="Note"><button class="btn sm icon ghost" id="kNoteDel" type="button" aria-label="Delete note" title="Delete note"></button></div>
-    </div>
-    <button class="btn sm icon" id="kMarks" type="button" aria-label="Copy notes" title="Copy notes"></button>
-    <button class="btn sm icon" id="kNotesClear" type="button" aria-label="Clear notes" title="Clear this song’s notes"></button>
     </div>
 
     <section class="stage" id="stage" aria-label="Pitch display">
@@ -218,6 +219,8 @@ const EMPTY_LIBRARY = false;
             <div class="set-row"><div class="set-what"><b>Theme</b><small>Light or dark</small></div><button class="pick" id="theme" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Accent color</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent color"></div></div>
             <label class="set-row"><span class="set-what"><b>Aurora</b><small>The glow behind Practice, as the song plays</small></span><input type="checkbox" class="switch" id="auroraOn"></label>
+            <!-- where every song starts (studio.js, initStartVol): a 4/4 click plays while it's moved -->
+            <div class="set-row"><div class="set-what"><b>Volume</b><small>Where every song starts; a click plays while you set it</small></div><input type="range" class="set-vol" id="setVol" min="0" max="1" step="0.01" aria-label="Volume every song starts at"></div>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMic">
@@ -260,7 +263,7 @@ const EMPTY_LIBRARY = false;
     </div>
   </main>
   <main id="vStems" aria-label="Stems" hidden>
-    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pSave" type="button">Save</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
+    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pExport" type="button">Download</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 
@@ -336,28 +339,27 @@ const EMPTY_LIBRARY = false;
     </section>
 
     <section class="player" id="sPlayer" hidden>
-      <div class="player-title"><div class="title-row"><b id="pTitle"></b>
+      <div class="player-title"><div class="title-row"><!-- play and the rest where Practice has them (the song's name is in the crumbs) -->
+        <div class="transport-row">
+          <button class="btn primary round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
+          <div class="seek" role="group" aria-label="Move through the song">
+            <button class="btn sm icon" id="pStart" type="button" aria-label="Go to start" title="Go to start (Home)"></button>
+            <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
+            <button class="btn sm" id="pFwd" type="button" aria-label="Forward 5 seconds">+5 s</button>
+            <button class="btn sm icon" id="pEnd" type="button" aria-label="Go to end" title="Go to end (End)"></button>
+          </div>
+          <output id="pTime">0:00 / 0:00</output>
+          <span class="ptracks" id="pMeta"></span>
+        </div>
         <div class="mix">
           <label class="mix-ico" for="pVol" title="Volume"></label>
           <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
-          <button class="btn sm icon ghost" id="pExport" type="button" aria-label="Export what you hear (MP3)" title="Export what you hear (MP3)"></button>
         </div></div>
         <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span class="knote" id="pKeyNote"></span></span>
           <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button></div></div>
       </div>
       <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
-      <div class="transport-row">
-        <button class="btn primary round" id="pPlay" type="button" aria-label="Play"><svg class="pp" viewBox="0 0 14 16" aria-hidden="true"><path/><path/></svg></button>
-        <div class="seek" role="group" aria-label="Move through the song">
-          <button class="btn sm icon" id="pStart" type="button" aria-label="Go to start" title="Go to start (Home)"></button>
-          <button class="btn sm" id="pBack" type="button" aria-label="Back 5 seconds">−5 s</button>
-          <button class="btn sm" id="pFwd" type="button" aria-label="Forward 5 seconds">+5 s</button>
-          <button class="btn sm icon" id="pEnd" type="button" aria-label="Go to end" title="Go to end (End)"></button>
-        </div>
-        <output id="pTime">0:00 / 0:00</output>
-        <span class="ptracks" id="pMeta"></span>
-      </div>
       <div class="tracks" id="pTracks"></div>
       <p class="muted export-state" id="pExportState"></p>
     </section>

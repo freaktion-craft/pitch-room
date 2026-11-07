@@ -265,8 +265,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Not looked for yet.": "아직 찾지 않았어요.", "Find lyrics": "가사 찾기", "Finding lyrics…": "가사 찾는 중…", "Song": "곡", "Lowest": "최저음", "Highest": "최고음",
 "In the song · {t}": "곡에서 · {t}", "Piano": "피아노",
   // Studio
-  "Save": "저장",
-  "Volume": "볼륨", "Export what you hear (MP3)": "들리는 그대로 내보내기 (MP3)", "Get video": "영상 받기", "Hide video": "영상 숨기기", "Show video": "영상 보기",
+  "Volume": "볼륨", "Where every song starts; a click plays while you set it": "모든 곡이 이 볼륨으로 시작해요. 조절하는 동안 클릭이 들려요", "Volume every song starts at": "모든 곡이 시작하는 볼륨", "Get video": "영상 받기", "Hide video": "영상 숨기기", "Show video": "영상 보기",
   "Loading video…": "영상 불러오는 중…", "Getting the video…": "영상 받는 중…", "Couldn’t load the video.": "영상을 불러오지 못했어요.",
   "Song overview — click to jump": "곡 전체 파형: 클릭하면 그 위치로 이동", "Play": "재생", "Pause": "일시정지",
   "Move through the song": "곡 안에서 이동", "Go to start": "처음으로", "Go to start (Home)": "처음으로 (Home)", "Go to end": "끝으로", "Go to end (End)": "끝으로 (End)",
@@ -285,7 +284,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "splitting into lead and backing… {pct}%": "리드와 백킹으로 나누는 중… {pct}%", "Couldn’t split the vocals: {why}": "보컬을 나누지 못했어요: {why}",
   "Turn on at least one track.": "트랙을 하나 이상 켜세요.", "Turn on at least one take to export.": "내보낼 테이크를 하나 이상 켜세요.", "Mixing the MP3…": "MP3 믹스하는 중…", "Export failed.": "내보내지 못했어요.",
   "Saved “{name}” to your downloads.": "“{name}” 파일을 다운로드 폴더에 저장했어요.",
-  "Couldn’t save that.": "저장하지 못했어요.", "Couldn’t save the mix.": "믹스를 저장하지 못했어요.",
+  "Couldn’t save that.": "저장하지 못했어요.",
   "Stop playing {a}–{b} while muted": "음소거 중에는 {a}–{b}도 재생하지 않기", "Keep playing here": "여기는 계속 재생",
   "Download {what}, {a}–{b} only (MP3)": "{what}의 {a}–{b} 구간만 내려받기 (MP3)", "Pick a stretch at least 0.2 s long.": "0.2초 이상 구간을 골라 주세요.",
 

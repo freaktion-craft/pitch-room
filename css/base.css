@@ -28,7 +28,7 @@ body { background: var(--bg); color: var(--ink); font: var(--text-lg)/1.6 var(--
 body { -webkit-user-select: none; user-select: none; }
 /* Korean lines break between words, as they're read, not inside them (a word too long for its line still breaks) */
 html:lang(ko) body { word-break: keep-all; overflow-wrap: break-word; }
-input, textarea, .song b, #pTitle, #iTitle, #pMeta, #iSub, .facts dd, .server-off, .log, .job .top,
+input, textarea, .song b, #iTitle, #pMeta, #iSub, .facts dd, .server-off, .log, .job .top,
 #sAddMsg, #sInstallState, #sGpuState, #pExportState, #tsState { -webkit-user-select: text; user-select: text; }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -89,7 +89,7 @@ html.desktop-win::before { content: ""; position: fixed; top: 0; left: 0; right:
 .brand .egg > i { position: absolute; top: 0; bottom: 0; width: 50%; }
 .brand .egg > .l { left: 0; transform-origin: 100% 50%; } /* each half shrinks to, and grows from, the middle */
 .brand .egg > .r { left: 50%; transform-origin: 0 50%; }
-.brand .egg-ink { position: absolute; left: 0; top: 0; color: var(--on-voice); pointer-events: none; } /* the name in black, over the white one, where a colour's under it */
+.brand .egg-ink { position: absolute; left: 0; top: 0; color: var(--on-accent); pointer-events: none; } /* the name in black, over the white one, where a colour's under it (any accent's: not yours) */
 /* The mic chip: a square with the mic struck through while it's off; turned on, it slides open to show the spectrum.
    Both icons share one cell. */
 .btn.quiet.mic { padding: 0 var(--space-2); transition: background-color var(--duration-fast), color var(--duration-fast); }
@@ -176,6 +176,7 @@ html.set-top .set-nav { top: var(--top-nav); z-index: 6; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); min-height: 68px; padding: var(--space-3) 0; }
 .set-row + .set-row { border-top: 1px solid var(--line); }
 .set-what { display: grid; gap: 2px; min-width: 0; }
+.set-vol { flex: none; width: 200px; } /* Settings › Volume: as wide as the Studio's */
 .set-what b { font-weight: var(--weight-regular); font-size: var(--text-md); line-height: 20px; color: var(--ink); }
 .set-what small { font-size: var(--text-sm); line-height: 18px; color: var(--muted); }
 label.set-row { cursor: pointer; }
