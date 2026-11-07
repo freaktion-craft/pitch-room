@@ -254,12 +254,12 @@
    filled up to a thin cap you drag (the input stays as tall as the buttons, so it is as easy to grab) */
 #sPlayer { --fader: var(--space-3); }
 #sPlayer input[type="range"] { height: var(--control-sm); }
-#sPlayer input[type="range"]::-webkit-slider-runnable-track { height: var(--fader); border-radius: var(--radius-sm);
+#sPlayer input[type="range"]::-webkit-slider-runnable-track { height: var(--fader); border-radius: var(--radius-xs);
   background: linear-gradient(to right, var(--dim) var(--p), var(--fill) var(--p)); }
 #sPlayer input[type="range"]::-webkit-slider-thumb { width: 4px; height: var(--fader); margin-top: 0; border-radius: var(--radius-xs); background: var(--ink); }
 #sPlayer input[type="range"].hot::-webkit-slider-thumb { background: var(--knob-hot); transform: none; }
-#sPlayer input[type="range"]::-moz-range-track { height: var(--fader); border-radius: var(--radius-sm); background: var(--fill); }
-#sPlayer input[type="range"]::-moz-range-progress { height: var(--fader); border-radius: var(--radius-sm); background: var(--dim); }
+#sPlayer input[type="range"]::-moz-range-track { height: var(--fader); border-radius: var(--radius-xs); background: var(--fill); }
+#sPlayer input[type="range"]::-moz-range-progress { height: var(--fader); border-radius: var(--radius-xs); background: var(--dim); }
 #sPlayer input[type="range"]::-moz-range-thumb { width: 4px; height: var(--fader); border-radius: var(--radius-xs); background: var(--ink); }
 .mix-ico .ico { width: var(--icon-md); height: var(--icon-md); }
 .mix input { width: 100%; justify-self: start; } /* placed like the track sliders, which start-align */
