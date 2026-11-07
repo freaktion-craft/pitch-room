@@ -290,7 +290,8 @@ function loop() {
   let m = null;
   if (ac && (micOn || testOsc)) {
     if (testOsc) {
-      const tgt = activeNote(songPos()) || lastTarget;
+      // (in the Lab, its note; while a Smooth pass runs, left where it is, for a glide set by hand)
+      const tgt = view === "voice" ? (VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
       if (tgt) testOsc.frequency.setTargetAtTime(mf(tgt.midi + testOffset / 100), ac.currentTime, 0.03);
     }
     analyser.getFloatTimeDomainData(tbuf);

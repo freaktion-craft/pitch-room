@@ -1,42 +1,44 @@
 "use strict";
-// Chest & head voice (#voice): where the sound you're making sits, live, on a pad. Across, chest to head: no one number
-// tells them apart in every voice, vowel and microphone, so a few are read (H1−H2, how much louder the lowest harmonic is
-// than the next, in head voice and falsetto far louder; H2−H4; the harmonics' slope, dB an octave; how periodic the sound
-// is, falsetto being breathier) and the singer teaches the pad which way they lean in their own voice: with Chest or Head on,
-// what they sing is kept as that, and the line that best parts the two (Fisher's) is the pad's axis, their middles at its
-// dashed lines. Untaught, H1−H2 alone. Up and down, forward and bright to back and dark, by the energy at 2–4 kHz against
-// below 1 kHz, about the singer's own middle. The dot's size is how loud; the keyboard and the readout show the note.
+// The Lab (#voice). Its Turn view, on one vowel at a time: Find steps up a semitone at a time and finds the note where H2
+// stands out most from H1 and H3 (P2), which is where 2·f0 meets F1: the turn. Smooth then cues a slow siren across it and
+// reads each pass for a break, a step in loudness or one in tone. The measures are js/turn.js's; this is the page around
+// them. Beside it, in its place, the Spectrogram and the EQ.
 
-// an: an analyser of its own, long enough to tell the lowest harmonics apart; x (0…1 across), bright, db, h12: as read now,
-// smoothed; trail: where the dot has been, the last VC_TRAIL s; rec: "chest" or "head" while one's being taught; train:
-// what's been taught ({chest, head}: frames of VC_F); model: the axis fitted to it; from: the page to go back to
-const VC = { an: null, data: null, hz: 0, x: null, h12: null, bright: null, db: null, trail: [], last: null, rec: null, model: null, painted: 0, live: null };
-const VC_DEFAULT = { chest: 3, head: 14, mid: -24 }; // untaught: H1−H2 (dB) at the dashed lines, and the middle's brightness (dB)
-const VC_SPAN = 12, VC_TRAIL = 1.5; // dB of brightness from the middle to the top or bottom; s
-// a frame taught: [H1−H2, H2−H4, slope (dB an octave), periodicity, brightness]; the first VC_D part chest from head
-const VC_D = 4, VC_MIN = 45, VC_KEEP = 1800; // frames of each before the axis is fitted (about 3/4 s); at most kept of each (half a minute: they go with the settings)
-VC.train = (() => { const t = store.get("voiceTrain", null); return t && Array.isArray(t.chest) && Array.isArray(t.head) ? t : { chest: [], head: [] }; })();
-// Step up: a note to sing (target, lit on the keyboard), a semitone higher each time. Held on pitch (within VC_NEAR) for
-// VC_HOLD ms, where the dot was is marked on the pad with the note's name, and with auto the next note plays. The marks
-// joined up show where, going up, the voice turns from chest to head. Tapping a key starts again there.
-const VC_HOLD = 1000, VC_NEAR = 0.35; // ms; semitones
-Object.assign(VC, { target: store.get("voiceStart", 48), auto: store.get("voiceAuto", true), hold: null, marks: [] });
+// Kept: voiceRuns (Find's runs, ten a vowel) and voiceSmooth (Smooth's days, sixty a vowel), each {v: 1, [vowel]: […]};
+// anything else is read as empty. voiceFloor: the start the singer picked with the arrows (Find starts no lower without a
+// turn). (voiceTrain, what the old pad was taught, voiceAuto, and voiceStart, which the old Step up moved with every note
+// it climbed, are left as they are, unread.)
+const vcLoad = (k) => { const o = store.get(k, null); return o && typeof o === "object" && o.v === 1 ? o : { v: 1 }; };
+const vcList = (o, v) => (Array.isArray(o[v]) ? o[v] : (o[v] = [])); // (to add to)
+const vcGet = (o, v) => (Array.isArray(o[v]) ? o[v] : []); // (to read)
+// an: the Spectrogram's and EQ's analyser (8192, smoothed); tn: Turn's own (4096, unsmoothed: a step isn't blurred, and the
+// frame rate doesn't matter); td, tdHz, tlag: its dB, the Hz a bin, how far behind now its FFT is centred (ms); fr: what's
+// been read, the last 15 s ({t, w, m, v, L, p2, c, u, tt}: js/turn.js); mute: till when the piano's still sounding (nothing
+// is read); p2: P2 now, smoothed (p2At: when read); h12, db, fm, env: the side's numbers and the EQ's vowel. mode: "find" or
+// "smooth"; vowel; target: Find's first note; centre: Smooth's (mine: picked, by a key or a set's breaks, not only where
+// the vowel's turn is expected); run: the step-up or the set going on; done: how the last
+// Find ended; set, sres: this set's passes (1 even, 0 a problem, −1 not read) and how each read; cur, prev: the last two
+// passes, drawn; msg: the status lines say something of their own (else what's idle is said)
+const VC = { an: null, data: null, hz: 0, h12: null, db: null, last: null, painted: 0, live: null,
+  tn: null, td: null, tdHz: 0, tlag: 43, fr: [], mute: 0, p2: null, p2At: 0, frAt: 0,
+  mode: store.get("voiceMode", "find"), vowel: store.get("voiceVowel", "a"),
+  target: 48, centre: null, mine: false, run: null, done: null, prev: null, cur: null, set: [], sres: [], msg: false,
+  runs: vcLoad("voiceRuns"), days: vcLoad("voiceSmooth"), guide: null };
+if (!["find", "smooth"].includes(VC.mode)) VC.mode = "find";
+if (!VOWELS.some(([v]) => v === VC.vowel)) VC.vowel = "a";
 
 function vcAnalyser() {
   if (!VC.an) {
     VC.an = ac.createAnalyser(); VC.an.fftSize = 8192; VC.an.smoothingTimeConstant = 0.5;
-    const sink = ac.createGain(); sink.gain.value = 0; micBus.connect(VC.an); VC.an.connect(sink); sink.connect(ac.destination);
+    VC.tn = ac.createAnalyser(); VC.tn.fftSize = 4096; VC.tn.smoothingTimeConstant = 0;
+    const sink = ac.createGain(); sink.gain.value = 0;
+    micBus.connect(VC.an); VC.an.connect(sink); micBus.connect(VC.tn); VC.tn.connect(sink); sink.connect(ac.destination);
     VC.data = new Float32Array(VC.an.frequencyBinCount); VC.hz = ac.sampleRate / VC.an.fftSize;
+    VC.td = new Float32Array(VC.tn.frequencyBinCount); VC.tdHz = ac.sampleRate / 4096; VC.tlag = (2048 / ac.sampleRate) * 1000;
   }
   return VC.an;
 }
-// the loudest bin (dB) within 3% of f, two bins at least either side; the power from lo to hi Hz
-function vcPeak(f) {
-  const c = Math.round(f / VC.hz), w = Math.max(2, Math.round((f * 0.03) / VC.hz));
-  let mx = -Infinity;
-  for (let i = Math.max(1, c - w); i <= c + w && i < VC.data.length; i++) mx = Math.max(mx, VC.data[i]);
-  return mx;
-}
+
 // The formants: an all-pole fit (LPC) of the last 2048 samples, brought down to about 11 kHz, pre-emphasised and windowed; the
 // fit's envelope (dB at VC_ENV points up to half that rate) and its peaks from 200 Hz up, the first three. null while there's
 // no voice. On high notes the harmonics are far apart and the fit follows them more than the vowel: less sure there.
@@ -67,143 +69,469 @@ function vcFormants() {
   for (let q = 1; q < VC_ENV - 1; q++) if (env[q] > env[q - 1] && env[q] >= env[q + 1] && hz[q] >= 200 && hz[q] <= 4500) peaks.push(hz[q]);
   return { env, hz, f: peaks.slice(0, 3) };
 }
-function vcBand(lo, hi) { let s = 0; for (let i = Math.round(lo / VC.hz); i <= Math.round(hi / VC.hz); i++) s += 10 ** (VC.data[i] / 10); return s; }
 
-// A frame's cues, from the note's harmonics (f0: its pitch), or null where they can't be trusted: the lowest harmonic far
-// under the second (the pitch read an octave low), or a strong one half way under it (an octave high)
-function vcCues(f0, q) {
-  const A = (k) => vcPeak(k * f0), a1 = A(1), a2 = A(2);
-  if (a1 < a2 - 20 || (f0 / 2 > 60 && vcPeak(f0 / 2) > a1 - 3)) return null;
-  const ks = [], as = [];
-  for (let k = 1; k * f0 <= 4000 && k <= 12; k++) { ks.push(Math.log2(k)); as.push(A(k)); }
-  let slope = 0;
-  if (ks.length >= 3) { // least squares, dB against octaves up
-    const mk = ks.reduce((s, v) => s + v, 0) / ks.length, ma = as.reduce((s, v) => s + v, 0) / as.length;
-    slope = ks.reduce((s, v, i) => s + (v - mk) * (as[i] - ma), 0) / Math.max(1e-6, ks.reduce((s, v) => s + (v - mk) ** 2, 0));
-  }
-  const br = 10 * Math.log10(vcBand(2000, 4000) / Math.max(1e-20, vcBand(80, 1000)));
-  const f = [a1 - a2, a2 - (4 * f0 < VC.hz * VC.data.length ? A(4) : a2), slope, q ?? 0.9, br];
-  return f.every(isFinite) ? f : null;
-}
-// The axis fitted to what's been taught: z-scored cues, Fisher's direction (the pooled spread's inverse onto the gap between
-// the two middles, a little ridge so it can't blow up), each kind's middle on it, and how many taught frames it puts on their
-// own side of halfway
-function vcFit() {
-  const C = VC.train.chest, H = VC.train.head;
-  if (C.length < VC_MIN || H.length < VC_MIN) { VC.model = null; return; }
-  const all = C.concat(H), d = VC_D;
-  const mean = (X) => Array.from({ length: d }, (_, j) => X.reduce((s, x) => s + x[j], 0) / X.length);
-  const mu = mean(all), sd = mu.map((m, j) => Math.sqrt(all.reduce((s, x) => s + (x[j] - m) ** 2, 0) / all.length) || 1);
-  const z = (x) => Array.from({ length: d }, (_, j) => (x[j] - mu[j]) / sd[j]);
-  const Zc = C.map(z), Zh = H.map(z), mc = mean(Zc), mh = mean(Zh);
-  const S = Array.from({ length: d }, () => new Array(d).fill(0));
-  for (const [Z, m] of [[Zc, mc], [Zh, mh]]) for (const x of Z) for (let a = 0; a < d; a++) for (let b = 0; b < d; b++) S[a][b] += (x[a] - m[a]) * (x[b] - m[b]);
-  for (let a = 0; a < d; a++) { for (let b = 0; b < d; b++) S[a][b] /= all.length; S[a][a] += 0.05; }
-  const w = solveLin(S, mh.map((v, j) => v - mc[j]));
-  const proj = (zx) => zx.reduce((s, v, j) => s + v * w[j], 0);
-  const pc = Zc.map(proj), ph = Zh.map(proj), sc = pc.reduce((s, v) => s + v, 0) / pc.length, sh = ph.reduce((s, v) => s + v, 0) / ph.length, mid = (sc + sh) / 2;
-  const acc = (pc.filter((v) => v < mid).length + ph.filter((v) => v >= mid).length) / all.length;
-  VC.model = { mu, sd, w, sc, sh, acc, bright: all.reduce((s, x) => s + x[4], 0) / all.length };
-}
-function solveLin(A, b) { // Gaussian elimination with pivoting (a 4 by 4)
-  const n = b.length, M = A.map((r, i) => [...r, b[i]]);
-  for (let c = 0; c < n; c++) {
-    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
-    [M[c], M[p]] = [M[p], M[c]];
-    for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
-  }
-  return M.map((r, i) => r[n] / r[i]);
-}
-// Where a frame's cues fall across (0…1 from chest): the taught kinds' middles at a fifth in from each side, so going past them shows
-function vcAcross(f) {
-  const m = VC.model;
-  if (!m) return 0.2 + (0.6 * (f[0] - VC_DEFAULT.chest)) / (VC_DEFAULT.head - VC_DEFAULT.chest);
-  const s = Array.from({ length: VC_D }, (_, j) => (f[j] - m.mu[j]) / m.sd[j]).reduce((t, v, j) => t + v * m.w[j], 0);
-  return 0.2 + (0.6 * (s - m.sc)) / (m.sh - m.sc || 1);
-}
-const vcDown = (br) => 0.5 - (br - (VC.model ? VC.model.bright : VC_DEFAULT.mid)) / (2 * VC_SPAN);
-
-// One frame, from the main loop while the page is shown: read the sound, set an end if one's being set, draw.
+// One frame, from the main loop while the page is shown: read the sound, keep a sample of it (time-weighted: js/turn.js),
+// move the run on, draw.
 function voiceFrame() {
-  const now = performance.now();
-  let f = null;
+  const now = performance.now(), dt = VC.frAt ? Math.min(100, now - VC.frAt) : 16;
+  VC.frAt = now;
   const hearing = !!ac && (micOn || !!testOsc);
-  if (hearing) vcAnalyser().getFloatFrequencyData(VC.data);
-  if (hearing && cur != null && level > S.gate) {
-    const f0 = mf(cur);
-    if (f0 > 70 && f0 < 1100) f = vcCues(f0, micQ);
-  }
-  if (f) {
-    const ease = (was, v) => (was == null ? v : was + (v - was) * 0.25), clamp = (v) => Math.min(0.97, Math.max(0.03, v));
-    VC.x = ease(VC.x, vcAcross(f)); VC.h12 = ease(VC.h12, f[0]); VC.bright = ease(VC.bright, f[4]);
+  if (hearing) { vcAnalyser().getFloatFrequencyData(VC.data); VC.tn.getFloatFrequencyData(VC.td); }
+  const voiced = hearing && cur != null && level > S.gate && micQ != null;
+  const h = voiced ? tnHarm(VC.td, VC.tdHz, mf(cur)) : null;
+  const unread = voiced && !h && tnOctave(VC.td, VC.tdHz, mf(cur)); // (the pitch read an octave off: heard, its pitch not kept)
+  if (h) {
+    if (h.h12 != null) VC.h12 = VC.h12 == null ? h.h12 : VC.h12 + (h.h12 - VC.h12) * (1 - Math.exp(-dt / 150));
     VC.db = 20 * Math.log10(level);
     const fm = vcFormants(); // (smoothed, each formant to the one read near it)
     VC.env = fm;
     if (fm) VC.fm = fm.f.map((v, i) => (VC.fm && VC.fm[i] != null && Math.abs(VC.fm[i] - v) < 400 ? VC.fm[i] + (v - VC.fm[i]) * 0.3 : v));
-    VC.last = { x: clamp(VC.x), y: clamp(vcDown(VC.bright)), db: VC.db, t: now };
-    VC.trail.push(VC.last);
-    if (VC.rec) { // being taught
-      const T = VC.train[VC.rec];
-      T.push(f.map((v, j) => Math.round(v * (j === 3 ? 100 : 10)) / (j === 3 ? 100 : 10))); if (T.length > VC_KEEP) T.splice(0, T.length - VC_KEEP);
-      if (now - (VC.fitAt || 0) > 500) { VC.fitAt = now; vcFit(); paintTeach(); }
-    }
-  } else if (VC.last && now - VC.last.t > 120) { VC.x = VC.h12 = VC.bright = VC.fm = VC.env = null; if (VC.trail.length && VC.trail[VC.trail.length - 1]) VC.trail.push(null); }
-  while (VC.trail.length && (!VC.trail[0] || now - VC.trail[0].t > VC_TRAIL * 1000)) VC.trail.shift();
-  vcHoldTick(now);
+    VC.last = { t: now };
+  } else if (VC.last && now - VC.last.t > 120) VC.h12 = VC.fm = VC.env = null;
+  if (hearing && now >= VC.mute) { // (nothing while the piano sounds)
+    const p = VC.fr[VC.fr.length - 1];
+    const s = { t: now, w: p ? Math.min(50, now - p.t) : 16, m: voiced && !unread ? cur : null, v: voiced, L: voiced ? 20 * Math.log10(level) : null,
+      p2: h ? h.p2 : null, c: h ? h.c.slice(0, 3) : null, u: h ? h.u : null, tt: now - VC.tlag };
+    VC.fr.push(s);
+    if (s.p2 != null) { VC.p2 = VC.p2 == null || now - VC.p2At > 300 ? s.p2 : VC.p2 + (s.p2 - VC.p2) * (1 - Math.exp(-dt / 200)); VC.p2At = now; }
+  }
+  if (!hearing) VC.p2 = null;
+  while (VC.fr.length && now - VC.fr[0].t > 15000) VC.fr.shift();
+  if (VC.run && !hearing) { vcAbort(); paintTurn(); } // (the mic turned off: the run's stopped, not left waiting)
+  if (VC.run) (VC.run.mode === "find" ? vcFindTick : vcPassTick)(now);
   const off = !micOn && !testOsc;
   if ($("#vcOff").hidden !== !off) $("#vcOff").hidden = !off;
-  drawPad(now); drawSpec(now, hearing); drawEq(now, hearing);
+  drawTurn(now); drawSpec(now, hearing); drawEq(now, hearing);
   if (now - VC.painted > 100) { VC.painted = now; paintVoiceRead(); }
   vcKeys(cur);
 }
 
-// The pad: a cross through the middle, your ends as dashed lines, the mix between them shaded; the trail, then the dot
-function drawPad(now) {
-  const cv = $("#vcPad"), g = cv.getContext("2d"), r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+// ---------- what's said ----------
+// The status line and the one under it (what to do), each English with its {placeholders}. keep: it stays till something
+// else happens; else it's what's said while idle, said again on every change (paintTurn).
+function vcSay(st, sv, d, dv, keep = true) {
+  say($("#vcSay"), st, sv || undefined); say($("#vcDo"), d, dv || undefined);
+  VC.msg = keep;
+  vcTitles();
+}
+// a cut-off line has its whole text as its title (and only then)
+function vcTitles() { for (const el of [$("#vcSay"), $("#vcDo")]) { const t = el.scrollWidth > el.clientWidth ? el.textContent : ""; if (el.title !== t) el.title = t; } }
+const vcV = (v = VC.vowel) => { const l = (VOWELS.find(([k]) => k === v) || VOWELS[0])[1]; return () => tr(l); }; // (said again in the language now)
+const vcSlide = (T) => ["Slide “{v}” {lo}–{hi} and back, slowly.", { v: vcV(), lo: absName(T - 4), hi: absName(T + 4) }];
+// a vowel's runs that found a turn, newest last; a turn's name (a span where H2 rode a wide F1)
+const vcTurns = (v) => vcGet(VC.runs, v).filter((r) => r && typeof r.t === "number");
+const vcTurnName = (r) => (r.lo != null && r.hi != null ? absName(r.lo) + "–" + absName(r.hi) : absName(r.t));
+function vcTurnSay(v) {
+  const ts = vcTurns(v), t = ts[ts.length - 1], p = ts[ts.length - 2];
+  if (!t) return null;
+  if (t.lo != null && t.hi != null) return [p ? "Turn {lo}–{hi} · last {p}" : "Turn {lo}–{hi}", { lo: absName(t.lo), hi: absName(t.hi), p: p ? absName(p.t) : "" }];
+  return [p ? "Turn {n} · last {p}" : "Turn {n}", { n: absName(t.t), p: p ? absName(p.t) : "" }];
+}
+function vcIdle() {
+  const ts = vcTurnSay(VC.vowel);
+  if (VC.mode === "find") {
+    if (ts) vcSay(ts[0], ts[1], "Start to find it again.", null, false);
+    else vcSay("No turn yet", null, "Start, then hold each lit note on “{v}”.", { v: vcV() }, false);
+  } else if (vcBlind()) vcSay("No turn yet", null, "Find it first.", null, false);
+  else {
+    const st = vcAtTurn(VC.centre) ? ts : ["Around {n}", { n: absName(VC.centre) }];
+    vcSay(st[0], st[1], ...vcSlide(VC.centre), false);
+  }
+}
+// the vowel's newest turn is this note; Smooth has nothing to go on yet (no turn found, no centre picked)
+const vcAtTurn = (m) => { const t = vcTurns(VC.vowel).pop(); return !!t && Math.round(t.t) === m; };
+const vcBlind = () => !vcTurns(VC.vowel).length && !VC.mine;
+const vcOpts = () => ({ prior: tnPrior(VC.vowel, A4) }); // (what tnTurn's told of the vowel sung)
+
+// ---------- Find ----------
+// A cue: the notes played one after another (step s apart, each dur s long), and nothing read till they've died away
+function vcCue(ms, step, dur) {
+  ms.forEach((m, i) => playKey(m, dur, i * step));
+  VC.mute = performance.now() + ((ms.length - 1) * step + dur) * 1000 + TN.mute;
+  if (VC.run) VC.run.cueEnd = VC.mute;
+}
+function vcFindStart() {
+  VC.done = null;
+  VC.run = { mode: "find", start: VC.target, notes: [], hold: null, cueEnd: 0, unread: 0 };
+  vcCue([VC.target], 0, 0.6);
+  vcSay("Hold {note}", { note: absName(VC.target) }, "Same easy volume on every note.");
+  paintTurn();
+}
+// Holding the note: on pitch (the last TN.nearWin ms' median within TN.near), counted in time; off for a moment forgiven.
+// Held TN.hold ms with TN.read of it read, the note's P2 and levels (medians) are kept; held TN.give ms without, it's
+// kept unread. Then the next note, or the end.
+function vcFindTick(now) {
+  const R = VC.run, s = VC.fr[VC.fr.length - 1];
+  if (now < VC.mute || !s || s.t !== now) return;
+  const med = wmed(VC.fr, "m", now - TN.nearWin, now, "t", (q) => q.v);
+  if (med.wt >= 100 && Math.abs(med.v - VC.target) < TN.near) {
+    R.hold ??= { on: 0, read: 0, rows: [], off: null };
+    R.hold.on += s.w; R.hold.off = null;
+    if (s.p2 != null) { R.hold.read += s.w; R.hold.rows.push({ t: s.t, w: s.w, p2: s.p2, c1: s.c[0], c2: s.c[1], c3: s.c[2] }); }
+  } else if (R.hold) {
+    R.hold.off ??= now;
+    if (now - R.hold.off > TN.forgive) R.hold = null;
+  }
+  $("#vcTgt").style.setProperty("--p", (R.hold ? Math.min(1, R.hold.on / TN.hold) * 100 : 0).toFixed(1) + "%");
+  const H = R.hold;
+  if (H && H.on >= TN.hold && H.read >= TN.read) {
+    const md = (k) => { const v = wmed(H.rows, k, -Infinity, Infinity).v; return v == null ? null : Math.round(v * 10) / 10; };
+    vcCommit({ m: VC.target, p2: md("p2"), c1: md("c1"), c2: md("c2"), c3: md("c3") });
+  } else if (H && H.on >= TN.give && H.read < TN.read) vcCommit({ m: VC.target, p2: null });
+  else if (now - R.cueEnd > TN.quiet) vcFindEnd(tnTurn(R.notes, vcOpts()));
+}
+function vcCommit(n) {
+  const R = VC.run;
+  R.notes = R.notes.filter((q) => q.m !== n.m).concat(n); R.hold = null;
+  $("#vcTgt").style.setProperty("--p", "0%");
+  if (n.p2 == null) {
+    if (++R.unread >= 2) { vcFindEnd(tnTurn(R.notes, vcOpts()), "faint"); return; }
+    vcSay("Couldn’t read {note}", { note: absName(n.m) }, "Louder, nearer the mic.");
+  } else R.unread = 0;
+  const r = tnTurn(R.notes, vcOpts());
+  R.own = r.own;
+  if (r.state === "found" || R.notes.length >= TN.maxNotes || VC.target >= vcHi()) { vcFindEnd(r); return; }
+  vcSetTarget(VC.target + 1, false);
+  vcCue([VC.target], 0, 0.6);
+  if (!R.unread) vcSay("Hold {note}", { note: absName(VC.target) }, "Same easy volume on every note.");
+}
+// The step-up's end: kept (with 3 notes read or more) for the vowel, its newest 10, and said. why: how it ended (tnTurn's
+// state, or "faint", or "stop"). The next start: 6 under a turn found, else as the singer would move it.
+function vcFindEnd(r, why) {
+  const R = VC.run;
+  if (!R || R.mode !== "find") return;
+  why = why || r.state;
+  const read = R.notes.filter((n) => n.p2 != null);
+  if (read.length >= 3) {
+    const list = vcList(VC.runs, VC.vowel);
+    list.push({ at: Date.now(), s: R.start, n: R.notes.slice().sort((a, b) => a.m - b.m).map((n) => [n.m, n.p2 ?? null, n.c1 ?? null, n.c2 ?? null, n.c3 ?? null]),
+      t: r.turn ?? null, lo: r.lo ?? null, hi: r.hi ?? null, why });
+    while (list.length > 10) list.shift();
+    store.set("voiceRuns", VC.runs);
+  }
+  VC.run = null; VC.done = r;
+  $("#vcTgt").style.setProperty("--p", "0%");
+  const top = read.length ? Math.max(...read.map((n) => n.m)) : R.start;
+  if (r.state === "found") vcSetTarget(tnStart(VC.vowel, r.turn, vcStored(), A4, KEY_LO, KEY_HI), false);
+  else if (why === "lower") vcSetTarget(R.start - 4, false);
+  else if (why === "higher") vcSetTarget(Math.max(R.start + 4, top - 4), false);
+  else vcSetTarget(R.start, false);
+  if (r.state === "found") { const ts = vcTurnSay(VC.vowel); vcSay(ts[0], ts[1], "Now smooth it."); }
+  else if (why === "faint") vcSay("Too faint to read", null, "Louder, nearer the mic.");
+  else if (why === "stop") vcSay("Stopped", null, "Start, then hold each lit note on “{v}”.", { v: vcV() });
+  else if (why === "higher") vcSay("No turn up to {note}", { note: absName(top) }, "Start a few notes higher.");
+  else if (why === "lower") vcSay("Turned from the first note", null, "Start a few notes lower.");
+  else if (why === "flat") vcSay("No clear turn", null, "Again, steadier, or another vowel.");
+  else vcSay("Too few notes read", null, "Hold each note a full second.");
+  paintTurn();
+}
+
+// ---------- Smooth ----------
+// A set: TN.set passes, each cued (the low note, the high, the low) and sung back, up and down across the centre T
+function vcSmoothStart() {
+  if (VC.centre == null) VC.centre = VC.target;
+  VC.run = { mode: "smooth", T: VC.centre, i: 0, phase: "cue", t0: 0, last: 0, next: 0, waitFrom: 0, fit: null, fitAt: 0, advice: null };
+  VC.set = []; VC.sres = []; VC.prev = VC.cur = null;
+  vcPassCue();
+}
+function vcPassCue() {
+  const R = VC.run;
+  R.i++;
+  vcCue([R.T - 4, R.T + 4, R.T - 4], 0.45, 0.4);
+  R.phase = "wait"; R.waitFrom = VC.mute;
+  // (the last pass's advice, if it had a problem, else how to sing it)
+  const d = R.advice || vcSlide(R.T);
+  vcSay("Pass {i} of {n}", { i: R.i, n: TN.set }, d[0], d[1]);
+  paintTurn();
+}
+// wait: for the voice near the low note; sing: till it's stopped TN.endGap ms (or TN.cap ms in all); rest: then the next
+function vcPassTick(now) {
+  const R = VC.run, s = VC.fr[VC.fr.length - 1], fresh = s && s.t === now;
+  if (R.phase === "wait") {
+    if (now < VC.mute) return;
+    if (fresh && s.v && Math.abs(s.m - (R.T - 4)) <= 1.5) { R.phase = "sing"; R.t0 = R.last = s.t; R.fit = null; }
+    else if (now - R.waitFrom > TN.wait) { VC.run = null; vcSay("Didn’t hear you", null, "Press Start when you’re ready."); paintTurn(); }
+  } else if (R.phase === "sing") {
+    if (fresh && s.v) R.last = s.t;
+    if (now - R.last >= TN.endGap || now - R.t0 >= TN.cap) {
+      const xs = VC.fr.filter((q) => q.t >= R.t0);
+      vcPassDone(tnPass(xs, R.T, { echo: S.echo }), xs);
+    } else if (now - R.fitAt > 200) { R.fitAt = now; R.fit = tnFits(VC.fr.filter((q) => q.t >= R.t0), R.T); } // (the live trace's trend)
+  } else if (R.phase === "rest" && now >= R.next) vcPassCue();
+}
+function vcPassDone(res, xs) {
+  const R = VC.run;
+  VC.set.push(res.ok); VC.sres.push(res);
+  VC.prev = VC.cur; VC.cur = { xs, res, T: R.T, fit: res.fL || res.fU ? { fL: res.fL, fU: res.fU } : null };
+  if (res.ok >= 0) vcDay(res.ok === 1);
+  const w = vcPassWords(res, R.T);
+  vcSay(...w);
+  R.advice = res.ok === 1 ? null : [w[2], w[3]];
+  if (VC.set.length < TN.set) { R.phase = "rest"; R.next = performance.now() + TN.rest; } else vcSetEnd();
+  paintTurn();
+}
+function vcPassWords(res, T) {
+  const at = res.at != null ? { note: absName(res.at) } : null;
+  if (res.ok === 1) return ["Even", null, "Again.", null];
+  if (res.ok === 0 && res.kind === "break") return ["Break at {note}", at, "Again, slower through {note}.", at];
+  if (res.ok === 0 && res.kind === "loud") return [res.d > 0 ? "Louder at {note} · +{d} dB" : "Softer at {note} · −{d} dB", { ...at, d: Math.abs(Math.round(res.d)) }, "Again, same volume through {note}.", at];
+  if (res.ok === 0) return ["Tone jumped at {note}", at, "Again, smoother through {note}.", at];
+  if (res.why === "short") { const top = { note: absName(T + 4) }; return ["Didn’t reach {note}", top, "Again, all the way to {note}.", top]; }
+  if (res.why === "low") return ["Started too high", null, "Again, from {note}.", { note: absName(T - 4) }];
+  if (res.why === "fast") return ["Too fast to read", null, "Slower: about 2 s each way.", null];
+  return ["Couldn’t read that one", null, "Louder, nearer the mic.", null];
+}
+// The set's end: how many were even (and the last set on an earlier day); where the voice broke, if it was much the same
+// place three times or more and not the centre, is the next set's centre
+function vcSetEnd() {
+  const R = VC.run, n = VC.set.length, k = VC.set.filter((x) => x === 1).length, row = vcDayRow();
+  const before = vcDays(VC.vowel).filter((r) => r[0] < row[0] && r[3] != null).pop();
+  row[3] = k; store.set("voiceSmooth", VC.days);
+  const firsts = VC.sres.filter((r) => r.ok === 0 && r.first != null).map((r) => r.first).sort((a, b) => a - b);
+  const M = firsts.length ? firsts[firsts.length >> 1] : null;
+  const st = before ? ["Even {k} of {n} · last time {j}", { k, n, j: before[3] }] : ["Even {k} of {n}", { k, n }];
+  VC.run = null;
+  if (M != null && firsts.filter((f) => Math.abs(f - M) <= 1).length >= 3 && Math.round(M) !== R.T) {
+    VC.centre = Math.max(KEY_LO, Math.min(KEY_HI, Math.round(M))); VC.mine = true; vcGuide();
+    vcSay(st[0], st[1], "Next set centres on {note}.", { note: absName(VC.centre) });
+  } else vcSay(st[0], st[1], k >= 4 ? "Next: try another vowel." : "Again, or rest a minute.", null);
+}
+// Smooth's days, a vowel's: [yyyymmdd, passes judged, even, the day's last set's even (null till a set ends)]
+const vcToday = () => { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); };
+const vcDays = (v) => vcGet(VC.days, v).filter((r) => Array.isArray(r) && r.length >= 3 && r.slice(0, 3).every(Number.isFinite));
+function vcDayRow() {
+  const list = vcList(VC.days, VC.vowel), today = vcToday();
+  let row = list[list.length - 1];
+  if (!Array.isArray(row) || row[0] !== today) { row = [today, 0, 0, null]; list.push(row); while (list.length > 60) list.shift(); }
+  return row;
+}
+function vcDay(even) { const row = vcDayRow(); row[1]++; if (even) row[2]++; store.set("voiceSmooth", VC.days); }
+
+// ---------- controls ----------
+const vcShown = () => (VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target); // the note beside the keys
+const vcStored = () => { const v = store.get("voiceFloor", 48); return Number.isFinite(v) ? v : 48; }; // (Find's floor)
+// Find's notes: the keys whose harmonics can be read
+const vcLo = () => Math.max(KEY_LO, tnRange(A4)[0]), vcHi = () => Math.min(KEY_HI, tnRange(A4)[1]);
+// Go: Stop while running; the mic on first; after a turn's found, on to Smooth; Smooth with nothing to go on, to Find; else
+// the mode's start
+function vcGo() {
+  if (VC.run) { vcAbort(); paintTurn(); return; }
+  if (!micOn && !testOsc) { startMic(); return; }
+  if (VC.mode === "find" && VC.done && VC.done.state === "found") { vcSetMode("smooth"); vcSmoothStart(); return; }
+  if (VC.mode === "smooth" && vcBlind()) { vcSetMode("find"); vcFindStart(); return; }
+  if (VC.mode === "find") vcFindStart(); else vcSmoothStart();
+}
+// a run stopped: a step-up kept as it is (with enough read), a set just ended
+function vcAbort() {
+  const R = VC.run;
+  if (!R) return;
+  if (R.mode === "find") { const r = tnTurn(R.notes, vcOpts()); vcFindEnd(r, r.state === "found" ? null : "stop"); return; }
+  VC.run = null; vcSay("Stopped", null, ...vcSlide(R.T));
+}
+function vcSetMode(m) { vcAbort(); VC.mode = m; store.set("voiceMode", m); vcSeed(); }
+function vcSetVowel(v) { vcAbort(); VC.vowel = v; store.set("voiceVowel", v); vcSeed(); }
+// on a new mode or vowel: Find from 6 under its newest turn (or where its usual F1 puts it), Smooth about that turn (or,
+// with none yet, where it's expected: Smooth then asks for Find first)
+function vcSeed() {
+  const t = vcTurns(VC.vowel).pop();
+  vcSetTarget(tnStart(VC.vowel, t ? t.t : null, vcStored(), A4, KEY_LO, KEY_HI), false);
+  VC.centre = Math.max(KEY_LO, Math.min(KEY_HI, Math.round(t ? t.t : tnPrior(VC.vowel, A4)))); VC.mine = false;
+  VC.done = null; VC.set = []; VC.sres = []; VC.prev = VC.cur = null; VC.msg = false;
+  vcGuide(); paintTurn();
+}
+// Find's note (within what can be read); keep: the singer's own pick with the arrows, kept as Find's floor
+function vcSetTarget(m, keep) {
+  VC.target = Math.max(vcLo(), Math.min(vcHi(), m));
+  if (keep) store.set("voiceFloor", VC.target);
+  vcGuide();
+}
+// the note beside the keys, lit on them and named
+function vcGuide() {
+  const m = vcShown();
+  if (VC.guide !== m) { vcKeyEls.get(VC.guide)?.classList.remove("guide"); vcKeyEls.get(m)?.classList.add("guide"); VC.guide = m; }
+  setText("vcTgt", absName(m));
+}
+// A note played (and nothing read while it sounds, in a run)
+function vcPlay(m) { playKey(m); if (VC.run) VC.mute = Math.max(VC.mute, performance.now() + TN.keyMute); }
+// a key tapped, or an arrow (arrow: kept as Find's floor): in a run, only heard; else Find's first note (and Find's ready
+// to run again) or Smooth's centre. (Nothing else is cleared.)
+function vcStart(m, arrow = false) {
+  m = Math.max(KEY_LO, Math.min(KEY_HI, m));
+  if (!VC.run) {
+    if (VC.mode === "find") { vcSetTarget(m, arrow); m = VC.target; VC.done = null; VC.msg = false; }
+    else { VC.centre = m; VC.mine = true; vcGuide(); }
+    paintTurn();
+  }
+  vcPlay(m);
+}
+
+// ---------- drawing ----------
+// What it all shows, in the page (paintTurn) and on the canvas (drawTurn)
+function paintTurn() {
+  for (const b of $("#vcMode").children) b.setAttribute("aria-checked", String(b.dataset.m === VC.mode));
+  say($("#vcGo"), VC.run ? "Stop" : VC.mode === "find" && VC.done && VC.done.state === "found" ? "Smooth" : VC.mode === "smooth" && vcBlind() ? "Find" : "Start");
+  say($("#vcStepLbl"), VC.mode === "find" ? "Start note" : "Centre");
+  vcGuide();
+  // (loudness isn't judged with echo cancellation on: its lane isn't shown)
+  $("#vcAxH2").hidden = VC.mode !== "find"; $("#vcAxT").hidden = VC.mode !== "smooth"; $("#vcAxL").hidden = VC.mode !== "smooth" || !!S.echo;
+  if (!VC.run) $("#vcTgt").style.setProperty("--p", "0%");
+  for (const b of $("#vcVowels").children) { // each vowel: its newest turn, and its last 8 days' even passes
+    const v = b.dataset.v, t = vcTurns(v).pop(), days = vcDays(v).slice(-8), bars = b.children[2].children;
+    b.setAttribute("aria-checked", String(v === VC.vowel));
+    b.children[1].textContent = t ? vcTurnName(t) : "–";
+    for (let i = 0; i < 8; i++) {
+      const r = days[i - (8 - days.length)];
+      bars[i].style.height = (r && r[1] ? Math.round((100 * r[2]) / r[1]) : 0) + "%";
+      bars[i].classList.toggle("thin", !!r && r[1] < 3);
+    }
+  }
+  if (!VC.run && !VC.msg) vcIdle();
+  vcTitles();
+}
+const VC_IN = { t: 96, b: 28, l: 40, r: 16 }; // the plot's inset in the pad, px (above it: the mode, Go and the two lines)
+const vcAxTop = (id, y) => { const el = $(id), v = Math.round(y) + "px"; if (el.style.top !== v) el.style.top = v; };
+function drawTurn(now) {
+  const cv = $("#vcPad"), r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
   const w = Math.round(r.width * d), h = Math.round(r.height * d);
   if (!w || !h) return;
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-  g.setTransform(d, 0, 0, d, 0, 0);
-  const W = r.width, H = r.height;
+  const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0);
+  const W = r.width, H = r.height, P = { l: VC_IN.l, r: W - VC_IN.r, t: VC_IN.t, b: H - VC_IN.b };
   g.clearRect(0, 0, W, H);
-  g.fillStyle = C.voice; g.globalAlpha = 0.06; g.fillRect(W * 0.4, 0, W * 0.2, H); g.globalAlpha = 1;
-  g.fillStyle = C.muted; g.font = `12px ${getComputedStyle(cv).fontFamily}`; g.textAlign = "center"; g.fillText(tr("Mix"), W * 0.5, 56);
+  VC.font ??= getComputedStyle(cv).fontFamily;
+  const font = (px) => `${px}px ${VC.font}`, mid = (P.t + P.b) / 2;
+  vcAxTop("#vcAxH2", P.t); vcAxTop("#vcAxL", P.t); vcAxTop("#vcAxT", mid);
+  g.lineCap = "round"; g.lineJoin = "round";
+  if (VC.mode === "find") drawFind(g, now, H, P, font); else drawSmooth(g, now, W, H, P, font, mid);
+}
+// the notes' names along the bottom (every other where they're close)
+function vcNames(g, H, lo, hi, X, font) {
+  const cw = X(lo + 1) - X(lo);
+  g.fillStyle = C.muted; g.font = font(11); g.textAlign = "center";
+  for (let m = lo; m <= hi; m++) if (cw >= 28 || (m - lo) % 2 === 0) g.fillText(absName(m), X(m), H - 10);
+}
+const vcVline = (g, x, y0, y1) => { g.beginPath(); g.moveTo(Math.round(x) + 0.5, y0); g.lineTo(Math.round(x) + 0.5, y1); g.stroke(); };
+// Find: a column a note; P2 up (−10 to +20 dB). The run going on, or the vowel's newest; its turn, last time's dashed;
+// the note to sing shaded, with P2 now on it
+function drawFind(g, now, H, P, font) {
+  const R = VC.run && VC.run.mode === "find" ? VC.run : null;
+  const saved = vcGet(VC.runs, VC.vowel), newest = saved[saved.length - 1];
+  const shown = !R && newest && Array.isArray(newest.n) ? newest : null;
+  const notes = R ? R.notes : shown ? shown.n.filter((n) => Array.isArray(n) && Number.isFinite(n[0])).map(([m, p2]) => ({ m, p2 })) : [];
+  const start = R ? R.start : shown && Number.isFinite(shown.s) ? shown.s : VC.target;
+  const turns = vcTurns(VC.vowel), turn = shown && shown.t != null ? shown : null;
+  const last = turn ? turns[turns.length - 2] : turns[turns.length - 1];
+  let lo = Math.min(start, VC.target) - 1;
+  const top = notes.length ? Math.max(...notes.map((n) => n.m)) : lo;
+  let hi = Math.max(lo + 13, top + 2, VC.target + 2);
+  if (hi - lo + 1 > 24) { lo = Math.max(lo, VC.target + 3 - 24); hi = lo + 23; } // (the note to sing kept in view)
+  const cw = (P.r - P.l) / (hi - lo + 1), X = (m) => P.l + (m - lo + 0.5) * cw;
+  const Y = (p) => P.t + ((20 - Math.max(-10, Math.min(20, p))) / 30) * (P.b - P.t);
   g.strokeStyle = C.line; g.lineWidth = 1;
-  g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
-  g.setLineDash([4, 5]);
-  g.beginPath(); g.moveTo(W * 0.2, 0); g.lineTo(W * 0.2, H); g.moveTo(W * 0.8, 0); g.lineTo(W * 0.8, H); g.stroke();
-  g.setLineDash([]);
-  // the notes stepped through, joined up in order, each named
-  g.strokeStyle = C.muted; g.fillStyle = C.ink; g.lineWidth = 1; g.textAlign = "left";
-  g.beginPath(); VC.marks.forEach((k, i) => (i ? g.lineTo(k.x * W, k.y * H) : g.moveTo(k.x * W, k.y * H))); g.stroke();
-  for (const k of VC.marks) {
-    g.beginPath(); g.arc(k.x * W, k.y * H, 3.5, 0, Math.PI * 2); g.fill();
-    g.fillStyle = C.muted; g.fillText(absName(k.m), k.x * W + 7, k.y * H - 6); g.fillStyle = C.ink;
+  g.beginPath(); g.moveTo(P.l, Math.round(Y(0)) + 0.5); g.lineTo(P.r, Math.round(Y(0)) + 0.5); g.stroke();
+  g.fillStyle = C.muted; g.font = font(11); g.textAlign = "right"; g.fillText("0", P.l - 6, Y(0) + 4);
+  if (VC.target >= lo && VC.target <= hi) { g.fillStyle = C.voice; g.globalAlpha = 0.06; g.fillRect(X(VC.target) - cw / 2, P.t, cw, P.b - P.t); g.globalAlpha = 1; }
+  g.save(); g.beginPath(); g.rect(P.l, 0, P.r - P.l, H); g.clip();
+  g.font = font(12); g.textAlign = "center";
+  if (last) {
+    g.strokeStyle = C.muted; g.setLineDash([4, 5]); vcVline(g, X(last.t), P.t + 30, P.b); g.setLineDash([]);
+    g.fillStyle = C.muted; g.fillText(tr("Last"), X(last.t), P.t + 26);
   }
-  g.strokeStyle = C.voice; g.lineWidth = 2; g.lineCap = "round";
-  for (let i = 1; i < VC.trail.length; i++) {
-    const a = VC.trail[i - 1], b = VC.trail[i];
-    if (!a || !b) continue;
-    g.globalAlpha = Math.max(0, 1 - (now - b.t) / (VC_TRAIL * 1000)) * 0.6;
-    g.beginPath(); g.moveTo(a.x * W, a.y * H); g.lineTo(b.x * W, b.y * H); g.stroke();
-  }
-  if (VC.ghost && VC.ghost.dot) { // the moment kept (Freeze): where the dot was, hollow
-    const q = VC.ghost.dot; g.strokeStyle = C.ink; g.lineWidth = 2; g.globalAlpha = 0.6; g.setLineDash([3, 3]);
-    g.beginPath(); g.arc(q.x * W, q.y * H, 10, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
-  }
-  const p = VC.last, fade = p ? Math.max(0, 1 - Math.max(0, now - p.t - 120) / 400) : 0;
-  if (fade > 0) {
-    const rad = 6 + 12 * Math.min(1, Math.max(0, (p.db + 60) / 50));
+  if (turn) {
     g.fillStyle = C.voice;
-    g.globalAlpha = 0.18 * fade; g.beginPath(); g.arc(p.x * W, p.y * H, rad * 2, 0, Math.PI * 2); g.fill();
-    g.globalAlpha = fade; g.beginPath(); g.arc(p.x * W, p.y * H, rad, 0, Math.PI * 2); g.fill();
+    if (turn.lo != null && turn.hi != null) { g.globalAlpha = 0.12; g.fillRect(X(turn.lo - 0.5), P.t + 16, X(turn.hi + 0.5) - X(turn.lo - 0.5), P.b - P.t - 16); g.globalAlpha = 1; }
+    else { g.strokeStyle = C.voice; g.lineWidth = 2; vcVline(g, X(turn.t), P.t + 16, P.b); g.lineWidth = 1; }
+    g.fillText(tr("Turn") + " " + vcTurnName(turn), X(turn.t), P.t + 12);
   }
-  g.globalAlpha = 1;
+  // (P2 as the turn was read from it: F2's part out, where there was one: tnOwn)
+  const own = R ? R.own || notes : shown ? vcOwnOf(shown, notes) : notes, sm = tnSmooth(own);
+  g.strokeStyle = C.muted; g.lineWidth = 1; g.beginPath();
+  sm.forEach((q, i) => (i ? g.lineTo(X(q.m), Y(q.s)) : g.moveTo(X(q.m), Y(q.s)))); g.stroke();
+  g.fillStyle = C.ink;
+  for (const q of sm) { g.beginPath(); g.arc(X(q.m), Y(q.p2), 3.5, 0, Math.PI * 2); g.fill(); }
+  g.strokeStyle = C.muted;
+  for (const q of notes) if (q.p2 == null) { g.beginPath(); g.arc(X(q.m), Y(-10), 3.5, 0, Math.PI * 2); g.stroke(); }
+  const at = wmed(VC.fr, "m", now - TN.nearWin, now, "t", (q) => q.v); // (where it's being sung: P2 belongs to that note)
+  if (VC.p2 != null && at.wt >= 100 && at.v >= lo - 0.5 && at.v <= hi + 0.5) { // P2 now, hollow once it's not fresh
+    g.fillStyle = g.strokeStyle = C.voice; g.lineWidth = 2; g.beginPath(); g.arc(X(at.v), Y(VC.p2), 6, 0, Math.PI * 2);
+    if (now - VC.p2At > 300) g.stroke(); else g.fill();
+  }
+  g.restore();
+  vcNames(g, H, lo, hi, X, font);
+}
+// a saved run's notes with F2's part out, worked out once (not kept with the run)
+const vcOwnSeen = new WeakMap();
+function vcOwnOf(run, notes) {
+  if (!vcOwnSeen.has(run)) vcOwnSeen.set(run, tnOwn(notes, tnPrior(VC.vowel, A4)));
+  return vcOwnSeen.get(run);
+}
+// Smooth: T ± 5 across; up top loudness, below it tone, each less the pass's own trend (its line against pitch). The pass
+// now (up solid, back dashed) over the one before, faint; what was found on it; the set's passes as dots by Go.
+function drawSmooth(g, now, W, H, P, font, mid) {
+  const R = VC.run && VC.run.mode === "smooth" ? VC.run : null, T = R ? R.T : VC.centre ?? VC.target;
+  const X = (m) => P.l + ((m - (T - 5)) / 10) * (P.r - P.l);
+  const yL0 = (P.t + mid) / 2, yU0 = (mid + P.b) / 2, hl = (mid - P.t) / 2 - 4, hu = (P.b - mid) / 2 - 4;
+  const yL = (v) => yL0 - Math.max(-1, Math.min(1, v / 12)) * hl, yU = (v) => yU0 - Math.max(-1, Math.min(1, v / 8)) * hu;
+  g.fillStyle = C.voice; g.globalAlpha = 0.1; g.fillRect(X(T - 0.5), P.t + 16, X(T + 0.5) - X(T - 0.5), P.b - P.t - 16); g.globalAlpha = 1;
+  g.font = font(12); g.textAlign = "center"; g.fillText(tr(vcAtTurn(T) ? "Turn" : "Centre"), X(T), P.t + 12);
+  if ($("#vcAxL").hidden !== !!S.echo) $("#vcAxL").hidden = !!S.echo; // (echo cancellation turned on or off meanwhile)
+  g.strokeStyle = C.line; g.lineWidth = 1;
+  for (const y of [yL0, yU0]) { g.beginPath(); g.moveTo(P.l, Math.round(y) + 0.5); g.lineTo(P.r, Math.round(y) + 0.5); g.stroke(); }
+  g.save(); g.beginPath(); g.rect(P.l, P.t, P.r - P.l, P.b - P.t); g.clip();
+  if (VC.prev) vcTrace(g, VC.prev, X, yL, yU, C.muted, 1.5, 0.35);
+  const live = R && R.phase === "sing";
+  const pass = live ? { xs: VC.fr.filter((s) => s.t >= R.t0), T: R.T, fit: R.fit } : VC.cur;
+  if (pass) vcTrace(g, pass, X, yL, yU, C.voice, 2, 1);
+  g.restore();
+  if (!live && VC.cur) for (const e of VC.cur.res.events) { // what was found, where
+    const x = X(e.at);
+    g.fillStyle = g.strokeStyle = C.ink; g.lineWidth = 1.5;
+    if (e.kind === "break") { g.font = font(16); g.textAlign = "center"; g.fillText("×", x, mid + 5); continue; }
+    const y = e.kind === "loud" ? yL0 : yU0;
+    g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = C.muted; g.font = font(12); g.textAlign = "left";
+    g.fillText((e.d > 0 ? "+" : "−") + Math.abs(Math.round(e.d)) + (e.kind === "loud" ? " dB" : " dB/oct"), x + 9, y - 8);
+  }
+  if (live && cur != null && Math.abs(cur - T) <= 5) { g.strokeStyle = C.voice; g.lineWidth = 1.5; vcVline(g, X(cur), P.t + 16, P.b); }
+  vcNames(g, H, T - 5, T + 5, X, font);
+  if (R || VC.set.length) { // the set: even filled, a problem ringed, unread dashed, to come faint
+    const gw = $("#vcGo").offsetWidth || 64, x1 = W - 12 - gw - 16, y = 12 + 16;
+    for (let i = 0; i < TN.set; i++) {
+      const x = x1 - (TN.set - 1 - i) * 14, k = VC.set[i];
+      g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.lineWidth = 1.5;
+      if (k === 1) { g.fillStyle = C.voice; g.fill(); }
+      else { g.strokeStyle = k === 0 ? C.ink : k === -1 ? C.muted : C.line; if (k === -1) g.setLineDash([2, 2]); g.stroke(); g.setLineDash([]); }
+    }
+  }
+}
+// A pass's two lanes: loudness and tone less their trend lines, against pitch; the way up solid, back down dashed; a gap,
+// a stall or leaving the view breaks the line
+function vcTrace(g, p, X, yL, yU, colour, width, alpha) {
+  const xs = p.xs, fit = p.fit || (p.fit = tnFits(xs, p.T));
+  let iTop = 0;
+  xs.forEach((s, i) => { if (s.v && s.m != null && (xs[iTop].m == null || s.m > xs[iTop].m)) iTop = i; });
+  g.strokeStyle = colour; g.lineWidth = width; g.globalAlpha = alpha;
+  for (const [key, f, Y] of [["L", fit.fL, yL], ["u", fit.fU, yU]]) {
+    if (!f || (key === "L" && S.echo)) continue; // (loudness isn't judged with echo cancellation on)
+    for (const leg of [0, 1]) {
+      g.setLineDash(leg ? [4, 4] : []); g.beginPath();
+      let on = false, pt = null;
+      for (let i = leg ? iTop : 0; i <= (leg ? xs.length - 1 : iTop); i++) {
+        const s = xs[i], gap = pt != null && s.t - pt > TN.stall;
+        pt = s.t;
+        if (!s.v || s.m == null || s[key] == null || Math.abs(s.m - p.T) > 5 || gap) { on = false; continue; }
+        const x = X(s.m), y = Y(s[key] - (f.a + f.b * s.m));
+        if (on) g.lineTo(x, y); else g.moveTo(x, y);
+        on = true;
+      }
+      g.stroke();
+    }
+  }
+  g.setLineDash([]); g.globalAlpha = 1;
 }
 
-// The spectrogram (the other view, in the pad's place): the sound's make-up going by, right to left, 0–5 kHz bottom to top, louder brighter
-// (dark blue, purple, red, yellow). A sung note's harmonics are its stripes; their strength up at 2–4 kHz is what the
-// pad reads as forward, and the lowest two against each other as chest or head.
+// The spectrogram (another view, in Turn's place): the sound's make-up going by, right to left, 0–5 kHz bottom to top, louder
+// brighter (dark blue, purple, red, yellow). A sung note's harmonics are its stripes.
 const SG = { top: 5000, lo: -100, span: 70, speed: 60 }; // Hz at the top; dB at the darkest; dB to the brightest; px a second
 const SG_LUT = (() => {
   const stops = [[0, 6, 6, 24], [0.25, 32, 24, 110], [0.5, 120, 34, 130], [0.72, 222, 68, 76], [0.88, 252, 160, 56], [1, 252, 250, 190]];
@@ -329,17 +657,20 @@ function drawEq(now, hearing) {
   g.textAlign = "left";
 }
 
-// Beside the pad: the note and how far off it is (in cents, against A440), and the numbers the dot is drawn from
+// Beside the view: the note and how far off it is (in cents, against A440), H1−H2, the level, and F1 · F2 ("~" once the
+// note's above a third of F1: the harmonics are too far apart there to read the vowel's shape)
 function paintVoiceRead() {
   const m = cur == null ? null : cur + 12 * Math.log2(A4 / 440);
-  setText("vcNote", m == null ? "–" : absName(m)); setText("vcTgt", absName(VC.target)); // (the names as set now)
+  setText("vcNote", m == null ? "–" : absName(m)); setText("vcTgt", absName(vcShown())); // (the names as set now)
   const c = m == null ? null : Math.round((m - Math.round(m)) * 100);
   setText("vcCents", c == null ? "" : (c > 0 ? "+" : c < 0 ? "−" : "±") + Math.abs(c) + "¢");
   $("#vcNeedle").style.left = (c == null ? 50 : 50 + c) + "%";
   $("#vcNeedle").style.opacity = c == null ? 0 : 1;
   const db = (v) => (v == null ? "–" : (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " dB");
-  setText("vcH12", db(VC.h12)); setText("vcBright", db(VC.bright)); setText("vcLvl", db(VC.h12 == null ? null : VC.db));
-  setText("vcF12", VC.fm && VC.fm.length >= 2 ? `${Math.round(VC.fm[0])} · ${Math.round(VC.fm[1])} Hz` : "–");
+  setText("vcH12", db(VC.h12)); setText("vcLvl", db(VC.h12 == null ? null : VC.db));
+  const high = cur != null && VC.fm && VC.fm.length && mf(cur) > VC.fm[0] / 3;
+  setText("vcF12", VC.fm && VC.fm.length >= 2 ? (high ? "~" : `${Math.round(VC.fm[0])} · ${Math.round(VC.fm[1])} Hz`) : "–");
+  vcTitles();
 }
 
 // The note you're singing, lit on the keyboard (kept in view)
@@ -354,56 +685,12 @@ function vcKeys(m) {
   if (x < 0 || x > wrap.clientWidth - 30) wrap.scrollTo({ left: k.offsetLeft - wrap.clientWidth / 2, behavior: "smooth" });
 }
 
-// Holding the target: how long on pitch so far (short drop-outs forgiven), shown filling its button; held long enough,
-// marked, then the next note
-function vcHoldTick(now) {
-  const on = VC.h12 != null && cur != null && Math.abs(cur - VC.target) < VC_NEAR;
-  if (on) {
-    if (!VC.hold) VC.hold = { at: now, xs: [], ys: [], done: false };
-    VC.hold.off = 0; VC.hold.xs.push(VC.last.x); VC.hold.ys.push(VC.last.y);
-  } else if (VC.hold) {
-    VC.hold.off ||= now;
-    if (now - VC.hold.off > 200) VC.hold = null;
-  }
-  const p = VC.hold && !VC.hold.done ? Math.min(1, (now - VC.hold.at) / VC_HOLD) : 0;
-  $("#vcTgt").style.setProperty("--p", (p * 100).toFixed(1) + "%");
-  if (p < 1) return;
-  const avg = (a) => a.reduce((s, v) => s + v, 0) / a.length;
-  VC.marks = VC.marks.filter((k) => k.m !== VC.target).concat({ x: avg(VC.hold.xs), y: avg(VC.hold.ys), m: VC.target });
-  VC.hold.done = true;
-  if (VC.auto && VC.target < KEY_HI) { vcSetTarget(VC.target + 1); playKey(VC.target); }
-}
-function vcSetTarget(m) {
-  m = Math.max(KEY_LO, Math.min(KEY_HI, m));
-  vcKeyEls.get(VC.target)?.classList.remove("guide");
-  VC.target = m; VC.hold = null; vcKeyEls.get(m)?.classList.add("guide");
-  setText("vcTgt", absName(m)); store.set("voiceStart", m);
-}
-// a key tapped: the ladder starts again from it
-function vcStart(m) { VC.marks = []; vcSetTarget(m); playKey(m); }
 
-// Teaching: Chest or Head on (one at a time; pressed again, off). Off, what was taught is kept, and the axis fitted again.
-function vcTeach(which) {
-  if (!micOn && !testOsc) { startMic(); return; }
-  const was = VC.rec;
-  VC.rec = was === which ? null : which;
-  if (was) store.set("voiceTrain", VC.train);
-  vcFit(); paintTeach();
-}
-function paintTeach() {
-  const n = (k) => VC.train[k].length, s = (k) => Math.round(n(k) / 60); // (frames at about 60 a second)
-  for (const [id, k] of [["#vcChest", "chest"], ["#vcHead", "head"]]) {
-    const b = $(id); b.setAttribute("aria-pressed", String(VC.rec === k)); b.classList.toggle("set", n(k) >= VC_MIN);
-  }
-  $("#vcReset").hidden = !n("chest") && !n("head");
-  const m = VC.model;
-  say($("#vcFit"), !n("chest") && !n("head") ? "" : m ? "Chest {c} s · head {h} s · tells them apart {acc}%" : "Chest {c} s · head {h} s · a little more of both",
-    { c: s("chest"), h: s("head"), acc: m ? Math.round(m.acc * 100) : 0 });
-}
-
-// Shown (route): the keyboard's samples, and the keys around middle C in view
+// Shown (route): the keyboard's samples, and the keys around middle C in view. A run left going when the page was left
+// (nothing was read meanwhile) is stopped.
 function voiceShow() {
   loadSamples();
+  if (VC.run) { vcAbort(); paintTurn(); }
   const wrap = $("#vcKeys").parentElement, k = vcKeyEls.get(60);
   if (k) wrap.scrollLeft = k.offsetLeft - wrap.clientWidth / 2;
   $("#vcOff").hidden = micOn || !!testOsc;
@@ -412,29 +699,36 @@ function initVoice() {
   // the header's Lab tab: in, and the mic on with it (this click lets it start)
   $("#tabLab").onclick = () => { if (view !== "voice") startMic(); };
   $("#vcMic").onclick = () => startMic();
-  $("#vcChest").onclick = () => vcTeach("chest");
-  $("#vcHead").onclick = () => vcTeach("head");
-  // the view: the pad, the spectrogram or the EQ in its place (the spectrogram's to begin with); the mic's ask
-  // (#vcOff) over whichever's shown
+  // the view: Turn, the spectrogram or the EQ in its place (the spectrogram's to begin with); the mic's ask (#vcOff) over
+  // whichever's shown. Leaving Turn stops its run.
   const showView = (v) => {
+    if (v !== "pad" && VC.run) { vcAbort(); paintTurn(); }
     $(".vc-pad").hidden = v !== "pad"; $(".vc-spec").hidden = v !== "spec"; $(".vc-eq").hidden = v !== "eq";
     $(".vc-" + v).append($("#vcOff"));
     for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
   };
   for (const b of $("#vcView").children) b.onclick = () => { showView(b.dataset.v); store.set("voiceView", b.dataset.v); };
   showView(["pad", "spec", "eq"].includes(store.get("voiceView", "spec")) ? store.get("voiceView", "spec") : "spec"); // (the spectrogram, till another's picked)
-  // Freeze: this moment kept faintly behind (the EQ's spectrum, envelope and formants, and the pad's dot), or let go
+  // Freeze: this moment kept faintly behind the EQ's spectrum, envelope and formants, or let go
   $("#vcFreeze").onclick = () => {
-    const live = VC.last && performance.now() - VC.last.t < 300;
-    VC.ghost = VC.ghost ? null : VC.eqNow ? { ...VC.eqNow, cols: Float32Array.from(VC.eqNow.cols), dot: live ? { x: VC.last.x, y: VC.last.y } : null } : null;
+    VC.ghost = VC.ghost ? null : VC.eqNow ? { ...VC.eqNow, cols: Float32Array.from(VC.eqNow.cols) } : null;
     $("#vcFreeze").setAttribute("aria-pressed", String(!!VC.ghost)); say($("#vcFreeze"), VC.ghost ? "Unfreeze" : "Freeze");
   };
+  // Turn: its mode, Go, the vowels (each a row: its name, its newest turn, its last days' bars), the note by the keys
+  for (const b of $("#vcMode").children) b.onclick = () => { if (b.dataset.m !== VC.mode) vcSetMode(b.dataset.m); };
+  $("#vcGo").onclick = vcGo;
+  for (const [v, label] of VOWELS) {
+    const b = document.createElement("button"), name = document.createElement("span"), t = document.createElement("span"), bars = document.createElement("span");
+    b.type = "button"; b.setAttribute("role", "radio"); b.dataset.v = v;
+    say(name, label); t.className = "vt"; bars.className = "vc-bars"; bars.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 8; i++) bars.append(document.createElement("i"));
+    b.append(name, t, bars);
+    b.onclick = () => { if (v !== VC.vowel) vcSetVowel(v); };
+    $("#vcVowels").append(b);
+  }
   $("#vcDown").append(icon("prev")); $("#vcUp").append(icon("next"));
-  $("#vcDown").onclick = () => { vcSetTarget(VC.target - 1); playKey(VC.target); };
-  $("#vcUp").onclick = () => { vcSetTarget(VC.target + 1); playKey(VC.target); };
-  $("#vcTgt").onclick = () => playKey(VC.target);
-  $("#vcAuto").checked = VC.auto; $("#vcAuto").onchange = (e) => { VC.auto = e.target.checked; store.set("voiceAuto", VC.auto); };
-  vcSetTarget(VC.target);
-  $("#vcReset").onclick = () => { VC.rec = null; VC.train = { chest: [], head: [] }; store.set("voiceTrain", VC.train); vcFit(); paintTeach(); };
-  vcFit(); paintTeach();
+  $("#vcDown").onclick = () => vcStart(vcShown() - 1, true);
+  $("#vcUp").onclick = () => vcStart(vcShown() + 1, true);
+  $("#vcTgt").onclick = () => vcPlay(vcShown());
+  vcSeed();
 }
