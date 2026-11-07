@@ -290,9 +290,10 @@ function loop() {
   let m = null;
   if (ac && (micOn || testOsc)) {
     if (testOsc) {
-      // (in the Lab, its note; while a Smooth pass runs, left where it is, for a glide set by hand)
-      const tgt = view === "voice" ? (VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
-      if (tgt) testOsc.frequency.setTargetAtTime(mf(tgt.midi + testOffset / 100), ac.currentTime, 0.03);
+      // (in the Lab, its note; in Scales, the pattern's note now; while a Smooth pass runs, left where it is, for a glide set by hand)
+      const tgt = view === "voice" ? (VC.view === "scale" ? { midi: scNow(now) } : VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
+      if (testGain) testGain.gain.setTargetAtTime(tgt && tgt.midi == null ? 0 : 0.3, ac.currentTime, 0.01); // (no note: quiet)
+      if (tgt && tgt.midi != null) testOsc.frequency.setTargetAtTime(mf(tgt.midi + testOffset / 100), ac.currentTime, 0.03);
     }
     analyser.getFloatTimeDomainData(tbuf);
     let s = 0; for (let i = 0; i < tbuf.length; i++) s += tbuf[i] * tbuf[i];

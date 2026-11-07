@@ -418,4 +418,4 @@ function tnPass(xs, T, opts = {}) {
     maxL, maxU, first: real.length ? real[0].at : null, events: real, fL, fU };
 }
 
-if (typeof module !== "undefined") module.exports = { TN, tnHarm, tnOctave, tnRange, tnTurn, tnCross, tnF2, tnOwn, tnPrior, tnPass, tnFit, wmed, tnStart, F1_PRIOR, VOWELS, tnSmooth, tnFits, tnTrend };
+if (typeof module !== "undefined") module.exports = { TN, tnHarm, tnOctave, tnRange, tnTurn, tnCross, tnF2, tnOwn, tnPrior, tnPass, tnFit, wmed, tnMed, tnStart, F1_PRIOR, VOWELS, tnSmooth, tnFits, tnTrend };
