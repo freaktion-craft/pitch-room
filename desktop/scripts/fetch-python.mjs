@@ -21,7 +21,6 @@ const arch = process.argv.includes("--arch") ? process.argv[process.argv.indexOf
 const triple = {
   darwin: { arm64: "aarch64-apple-darwin", x64: "x86_64-apple-darwin" },
   win32: { x64: "x86_64-pc-windows-msvc" },
-  linux: { x64: "x86_64-unknown-linux-gnu" },
 }[process.platform]?.[arch];
 if (!triple) throw new Error(`No Python build for ${process.platform} ${arch}`);
 

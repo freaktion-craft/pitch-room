@@ -85,13 +85,6 @@
       "createDesktopShortcut": true,
       "shortcutName": "Pitchroom"
     },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "category": "Audio",
-      "icon": "build/icon-win.png"
-    },
     "publish": [
       {
         "provider": "github",

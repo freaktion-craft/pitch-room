@@ -224,10 +224,10 @@ function permissions() {
 }
 
 // ---------- updates ----------
-// Windows and the Linux AppImage update themselves, in the splash before the engine starts: the latest release's
+// Windows updates itself, in the splash before the engine starts: the latest release's
 // latest.yml looked up (≤ 5 s, or it's skipped this time), a newer version downloaded, installed silently and opened.
 // macOS can't till the app's signed (Squirrel.Mac checks the signature): a newer release is offered as a download.
-const SELF_UPDATES = app.isPackaged && !WIP && (win32 || (process.platform === "linux" && !!process.env.APPIMAGE)); // (WIP: never a release over it)
+const SELF_UPDATES = app.isPackaged && !WIP && win32; // (WIP: never a release over it)
 const within = (ms, p) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(`no answer in ${ms / 1000} s`)), ms))]);
 async function updateFirst() { // true: it's installing, the app's about to quit
   autoUpdater.autoDownload = false;
@@ -355,7 +355,7 @@ else {
     execFile(ps, ["-NoProfile", "-NonInteractive", "-Command", "try { Start-Process -FilePath $env:PR_CABLE_SETUP -WorkingDirectory (Split-Path $env:PR_CABLE_SETUP) -Verb RunAs -Wait -ErrorAction Stop; 'ok' } catch { 'cancelled' }"],
       { windowsHide: true, env: { ...process.env, PR_CABLE_SETUP: CABLE_SETUP } }, (e, out) => ok(!e && /\bok\b/.test(String(out)) ? "ok" : "cancelled"));
   }));
-  ipcMain.handle("mic-access", () => (process.platform === "linux" ? "granted" : systemPreferences.getMediaAccessStatus("microphone"))); // (asked yet? allowed?)
+  ipcMain.handle("mic-access", () => systemPreferences.getMediaAccessStatus("microphone")); // (asked yet? allowed?)
   ipcMain.on("mic-settings", () => shell.openExternal(process.platform === "darwin" // where the mic's allowed for apps, once refused
     ? "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" : "ms-settings:privacy-microphone"));
   ipcMain.handle("pick-folder", async (e) => {
