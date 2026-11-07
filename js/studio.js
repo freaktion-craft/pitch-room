@@ -896,17 +896,21 @@ document.addEventListener("keydown", (e) => {
     if (Math.abs(b - a) >= 0.2) addKeep(name, Math.min(a, b), Math.max(a, b));
   } else if (e.key === "Escape" && (P.mark || P.tsel)) { P.mark = null; P.tsel = null; paintKeeps(); }
 });
-// Over a waveform (the song's, a track's), the time under the pointer in a tip, as Practice's timeline has it (not while
-// the playhead's dragged: its flag says it)
+// Over a waveform (the song's, a track's), the time under the pointer in a tip across its middle, in the pointer's place
+// (stems.css hides the pointer there), a faint line down through the waveform where it points; both fade in. Not while
+// the playhead's dragged: its flag says it
 function timeTip(c) {
-  const tip = el("output", "tl-tip"); tip.hidden = true; c.parentElement.append(tip);
+  const tip = el("span", "tl-tip mid"), line = el("i", "tt-line");
+  tip.setAttribute("aria-hidden", "true"); c.parentElement.append(line, tip);
+  const show = (on) => { tip.classList.toggle("on", on); line.classList.toggle("on", on); };
   c.addEventListener("pointermove", (e) => {
-    if (!P.song || P.scrub) { tip.hidden = true; return; }
+    if (!P.song || P.scrub) { show(false); return; }
     const r = c.getBoundingClientRect(), x = Math.max(0, Math.min(r.width, e.clientX - r.left));
-    tip.textContent = fmtTime((x / r.width) * songDur()); tip.hidden = false;
+    tip.textContent = fmtTime((x / r.width) * songDur());
     const half = tip.offsetWidth / 2; tip.style.left = Math.max(half, Math.min(r.width - half, x)) + "px"; // kept over it
+    line.style.left = x + "px"; show(true);
   });
-  c.addEventListener("pointerleave", () => { tip.hidden = true; });
+  c.addEventListener("pointerleave", () => show(false));
 }
 // The song's waveform: a click jumps there; within a few pixels of the playhead you can grab it (it thickens) and drag
 // it, its time on a flag at its top.
