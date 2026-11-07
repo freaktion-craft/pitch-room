@@ -270,9 +270,9 @@
    buttons line up with the transport row's above */
 .tracks { display: grid; }
 /* the icon gets room on both sides (wider first column, more left padding); the right side lines up with .mix above */
-.track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) calc(var(--c-btn) * 2) var(--c-vol) var(--c-btn); align-items: center; gap: var(--space-3); padding: var(--space-2) 0; min-height: 48px; }
+.track { display: grid; grid-template-columns: 24px minmax(84px, 1fr) calc(var(--c-btn) * 2) var(--c-vol) var(--c-btn); align-items: center; gap: var(--space-3); padding: var(--space-4) 0; min-height: 48px; }
 .track + .track { border-top: 1px solid var(--line); }
-.track { row-gap: var(--space-2); }
+.track { row-gap: var(--space-1); } /* a track's name and its waveform close, the tracks apart */
 .track .twave { display: block; width: 100%; height: 28px; cursor: none; } /* as wide as the song's waveform (.twrap spans the row) */
 /* the Vocals row's open/close button, after its name */
 .disclose { margin: calc(var(--space-1) * -1) 0 calc(var(--space-1) * -1) var(--space-1); vertical-align: middle; }
