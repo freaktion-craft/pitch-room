@@ -138,9 +138,12 @@ Lyrics: LRCLIB candidates, Whisper (large-v3-turbo via stable-ts) to screen and 
 - Heavy imports (torch, demucs, librosa, whisper, yt_dlp, and the song modules) happen inside functions. The base app
   runs with `requirements.txt` only: numpy, parselmouth, imageio-ffmpeg, yt-dlp and deno (yt-dlp's JS runtime). The
   desktop app ships without praat-parselmouth (GPL), so nothing may depend on it there.
-- A new base package goes into `requirements.txt` **and** `NEEDED` in `launch.py` (only those are checked at start).
-  `update.py` reinstalls when `requirements.txt` changes, and `desktop/scripts/fetch-python.mjs` bundles every line of
-  it (but praat-parselmouth) into the desktop app's Python.
+- A new base package goes into `requirements.txt` **and** `NEEDED` in `launch.py` (only those are checked at start; one
+  not in `CORE` there lets the app start without it when pip can't install it). `update.py` reinstalls when
+  `requirements.txt` differs from the one it last installed (`.venv/.requirements-installed`), and
+  `desktop/scripts/fetch-python.mjs` bundles every line of it (but praat-parselmouth) into the desktop app's Python.
+- yt-dlp finds deno through PATH: call `stems.deno_on_path()` before using it (it adds deno's folder once; prepending
+  on every call grew PATH past Windows' limit).
 - Tuning constants sit at module top with the reason and the bench numbers they were chosen on. Keep that when changing
   one.
 - Lyric sync changes go into the model or algorithm (`syllables.py`, `melody.py`, alignment in `stems.py`), never into

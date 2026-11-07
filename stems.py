@@ -30,6 +30,7 @@ import os
 import re
 import secrets
 import shutil
+import sysconfig
 import subprocess
 import sys
 import tempfile
@@ -329,7 +330,8 @@ def freshen_finders():
 
     def run():
         r = subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-warn-script-location", "-q", "-U", "yt-dlp[default]"],
-                           capture_output=True, text=True, timeout=600, **({"creationflags": 0x08000000} if os.name == "nt" else {}))
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                           timeout=600, **({"creationflags": 0x08000000} if os.name == "nt" else {}))
         if r.returncode == 0:
             with contextlib.suppress(OSError), open(stamp, "w") as f:
                 f.write(str(round(time.time())))
@@ -406,7 +408,8 @@ def check_tools() -> dict:
     code = ("import importlib, json, sys\nout = {}\nfor m in sys.argv[1:]:\n    try:\n        importlib.import_module(m); out[m] = ''\n"
             "    except BaseException as e:\n        out[m] = (type(e).__name__ + ': ' + str(e))[:300]\nprint(json.dumps(out))")
     try:
-        r = subprocess.run([sys.executable, "-c", code, *CHECK_IMPORTS], capture_output=True, text=True, timeout=180,
+        r = subprocess.run([sys.executable, "-c", code, *CHECK_IMPORTS], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", env={**os.environ, "PYTHONIOENCODING": "utf-8"}, timeout=180,
                            **({"creationflags": 0x08000000} if os.name == "nt" else {}))
         loads = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"python": (r.stderr or "no answer").strip()[-300:]}
     except (subprocess.TimeoutExpired, ValueError, OSError) as e:
@@ -458,18 +461,26 @@ def _pip_line(job, line: str):
 
 
 def _pip(job, args: list[str], share: tuple[float, float]) -> int:
+    # pip told to write UTF-8 and read as UTF-8: its lines carry paths, and a Korean user name in one isn't the
+    # code page's (the desktop app already sets PYTHONIOENCODING, which pip inherits)
     p = subprocess.Popen([sys.executable, "-m", "pip", *args, "--disable-pip-version-check", "--progress-bar", "off"],
-                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                         bufsize=1, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     n = 0
-    for line in p.stdout:
-        line = line.strip()
-        if not line:
-            continue
-        n += 1
-        with _jobs_lock:
-            _pip_line(job, line)
-            job["log"].append(line[-160:])
-            job["progress"] = share[0] + (share[1] - share[0]) * min(1.0, n / 120)
+    try:
+        for line in p.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            n += 1
+            with _jobs_lock:
+                _pip_line(job, line)
+                job["log"].append(line[-160:])
+                job["progress"] = share[0] + (share[1] - share[0]) * min(1.0, n / 120)
+    except BaseException:  # stopped reading: pip mustn't sit blocked on a full pipe, half done
+        p.kill()
+        p.wait()
+        raise
     return p.wait()
 
 
@@ -911,10 +922,29 @@ def _lookup_worker():
         time.sleep(1)  # the sites ask for a few searches a second at most
 
 
+def on_path(d: str):
+    """Put a folder at the front of PATH, once: it's asked for on every download, and a PATH grown past 32767
+    characters can't be set on Windows."""
+    have = [os.path.normcase(os.path.normpath(x)) for x in os.environ.get("PATH", "").split(os.pathsep) if x]
+    if os.path.normcase(os.path.normpath(d)) not in have:
+        os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+
+
+def deno_on_path():
+    """yt-dlp needs a JavaScript runtime for YouTube: the `deno` package's, put on PATH. It's beside this Python in a
+    copy run from source; in the desktop app (a venv over its own Python) it's in that Python's scripts folder."""
+    exe = "deno" + (".exe" if os.name == "nt" else "")
+    base = {"base": sys.base_prefix, "platbase": sys.base_prefix}
+    for d in (os.path.dirname(sys.executable), sysconfig.get_path("scripts"), sysconfig.get_path("scripts", vars=base)):
+        if os.path.isfile(os.path.join(d, exe)):
+            on_path(d)
+            return
+
+
 def _channel(url: str) -> str:
     """Who put a video up (its channel), asked of YouTube; "" if it can't be had."""
     import yt_dlp
-    os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")
+    deno_on_path()
     try:
         with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}) as ydl:
             info = ydl.extract_info(url, download=False, process=False)
@@ -931,7 +961,7 @@ def find(url: str) -> dict:
     import covers
     import lyrics
     import yt_dlp
-    os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")  # its deno, beside this Python
+    deno_on_path()
     if vid := _video_id(url):  # the video alone: a link from a mix or a playlist (&list=…&index=…) is read as the playlist, with no title
         url = "https://www.youtube.com/watch?v=" + vid
     try:
@@ -1393,8 +1423,7 @@ def _ytdl(job, folder: str, name: str, fmt: str, p0: float, p1: float):
             if total:
                 _set(job, progress=p0 + (p1 - p0) * d.get("downloaded_bytes", 0) / total)
 
-    # yt-dlp needs a JavaScript runtime for YouTube; the `deno` package puts one next to this Python
-    os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")
+    deno_on_path()
     return yt_dlp.YoutubeDL({"format": fmt, "outtmpl": os.path.join(folder, name + ".%(ext)s"), "noplaylist": True,
                              "quiet": True, "no_warnings": True, "progress_hooks": [hook], "ffmpeg_location": ffmpeg_exe()})
 
@@ -1403,13 +1432,38 @@ def _saved(folder: str, name: str) -> str | None:
     return next((f for f in os.listdir(folder) if f.startswith(name + ".") and not f.endswith((".part", ".ytdl"))), None)
 
 
+def _unfit(info: dict) -> str:
+    """Why a video can't be a song, said before it's downloaded (a live stream never ends; a mix hours long would be
+    fetched and read whole only to be turned away), or ""."""
+    if info.get("is_live") or info.get("live_status") in ("is_live", "is_upcoming"):
+        return "Live streams can’t be added. Add it once it’s over."
+    if float(info.get("duration") or 0) > 20 * 60:
+        return "Songs up to 20 minutes, please."
+    return ""
+
+
 def _download(job, url: str, folder: str) -> tuple[str, str, str]:
+    why = ""
     try:
         with _ytdl(job, folder, "source", "bestaudio/best", 0.02, 0.12) as ydl:
-            info = ydl.extract_info(url, download=True)
+            # what it is first, nothing downloaded: a link to it followed (a channel's /live); a channel, a search or a
+            # set turned away before its videos are each looked up (minutes, with nothing to cancel it at)
+            info = ydl.extract_info(url, download=False, process=False)
+            for _ in range(3):
+                if info.get("_type") != "url":
+                    break
+                info = ydl.extract_info(info["url"], download=False, process=False, ie_key=info.get("ie_key"))
+            if info.get("_type") in ("playlist", "multi_video"):
+                why = "That’s a channel or a playlist. Add one song’s link."
+            else:
+                info = ydl.process_ie_result(info, download=False)
+                if not (why := _unfit(info)):
+                    info = ydl.process_ie_result(info, download=True)
     except Exception as e:  # noqa: BLE001
         msg = str(e)
         raise ValueError("Couldn’t download that link. " + (msg.split("ERROR:")[-1].strip()[:200] if msg else "")) from None
+    if why:
+        raise ValueError(why)
     name = _saved(folder, "source")
     if not name:
         raise ValueError("The download finished but no audio file was saved.")
@@ -2477,7 +2531,7 @@ def _ffmpeg_on_path():
             os.link(ffmpeg_exe(), exe)  # a hard link takes no extra space
         except OSError:
             shutil.copy2(ffmpeg_exe(), exe)
-    os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+    on_path(d)
 
 
 @contextlib.contextmanager
@@ -3294,7 +3348,7 @@ def _shift_track(folder: str, name: str, n: int, stop, progress, s: float = 1.0)
     tmp = dst + ".part"
     p = subprocess.Popen([_rubberband_ffmpeg(), "-v", "error", "-nostdin", "-y", "-i", src, "-af", af, "-c:a", "libmp3lame",
                           "-b:a", "256k", "-f", "mp3", "-progress", "pipe:1", "-nostats", tmp],
-                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")  # (paths in its errors)
     errors = []
     try:
         for line in p.stdout:  # key=value lines about twice a second; anything else is an error message

@@ -25,8 +25,9 @@ def is_playlist(url: str) -> bool:
 
 def _ydl(opts: dict):
     import yt_dlp
-    # yt-dlp needs a JavaScript runtime for YouTube; the `deno` package puts one next to this Python
-    os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")
+
+    import stems
+    stems.deno_on_path()
     return yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, **opts})
 
 

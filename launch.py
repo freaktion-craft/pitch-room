@@ -20,7 +20,9 @@ import urllib.request
 import webbrowser
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-NEEDED = {"parselmouth": "praat-parselmouth", "numpy": "numpy", "imageio_ffmpeg": "imageio-ffmpeg"}
+NEEDED = {"parselmouth": "praat-parselmouth", "numpy": "numpy", "imageio_ffmpeg": "imageio-ffmpeg", "yt_dlp": "yt-dlp",
+          "deno": "deno"}
+CORE = ("parselmouth", "numpy", "imageio_ffmpeg")  # without these it can't start; without the rest only adding from a link waits
 
 
 def ensure_packages():
@@ -29,7 +31,12 @@ def ensure_packages():
         return
     print("First run: installing the base tools (1–2 minutes)…", flush=True)
     req = os.path.join(ROOT, "requirements.txt")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", req])
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", req])
+    except (subprocess.CalledProcessError, OSError):
+        if any(mod in missing for mod in CORE):
+            raise
+        print("Couldn't install yt-dlp (offline?): starting without it. Adding songs from links waits for the next start.", flush=True)
 
 
 def is_ours(port):
