@@ -508,13 +508,13 @@ function trackRow(name, members, sub, open) {
     sh.className = "tog"; sh.textContent = t.offset ? accentOn() : tr("Shift accent");
     opts.append(bpb.btn, sh);
     if (!P.song.beats || !P.song.beats.length) { m.disabled = true; nm.querySelector("small").textContent = tr("no steady beat found"); }
-  } else if (!group && !VOCAL_TRACKS.includes(name)) {
-    last = el("span"); // only the vocals have a download of their own; the band comes with the song's export
+  } else if ((!group && !VOCAL_TRACKS.includes(name)) || sub) {
+    last = el("span"); // only the vocals have a download of their own (lead and backing in Vocals'); the band comes with the song's export
   } else {
     if (name === "vocals" && splitting[P.song.id]) nm.querySelector("small").textContent = tr(...splitting[P.song.id]);
     last = el("button", "btn sm icon ghost"); last.type = "button"; last.title = tr("Download {what} only (MP3)", { what: tr(group ? "the vocals" : TRACK_TITLES[name] || name) }); last.setAttribute("aria-label", last.title);
     last.append(icon("download"));
-    last.onclick = () => exportMix(members.map((k) => ({ name: k, gain: 1 })), null, last);
+    last.onclick = () => exportMix(vocalsOut(members), null, last);
   }
   const ms = el("div", "ms"); ms.append(m, s);
   row.append(dot, label, ms, v, last);
@@ -770,6 +770,14 @@ async function autoSplit(m) {
 // Songs that kept their vocals whole in parts ("unsplit": the lead moved into the backing there) have those as the lead's.
 const keepOf = (m) => (m.keep && typeof m.keep === "object" ? m.keep : m.unsplit && m.unsplit.length ? { lead: m.unsplit } : {});
 const keepMembers = (name) => (name === "voices" ? ["lead", "backing"] : [name]);
+// The vocals' download (Vocals', or a stretch of a vocal track's): its tracks as you hear them among themselves, a muted
+// one left out (one soloed, only those soloed); the rest of the band's mutes and solos don't come into it
+function vocalsOut(members) {
+  const ts = members.filter((k) => P.tracks[k]), solo = ts.filter((k) => P.tracks[k].solo);
+  return (solo.length ? solo : ts.filter((k) => !P.tracks[k].mute)).map((k) => ({ name: k, gain: 1 }));
+}
+// a vocal track's stretch downloads the vocals, all of them (lead and backing apart are the same as one)
+const cutMembers = (name) => (P.tracks.lead && P.tracks.backing && (name === "lead" || name === "backing") ? ["lead", "backing"] : keepMembers(name));
 function mergeParts(parts) {
   const out = [];
   for (const [a, b] of [...parts].sort((x, y) => x[0] - y[0])) {
@@ -839,9 +847,10 @@ function paintKeeps() {
       const bar = el("div", "selbar"), keep = el("button", "btn xs primary", tr("Keep playing here")), cut = el("button", "btn xs icon primary"), { a, b } = P.tsel;
       keep.type = cut.type = "button";
       keep.onclick = () => addKeep(name, a, b);
-      cut.title = tr("Download {what}, {a}–{b} only (MP3)", { what: tr(name === "voices" ? "the vocals" : TRACK_TITLES[name] || name), a: fmtTime(a), b: fmtTime(b) });
+      const ms = cutMembers(name);
+      cut.title = tr("Download {what}, {a}–{b} only (MP3)", { what: tr(ms.length > 1 ? "the vocals" : TRACK_TITLES[name] || name), a: fmtTime(a), b: fmtTime(b) });
       cut.setAttribute("aria-label", cut.title); cut.append(icon("download"));
-      cut.onclick = () => exportMix(keepMembers(name).map((k) => ({ name: k, gain: 1 })), null, cut, [a, b]);
+      cut.onclick = () => exportMix(VOCAL_TRACKS.includes(ms[0]) ? vocalsOut(ms) : ms.map((k) => ({ name: k, gain: 1 })), null, cut, [a, b]);
       bar.append(keep, cut); box.append(bar);
       const half = bar.offsetWidth / 2; // in the middle of the stretch, kept inside the waveform
       bar.style.left = Math.max(half + 4, Math.min(w - half - 4, ((a + b) / 2 / dur) * w)) + "px";
