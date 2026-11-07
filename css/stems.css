@@ -155,7 +155,7 @@
 .player { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad-card); display: grid; gap: var(--space-4); margin-bottom: var(--space-8); }
 .player-head { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); } /* Info's title and buttons */
 .player-title { display: grid; gap: var(--space-1); min-width: 0; }
-#sPlayer .player-title { gap: var(--space-2); } /* play and the rest (the song's volume at the end), then the key, the facts and the buttons: as Practice has them */
+#sPlayer .player-title { gap: var(--space-2); } /* play, the seek buttons, the key and tempo (the song's volume at the end), then the time and the tracks */
 .title-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; min-height: 40px; } /* as tall as Practice's play row, so the key under it is where Practice has it */
 .player-title .muted { font-size: var(--text-sm); }
 #pWave { width: 100%; height: 96px; display: block; border-radius: var(--radius-lg); background: var(--bg); cursor: none; touch-action: pan-y; }
@@ -190,8 +190,8 @@
 .tparts .selbar { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; gap: var(--space-1); pointer-events: auto; }
 .tparts .selbar .btn { white-space: nowrap; box-shadow: var(--shadow-raised); }
 .transport-row { display: flex; align-items: center; gap: var(--space-2) var(--space-4); flex-wrap: wrap; } /* spaced as Practice's (.sb-main), so each button's where it is there */
-.transport-row output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.transport-row .ptracks { font-size: var(--text-sm); color: var(--muted); } /* how many tracks, after the time */
+.song-facts output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.song-facts .ptracks { font-size: var(--text-sm); color: var(--muted); } /* how many tracks, after the time */
 /* Key change, in the Studio's header and in Practice's bar: a dropdown of the keys, then a note in whatever room is
    left on the line (that big shifts can sound processed, or why a change failed). The dropdown has a fixed width and
    the note takes no room of its own, so nothing moves as they change. */
@@ -217,10 +217,10 @@
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .knote.warn { color: var(--warn-ink); }
 .knote.err { color: var(--bad); }
-/* In the Studio the control sits under the title, then the tempo, length and tracks, then its note, and the song's
-   buttons at the end of that line; on a narrow screen the buttons go to a line of their own */
+/* In the Studio the key and tempo sit after the seek buttons, their note after them; the time and the tracks go on
+   the line under */
 .song-facts { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; }
-.song-facts .keyctl { flex: none; }
+.transport-row .keyctl { flex: none; }
 .meta-line { display: flex; flex: 1 1 120px; min-width: 0; white-space: nowrap; }
 #pKeyNote { flex: 1 1 0; width: auto; min-width: 0; height: auto; max-height: none; display: block; overflow: hidden; text-overflow: ellipsis; font-size: inherit; line-height: inherit; }
 #pKeyNote:not(:empty)::before { content: " · "; color: var(--muted); white-space: pre; }
