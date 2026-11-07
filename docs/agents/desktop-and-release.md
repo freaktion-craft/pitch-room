@@ -33,7 +33,10 @@ Windows and macOS only.
 
 In `desktop/` (Node 22.12+, which Electron 45 requires; CI uses 22). A fresh worktree has no `node_modules`.
 
-1. `npm ci` (downloads Electron)
+1. `npm ci` (downloads Electron). In a worktree too: never junction another checkout's `node_modules` into it.
+   Through a junction electron-builder can't find electron-updater's own dependencies; 1.0.18 shipped without them
+   and couldn't start. `desktop/scripts/check-packed.js` (the build's `afterPack`) now fails the build when
+   `app.asar` lacks a package the app needs at run time.
 2. `npm run python`: fetches the pinned standalone Python into `desktop/runtime` (no praat-parselmouth, which is GPL).
    On Windows also `node scripts/fetch-vbcable.mjs` (into `desktop/vbcable`; it needs System32's `tar.exe`, not Git's).
 3. `npm start`: Electron on the repo's live code (not a sandbox, below).
