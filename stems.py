@@ -2,7 +2,7 @@
 
 Songs live in ./library/<id>/ :
     source.*        the original audio (the YouTube download; a file, for a song added from one by an older version)
-    video.*         the picture of a YouTube video, no sound (shown above the player to follow lyrics)
+    video.*         older songs only: the YouTube video's picture, no longer fetched or shown
     <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
@@ -183,7 +183,7 @@ def _set(job, **kw):
 
 class Cancelled(BaseException):
     """Raised in a job's thread at its next checkpoint once the job is cancelled. A BaseException, so the
-    `except Exception` around optional steps (the video, the key) lets it through."""
+    `except Exception` around optional steps (the key) lets it through."""
 
 
 def cancel_job(job_id: str) -> str:
@@ -1445,7 +1445,7 @@ def _unfit(info: dict) -> str:
 def _download(job, url: str, folder: str) -> tuple[str, str, str]:
     why = ""
     try:
-        with _ytdl(job, folder, "source", "bestaudio/best", 0.02, 0.12) as ydl:
+        with _ytdl(job, folder, "source", "bestaudio/best", 0.02, 0.2) as ydl:
             # what it is first, nothing downloaded: a link to it followed (a channel's /live); a channel, a search or a
             # set turned away before its videos are each looked up (minutes, with nothing to cancel it at)
             info = ydl.extract_info(url, download=False, process=False)
@@ -1468,38 +1468,6 @@ def _download(job, url: str, folder: str) -> tuple[str, str, str]:
     if not name:
         raise ValueError("The download finished but no audio file was saved.")
     return os.path.join(folder, name), info.get("title") or "YouTube audio", info.get("channel") or info.get("uploader") or ""
-
-
-# The picture only, to follow lyrics while singing: the stems play the sound. Up to 720p, H.264 MP4 when there is one
-# (plays everywhere), else whatever video stream exists. Audio and video streams of one YouTube video share a timeline.
-VIDEO_FORMAT = "bv*[height<=720][vcodec^=avc1][ext=mp4]/bv*[height<=720][ext=mp4]/bv*[height<=720]/bv*"
-
-
-def _download_video(job, url: str, folder: str, p0: float, p1: float) -> str | None:
-    with _ytdl(job, folder, "video", VIDEO_FORMAT, p0, p1) as ydl:
-        ydl.extract_info(url, download=True)
-    return _saved(folder, "video")
-
-
-def start_video(song_id: str) -> str:
-    """Fetch the video for a song added from a link before videos were saved."""
-    folder = _song_dir(song_id)
-    meta = _read_meta(folder)
-    if not re.match(r"^https?://", meta.get("source") or ""):
-        raise ValueError("This song wasn’t added from a link, so there’s no video to get.")
-
-    def work(job):
-        _set(job, status="running", stage="Getting the video", progress=0.02)
-        try:
-            video = _download_video(job, meta["source"], folder, 0.02, 0.98)
-        except Exception as e:  # noqa: BLE001
-            raise ValueError("Couldn’t get the video. " + str(e).split("ERROR:")[-1].strip()[:200]) from None
-        if not video:
-            raise ValueError("That link has no video.")
-        _update_meta(folder, video=video)
-        _set(job, songId=song_id)
-
-    return _run(_new_job("video"), work)
 
 
 def _get_model(name: str):
@@ -1629,7 +1597,7 @@ def _pipeline(job, src: dict, model_name: str):
         with _download_slots:
             _check(job)
             _set(job, status="running", stage="Getting the audio", progress=0.02)
-            video, channel = None, ""
+            channel = ""
             # from a link (YouTube, or a Spotify playlist's song looked for there): the only way a song comes in
             if src.get("find"):  # a Spotify playlist's song: the likeliest video of it
                 import playlists
@@ -1646,11 +1614,6 @@ def _pipeline(job, src: dict, model_name: str):
             path, title, channel = _download(job, src["url"], folder)
             _set(job, name=title)
             source = src["url"]
-            _stage(job, "Getting the video", 0.12)
-            try:
-                video = _download_video(job, src["url"], folder, 0.12, 0.2)
-            except Exception:  # noqa: BLE001  (the song still works without a picture)
-                video = None
         _set(job, status="queued", stage="Waiting for the previous song to finish", progress=0.2)
         with contextlib.ExitStack() as held:
             turn = held.enter_context(contextlib.ExitStack())
@@ -1703,7 +1666,7 @@ def _pipeline(job, src: dict, model_name: str):
                 _set(job, progress=0.9 + 0.09 * (i + 1) / len(order))
             _check(job)  # the last chance: once meta.json is written the song is in the library
             meta = {"id": song_id, "title": title, "source": source, "duration": round(dur, 2), "bpm": bpm, "beats": beats,
-                    "beatsV": BEATS_VERSION, "key": key, "stems": order, "model": model_name, "created": time.time(), "video": video,
+                    "beatsV": BEATS_VERSION, "key": key, "stems": order, "model": model_name, "created": time.time(),
                     "adding": True}  # (out of the library till its lyrics are in: _lyrics_phase)
             if channel:
                 meta["channel"] = channel  # who put the video up: a cover's singer, often

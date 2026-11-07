@@ -220,8 +220,8 @@ label.set-row { cursor: pointer; }
    library loads; the page meanwhile hidden, so nothing shows half-made. Then boot() brings the page in. */
 #boot { position: fixed; inset: 0; z-index: var(--z-boot); display: none; place-items: center; pointer-events: none; }
 /* a new key or tempo being made (paintBusy): the song's controls dimmed and out of reach (inert), the key's and tempo's not */
-:is(#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl) { transition: opacity var(--duration-base); }
-html.song-busy :is(#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #pVideoBtn, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl) { opacity: 0.4; cursor: default; }
+:is(#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl) { transition: opacity var(--duration-base); }
+html.song-busy :is(#pPlay, #pStart, #pBack, #pFwd, #pEnd, #pWaveWrap, #pTracks, #pExport, #startBtn, #songBar .seek, #songBar .sb-vol, #songBar .phrase-row, #kStrip, #kTl) { opacity: 0.4; cursor: default; }
 html.booting #boot { display: grid; }
 html.booting #app { visibility: hidden; }
 html.coming #app { visibility: hidden; } /* a reload: held back till it rises in (boot) */

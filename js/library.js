@@ -753,7 +753,7 @@ function paintFade(now) {
     f.classList.toggle("on", here && px > 0);
   }
 }
-// the page growing or shrinking under a still window (a song's tracks in, its video shown): the foot's fade with it
+// the page growing or shrinking under a still window (a song's tracks in): the foot's fade with it
 new ResizeObserver(() => paintFade()).observe(document.body);
 function initCoverView() {
   const view = $("#coverView"), card = view.querySelector(".cv-card");

@@ -204,7 +204,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def _send_range(self):
-        """Serve one byte range of a static file (206), so the browser can seek in a video. False = not a range request."""
+        """Serve one byte range of a static file (206), so the browser can seek in a media file. False = not a range request."""
         m = re.fullmatch(r"bytes=(\d*)-(\d*)", (self.headers.get("Range") or "").strip())
         path = self.translate_path(self.path)
         if not m or m.groups() == ("", "") or not os.path.isfile(path):
@@ -390,8 +390,6 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == "rename":
                 body = json.loads(self._body(100_000) or b"{}")
                 return self._json(200, {"title": stems.rename_song(parts[2], body.get("title") if isinstance(body, dict) else None)})
-            if parts[3] == "video":
-                return self._json(200, {"job": stems.start_video(parts[2])})
             if parts[3] == "split":
                 return self._json(200, {"job": stems.start_split(parts[2])})
             if parts[3] == "mix":

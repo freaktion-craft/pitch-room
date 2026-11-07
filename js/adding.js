@@ -419,11 +419,6 @@ function watchJob(id, kind, forSong) {
       say($("#sInstallState"), j.status === "error" ? j.error : j.stage);
       $("#sInstallLog").textContent = (j.log || []).join("\n");
       $("#sInstallBtn").disabled = j.status === "running" || j.status === "queued";
-    } else if (kind === "video") {
-      if (P.song && P.song.id === forSong) {
-        if (j.status === "error") videoWait(j.error, true);
-        else videoWait("{stage}… {pct}%", false, { stage: () => tr(j.stage), pct: Math.round(j.progress * 100) });
-      }
     } else if (kind === "lyrics") {
       if (j.status === "queued" || j.status === "running") lyricNote(forSong, { t: "{stage}… {pct}%", v: { stage: tr(j.stage), pct: Math.round(j.progress * 100) } });
       else if (j.status === "error") lyricNote(forSong, { t: "Couldn’t get the lyrics: {why}", v: { why: tr(j.error) }, err: true });
@@ -448,7 +443,6 @@ function watchJob(id, kind, forSong) {
       if (j.status === "cancelled") return dropJob(id);
       if (kind === "install" && j.status === "done") installDone(j);
       if (kind === "gpu" && j.status === "done") stemsRefresh();
-      if (kind === "video") videoFetched(forSong, j.status === "done");
       if (kind === "lyrics") lyricsDone(forSong, j.status === "done");
       if (kind === "split") {
         delete splitting[forSong];

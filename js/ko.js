@@ -38,8 +38,6 @@ const KO_SERVER = {
   "Send the song’s title to look for.": "찾을 곡 제목을 보내 주세요.", "That’s a playlist: add it from the Add song form.": "플레이리스트예요. 곡 추가 창에서 추가하세요.",
   "Finding it on YouTube": "YouTube에서 찾는 중", "Not found on YouTube.": "YouTube에서 찾지 못했어요.", "Couldn’t search YouTube. Is this computer online?": "YouTube에서 찾지 못했어요. 인터넷에 연결돼 있나요?",
   "The download finished but no audio file was saved.": "내려받기는 끝났지만 오디오 파일이 저장되지 않았어요.",
-  "This song wasn’t added from a link, so there’s no video to get.": "링크로 추가한 곡이 아니라서 받을 영상이 없어요.",
-  "Getting the video": "영상 받는 중", "Couldn’t get the video. {why}": "영상을 받지 못했어요. {why}", "That link has no video.": "그 링크에는 영상이 없어요.",
   "Pitchroom’s tools aren’t installed yet.": "Pitchroom 도구가 아직 설치되지 않았어요.",
   "Waiting for the previous song to finish": "앞 곡이 끝나길 기다리는 중", "Waiting to download": "받기 대기 중", "Getting the audio": "오디오 받는 중", "Reading the audio": "오디오 읽는 중",
   "The audio is shorter than 3 seconds.": "오디오가 3초보다 짧아요.", "Songs up to 20 minutes, please.": "20분까지의 곡만 넣을 수 있어요.",
@@ -307,8 +305,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Not looked for yet.": "아직 찾지 않았어요.", "Find lyrics": "가사 찾기", "Finding lyrics…": "가사 찾는 중…", "Song": "곡", "Lowest": "최저음", "Highest": "최고음",
 "In the song · {t}": "곡에서 · {t}", "Piano": "피아노",
   // Studio
-  "Volume": "볼륨", "Where every song starts; a click plays while you set it": "모든 곡이 이 볼륨으로 시작해요. 조절하는 동안 클릭이 들려요", "Volume every song starts at": "모든 곡이 시작하는 볼륨", "Get video": "영상 받기", "Hide video": "영상 숨기기", "Show video": "영상 보기",
-  "Loading video…": "영상 불러오는 중…", "Getting the video…": "영상 받는 중…", "Couldn’t load the video.": "영상을 불러오지 못했어요.",
+  "Volume": "볼륨", "Where every song starts; a click plays while you set it": "모든 곡이 이 볼륨으로 시작해요. 조절하는 동안 클릭이 들려요", "Volume every song starts at": "모든 곡이 시작하는 볼륨",
   "Song overview — click to jump": "곡 전체 파형: 클릭하면 그 위치로 이동", "Play": "재생", "Pause": "일시정지",
   "Move through the song": "곡 안에서 이동", "Go to start": "처음으로", "Go to start (Home)": "처음으로 (Home)", "Go to end": "끝으로", "Go to end (End)": "끝으로 (End)",
   "Back 5 seconds": "5초 뒤로", "Forward 5 seconds": "5초 앞으로", "−5 s": "−5초", "+5 s": "+5초", "loading tracks…": "트랙 불러오는 중…",

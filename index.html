@@ -359,10 +359,8 @@ const EMPTY_LIBRARY = false;
           <label class="mix-ico" for="pVol" title="Volume"></label>
           <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
         </div></div>
-        <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span class="knote" id="pKeyNote"></span></span>
-          <div class="row-actions"><button class="btn sm" id="pGetVideo" type="button" hidden>Get video</button><button class="btn sm" id="pVideoBtn" type="button" hidden>Hide video</button></div></div>
+        <div class="song-facts"><div class="keyctl" role="group" aria-label="Key" data-note="#pKeyNote"></div><span class="muted meta-line"><span class="knote" id="pKeyNote"></span></span></div>
       </div>
-      <div class="video" id="pVideoBox" hidden><video id="pVideo" muted playsinline preload="auto"></video><span class="video-wait" id="pVideoWait">Loading video…</span></div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output></div>
       <div class="tracks" id="pTracks"></div>
       <p class="muted export-state" id="pExportState"></p>
