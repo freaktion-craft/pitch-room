@@ -43,6 +43,8 @@ const KO_SERVER = {
   "Pitchroom’s tools aren’t installed yet.": "Pitchroom 도구가 아직 설치되지 않았어요.",
   "Waiting for the previous song to finish": "앞 곡이 끝나길 기다리는 중", "Waiting to download": "받기 대기 중", "Getting the audio": "오디오 받는 중", "Reading the audio": "오디오 읽는 중",
   "The audio is shorter than 3 seconds.": "오디오가 3초보다 짧아요.", "Songs up to 20 minutes, please.": "20분까지의 곡만 넣을 수 있어요.",
+  "Live streams can’t be added. Add it once it’s over.": "라이브 방송은 넣을 수 없어요. 방송이 끝난 뒤에 넣어 주세요.",
+  "That’s a channel or a playlist. Add one song’s link.": "채널이나 플레이리스트 링크예요. 곡 하나의 링크를 넣어 주세요.",
   "Loading the separation model ({model})": "분리 모델 불러오는 중 ({model})", "Separating on {dev}": "{dev}로 분리하는 중",
   "Finding the beat": "박자 찾는 중", "Finding the key": "키 찾는 중", "Reading the vocal melody": "보컬 멜로디 읽는 중", "Saving tracks": "트랙 저장하는 중",
   "Downloading the lead-vocal model (first time only, ≈200 MB)": "리드 보컬 모델 내려받는 중 (처음 한 번만, ≈200 MB)",

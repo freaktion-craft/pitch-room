@@ -27,6 +27,10 @@ _last = 0.0  # when LRCLIB was last asked: a song's lookup is a handful of searc
 GAP = 0.4
 
 
+class Unreachable(RuntimeError):
+    """LRCLIB busy or out of reach after its waits: any other search now would wait as long, and fail the same."""
+
+
 def _get(path: str, params: dict | None = None, tries: int = 6):
     """LRCLIB's json for path, None for 404. When it's busy it answers 503 (or 429), with a Retry-After at times: that
     long, or 1, 2, 4, 8 then 16 s, is waited before asking again, half a minute in all before giving up."""
@@ -43,15 +47,17 @@ def _get(path: str, params: dict | None = None, tries: int = 6):
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return None
-            if (e.code < 500 and e.code != 429) or i == tries - 1:
-                raise RuntimeError("LRCLIB is busy right now. Try again in a minute." if e.code in (429, 503)
-                                   else f"LRCLIB answered {e.code}.") from None
+            if e.code < 500 and e.code != 429:
+                raise RuntimeError(f"LRCLIB answered {e.code}.") from None
+            if i == tries - 1:
+                raise Unreachable("LRCLIB is busy right now. Try again in a minute." if e.code in (429, 503)
+                                  else f"LRCLIB answered {e.code}.") from None
             after = e.headers.get("Retry-After", "")
             if after.strip().isdigit():
                 wait = min(int(after), 30)
         except (urllib.error.URLError, TimeoutError, OSError):
             if i == tries - 1:
-                raise RuntimeError("Couldn’t reach LRCLIB. Is this computer online?") from None
+                raise Unreachable("Couldn’t reach LRCLIB. Is this computer online?") from None
         time.sleep(wait)
     return None
 
@@ -161,7 +167,10 @@ def candidates(title: str, duration: float, most: int = 3, hint: str = "") -> li
     for q in dict.fromkeys(([hint] if hint else []) + queries(title)):
         try:
             results = _found(q)
-        except RuntimeError as e:  # LRCLIB busy or out of reach: the other searches may still get through
+        except Unreachable as e:  # busy or out of reach: the rest would each wait half a minute (or more) as well, the GPU's queue held
+            failed = e
+            break
+        except RuntimeError as e:  # this search refused: the others may still get through
             failed = e
             continue
         for r in results:

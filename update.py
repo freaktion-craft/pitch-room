@@ -47,6 +47,18 @@ def requirements() -> str:
     return hashlib.sha1(open(path, "rb").read()).hexdigest() if os.path.isfile(path) else ""
 
 
+# The requirements.txt last installed in full, kept in the venv: a pip that failed (or a copy pulled by hand) is
+# installed on the next run, not taken for done because the file didn't change in that run
+INSTALLED = os.path.join(ROOT, ".venv", ".requirements-installed")
+
+
+def installed() -> str:
+    try:
+        return open(INSTALLED, encoding="utf-8").read().strip()
+    except OSError:
+        return ""
+
+
 def from_git() -> bool:
     git = shutil.which("git")
     if not git:
@@ -117,16 +129,19 @@ def main():
     at = running()
     if at:
         sys.exit(f"Pitchroom is running ({at}). Close its window first, then run this again.")
-    req = requirements()
     step(2, "Getting the latest version…")
     changed = from_git() if os.path.isdir(os.path.join(ROOT, ".git")) else from_zip()
-    if not changed:
+    req = requirements()
+    pip = req != installed() and os.path.isfile(os.path.join(ROOT, ".venv", "pyvenv.cfg"))
+    if not changed and not pip:
         step(3, "Nothing new: already up to date.")
         return
-    if req != requirements() and os.path.isfile(os.path.join(ROOT, ".venv", "pyvenv.cfg")):
+    if pip:
         step(3, "Installing the base tools this version needs (can take a minute)…")
         venv = os.path.join(ROOT, ".venv", *(("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")))
         subprocess.check_call([venv, "-m", "pip", "install", "--disable-pip-version-check", "-r", os.path.join(ROOT, "requirements.txt")])
+        with open(INSTALLED, "w", encoding="utf-8") as f:
+            f.write(req)
     else:
         step(3, "Base tools: nothing new to install.")
     step(4, "Updated. Start Pitchroom as usual.")
