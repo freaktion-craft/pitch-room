@@ -189,7 +189,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Chest {c} s · head {h} s · tells them apart {acc}%": "진성 {c}초 · 가성 {h}초 · 구분 {acc}%", "Chest {c} s · head {h} s · a little more of both": "진성 {c}초 · 가성 {h}초 · 둘 다 조금 더",
   "Lab": "랩","EQ": "EQ","Spectrum and formants": "스펙트럼과 포먼트",
   "Formants, the vowel's shape: F1 rises as the mouth opens, F2 as the tongue comes forward. Less sure on high notes, where the harmonics are far apart": "포먼트, 모음의 모양: 입을 벌릴수록 F1이, 혀가 앞으로 올수록 F2가 올라가요. 배음 간격이 넓은 높은 음에서는 덜 정확해요",
-  "Freeze": "고정", "Unfreeze": "고정 풀기",
+  "Freeze": "고정", "Unfreeze": "고정 풀기", "H2 stands out": "H2가 두드러져요",
   "Spectrogram": "스펙트로그램", "View": "보기", "Pad": "패드", "Spectrum": "스펙트럼", "Step up": "반음씩 올리기",
   "Down a semitone": "반음 내리기", "Up a semitone": "반음 올리기","Move up by itself": "맞추면 자동으로 올리기",
 "Tap a key to start there.": "건반을 누르면 그 음부터 시작해요.",

@@ -145,7 +145,7 @@ const p2Of = (c1, c2, c3) => c2 - (c1 + 0.6309 * (c3 - c1));
       const fr = held(note, mult * f0, B1, 1150, SRC[sn], rng(seed++)), hi = tnRead(fr.db, BIN, 2 * fr.f), as = tnRead(fr.db, BIN, fr.f);
       ny++;
       if (hi.down && hi.h) put++;
-      if (hi.down && hi.h && hi.h.p2 != null && hi.h.p2 >= 6) stood++;
+      if (hi.down && hi.h && hi.h.p2 != null && hi.h.p2 >= TN.p2Out) stood++;
       if (!as.down && as.h) kept++;
       nLow++; if (tnRead(fr.db, BIN, fr.f / 2).down) lowMoved++;
     }
@@ -156,7 +156,7 @@ const p2Of = (c1, c2, c3) => c2 - (c1 + 0.6309 * (c3 - c1));
     }
   }
   check("A6 yells read an octave high → put right an octave down, every frame", put === ny, pct(put, ny));
-  check("A6 yells put right → H2 stands out (P2 ≥ 6 dB), ≥95%", stood >= 0.95 * ny, pct(stood, ny));
+  check(`A6 yells put right → H2 stands out (P2 ≥ TN.p2Out, ${TN.p2Out} dB), ≥95%`, stood >= 0.95 * ny, pct(stood, ny));
   check("A6 yells read at their own pitch → read as they are, every frame", kept === ny, pct(kept, ny));
   check("A6 whoops (breathy, falsetto, modal) → never moved down", moved === 0, `${pct(moved, nw)} moved; read ${pct(wRead, nw)}`);
   check("A6 anything read an octave low → never moved down", lowMoved === 0, pct(lowMoved, nLow));
