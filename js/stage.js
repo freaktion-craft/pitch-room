@@ -271,7 +271,8 @@ function drawAurora() {
 // down, as a note starts or fades), and drawn that's a sudden plunge. So a note starts, and a leap past a fourth counts,
 // only once its readings agree for 50 ms; until then the line holds where it was.
 const LEAP = 5, HOLD = 50;
-let med = [], cur = null, miss = 0, level = 0, leap = null, micQ = null; // micQ: how periodic the last reading was (YIN's 1 − dip), for Chest & head voice
+// micQ: how periodic the last reading was (YIN's 1 − dip); micRaw: that reading itself (MIDI, before the median), for the Lab
+let med = [], cur = null, miss = 0, level = 0, leap = null, micQ = null, micRaw = null;
 const middle = (a) => [...a].sort((x, y) => x - y)[a.length >> 1];
 function reading(m) {
   if (m == null) { if (++miss > 3) { med = []; cur = null; leap = null; } return; }
@@ -301,6 +302,7 @@ function loop() {
     micQ = null;
     if (level > S.gate) { const r = yin(tbuf, ac.sampleRate); if (r && r.f > 60 && r.f < 1500) { m = 69 + 12 * Math.log2(r.f / A4); micQ = r.q; } }
   } else level = 0;
+  micRaw = m;
   reading(m);
   if (view === "voice") voiceFrame();
   drawSpectrum(); // the mic chip is in the header on every page

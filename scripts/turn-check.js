@@ -1,14 +1,15 @@
 "use strict";
 // Offline checks for js/turn.js (the Lab's Turn view): synthetic voices only, no dependencies, seeded.
 //   node scripts/turn-check.js
-// A. tnHarm on 4096-sample frames (48 kHz, Blackman, dB as an AnalyserNode gives them) built from known harmonic levels.
+// A. tnHarm (and A6, tnRead) on 4096-sample frames (48 kHz, Blackman, dB as an AnalyserNode gives them) built from known
+//    harmonic levels.
 // B. tnTurn on step-ups through a source-filter model (a −12 dB/oct source × a resonance at F1, and F2 near it), with
 //    level jitter.
 // C. tnPass on siren sample streams at 30–144 frames a second, clean and with a crack, a gap, a level step or a tone step;
 //    and on sirens made as sound (a steady source through the vowel's resonances), read frame by frame as the Lab does.
 // Prints a line per check and exits 1 if any fails. If one fails, change the model or a TN constant, never one signal.
 const path = require("path");
-const { TN, tnHarm, tnOctave, tnTurn, tnPass, tnStart, tnPrior, F1_PRIOR } = require(path.join(__dirname, "..", "js", "turn.js"));
+const { TN, tnHarm, tnRead, tnOctave, tnTurn, tnPass, tnStart, tnPrior, F1_PRIOR } = require(path.join(__dirname, "..", "js", "turn.js"));
 
 let failed = 0;
 const check = (name, ok, info = "") => { console.log(`${ok ? "pass" : "FAIL"}  ${name}${info ? "  (" + info + ")" : ""}`); if (!ok) failed++; };
@@ -122,6 +123,43 @@ const p2Of = (c1, c2, c3) => c2 - (c1 + 0.6309 * (c3 - c1));
   // frame now and then reads as seen; a held note takes the median of its frames)
   check("A5 H3 at SNR 6 dB → p2 null, ≥95% of frames", lowOk >= 0.95 * n, pct(lowOk, n));
   check("A5 H3 at SNR 30 dB → p2 within 0.5 dB of the truth", hiOk === n, `${pct(hiOk, n)}, worst ${worst.toFixed(2)} dB`);
+}
+// A6. tnRead on held 어/아 notes at D4 and E4, vibrato ±40 c. Yells (R1 on H2, F2 1150) whose H2 stands 10–13 dB over H1,
+// so a pitch tracker reads them an octave high: read at 2·f0 they're put right, read at f0 read as they are. Whoops (R1
+// on H1, F2 800): never moved down. Nothing read an octave low is ever moved down. Sources: H1 over H2 before the
+// resonances (dB), the tilt above H2 (dB/oct), the noise against the harmonics up to 4 kHz (dB): pressed, modal and
+// breathy as Toles et al. 2026's means, falsetto about 12 dB more H1 than modal (Salomão 2008).
+{
+  const SRC = { pressed: [3.5, -3, 35], modal: [7, -6, 30], breathy: [11.5, -10, 12], falsetto: [19, -12, 20] };
+  const rz = (f, F, B) => { const b = B / 2; return 10 * Math.log10(((F * F + b * b) ** 2) / (((f - F) ** 2 + b * b) * ((f + F) ** 2 + b * b))); };
+  const held = (note, F1, B1, F2, [h12, tilt, hnr], R) => {
+    const f0 = 440 * 2 ** ((note - 69) / 12), Fs = [[F1, B1], [F2, 100], [2500, 150], [3500, 200]];
+    const lv = (k) => (k === 1 ? 0 : -h12 + tilt * Math.log2(k / 2)) + Fs.reduce((s, [F, B]) => s + rz(k * f0, F, B), 0);
+    let P = 0; for (let k = 1; k * f0 < 4000; k++) P += 10 ** (lv(k) / 10) / 2; // (white noise: a sixth of it under 4 kHz)
+    return frame(f0, lv, R, { vib: 40, sigma: Math.sqrt((6 * P) / 10 ** (hnr / 10)) });
+  };
+  let seed = 7100, ny = 0, put = 0, stood = 0, kept = 0, nw = 0, moved = 0, wRead = 0, nLow = 0, lowMoved = 0;
+  for (const note of [62, 64]) for (const B1 of [60, 100]) {
+    const f0 = 440 * 2 ** ((note - 69) / 12);
+    for (const mult of [1.94, 2.06]) for (const sn of ["pressed", "modal"]) for (let i = 0; i < 6; i++) {
+      const fr = held(note, mult * f0, B1, 1150, SRC[sn], rng(seed++)), hi = tnRead(fr.db, BIN, 2 * fr.f), as = tnRead(fr.db, BIN, fr.f);
+      ny++;
+      if (hi.down && hi.h) put++;
+      if (hi.down && hi.h && hi.h.p2 != null && hi.h.p2 >= 6) stood++;
+      if (!as.down && as.h) kept++;
+      nLow++; if (tnRead(fr.db, BIN, fr.f / 2).down) lowMoved++;
+    }
+    for (const mult of [0.95, 1.05]) for (const sn of ["breathy", "falsetto", "modal"]) for (let i = 0; i < 6; i++) {
+      const fr = held(note, mult * f0, B1, 800, SRC[sn], rng(seed++)), as = tnRead(fr.db, BIN, fr.f);
+      nw++; if (as.down) moved++; if (as.h) wRead++;
+      nLow++; if (tnRead(fr.db, BIN, fr.f / 2).down) lowMoved++;
+    }
+  }
+  check("A6 yells read an octave high → put right an octave down, every frame", put === ny, pct(put, ny));
+  check("A6 yells put right → H2 stands out (P2 ≥ 6 dB), ≥95%", stood >= 0.95 * ny, pct(stood, ny));
+  check("A6 yells read at their own pitch → read as they are, every frame", kept === ny, pct(kept, ny));
+  check("A6 whoops (breathy, falsetto, modal) → never moved down", moved === 0, `${pct(moved, nw)} moved; read ${pct(wRead, nw)}`);
+  check("A6 anything read an octave low → never moved down", lowMoved === 0, pct(lowMoved, nLow));
 }
 
 // ---------- B. tnTurn ----------
@@ -304,9 +342,9 @@ function passOf(o) {
 // ---------- C5. sirens as sound ----------
 // A steady −12 dB/oct source through the vowel's resonances (so its level and tone follow the pitch, most where a harmonic
 // meets a narrow F1), vibrato ±50 c, gliding T−4.5 → T+4.5 → T−4.5 at a rate (st/s, the eased mean). Each frame (30, 60
-// or 144 a second): the last 4096 samples' dB read by tnHarm at the tracker's pitch, and the level of the last 2048, as the
-// Lab reads them. o.oct: the tracker's pitch read an octave high for that many ms on the way up (marked unread where
-// tnOctave says so, as the Lab marks it); o.drop: the source 6 dB softer from T+1 to the top.
+// or 144 a second): the last 4096 samples' dB read by tnRead at the tracker's pitch, and the level of the last 2048, as the
+// Lab reads them. o.oct: the tracker's pitch read an octave high for that many ms on the way up (put right an octave down,
+// or marked unread, where tnRead says so, as the Lab does); o.drop: the source 6 dB softer from T+1 to the top.
 function sirenOf(o) {
   const R = rng(o.seed), T = o.T, hold = 150, up = (9 / o.rate) * 1000, total = hold * 2 + up * 2 + 300;
   const ease = (x) => 0.5 - 0.5 * Math.cos(Math.PI * x), phV = R() * 2 * Math.PI, sung = hold * 2 + up * 2;
@@ -332,8 +370,8 @@ function sirenOf(o) {
     const voiced = t < sung - 30;
     let m = voiced ? pitch(t - 21) + 0.1 * R.n() : null;
     if (m != null && o.oct && t > tUp1 - 300 && t < tUp1 - 300 + o.oct) m += 12;
-    const h = voiced ? tnHarm(db, BIN, mfr(m)) : null;
-    if (voiced && !h && tnOctave(db, BIN, mfr(m))) m = null;
+    const r = voiced ? tnRead(db, BIN, mfr(m)) : null, h = r ? r.h : null;
+    if (r && r.oct) m = null; else if (r && r.down) m -= 12;
     xs.push({ t, w: prev == null ? 16 : Math.min(50, t - prev), m, v: voiced, L: voiced ? 10 * Math.log10(e / 2048) : null, u: h ? h.u : null, tt: t - 43 });
     prev = t;
   }
