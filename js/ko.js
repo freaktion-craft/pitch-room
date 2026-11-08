@@ -244,6 +244,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Paste a YouTube link or a playlist.": "YouTube 링크나 재생목록을 붙여넣으세요.",
   "More": "더 보기", "More for {title}": "{title} 더 보기", "Album art": "앨범 커버", "Album art of {title}": "{title} 앨범 커버", "Title": "제목", "Added": "추가한 날", "Search songs": "곡 검색", "New": "새로 추가한 곡", "No songs match “{q}”": "“{q}”에 맞는 곡이 없어요", "Sort by {col}": "{col} 순으로 정렬", "Sorted by {col}, {way}": "{col} 순, {way}",
   "ascending": "오름차순", "descending": "내림차순", "Info": "정보", "Rename": "이름 바꾸기", "Delete": "삭제", "Really delete?": "정말 삭제할까요?",
+  "Continue practising": "이어서 연습",
+  "Last take {day}": "{day} 녹음", "Practised {day}": "{day} 연습", "today": "오늘", "yesterday": "어제",
+  "1 take": "테이크 1개", "{n} takes": "테이크 {n}개", "Practice {title}": "{title} 연습", "Updating…": "업데이트 중…",
   "Song title": "곡 제목", "Couldn’t rename the song. Is the app still running?": "곡 이름을 바꾸지 못했어요. 앱이 아직 실행 중인가요?",
   "no steady beat": "일정한 박자 없음", "major": "장조", "minor": "단조",
   "This needs the Python server. Start the app with the start-… file for your OS, then reopen it from http://localhost:5178.":

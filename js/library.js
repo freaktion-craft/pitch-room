@@ -106,6 +106,7 @@ async function drawLibrary() {
   box.innerHTML = "";
   const coming = [...adding.values()].some((j) => j.status !== "error");
   $("#sSearchBox").hidden = !lib.length; // nothing to search
+  $("#sAddBtn").classList.toggle("primary", !lib.length); // Add song the page's strong button only while there's nothing else to do: with songs, they are
   if (addOnShow) { addOnShow = false; showAdd(true); } // asked for by a link
   const head = el("div", "lib-cols");
   for (const [by, c] of Object.entries(SORTS)) {
@@ -134,8 +135,11 @@ async function drawLibrary() {
   }
   if (!lib.length) { // the column heads are new: pinned where they stand (no albums' grid over the first-song row)
     libAlbum = null; $("#sLibPage").classList.remove("album-grid"); $("#sAlbums").replaceChildren(); albumBarNode?.remove();
+    paintCont(); // (Continue practising gone with them)
     drawNew(lib); pinLibTop(); paintFade(true); return;
   }
+  const log = cpLog(); // every song's takes asked about (when each was last recorded to: Continue practising), its songs first
+  lib.map((m) => m.id).sort((a, b) => cpWhen(log[b]) - cpWhen(log[a])).forEach((id) => askTakes(id));
   lib.forEach((m) => {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     row.dataset.id = m.id; libRows.set(m.id, row);
@@ -295,20 +299,22 @@ const canNew = () => view === "stems" && stemsPage === "lib" && libView === "son
 // Folded, the list goes up into the page's gap after it too (a grid row can't be less than nothing, so New's own
 // margin can't take it back), and it's where it is with New gone
 const NEW_TUCK = "calc(var(--space-3) * -1)";
+// what's under New, that goes up into its gap: the list, or Continue practising between them
+const newNext = () => (!$("#sCont").hidden ? $("#sCont") : $("#sLib"));
 // to a height, out (its margin, the list in its place) or in (none, the list up by the gap), as a transition from
 // where it is now
 function newTo(px, out, done) {
   const box = $("#sNew");
   box.style.height = box.offsetHeight + "px"; void box.offsetHeight;
-  box.style.height = px + "px"; box.style.marginBottom = out ? "" : "0px"; $("#sLib").style.marginTop = out ? "" : NEW_TUCK;
+  box.style.height = px + "px"; box.style.marginBottom = out ? "" : "0px"; newNext().style.marginTop = out ? "" : NEW_TUCK;
   clearTimeout(newTo.t); newTo.t = setTimeout(done, stillMotion() ? 0 : (out ? NEW_OPEN_MS : NEW_MS) + 20);
 }
 function newRest() { // folded and gone
-  const box = $("#sNew"), lib = $("#sLib");
+  const box = $("#sNew"), under = [$("#sCont"), $("#sLib")]; // (either may have gone up into its gap: Continue shown or not meanwhile)
   newMove = null; cancelAnimationFrame(pull.raf);
   box.classList.remove("shut", "opening"); box.style.height = box.style.marginBottom = "";
-  lib.style.transition = "none"; lib.style.marginTop = ""; // the gap back with New gone, at once: the list stays put
-  paintNew(); void lib.offsetHeight; lib.style.transition = "";
+  for (const n of under) { n.style.transition = "none"; n.style.marginTop = ""; } // the gap back with New gone, at once: the list stays put
+  paintNew(); void box.offsetHeight; for (const n of under) n.style.transition = "";
   paintFade();
 }
 function shutNew() {
@@ -319,7 +325,7 @@ function shutNew() {
   newTo(0, false, newRest);
 }
 function openNew() { // from folded: out of nothing
-  const box = $("#sNew"), lib = $("#sLib");
+  const box = $("#sNew"), lib = newNext();
   newOpen = true; newMove = "open"; $("#sNewPull").classList.remove("on"); keepShut(false);
   box.classList.remove("shut"); box.classList.add("opening"); box.style.height = ""; box.style.marginBottom = "0px"; box.hidden = false;
   paintNewEnds(); // its arrows as they'll be, from the start
@@ -527,6 +533,7 @@ function arrangeRows() {
   } else albumBarNode?.remove();
   const shown = found.length;
   paintNew();
+  paintCont(); // (Continue practising: not while a search is typed, nor in the Artist or Album view)
   let none = box.querySelector(".lib-none") || grid.querySelector(".lib-none");
   if (!shown && songs.length) {
     none ??= el("p", "lib-none");
@@ -722,8 +729,8 @@ function pinLibTop() {
     return { top, bottom: top + n.offsetHeight };
   };
   const parts = { header: at($("#app > header")), head: at($("#sLibPage .lib-head")), cols: at($("#sLib .lib-cols")) };
-  // the column heads pin where they'd stand without the New row, which goes up under the search's line first
-  if (parts.cols) { parts.cols.top -= newRoom(); parts.cols.bottom -= newRoom(); }
+  // the column heads pin where they'd stand without the New row and Continue practising, which go up under the search's line first
+  if (parts.cols) { parts.cols.top -= topRoom(); parts.cols.bottom -= topRoom(); }
   let bottom = 0;
   for (const [k, r] of Object.entries(parts)) if (r) { root.style.setProperty(`--top-${k}`, r.top + "px"); bottom = Math.max(bottom, r.bottom); }
   root.style.setProperty("--mast", bottom + "px");
@@ -735,19 +742,24 @@ addEventListener("resize", pinLibTop);
 // list drawn (a reload, scrolled down it), where they're there (or gone) at once with it, not fading in after.
 const FADE_H = 192;
 // the room the New row takes above the list (none while it's hidden): hidden, the list starts where it does
-const newRoom = () => { // (down to the list, or to the albums' grid in its place)
-  const n = $("#sNew"), next = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums") : $("#sLib");
+const newRoom = () => { // (down to the list, or to the albums' grid in its place; or to Continue practising, under it)
+  const n = $("#sNew"), next = !$("#sCont").hidden ? $("#sCont") : $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums") : $("#sLib");
   return n.hidden ? 0 : next.offsetTop - n.offsetTop;
+};
+// the room over the list New and Continue practising take together: Continue doesn't fold, it goes up under the
+// search's line as the page scrolls
+const topRoom = () => {
+  const n = [$("#sNew"), $("#sCont")].find((x) => !x.hidden), next = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums") : $("#sLib");
+  return n ? next.offsetTop - n.offsetTop : 0;
 };
 // The foot's fade on a song's page too (the Studio), as its tracks go on below the window; the top's the library's and
 // Settings' (under their pinned tops), the foot's theirs too
 function paintFade(now) {
   const set = view === "settings", lib = view === "stems" && stemsPage === "lib", song = view === "stems" && stemsPage === "song";
   const below = document.documentElement.scrollHeight - (scrollY + innerHeight);
-  // the New row, over the band behind the pinned top while it goes up: cut off where it reaches the search's line
-  const nw = $("#sNew");
-  if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
-  for (const [f, px, here] of [[$("#listFade"), below, lib || song || set], [$("#listFadeTop"), set ? scrollY : scrollY - newRoom(), lib || set]]) {
+  // the New row and Continue practising, over the band behind the pinned top while they go up: cut off where they reach the search's line
+  for (const nw of [$("#sNew"), $("#sCont")]) if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
+  for (const [f, px, here] of [[$("#listFade"), below, lib || song || set], [$("#listFadeTop"), set ? scrollY : scrollY - topRoom(), lib || set]]) {
     if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
     f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
     f.classList.toggle("on", here && px > 0);
@@ -810,6 +822,7 @@ function awaitLookups(lib, tries = 0) {
       }
     }
     if (renamed && (SORTS[libSort.by]?.text || libView !== "song")) arrangeRows(); // sorted by name, or under its artist or album: it may belong elsewhere now
+    paintCont(); // (Continue practising's songs as the list has them now)
     awaitLookups(now, tries + 1);
   }, upgrading ? 1000 : looking ? 3000 : 5000);
 }
@@ -837,6 +850,140 @@ function keyOf(m) {
   if ("key" in m) return Promise.resolve(m.key);
   if (!keyJobs.has(m.id)) keyJobs.set(m.id, fetch(`/api/library/${m.id}/info`).then((r) => (r.ok ? r.json() : {})).then((s) => s.key).catch(() => undefined));
   return keyJobs.get(m.id).then((k) => { if (k !== undefined) m.key = k; return k; });
+}
+
+// ---------- Continue practising ----------
+// Over the list (under New, when it's there), the three songs last practised (sung along in Practice, or recorded),
+// each with when, how many takes, and your key and tempo for it. When each song was last recorded to and how many takes
+// it has isn't in the listing: it's asked of the server a few songs at a time (/takes), kept for the page's life and
+// asked again for a song opened since (or recorded to, deleted from: takes.js).
+const CP = { facts: new Map(), ask: new Map(), want: [], busy: 0, items: new Map(), timer: 0 }; // facts {n, last, kept} by id; ask: when, by id
+const CP_ASKS = 4, CP_MAX = 3, CP_KEEP = 24; // requests at a time; songs shown; songs whose times are kept
+// store "libLast": {id: {o, p, t}}, epoch s: last opened (Studio, Practice, Takes: for asking its takes again), last
+// played in Practice, newest take (from /takes, so Continue is whole at first paint next time); the CP_KEEP last
+// practised kept first (a song only opened doesn't push one out)
+const cpLog = () => { const v = store.get("libLast", {}); return v && typeof v === "object" ? v : {}; };
+const cpWhen = (x) => Math.max(x?.o || 0, x?.p || 0, x?.t || 0);
+const cpPractised = (x) => Math.max(x?.p || 0, x?.t || 0); // (opened alone isn't practised)
+const cpKeep = (all) => store.set("libLast", Object.fromEntries(Object.entries(all)
+  .sort((a, b) => cpPractised(b[1]) - cpPractised(a[1]) || cpWhen(b[1]) - cpWhen(a[1])).slice(0, CP_KEEP)));
+function noteSong(id, k) { // a song opened (o: openSong) or played in Practice (p: playSong)
+  if (!id) return;
+  const all = cpLog(), was = all[id] || {}, now = Math.round(Date.now() / 1000);
+  if (now - (was[k] || 0) < 60) return; // (Practice plays again and again: once a minute is plenty)
+  all[id] = { ...was, [k]: now }; cpKeep(all);
+}
+// a song's takes asked of the server (how many, the newest's time), a few at a time
+function askTakes(id) {
+  const at = CP.ask.get(id), x = cpLog()[id];
+  if (at && at / 1000 >= Math.max(x?.o || 0, x?.p || 0)) return; // asked since it was last opened
+  CP.ask.set(id, Date.now());
+  CP.want.push(id); pumpTakes();
+}
+function pumpTakes() {
+  while (CP.busy < CP_ASKS && CP.want.length) {
+    const id = CP.want.shift(); CP.busy++;
+    fetch(`/api/library/${id}/takes`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (!Array.isArray(j)) return;
+      CP.facts.set(id, { n: j.length, last: j[0]?.created || 0, kept: false }); // (newest first: stems.list_takes)
+      clearTimeout(CP.timer); CP.timer = setTimeout(takesIn, 120);
+    }).catch(() => {}).finally(() => { CP.busy--; pumpTakes(); });
+  }
+}
+// takes in: what the server says is so (its newest take, none once they're all deleted) kept for Continue's next first
+// paint, and Continue painted again
+function takesIn() {
+  const all = cpLog(); let more = false;
+  for (const [id, f] of CP.facts) {
+    if (f.kept) continue;
+    f.kept = true;
+    const t = Math.round(f.last), x = { ...all[id] };
+    if (Math.abs(t - (x.t || 0)) <= 1) continue;
+    if (t) x.t = t; else delete x.t;
+    if (Object.keys(x).length) all[id] = x; else delete all[id];
+    more = true;
+  }
+  if (more) cpKeep(all);
+  paintCont(); paintFade();
+}
+// a day in a line of words: today, yesterday (small, mid-line), or its date as New has it (newDay), with its year if
+// it isn't this year's
+const cpDay = (t) => {
+  const d = new Date(t * 1000), n = Math.round((new Date().setHours(12, 0, 0, 0) - new Date(d).setHours(12, 0, 0, 0)) / 864e5);
+  if (n === 0 || n === 1) return tr(n ? "yesterday" : "today");
+  return d.getFullYear() === new Date().getFullYear() ? newDay(t) : d.toLocaleDateString(locale(), { year: "numeric", month: "short", day: "numeric" });
+};
+// A Continue row's line under its title: when it was last practised (its last take, or Practice), how many takes, and
+// your key and tempo for it (Practice's)
+function paintContLine(box, m) {
+  if (!box) return;
+  const f = CP.facts.get(m.id), x = cpLog()[m.id] || {}, parts = [];
+  if (m.pending || m.upgrade != null) parts.push(tr("Updating…"));
+  else {
+    // the last take, if it's the latest thing done (or on the day of the last Practice); else the last Practice. (Its
+    // takes as the server has them, once asked: one deleted isn't the last any more)
+    const take = f ? f.last : x.t || 0, p = x.p || 0, day = (t) => new Date(t * 1000).toDateString();
+    if (take && (take >= p || day(take) === day(p))) parts.push(tr("Last take {day}", { day: cpDay(take) }));
+    else if (p) parts.push(tr("Practised {day}", { day: cpDay(p) }));
+    if (f?.n) parts.push(f.n === 1 ? tr("1 take") : tr("{n} takes", { n: f.n }));
+    const n = savedKey(m.id), s = savedRate(m.id);
+    if (n) parts.push(el("span", "yours", tr("Key {n}", { n: keySign(n) })));
+    if (s !== 1) parts.push(el("span", "yours", m.bpm ? `${bpmAt(m, s)} BPM` : `${Math.round(s * 100)} %`)); // (as the Takes Studio names a version: verName)
+  }
+  box.replaceChildren(...parts.flatMap((p, i) => (i ? [" · ", p] : [p])));
+}
+// Practice, as the Studio's: it says on itself what it's doing meanwhile (singSong); the song as the list has it then.
+// Shown with its row's hover (CSS); what it says when it couldn't stays in sight a moment (.said), pointed at or not.
+function contSing(id) {
+  const b = el("button", "btn sm lc-sing"), t = el("span", "txt");
+  b.type = "button"; b.append(icon("practice"), t); say(t, "Practice");
+  b.setAttribute("aria-label", tr("Practice {title}", { title: libCache.get(id)?.title || "" }));
+  b.onclick = async () => {
+    const at = location.hash;
+    if (!libCache.has(id)) await renderLibrary(); // (let go to be read afresh: its lead and backing just split, adding.js)
+    const m = libCache.get(id);
+    if (!m) return; // (deleted meanwhile)
+    await singSong(m, b);
+    if (location.hash !== at) return; // gone to Practice
+    b.classList.add("said"); clearTimeout(b.saidFor); b.saidFor = setTimeout(() => b.classList.remove("said"), 4000); // (as long as singSong says why not)
+  };
+  return b;
+}
+// Continue practising (#sCont): the three songs last practised (sung along in Practice, or recorded; one only opened
+// isn't), latest first; in the Song view alone (as New), not while a search is typed. Its rows made once each
+// (CP.items: no cover blinking in again), painted again, and put back only when they've changed (a Practice button
+// there keeps the keyboard).
+function contSongs() {
+  const all = cpLog(), when = (id) => { const f = CP.facts.get(id); return Math.max(all[id]?.p || 0, f ? f.last : all[id]?.t || 0); }; // (its takes as the server has them, once asked)
+  return [...libRows.keys()].filter((id) => libCache.has(id) && when(id) > 0).sort((a, b) => when(b) - when(a)).slice(0, CP_MAX).map((id) => libCache.get(id));
+}
+function paintCont() {
+  const box = $("#sCont"), list = $("#sContList"), was = box.hidden;
+  const songs = libView === "song" && !$("#sSearch").value.trim() ? contSongs() : [];
+  box.hidden = !songs.length;
+  const items = songs.map((m) => { let it = CP.items.get(m.id); if (!it) CP.items.set(m.id, (it = contItem(m.id))); paintContItem(it, m); return it; });
+  if (items.length !== list.children.length || items.some((it, i) => list.children[i] !== it)) list.replaceChildren(...items);
+  if (box.hidden !== was && view === "stems" && stemsPage === "lib") { pinLibTop(); paintFade(); } // (in or out after the list: the column heads pinned where they now stand)
+}
+function contItem(id) {
+  const it = el("div", "lc-item"), info = el("div", "song"), link = el("a"), m = libCache.get(id);
+  it.dataset.id = id; link.href = "#stems/" + id; link.append(el("b"));
+  info.append(link, el("small"), el("span", "lc-line"));
+  it.append(coverTile(m), info);
+  if (m.stems.includes("vocals")) it.append(contSing(id));
+  it.onclick = (e) => { if (!it.classList.contains("pending") && !e.composedPath().some((n) => n.tagName === "A" || n.tagName === "BUTTON")) go("stems/" + id); };
+  link.addEventListener("click", (e) => { if (it.classList.contains("pending")) e.preventDefault(); });
+  return it;
+}
+function paintContItem(it, m) {
+  const link = it.querySelector(".song a"), tile = it.querySelector(".cover"), b = it.querySelector(".lc-sing");
+  link.title = m.title; link.setAttribute("aria-label", libLine(m)); link.querySelector("b").textContent = m.title;
+  it.querySelector(".song small").textContent = m.artist || "";
+  paintContLine(it.querySelector(".lc-line"), m);
+  paintCover(tile, m); paintUpgrade(tile, m);
+  it.classList.toggle("pending", !!m.pending);
+  if (b && !b.hasAttribute("aria-busy")) { b.disabled = !!m.pending; b.setAttribute("aria-label", tr("Practice {title}", { title: m.title })); }
+  if (b && !b.hasAttribute("aria-busy") && !b.classList.contains("said")) say(b.querySelector(".txt"), "Practice"); // (in the language picked while it was out of the page, as well)
 }
 
 // The library's ⋮ menu: Info, Rename, and Delete (which asks "Really delete?" first). One shared menu, placed under the button.
@@ -961,5 +1108,6 @@ function songRenamed(id, title) {
   for (const s of [libCache.get(id), P.song, K.song]) if (s && s.id === id) s.title = title;
   const card = $(`#sNewTrack .ln-card[data-id="${id}"]`);
   if (card && libCache.get(id)) paintNewCard(card, libCache.get(id));
+  paintCont(); // (in Continue practising too)
   paintCrumbs(); // the song's name in them too
 }

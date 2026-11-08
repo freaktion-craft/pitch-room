@@ -307,10 +307,15 @@ const EMPTY_LIBRARY = false;
         <div class="seg lib-title lib-view" id="sLibView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="song" aria-checked="true">Song</button><button type="button" role="radio" data-v="artist" aria-checked="false">Artist</button><button type="button" role="radio" data-v="album" aria-checked="false">Album</button></div>
         <label class="search" id="sSearchBox" hidden><input id="sSearch" type="search" placeholder="Search songs" aria-label="Search songs" autocomplete="off" spellcheck="false"></label>
         <button class="btn sm" id="sUpdate" type="button" hidden>Update</button>
-        <span class="add-at" id="sAddAt"><button class="btn sm primary" id="sAddBtn" type="button" aria-expanded="false" aria-controls="jobsPop">Add song</button></span></div>
+        <span class="add-at" id="sAddAt"><button class="btn sm" id="sAddBtn" type="button" aria-expanded="false" aria-controls="jobsPop">Add song</button></span></div>
       <section class="lib-new" id="sNew" aria-labelledby="sNewTitle" hidden>
         <div class="ln-head"><h2 class="group-label" id="sNewTitle">New <span class="ln-n" id="sNewCount"></span></h2><span class="ln-arrows"><button class="btn sm icon ghost" id="sNewPrev" type="button" aria-label="Back" title="Back"></button><button class="btn sm icon ghost" id="sNewNext" type="button" aria-label="More" title="More"></button></span></div>
         <div class="ln-track" id="sNewTrack"></div>
+      </section>
+      <!-- the three songs last practised, under New (paintCont) -->
+      <section class="lib-cont" id="sCont" aria-labelledby="sContTitle" hidden>
+        <div class="lc-head"><h2 class="group-label" id="sContTitle">Continue practising</h2></div>
+        <div class="lc-list" id="sContList"></div>
       </section>
       <div class="rows" id="sLib"></div>
       <div class="al-grid" id="sAlbums" aria-label="Albums"></div>

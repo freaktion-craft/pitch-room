@@ -49,7 +49,7 @@ Each area keeps its state in one short capitalised object.
 | `audio.js` | AudioContext (`ensureCtx`), piano samples, mic start/stop, `listMics`, the YIN pitch detector, `__autoSing` |
 | `live.js` | `LIVE`: Live mic through VB-CABLE (Windows) |
 | `helpers.js` | `el`, `mkBtn`, slider value tips, `makePick` (dropdowns), `progRing`, `ICONS` and `icon()`, `fmtTime` |
-| `library.js` | Song list, sort, search, views, New strip, cover zoom (`CV`), song menu, tool status |
+| `library.js` | Song list, sort, search, views, New strip, Continue practising (`CP`), cover zoom (`CV`), song menu, tool status |
 | `info.js` | Info page |
 | `adding.js` | Add-song drawer, jobs (`paintJobs`, `watchJob`), links and playlists |
 | `studio.js` | `P`: the loaded song and player (`openSong`, `playSong`), tracks, key and tempo, export, `initStems` |
@@ -89,6 +89,8 @@ play outside Studio and Practice.
   names must match `\w{1,64}`.
 - `S` (names, echo, gate, vol, mic, countIn, ears, dev, aurora, live) is stored whole under `"settings"` by `save()`.
   Other keys (`accent`, `theme`, `lang`, `welcomed`, `keys`, `tempos`, ...) are top-level keys of their own.
+  `libLast` is the library's Continue practising: per song, when it was last opened, played in Practice and recorded
+  to (`noteSong`, and the takes' times from `/takes`), the 24 last practised.
 - Always go through `store`, never raw localStorage. sessionStorage is only for per-tab UI, with keys prefixed `stem:`.
 - On a server's first run (empty settings) the page copies its localStorage settings up to the server.
 

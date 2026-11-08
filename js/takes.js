@@ -301,6 +301,7 @@ async function takeSave(c, wav) {
     t.retry = () => takeSave(c, wav); // the recording stays here until it's saved or dismissed
   }
   if (saved) T.unsaved = T.unsaved.filter((x) => x !== t);
+  if (saved) CP.ask.delete(c.song); // (the library's Continue practising: its takes asked for again)
   if (T.song !== c.song) return;
   if (saved) T.list = T.list.map((x) => (x === t ? saved : x));
   renderTakes();
@@ -428,6 +429,7 @@ async function takeDelete(t) {
   try { r = await fetch(`/api/library/${T.song}/takes/${t.id}/delete`, { method: "POST" }); } catch (e) { r = null; }
   if (!r || (!r.ok && r.status !== 422)) { del.disabled = false; takeNote(t.id, "Couldn’t delete the take. Is the app still running?", true); return; } // 422: gone already
   T.list = T.list.filter((x) => x !== t); T.voice.delete(t.id); T.peaks.delete(t.id);
+  CP.ask.delete(T.song); // (the library's Continue practising: its takes asked for again)
   if (T.at && T.at.id === t.id) T.at = null;
   renderTakes();
 }
