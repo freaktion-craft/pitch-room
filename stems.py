@@ -61,8 +61,10 @@ MODEL_DIR = os.path.join(DATA, "models")
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 _work_lock = threading.Lock()  # one separation at a time; others wait as "queued"
-_download_slots = threading.Semaphore(2)  # songs' downloads at once, ahead of their turn to be split (_pipeline)
-_line: list[str] = []  # the jobs waiting for _work_lock (the one holding it first), in the order they asked
+# the jobs waiting for _work_lock (the one holding it first), in the order they asked; a song being added from as it
+# starts, its download and all (_pipeline)
+_line: list[str] = []
+FETCH_AHEAD = 2  # songs downloaded ahead of the one being split, at most (_fetch_turn)
 _model_cache: dict = {}
 
 
@@ -172,8 +174,13 @@ def _get_job(job_id: str) -> dict | None:
         if "pkgs" in job:
             out["pkgs"] = dict(job["pkgs"])  # (a copy: the install's thread goes on changing it)
         if job["kind"] == "separate" and job["status"] == "queued" and job_id in _line:
-            out["ahead"] = sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate" or _jobs.get(j, {}).get("front"))
+            out["ahead"] = _ahead(job_id)
         return out
+
+
+def _ahead(job_id: str) -> int:
+    """How many songs being added, and such songs' lyrics, are ahead of a job in _line. Under _jobs_lock."""
+    return sum(1 for j in _line[: _line.index(job_id)] if _jobs.get(j, {}).get("kind") == "separate" or _jobs.get(j, {}).get("front"))
 
 
 def _set(job, **kw):
@@ -217,35 +224,66 @@ def _stage(job, stage: str, progress: float):
 
 @contextlib.contextmanager
 def _turn(job):
-    """Hold _work_lock for a job, once the jobs that asked before it have had theirs (a lock alone would let any of the
-    waiting ones in next), waiting in short steps so a job cancelled while queued stops at once."""
+    """Hold _work_lock for a job, once the jobs that asked before it have had theirs (_in_line, then _held)."""
+    with _in_line(job), _held(job):
+        yield
+
+
+@contextlib.contextmanager
+def _in_line(job):
+    """A job's place in _line, from when it asks for its turn (a song being added: as it starts, _pipeline) till its
+    turn's over."""
     with _jobs_lock:
         if job.get("front"):  # a song just added's lyrics (_lyrics_phase): next, after the one working and the others of theirs
-            at = 1
+            at = 0 if _line and _jobs.get(_line[0], {}).get("fetching") else 1  # (one first in line still getting its audio isn't working)
             while at < len(_line) and _jobs.get(_line[at], {}).get("front"):
                 at += 1
             _line.insert(min(at, len(_line)), job["id"])
         else:
             _line.append(job["id"])
     try:
-        while True:
-            _check(job)
-            with _jobs_lock:
-                first = _line[0] == job["id"]
-            if first and _work_lock.acquire(timeout=0.25):
-                break
-            if not first:
-                time.sleep(0.1)
-        try:
-            _check(job)
-            with _held_low(job):
-                yield
-        finally:
-            _free_gpu()
-            _work_lock.release()
+        yield
     finally:
         with _jobs_lock:
             _line.remove(job["id"])
+
+
+@contextlib.contextmanager
+def _held(job):
+    """_work_lock for a job in _line once it's first there (a lock alone would let any of the waiting ones in next),
+    waiting in short steps so a job cancelled while queued stops at once."""
+    while True:
+        _check(job)
+        with _jobs_lock:
+            first = _line[0] == job["id"]
+        if first and _work_lock.acquire(timeout=0.25):
+            break
+        if not first:
+            time.sleep(0.1)
+    try:
+        _check(job)
+        with _held_low(job):
+            yield
+    finally:
+        try:
+            _free_gpu()
+        finally:  # (even should freeing it fail, as it does after a CUDA error: else every job after would wait for ever)
+            _work_lock.release()
+
+
+def _fetch_turn(job) -> bool:
+    """A song being added, in _line, waits its turn to download: till it's among the first FETCH_AHEAD + 1 songs there
+    (the one being split and the next ones), in short steps so one cancelled meanwhile stops at once. So the next songs'
+    audio is in when their turns come, yet few are downloaded ahead (each one's left behind should the app be quit, till
+    sweep_unfinished), and YouTube isn't asked for a playlist's all at once. Returns whether it's first in line: being
+    worked on from now, not downloaded ahead of its turn."""
+    while True:
+        _check(job)
+        with _jobs_lock:
+            at = _line.index(job["id"])
+            if sum(1 for j in _line[:at] if _jobs.get(j, {}).get("kind") == "separate") <= FETCH_AHEAD:
+                return at == 0
+        time.sleep(0.1)
 
 
 def _low_priority(on: bool):
@@ -818,6 +856,35 @@ def library() -> list[dict]:
                 _want_extras(d)
             out.append(meta)
     return sorted(out, key=lambda m: m.get("created", 0), reverse=True)
+
+
+# What a song being added has in its folder before its meta.json (_pipeline): its download (yt-dlp's own files too), its
+# tracks, its melody, and files still being written
+_ADDING_FILES = re.compile(r"source\..+|[\w-]+\.mp3|melody\.json|.+\.part")
+
+
+def sweep_unfinished():
+    """A song whose adding was cut off (the app quit or closed meanwhile) leaves a folder with no meta.json, which
+    library() never lists and nothing else removes: removed as the server starts, if all it holds is what an add writes
+    (_ADDING_FILES: never takes or notes) and nothing in it changed within the hour (another server on the same data
+    could still be adding it)."""
+    try:
+        names = os.listdir(LIB)
+    except OSError:
+        return
+    now = time.time()
+    for d in names:
+        folder = os.path.join(LIB, d)
+        if not re.fullmatch(r"[0-9a-f]{12}", d) or not os.path.isdir(folder) or os.path.exists(os.path.join(folder, "meta.json")):
+            continue
+        try:
+            files = [os.path.join(at, f) for at, _, fs in os.walk(folder) for f in fs]
+            newest = max([os.path.getmtime(folder)] + [os.path.getmtime(p) for p in files])
+        except OSError:
+            continue
+        if now - newest >= 3600 and all(_ADDING_FILES.fullmatch(os.path.basename(p)) for p in files):
+            shutil.rmtree(folder, ignore_errors=True)
+            print(f"Removed library/{d}: a song whose adding was cut off (it had no meta.json)", file=sys.stderr)
 
 
 # A cover saved before there were these (or since): its small copy, colour and BlurHash (covers.extras), made in the
@@ -1589,14 +1656,18 @@ def _pipeline(job, src: dict, model_name: str):
         model_name = "htdemucs"
     song_id = secrets.token_hex(6)
     folder = os.path.join(LIB, song_id)
-    os.makedirs(folder, exist_ok=True)
     try:
-        # the download first, outside the queue: the network's work, so the next song's comes down while this one's
-        # being split (two at most at once); only the splitting waits its turn
-        _set(job, status="queued", stage="Waiting to download")
-        with _download_slots:
-            _check(job)
-            _set(job, status="running", stage="Getting the audio", progress=0.02)
+        with contextlib.ExitStack() as held:
+            # in line from the start, so songs are split in the order they were sent; its audio comes down once its turn's
+            # near (_fetch_turn), so the next song's is in while this one's split. One downloaded ahead of its turn still
+            # waits it, "queued" (the drawer's Pending, its time left not timed yet); the first in line is being worked on.
+            # (fetching: till its audio's in, a song just added's lyrics go ahead of it, _in_line)
+            _set(job, stage="Waiting to download", fetching=True)
+            turn = held.enter_context(contextlib.ExitStack())
+            turn.enter_context(_in_line(job))
+            first = _fetch_turn(job)
+            os.makedirs(folder, exist_ok=True)
+            _set(job, status="running" if first else "queued", stage="Getting the audio", progress=0.02)
             channel = ""
             # from a link (YouTube, or a Spotify playlist's song looked for there): the only way a song comes in
             if src.get("find"):  # a Spotify playlist's song: the likeliest video of it
@@ -1612,13 +1683,11 @@ def _pipeline(job, src: dict, model_name: str):
                 _set(job, link=src["url"])
                 _check(job)
             path, title, channel = _download(job, src["url"], folder)
-            _set(job, name=title)
+            # (waiting: its pixels still and no time left, should the GPU still be another's: one first in line is running)
+            _set(job, name=title, progress=0.2, fetching=False, waiting=True, stage="Waiting for the previous song to finish")
             source = src["url"]
-        _set(job, status="queued", stage="Waiting for the previous song to finish", progress=0.2)
-        with contextlib.ExitStack() as held:
-            turn = held.enter_context(contextlib.ExitStack())
-            turn.enter_context(_turn(job))
-            _set(job, status="running")
+            turn.enter_context(_held(job))
+            _set(job, status="running", waiting=False)
             _stage(job, "Reading the audio", 0.2)
             wav = _decode_stereo(path)
             dur = wav.shape[1] / SR

@@ -480,6 +480,7 @@ class Handler(SimpleHTTPRequestHandler):
 def serve(port: int) -> ThreadingHTTPServer:
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     stems.freshen_finders()  # the desktop app's yt-dlp, a day old at most
+    stems.sweep_unfinished()  # songs whose adding was cut off by the app closing: their folders
     if not stems.update_offer():  # (with songs to time again, the page asks first: stems.answer_update)
         stems.start_upgrades()  # songs made by an older version, brought up to date in the background
     return httpd
