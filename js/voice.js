@@ -14,7 +14,8 @@ const vcGet = (o, v) => (Array.isArray(o[v]) ? o[v] : []); // (to read)
 // an: the Spectrogram's and EQ's analyser (8192, smoothed); tn: Turn's own (4096, unsmoothed: a step isn't blurred, and the
 // frame rate doesn't matter); td, tdHz, tlag: its dB, the Hz a bin, how far behind now its FFT is centred (ms); fr: what's
 // been read, the last 15 s ({t, w, m, v, L, p2, c, u, h12, raw, tt}: js/turn.js; m: the line, put right where it read an
-// octave high; raw: the frame's own reading); down: the last frame's line read an octave high and was put right (tnRead);
+// octave high; raw: the frame's own reading); down: the last frame's line read an octave high and was put right (tnRead;
+// downAt: the line on the frame before, voiced);
 // mute: till when the piano's still sounding (nothing is read); p2: P2 now, smoothed (p2At: when read); h12, db, fm, env:
 // the side's numbers and the EQ's vowel. mode: "find" or
 // "smooth"; vowel; target: Find's first note; centre: Smooth's (mine: picked, by a key or a set's breaks, not only where
@@ -22,7 +23,7 @@ const vcGet = (o, v) => (Array.isArray(o[v]) ? o[v] : []); // (to read)
 // Find ended; set, sres: this set's passes (1 even, 0 a problem, −1 not read) and how each read; cur, prev: the last two
 // passes, drawn; msg: the status lines say something of their own (else what's idle is said); view: the view shown
 const VC = { an: null, data: null, hz: 0, h12: null, db: null, last: null, painted: 0, live: null,
-  tn: null, td: null, tdHz: 0, tlag: 43, fr: [], down: false, mute: 0, p2: null, p2At: 0, frAt: 0,
+  tn: null, td: null, tdHz: 0, tlag: 43, fr: [], down: false, downAt: null, mute: 0, p2: null, p2At: 0, frAt: 0,
   mode: store.get("voiceMode", "find"), vowel: store.get("voiceVowel", "a"),
   target: 48, centre: null, mine: false, run: null, done: null, prev: null, cur: null, set: [], sres: [], msg: false,
   runs: vcLoad("voiceRuns"), days: vcLoad("voiceSmooth"), guide: null, view: "spec" };
@@ -81,9 +82,11 @@ function voiceFrame() {
   if (hearing) { vcAnalyser().getFloatFrequencyData(VC.data); VC.tn.getFloatFrequencyData(VC.td); }
   const voiced = hearing && cur != null && level > S.gate && micQ != null;
   // (r.oct: the pitch read an octave off, heard but not kept; r.down: read an octave high, as a yell's strong H2 makes it,
-  // and kept an octave down)
+  // and kept an octave down. A frame that can't be read keeps the frame before's way of taking the line while the line
+  // hasn't leapt: shown, the note doesn't flick to the octave above between frames put right)
   const r = voiced ? tnRead(VC.td, VC.tdHz, mf(cur)) : null, h = r ? r.h : null;
-  VC.down = !!r && r.down;
+  VC.down = !!r && (r.oct ? VC.down && VC.downAt != null && Math.abs(cur - VC.downAt) < 1 : r.down);
+  VC.downAt = r ? cur : null;
   const m = voiced && !r.oct ? (VC.down ? cur - 12 : cur) : null;
   if (h) {
     if (h.h12 != null) VC.h12 = VC.h12 == null ? h.h12 : VC.h12 + (h.h12 - VC.h12) * (1 - Math.exp(-dt / 150));
