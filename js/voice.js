@@ -17,13 +17,15 @@ const vcGet = (o, v) => (Array.isArray(o[v]) ? o[v] : []); // (to read)
 // octave high; raw: the frame's own reading); down: the last frame's line read an octave high and was put right (tnRead;
 // downAt: the line on the frame before, voiced);
 // mute: till when the piano's still sounding (nothing is read); p2: P2 now, smoothed (p2At: when read); h12, db, fm, env:
-// the side's numbers and the EQ's vowel (fmAt: the note fm was last read on). mode: "find" or
+// the side's numbers and the EQ's vowel (fmAt: the note fm was last read on); filt: what the browser still does to the
+// mic's sound (vcLock; relockAt: when the mic was last opened again for the Lab, inKey: what's said of it). mode: "find" or
 // "smooth"; vowel; target: Find's first note; centre: Smooth's (mine: picked, by a key or a set's breaks, not only where
 // the vowel's turn is expected); run: the step-up or the set going on; done: how the last
 // Find ended; set, sres: this set's passes (1 even, 0 a problem, −1 not read) and how each read; cur, prev: the last two
 // passes, drawn; msg: the status lines say something of their own (else what's idle is said); view: the view shown
 const VC = { an: null, data: null, hz: 0, h12: null, db: null, last: null, painted: 0, live: null,
   tn: null, td: null, tdHz: 0, tlag: 43, fr: [], down: false, downAt: null, mute: 0, p2: null, p2At: 0, frAt: 0,
+  filt: [], relockAt: 0, inKey: null,
   mode: store.get("voiceMode", "find"), vowel: store.get("voiceVowel", "a"),
   target: 48, centre: null, mine: false, run: null, done: null, prev: null, cur: null, set: [], sres: [], msg: false,
   runs: vcLoad("voiceRuns"), days: vcLoad("voiceSmooth"), guide: null, view: "spec" };
@@ -81,10 +83,12 @@ function voiceFrame() {
   const hearing = !!ac && (micOn || !!testOsc);
   if (hearing) { vcAnalyser().getFloatFrequencyData(VC.data); VC.tn.getFloatFrequencyData(VC.td); }
   const voiced = hearing && cur != null && level > S.gate && micQ != null;
+  vcLock(now);
+  const raw = !VC.filt.length; // (nothing of the browser's own on the sound: its harmonics, level and tone are read)
   // (r.oct: the pitch read an octave off, heard but not kept; r.down: read an octave high, as a yell's strong H2 makes it,
   // and kept an octave down. A frame that can't be read keeps the frame before's way of taking the line while the line
   // hasn't leapt: shown, the note doesn't flick to the octave above between frames put right)
-  const r = voiced ? tnRead(VC.td, VC.tdHz, mf(cur)) : null, h = r ? r.h : null;
+  const r = voiced ? tnRead(VC.td, VC.tdHz, mf(cur)) : null, h = r && raw ? r.h : null;
   VC.down = !!r && (r.oct ? VC.down && VC.downAt != null && Math.abs(cur - VC.downAt) < 1 : r.down);
   VC.downAt = r ? cur : null;
   const m = voiced && !r.oct ? (VC.down ? cur - 12 : cur) : null;
@@ -98,14 +102,15 @@ function voiceFrame() {
   } else if (VC.last && now - VC.last.t > 120) VC.h12 = VC.fm = VC.env = null;
   if (hearing && now >= VC.mute) { // (nothing while the piano sounds)
     const p = VC.fr[VC.fr.length - 1]; // (w: its real time, to 10 fps; past that, a gap)
-    const s = { t: now, w: p ? Math.min(100, now - p.t) : 16, m, v: voiced, L: voiced ? 20 * Math.log10(level) : null,
+    const s = { t: now, w: p ? Math.min(100, now - p.t) : 16, m, v: voiced, L: voiced && raw ? 20 * Math.log10(level) : null,
       p2: h ? h.p2 : null, c: h ? h.c.slice(0, 3) : null, u: h ? h.u : null, h12: h ? h.h12 : null, raw: voiced ? micRaw : null,
       tt: now - VC.tlag };
     VC.fr.push(s);
     if (s.p2 != null) { VC.p2 = VC.p2 == null || now - VC.p2At > 300 ? s.p2 : VC.p2 + (s.p2 - VC.p2) * (1 - Math.exp(-dt / 200)); VC.p2At = now; }
   }
-  if (!hearing) VC.p2 = null;
+  if (!hearing || !raw) VC.p2 = null;
   while (VC.fr.length && now - VC.fr[0].t > 15000) VC.fr.shift();
+  if (VC.run && VC.run.mode === "find" && vcFiltered()) { vcAbort(); vcSay(...vcLockSay()); paintTurn(); } // (Find reads only harmonics)
   if (VC.run && !hearing) { vcAbort(); paintTurn(); } // (the mic turned off: the run's stopped, not left waiting)
   if (VC.run) (VC.run.mode === "find" ? vcFindTick : vcPassTick)(now);
   if (SV.run) { if (!hearing) scAbort(); else scTick(now, voiced, dt); } // (Scales' set: js/voice-scale.js)
@@ -117,6 +122,30 @@ function voiceFrame() {
 }
 // The note read now, as the Lab reads it: the line, an octave down where it read a yell an octave high (VC.down)
 const vcCur = () => (cur != null && VC.down ? cur - 12 : cur);
+
+// The input lock. While the Lab's shown the mic runs with nothing of the browser's own on its sound: openMic has noise
+// suppression, gain control and voice isolation off, and the echo filter's off here too (micEcho), so a mic opened with
+// it is opened again (once every 3 s at most, should that fail). What the track says it still does (getSettings) is read
+// every frame; with anything on, the harmonics, the level and the tone aren't read, only the pitch (vcFiltered: and
+// said, once no new stream's on its way). Left, the mic's opened again as the rest of the app has it (voiceHide).
+function vcLock(now) {
+  if (micOn && !micSwap && micAsked !== micEcho() && now - VC.relockAt > 3000) { VC.relockAt = now; restartMic(); }
+  VC.filt = micOn ? micFilters() : [];
+}
+const vcFiltered = () => micOn && !micSwap && VC.filt.length > 0;
+// what's said of it: what's on, and that only the pitch is read (a fix: the desktop app; there, the mic opened again)
+const vcLockSay = () => ["Mic still filtered: {what}", { what: () => VC.filt.map((k) => tr(MIC_FILTERS[k])).join(", ") },
+  window.pitchroom?.desktop ? "Only pitch is read. Turn the mic off and on." : "Only pitch is read. The desktop app reads tone too.", null];
+// Under the numbers, what they're read from: that (vcLockSay), or with the mic on, a line for singers coming in through a
+// DAW (its effects and the distance to the mic move the harmonics and the level as much as the voice does)
+function paintLock() {
+  const key = !micOn ? "" : vcFiltered() ? VC.filt.join() : "dry";
+  if (VC.inKey === key) return;
+  VC.inKey = key;
+  $("#vcIn").hidden = !key; $("#vcInSay").hidden = key === "dry";
+  if (key === "dry") say($("#vcInDo"), "From a DAW: the dry mic, before effects, at a set distance.");
+  else if (key) { const [st, sv, d] = vcLockSay(); say($("#vcInSay"), st, sv); say($("#vcInDo"), d); }
+}
 
 // ---------- what's said ----------
 // The status line and the one under it (what to do), each English with its {placeholders}. keep: it stays till something
@@ -166,6 +195,7 @@ function vcCue(ms, step, dur) {
   if (VC.run) VC.run.cueEnd = VC.mute;
 }
 function vcFindStart() {
+  if (vcFiltered()) { vcSay(...vcLockSay()); paintTurn(); return; } // (it reads only harmonics)
   VC.done = null;
   VC.run = { mode: "find", start: VC.target, notes: [], hold: null, cueEnd: 0, unread: 0 };
   vcCue([VC.target], 0, 0.6);
@@ -270,7 +300,7 @@ function vcPassTick(now) {
     if (fresh && s.v) R.last = s.t;
     if (now - R.last >= TN.endGap || now - R.t0 >= TN.cap) {
       const xs = VC.fr.filter((q) => q.t >= R.t0);
-      vcPassDone(tnPass(xs, R.T, { echo: S.echo }), xs);
+      vcPassDone(tnPass(xs, R.T, { echo: VC.filt.length > 0 }), xs);
     } else if (now - R.fitAt > 200) { R.fitAt = now; R.fit = tnFits(VC.fr.filter((q) => q.t >= R.t0), R.T); } // (the live trace's trend)
   } else if (R.phase === "rest" && now >= R.next) vcPassCue();
 }
@@ -393,8 +423,8 @@ function paintTurn() {
   say($("#vcGo"), VC.run ? "Stop" : VC.mode === "find" && VC.done && VC.done.state === "found" ? "Smooth" : VC.mode === "smooth" && vcBlind() ? "Find" : "Start");
   say($("#vcStepLbl"), VC.view === "scale" ? (SV.run ? "Key" : "Start note") : VC.mode === "find" ? "Start note" : "Centre");
   vcGuide();
-  // (loudness isn't judged with echo cancellation on: its lane isn't shown)
-  $("#vcAxH2").hidden = VC.mode !== "find"; $("#vcAxT").hidden = VC.mode !== "smooth"; $("#vcAxL").hidden = VC.mode !== "smooth" || !!S.echo;
+  // (loudness and tone aren't read while the browser filters the mic: their lanes aren't shown, vcLock)
+  $("#vcAxH2").hidden = VC.mode !== "find"; $("#vcAxT").hidden = $("#vcAxL").hidden = VC.mode !== "smooth" || VC.filt.length > 0;
   if (!VC.run) $("#vcTgt").style.setProperty("--p", "0%");
   for (const b of $("#vcVowels").children) { // each vowel: its newest turn, and its last 8 days' even passes
     const v = b.dataset.v, t = vcTurns(v).pop(), days = vcDays(v).slice(-8), bars = b.children[2].children;
@@ -498,7 +528,8 @@ function drawSmooth(g, now, W, H, P, font, mid) {
   const atTurn = vcAtTurn(T);
   g.fillStyle = C.ink; g.globalAlpha = 0.06; g.fillRect(X(T - 0.5), P.t + 16, X(T + 0.5) - X(T - 0.5), P.b - P.t - 16); g.globalAlpha = 1;
   g.font = font(12); g.textAlign = "center"; g.fillText(tr(atTurn ? "Turn" : "Centre"), X(T), P.t + 12);
-  if ($("#vcAxL").hidden !== !!S.echo) $("#vcAxL").hidden = !!S.echo; // (echo cancellation turned on or off meanwhile)
+  const lanes = !VC.filt.length; // (the browser's filtering found or gone meanwhile)
+  if ($("#vcAxL").hidden === lanes) $("#vcAxL").hidden = $("#vcAxT").hidden = !lanes;
   g.strokeStyle = C.line; g.lineWidth = 1;
   for (const y of [yL0, yU0]) { g.beginPath(); g.moveTo(P.l, Math.round(y) + 0.5); g.lineTo(P.r, Math.round(y) + 0.5); g.stroke(); }
   g.save(); g.beginPath(); g.rect(P.l, P.t, P.r - P.l, P.b - P.t); g.clip();
@@ -542,7 +573,7 @@ function vcTrace(g, p, X, yL, yU, colour, width, alpha) {
   xs.forEach((s, i) => { if (s.v && s.m != null && (xs[iTop].m == null || s.m > xs[iTop].m)) iTop = i; });
   g.strokeStyle = colour; g.lineWidth = width; g.globalAlpha = alpha;
   for (const [key, f, Y] of [["L", fit.fL, yL], ["u", fit.fU, yU]]) {
-    if (!f || (key === "L" && S.echo)) continue; // (loudness isn't judged with echo cancellation on)
+    if (!f || VC.filt.length) continue; // (loudness and tone aren't read while the browser filters the mic)
     for (const leg of [0, 1]) {
       g.setLineDash(leg ? [4, 4] : []); g.beginPath();
       let on = false, pt = null;
@@ -735,6 +766,7 @@ function paintVoiceRead() {
   const db = (v) => (v == null ? "–" : (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " dB");
   setText("vcH12", db(VC.h12)); setText("vcLvl", db(VC.h12 == null ? null : VC.db));
   setText("vcF12", VC.fm && VC.fm.length >= 2 ? (vcVowelRead() ? `${Math.round(VC.fm[0])} · ${Math.round(VC.fm[1])} Hz` : "~") : "–");
+  paintLock();
   vcTitles();
 }
 
@@ -751,18 +783,20 @@ function vcKeys(m) {
 }
 
 
-// Shown (route): the keyboard's samples, and the keys around middle C in view. A run left going when the page was left
-// (nothing was read meanwhile) is stopped.
+// Shown (route): the keyboard's samples, and the keys around middle C in view; the mic without the echo filter (vcLock). A
+// run left going when the page was left (nothing was read meanwhile) is stopped.
 function voiceShow() {
   loadSamples();
+  VC.relockAt = 0; vcLock(performance.now());
   if (VC.run) { vcAbort(); paintTurn(); }
   if (SV.run) scAbort();
   const wrap = $("#vcKeys").parentElement, k = vcKeyEls.get(60);
   if (k) wrap.scrollLeft = k.offsetLeft - wrap.clientWidth / 2;
   $("#vcOff").hidden = micOn || !!testOsc;
 }
-// Left (route): Scales' set stopped, its call hushed (a pattern queued on the piano would play on over the next page)
-function voiceHide() { if (SV.run) scAbort(); }
+// Left (route): Scales' set stopped, its call hushed (a pattern queued on the piano would play on over the next page); the
+// mic with the echo filter again, if it's set
+function voiceHide() { if (SV.run) scAbort(); if (micOn && micAsked !== micEcho()) restartMic(); }
 function initVoice() {
   // the header's Lab tab: in, and the mic on with it (this click lets it start)
   $("#tabLab").onclick = () => { if (view !== "voice") startMic(); };

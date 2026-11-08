@@ -163,6 +163,10 @@ working without it.
   `initStems` in `studio.js`), so selectors scoped to `#vStems` won't find them.
 - The concatenated `node --check` doesn't see the inline scripts in `index.html`: a top-level name in `js/` that
   clashes with `SAVED`, `SAVED_LIB`, `SAVED_UPDATE`, `WELCOME_*`, `ONBOARD_*` or `EMPTY_LIBRARY` goes undetected.
+- The mic is one stream for the whole app, opened with the browser's noise suppression, gain control and voice isolation
+  off. Its echo filter follows Settings everywhere but the Lab (`micEcho`): entering or leaving the Lab opens it again
+  (`restartMic`, one at a time), and the Lab reads only pitch while `getSettings()` reports any of them on (`vcLock`).
+  Open the mic with `openMic()`'s default unless a measurement needs it unfiltered (`measureDelay`).
 - The piano samples come from a CDN (tonejs.github.io), fonts from jsDelivr.
 - The desktop build minifies JS with terser (top-level names kept, locals mangled: don't rely on a local function's
   `.name`) and CSS with lightningcss (which can rewrite colour values: JS parsing a token must accept both forms).
