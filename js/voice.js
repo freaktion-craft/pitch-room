@@ -598,31 +598,25 @@ function drawSpec(now, hearing) {
 }
 
 // The EQ view: the spectrum as an EQ's analyser shows it, 30 Hz to 16 kHz on an octave scale, tilted 4.5 dB an octave about
-// 1 kHz (as Pro-Q's is: a voice's falling top end drawn level), falling back gently with a slower peak line; over it the
-// formants' envelope (the vowel's shape), F1-F3 marked with their Hz, and the note's fundamental marked with its name.
-const EQ = { lo: 30, hi: 16000, top: 10, span: 80, tilt: 4.5, fall: 0.85, peakFall: 12 }; // Hz; dB at the top; dB down to the bottom; dB/oct; per frame; dB/s
-let eqCols = null, eqPeak = null, eqAt = 0;
+// 1 kHz (as Pro-Q's is: a voice's falling top end drawn level), a soft curve over the harmonics' tops that falls back
+// gently. Over it the note's first four harmonics where they are, the loudest of H1–H3 lit, and "H2 stands out" once P2
+// reaches TN.p2Out (F1 on H2, as in a yell); the formants' envelope, F1–F3 as dots with their Hz, but only while the note's
+// under a third of F1 (above that the harmonics are too far apart to read the vowel, as the side's "~" says: the envelope
+// faint, unmarked); the note's name in the gutter along the bottom, with the Hz. Freeze keeps a moment, its harmonics' tops
+// dashed under what's heard now: two ways of singing one note side by side (a whoop and a yell, say).
+const EQ = { lo: 30, hi: 16000, top: 10, span: 80, tilt: 4.5, fall: 0.85, gutter: 22, lead: 200 }; // Hz; dB at the top; dB down to the bottom; dB/oct; per frame; px; ms
+let eqCols = null;
 function drawEq(now, hearing) {
   const cv = $("#vcEq"), r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
   const W = r.width, H = r.height;
   if (!W || !H) return;
   if (cv.width !== Math.round(W * d) || cv.height !== Math.round(H * d)) { cv.width = Math.round(W * d); cv.height = Math.round(H * d); eqCols = null; }
   const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, W, H);
+  g.font = `11px ${getComputedStyle(cv).fontFamily}`;
   const L = Math.log(EQ.hi / EQ.lo), xOf = (f) => (Math.log(f / EQ.lo) / L) * W, fOf = (x) => EQ.lo * Math.exp((x / W) * L);
-  const yOf = (db) => ((EQ.top - db) / EQ.span) * H, tilt = (f) => EQ.tilt * Math.log2(f / 1000);
+  const Hp = H - EQ.gutter, yOf = (db) => Math.max(0, Math.min(Hp, ((EQ.top - db) / EQ.span) * Hp)), tilt = (f) => EQ.tilt * Math.log2(f / 1000);
   const n = Math.max(2, Math.round(W / 2)); // a column every 2 px
-  if (!eqCols || eqCols.length !== n) { eqCols = new Float32Array(n).fill(EQ.top - EQ.span); eqPeak = new Float32Array(n).fill(EQ.top - EQ.span); }
-  const dt = eqAt ? Math.min(0.1, (now - eqAt) / 1000) : 0; eqAt = now;
-  // the grid
-  g.font = `11px ${getComputedStyle(cv).fontFamily}`; g.lineWidth = 1;
-  for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) {
-    const x = Math.round(xOf(f)) + 0.5; g.strokeStyle = C.line; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
-    g.fillStyle = C.muted; g.fillText(f >= 1000 ? f / 1000 + "k" : String(f), x + 3, H - 6);
-  }
-  for (let db = EQ.top - 20; db > EQ.top - EQ.span; db -= 20) {
-    const y = Math.round(yOf(db)) + 0.5; g.strokeStyle = C.line; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
-    g.fillStyle = C.muted; g.fillText(db + " dB", 4, y - 3);
-  }
+  if (!eqCols || eqCols.length !== n) eqCols = new Float32Array(n).fill(EQ.top - EQ.span);
   // the spectrum: each column the loudest bin under it (between bins down low, read off the line between them)
   for (let c = 0; c < n; c++) {
     const f0 = fOf((c / n) * W), f1 = fOf(((c + 1) / n) * W);
@@ -634,54 +628,87 @@ function drawEq(now, hearing) {
       v += tilt(Math.sqrt(f0 * f1));
     }
     eqCols[c] = Math.max(v, eqCols[c] - (1 - EQ.fall) * 60); // (rises at once, falls back gently)
-    eqPeak[c] = Math.max(eqCols[c], eqPeak[c] - EQ.peakFall * dt);
   }
   const colX = (c) => ((c + 0.5) / n) * W;
-  g.beginPath(); g.moveTo(0, H);
-  for (let c = 0; c < n; c++) g.lineTo(colX(c), yOf(eqCols[c]));
-  g.lineTo(W, H); g.closePath();
-  const grad = g.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, C.voice); grad.addColorStop(1, "transparent");
-  g.globalAlpha = 0.35; g.fillStyle = grad; g.fill(); g.globalAlpha = 1;
-  g.strokeStyle = C.voice; g.lineWidth = 1.5; g.beginPath();
-  for (let c = 0; c < n; c++) (c ? g.lineTo : g.moveTo).call(g, colX(c), yOf(eqCols[c])); g.stroke();
-  g.strokeStyle = C.muted; g.lineWidth = 1; g.globalAlpha = 0.6; g.beginPath();
-  for (let c = 0; c < n; c++) (c ? g.lineTo : g.moveTo).call(g, colX(c), yOf(eqPeak[c])); g.stroke(); g.globalAlpha = 1;
-  // a moment kept (Freeze): faint and dashed, under what's heard now
-  const G = VC.ghost;
-  if (G) {
-    g.setLineDash([4, 4]); g.lineWidth = 1.5; g.globalAlpha = 0.55;
-    g.strokeStyle = C.muted; g.beginPath(); G.cols.forEach((v, c) => (c ? g.lineTo : g.moveTo).call(g, ((c + 0.5) / G.cols.length) * W, yOf(v))); g.stroke();
-    if (G.env.length) { g.strokeStyle = C.ink; g.beginPath(); G.env.forEach(([f, v], k) => (k ? g.lineTo : g.moveTo).call(g, xOf(f), yOf(v))); g.stroke(); }
-    g.setLineDash([]); g.fillStyle = C.muted; g.textAlign = "center";
-    let lx = -1e9, row = 0;
-    G.fm.forEach((f, i) => { const x = xOf(f); row = x - lx < 64 ? row + 1 : 0; lx = x; g.fillText(`F${i + 1} ${Math.round(f)}`, x, 46 + row * 13); });
-    g.globalAlpha = 1; g.textAlign = "left";
-  }
-  // the vowel's shape: the envelope, set on top of the harmonics it's under, and the formants
-  const E = VC.env, envPts = [];
+  // the envelope, set on the harmonics it's under (its top level with theirs, 150 Hz to 4.5 kHz)
+  const E = VC.env, env = [];
   if (E) {
     let topS = -200, topE = -200;
     for (let c = 0; c < n; c++) { const f = fOf(colX(c)); if (f > 150 && f < 4500) topS = Math.max(topS, eqCols[c] - tilt(f)); }
     for (let q = 0; q < E.env.length; q++) if (E.hz[q] > 150 && E.hz[q] < 4500) topE = Math.max(topE, E.env[q]);
-    const off = topS - topE;
-    g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath();
-    let on = false;
-    for (let q = 0; q < E.env.length; q++) { const f = E.hz[q]; if (f < EQ.lo) continue; const v = E.env[q] + off + tilt(f), x = xOf(f), y = yOf(v); envPts.push([f, v]); on ? g.lineTo(x, y) : g.moveTo(x, y); on = true; }
-    g.stroke();
+    for (let q = 0; q < E.env.length; q++) { const f = E.hz[q]; if (f >= EQ.lo) env.push([f, E.env[q] + topS - topE + tilt(f)]); }
   }
-  VC.eqNow = { cols: eqCols.slice(), env: envPts, fm: (VC.fm || []).slice() }; // (what Freeze keeps)
-  g.textAlign = "center";
-  let lx = -1e9, row = 0; // (labels close together: the next a line down)
-  (VC.fm || []).forEach((f, i) => {
-    const x = xOf(f); row = x - lx < 64 ? row + 1 : 0; lx = x;
-    g.strokeStyle = C.ink; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(x, 20 + row * 13); g.lineTo(x, H - 20); g.stroke(); g.setLineDash([]);
-    g.fillStyle = C.ink; g.fillText(`F${i + 1} ${Math.round(f)}`, x, 15 + row * 13);
+  const sung = vcCur(), fm = VC.fm || [], f0 = sung != null && VC.h12 != null ? mf(sung) : null;
+  VC.eqNow = { cols: eqCols.slice(), env, fm: fm.slice(), f0 }; // (what Freeze keeps)
+  const envAt = (f) => { for (let k = 1; k < env.length; k++) if (env[k][0] >= f) { const [a, va] = env[k - 1], [b, vb] = env[k]; return va + ((vb - va) * (f - a)) / (b - a || 1); } return null; };
+  const line = (pts) => { g.beginPath(); pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y))); };
+  const chip = (text, x, y, fg, bg) => { // a label on a rounded tab, centred on x, its bottom at y
+    const w = g.measureText(text).width + 12, l = Math.max(2, Math.min(W - w - 2, x - w / 2));
+    g.fillStyle = bg; g.beginPath(); g.roundRect(l, y - 18, w, 18, 4); g.fill(); g.fillStyle = fg; g.textAlign = "left"; g.fillText(text, l + 6, y - 5);
+  };
+  // the tops of a spectrum: each column the loudest within half a harmonic (of step Hz) either side, a 30th of an octave up high
+  const tops = (cols, step) => {
+    const pts = [], m = cols.length, floor = EQ.top - EQ.span + 3, cx = (c) => ((c + 0.5) / m) * W;
+    for (let c = 0; c < m; c++) {
+      const f = fOf(cx(c)), half = Math.max(f * 0.03, (step || 200) * 0.45);
+      const a = Math.max(0, Math.floor((xOf(f - half) / W) * m)), b = Math.min(m - 1, Math.ceil((xOf(f + half) / W) * m));
+      let top = true; for (let j = a; j <= b && top; j++) if (cols[j] > cols[c]) top = false;
+      if (top && cols[c] > floor && (!pts.length || cx(c) - pts[pts.length - 1][0] > 3)) pts.push([cx(c), yOf(cols[c])]);
+    }
+    return pts;
+  };
+  const curve = (pts) => { // through the points, its corners rounded (a quadratic through each midpoint)
+    g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length - 1; k++) g.quadraticCurveTo(pts[k][0], pts[k][1], (pts[k][0] + pts[k + 1][0]) / 2, (pts[k][1] + pts[k + 1][1]) / 2);
+    g.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+  };
+  // the grid: Hz in the gutter, dB faint at the left
+  g.lineWidth = 1; g.textAlign = "center";
+  for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) {
+    const x = Math.round(xOf(f)) + 0.5; g.strokeStyle = C.line; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, Hp); g.stroke();
+    g.fillStyle = C.muted; g.fillText(f >= 1000 ? f / 1000 + "k" : String(f), x, H - 7);
+  }
+  g.strokeStyle = C.line; g.beginPath(); g.moveTo(0, Hp + 0.5); g.lineTo(W, Hp + 0.5); g.stroke();
+  g.textAlign = "left";
+  for (let db = EQ.top - 20; db > EQ.top - EQ.span; db -= 20) {
+    const y = Math.round(yOf(db)) + 0.5; g.strokeStyle = C.line; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = C.muted; g.fillText(db + " dB", 6, y - 4);
+  }
+  // a moment kept (Freeze): its harmonics' tops, dashed, under what's heard now
+  const G = VC.ghost;
+  if (G) { const gp = tops(G.cols, G.f0); if (gp.length > 1) { g.setLineDash([4, 4]); g.strokeStyle = C.muted; g.lineWidth = 1.5; curve(gp); g.stroke(); g.setLineDash([]); } }
+  // the spectrum: a soft curve over the harmonics' tops, filled under
+  const sm = tops(eqCols, f0);
+  if (sm.length > 1) {
+    const hi = Math.min(...sm.map((p) => p[1]));
+    const grad = g.createLinearGradient(0, hi, 0, Hp); grad.addColorStop(0, C.voice); grad.addColorStop(1, "transparent");
+    curve(sm); g.lineTo(sm[sm.length - 1][0], Hp); g.lineTo(sm[0][0], Hp); g.closePath(); g.globalAlpha = 0.3; g.fillStyle = grad; g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = C.voice; g.globalAlpha = 0.8; g.lineWidth = 1.5; curve(sm); g.stroke(); g.globalAlpha = 1;
+  }
+  // the note's first harmonics where they are, the loudest of H1–H3 lit (each one's median level over the last EQ.lead ms)
+  if (f0) {
+    const lv = [[], [], []];
+    for (let i = VC.fr.length - 1; i >= 0 && VC.fr[i].t > now - EQ.lead; i--) { const c = VC.fr[i].c; if (c) for (let k = 0; k < 3; k++) lv[k].push(c[k]); }
+    const mid = (a) => (a.length ? a.sort((x, y) => x - y)[a.length >> 1] : -Infinity), m3 = lv.map(mid);
+    const lead = lv[0].length ? m3.indexOf(Math.max(...m3)) + 1 : 0;
+    g.textAlign = "center";
+    for (let k = 1; k <= 4 && k * f0 < EQ.hi; k++) {
+      const x = xOf(k * f0); g.strokeStyle = g.fillStyle = k === lead ? C.voice : C.muted; g.lineWidth = k === lead ? 2 : 1;
+      g.beginPath(); g.moveTo(x, Hp); g.lineTo(x, Hp - 26); g.stroke(); g.fillText("H" + k, x, Hp - 30);
+    }
+    if (VC.p2 != null && now - VC.p2At < 300 && VC.p2 >= TN.p2Out) chip(tr("H2 stands out"), xOf(2 * f0), Hp - 44, C.surface, C.voice);
+  }
+  // the envelope, and the formants as dots on it with their Hz on a tab above (only while the vowel can be read)
+  const blur = f0 != null && fm.length > 0 && f0 > fm[0] / 3;
+  if (env.length) { g.strokeStyle = C.ink; g.lineWidth = 2; g.globalAlpha = blur ? 0.35 : 1; line(env.map(([f, v]) => [xOf(f), yOf(v)])); g.stroke(); g.globalAlpha = 1; }
+  let lx = -1e9, row = 0;
+  if (!blur) fm.forEach((f, i) => {
+    const v = envAt(f); if (v == null) return; const x = xOf(f), y = yOf(v); row = x - lx < 70 ? row + 1 : 0; lx = x;
+    g.fillStyle = C.ink; g.strokeStyle = C.surface; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); g.stroke();
+    chip(`F${i + 1} ${Math.round(f)}`, x, y - 10 - row * 22, C.ink, C["surface-2"]);
   });
-  const sung = vcCur();
-  if (sung != null && VC.h12 != null) { // the note's fundamental
-    const x = xOf(mf(sung)); g.strokeStyle = C.voice; g.beginPath(); g.moveTo(x, H - 34); g.lineTo(x, H - 20); g.stroke();
-    g.fillStyle = C.voice; g.fillText(absName(sung + 12 * Math.log2(A4 / 440)), x, H - 38);
-  }
+  // the note's fundamental, named on the Hz line in the gutter
+  if (f0) chip(absName(sung + 12 * Math.log2(A4 / 440)), xOf(f0), H - 2, C.surface, C.voice);
   g.textAlign = "left";
 }
 

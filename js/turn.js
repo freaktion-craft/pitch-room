@@ -14,6 +14,9 @@ const TN = {
   // prom 4, fallWin 4 (not 3, 3): with 1 dB jitter a sawtooth's P2 made a 3 dB peak in 1 run of 16; a low F1's broad top
   // (H2 within 1.2 dB over 4 notes) often hadn't fallen 3 dB within 3 notes
   prom: 4, peakWin: 2, fallWin: 4, plat: 1, minNotes: 5,     // dB; st; st; dB; notes
+  // p2Out: from this P2 (dB) the EQ says H2 stands out, F1 on H2 as in a yell (synthetic notes: every yell, whatever the
+  // source, and nothing else; the source moved P2 1–3 dB against 4.5–12 for H1−H2, so H1 the loudest names nothing)
+  p2Out: 6,
   // tnF2: F1's crossing within f1Span of the vowel's usual one; F2's f2Gap (F2/F1 1.3) to f2Far (2.0) above it; with
   // f2Notes read or more, and F2's crossing f2Seen under the top note read; the bandwidths tried (Hz); the fit's floor
   // (dB², about 0.3 dB rms)
