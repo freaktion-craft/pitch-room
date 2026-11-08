@@ -306,6 +306,7 @@ function loop() {
   } else level = 0;
   micRaw = m;
   reading(m);
+  micKeep(now); // (the mic as the page has it: js/audio.js)
   if (view === "voice") voiceFrame();
   drawSpectrum(); // the mic chip is in the header on every page
   paintGate();
