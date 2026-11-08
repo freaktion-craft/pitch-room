@@ -13,14 +13,17 @@ const vcList = (o, v) => (Array.isArray(o[v]) ? o[v] : (o[v] = [])); // (to add 
 const vcGet = (o, v) => (Array.isArray(o[v]) ? o[v] : []); // (to read)
 // an: the Spectrogram's and EQ's analyser (8192, smoothed); tn: Turn's own (4096, unsmoothed: a step isn't blurred, and the
 // frame rate doesn't matter); td, tdHz, tlag: its dB, the Hz a bin, how far behind now its FFT is centred (ms); fr: what's
-// been read, the last 15 s ({t, w, m, v, L, p2, c, u, tt}: js/turn.js); mute: till when the piano's still sounding (nothing
-// is read); p2: P2 now, smoothed (p2At: when read); h12, db, fm, env: the side's numbers and the EQ's vowel. mode: "find" or
+// been read, the last 15 s ({t, w, m, v, L, p2, c, u, h12, raw, tt}: js/turn.js; m: the line, put right where it read an
+// octave high; raw: the frame's own reading); down: the last frame's line read an octave high and was put right (tnRead;
+// downAt: the line on the frame before, voiced);
+// mute: till when the piano's still sounding (nothing is read); p2: P2 now, smoothed (p2At: when read); h12, db, fm, env:
+// the side's numbers and the EQ's vowel. mode: "find" or
 // "smooth"; vowel; target: Find's first note; centre: Smooth's (mine: picked, by a key or a set's breaks, not only where
 // the vowel's turn is expected); run: the step-up or the set going on; done: how the last
 // Find ended; set, sres: this set's passes (1 even, 0 a problem, −1 not read) and how each read; cur, prev: the last two
 // passes, drawn; msg: the status lines say something of their own (else what's idle is said); view: the view shown
 const VC = { an: null, data: null, hz: 0, h12: null, db: null, last: null, painted: 0, live: null,
-  tn: null, td: null, tdHz: 0, tlag: 43, fr: [], mute: 0, p2: null, p2At: 0, frAt: 0,
+  tn: null, td: null, tdHz: 0, tlag: 43, fr: [], down: false, downAt: null, mute: 0, p2: null, p2At: 0, frAt: 0,
   mode: store.get("voiceMode", "find"), vowel: store.get("voiceVowel", "a"),
   target: 48, centre: null, mine: false, run: null, done: null, prev: null, cur: null, set: [], sres: [], msg: false,
   runs: vcLoad("voiceRuns"), days: vcLoad("voiceSmooth"), guide: null, view: "spec" };
@@ -78,8 +81,13 @@ function voiceFrame() {
   const hearing = !!ac && (micOn || !!testOsc);
   if (hearing) { vcAnalyser().getFloatFrequencyData(VC.data); VC.tn.getFloatFrequencyData(VC.td); }
   const voiced = hearing && cur != null && level > S.gate && micQ != null;
-  const h = voiced ? tnHarm(VC.td, VC.tdHz, mf(cur)) : null;
-  const unread = voiced && !h && tnOctave(VC.td, VC.tdHz, mf(cur)); // (the pitch read an octave off: heard, its pitch not kept)
+  // (r.oct: the pitch read an octave off, heard but not kept; r.down: read an octave high, as a yell's strong H2 makes it,
+  // and kept an octave down. A frame that can't be read keeps the frame before's way of taking the line while the line
+  // hasn't leapt: shown, the note doesn't flick to the octave above between frames put right)
+  const r = voiced ? tnRead(VC.td, VC.tdHz, mf(cur)) : null, h = r ? r.h : null;
+  VC.down = !!r && (r.oct ? VC.down && VC.downAt != null && Math.abs(cur - VC.downAt) < 1 : r.down);
+  VC.downAt = r ? cur : null;
+  const m = voiced && !r.oct ? (VC.down ? cur - 12 : cur) : null;
   if (h) {
     if (h.h12 != null) VC.h12 = VC.h12 == null ? h.h12 : VC.h12 + (h.h12 - VC.h12) * (1 - Math.exp(-dt / 150));
     VC.db = 20 * Math.log10(level);
@@ -90,8 +98,9 @@ function voiceFrame() {
   } else if (VC.last && now - VC.last.t > 120) VC.h12 = VC.fm = VC.env = null;
   if (hearing && now >= VC.mute) { // (nothing while the piano sounds)
     const p = VC.fr[VC.fr.length - 1]; // (w: its real time, to 10 fps; past that, a gap)
-    const s = { t: now, w: p ? Math.min(100, now - p.t) : 16, m: voiced && !unread ? cur : null, v: voiced, L: voiced ? 20 * Math.log10(level) : null,
-      p2: h ? h.p2 : null, c: h ? h.c.slice(0, 3) : null, u: h ? h.u : null, tt: now - VC.tlag };
+    const s = { t: now, w: p ? Math.min(100, now - p.t) : 16, m, v: voiced, L: voiced ? 20 * Math.log10(level) : null,
+      p2: h ? h.p2 : null, c: h ? h.c.slice(0, 3) : null, u: h ? h.u : null, h12: h ? h.h12 : null, raw: voiced ? micRaw : null,
+      tt: now - VC.tlag };
     VC.fr.push(s);
     if (s.p2 != null) { VC.p2 = VC.p2 == null || now - VC.p2At > 300 ? s.p2 : VC.p2 + (s.p2 - VC.p2) * (1 - Math.exp(-dt / 200)); VC.p2At = now; }
   }
@@ -104,8 +113,10 @@ function voiceFrame() {
   if ($("#vcOff").hidden !== !off) $("#vcOff").hidden = !off;
   drawTurn(now); drawScale(now); drawSpec(now, hearing); drawEq(now, hearing);
   if (now - VC.painted > 100) { VC.painted = now; paintVoiceRead(); }
-  vcKeys(cur);
+  vcKeys(vcCur());
 }
+// The note read now, as the Lab reads it: the line, an octave down where it read a yell an octave high (VC.down)
+const vcCur = () => (cur != null && VC.down ? cur - 12 : cur);
 
 // ---------- what's said ----------
 // The status line and the one under it (what to do), each English with its {placeholders}. keep: it stays till something
@@ -507,7 +518,8 @@ function drawSmooth(g, now, W, H, P, font, mid) {
     g.font = font(12); g.textAlign = "left";
     halo((u) => (u ? g.strokeText(label, x + 9, y - 8) : g.fillText(label, x + 9, y - 8)));
   }
-  if (live && cur != null && Math.abs(cur - T) <= 5) { g.strokeStyle = vcMine(); g.lineWidth = 1.5; vcVline(g, X(cur), P.t + 16, P.b); }
+  const sung = vcCur();
+  if (live && sung != null && Math.abs(sung - T) <= 5) { g.strokeStyle = vcMine(); g.lineWidth = 1.5; vcVline(g, X(sung), P.t + 16, P.b); }
   vcNames(g, H, T - 5, T + 5, X, font);
   if (R || VC.set.length) { // the set: even filled green, a break a red ×, a step an orange ring (as on the plot), unread dashed, to come faint
     const gw = $("#vcGo").offsetWidth || 64, x1 = W - 12 - gw - 16, y = 12 + 16;
@@ -668,9 +680,10 @@ function drawEq(now, hearing) {
     g.strokeStyle = C.ink; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(x, 20 + row * 13); g.lineTo(x, H - 20); g.stroke(); g.setLineDash([]);
     g.fillStyle = C.ink; g.fillText(`F${i + 1} ${Math.round(f)}`, x, 15 + row * 13);
   });
-  if (cur != null && VC.h12 != null) { // the note's fundamental
-    const x = xOf(mf(cur)); g.strokeStyle = C.voice; g.beginPath(); g.moveTo(x, H - 34); g.lineTo(x, H - 20); g.stroke();
-    g.fillStyle = C.voice; g.fillText(absName(cur + 12 * Math.log2(A4 / 440)), x, H - 38);
+  const sung = vcCur();
+  if (sung != null && VC.h12 != null) { // the note's fundamental
+    const x = xOf(mf(sung)); g.strokeStyle = C.voice; g.beginPath(); g.moveTo(x, H - 34); g.lineTo(x, H - 20); g.stroke();
+    g.fillStyle = C.voice; g.fillText(absName(sung + 12 * Math.log2(A4 / 440)), x, H - 38);
   }
   g.textAlign = "left";
 }
@@ -678,7 +691,7 @@ function drawEq(now, hearing) {
 // Beside the view: the note and how far off it is (in cents, against A440), H1−H2, the level, and F1 · F2 ("~" once the
 // note's above a third of F1: the harmonics are too far apart there to read the vowel's shape)
 function paintVoiceRead() {
-  const m = cur == null ? null : cur + 12 * Math.log2(A4 / 440);
+  const sung = vcCur(), m = sung == null ? null : sung + 12 * Math.log2(A4 / 440);
   setText("vcNote", m == null ? "–" : absName(m)); setText("vcTgt", absName(vcShown())); // (the names as set now)
   const c = m == null ? null : Math.round((m - Math.round(m)) * 100);
   setText("vcCents", c == null ? "" : (c > 0 ? "+" : c < 0 ? "−" : "±") + Math.abs(c) + "¢");
@@ -686,7 +699,7 @@ function paintVoiceRead() {
   $("#vcNeedle").style.opacity = c == null ? 0 : 1;
   const db = (v) => (v == null ? "–" : (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " dB");
   setText("vcH12", db(VC.h12)); setText("vcLvl", db(VC.h12 == null ? null : VC.db));
-  const high = cur != null && VC.fm && VC.fm.length && mf(cur) > VC.fm[0] / 3;
+  const high = sung != null && VC.fm && VC.fm.length && mf(sung) > VC.fm[0] / 3;
   setText("vcF12", VC.fm && VC.fm.length >= 2 ? (high ? "~" : `${Math.round(VC.fm[0])} · ${Math.round(VC.fm[1])} Hz`) : "–");
   vcTitles();
 }

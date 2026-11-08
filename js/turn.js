@@ -69,7 +69,8 @@ function tnFit(xs, ys, ws) {
 
 // One frame's harmonics, as they are (tnHarm reads them): null out of range or with too few bins for a noise floor; else
 // c (each harmonic's level, its band's power less the noise), snr (against the noise in its band), seen (clear of it by
-// TN.snr) and oct (the pitch reads an octave off, or a subharmonic of the voice: nothing about it is to be trusted).
+// TN.snr) and oct (the pitch reads an octave off, or a subharmonic of the voice: nothing about it is to be trusted); high:
+// it's off upwards, or a subharmonic (tnRead tries the octave below).
 function tnBands(db, binHz, f0) {
   if (!(f0 >= TN.fmin && f0 <= TN.fmax)) return null;
   const nb0 = db.length, K = Math.min(12, Math.floor(4000 / f0));
@@ -102,7 +103,7 @@ function tnBands(db, binHz, f0) {
   // TN.octHi of H1 and H2 as read (two, not the upper pair alone: a vowel whose F1 lifts the true H2 can leave its H5 low)
   const half = [0.5, 1.5, 2.5].map((h) => mpb(h * f0)).sort((a, b) => b - a);
   const high = !low && half[1] >= (mpb(f0) + mpb(2 * f0)) / 2 - TN.octHi;
-  return { c, snr, seen, oct: low || high };
+  return { c, snr, seen, oct: low || high, high };
 }
 // The pitch read an octave off (or a subharmonic): the voice is there, its pitch isn't to be trusted
 function tnOctave(db, binHz, f0) { const b = tnBands(db, binHz, f0); return !!b && b.oct; }
@@ -112,7 +113,24 @@ function tnOctave(db, binHz, f0) { const b = tnBands(db, binHz, f0); return !!b 
 // dB/oct tilt cancels and a sawtooth gives 0); u: the tone, a slope (dB/oct), its weights tapered towards 4 kHz; h12: H1−H2.
 function tnHarm(db, binHz, f0) {
   const bands = tnBands(db, binHz, f0);
-  if (!bands || bands.oct) return null;
+  return bands && !bands.oct ? tnHarmOf(bands, f0) : null;
+}
+// One frame's harmonics, the pitch put right where it reads an octave high. A yell's H2 can stand 10–13 dB over its H1, so
+// YIN's half period dips under its threshold first and the pitch reads an octave high (synthetic yells: 26–48% of frames,
+// all of them unread). Where tnBands finds the pitch high and the octave below reads cleanly, with its H1 and H3 (the
+// half-way places as read) clear of the noise, that octave is the voice's. Never down from a low reading, nor where H1 or
+// H3 is under the noise: a breathy whoop's frames found high stay unread (without that, 13% of them went an octave down).
+// Not tried on creak, fry or growls, whose subharmonics read high too. h: tnHarm's, at the pitch kept (or null); oct: heard
+// an octave off, its pitch not to be kept; down: the pitch kept is the octave below.
+function tnRead(db, binHz, f0) {
+  const b = tnBands(db, binHz, f0);
+  if (b && !b.oct) return { h: tnHarmOf(b, f0), oct: false, down: false };
+  const lo = b && b.high ? tnBands(db, binHz, f0 / 2) : null;
+  if (lo && !lo.oct && lo.seen[0] && lo.seen[2]) return { h: tnHarmOf(lo, f0 / 2), oct: false, down: true };
+  return { h: null, oct: !!b, down: false };
+}
+// tnHarm's reading of a frame's bands (tnBands', none of them off)
+function tnHarmOf(bands, f0) {
   const { c, seen } = bands;
   const p2 = seen[0] && seen[1] && seen[2] ? c[1] - (c[0] + 0.6309 * (c[2] - c[0])) : null;
   const xs = [], ys = [], ws = [];
@@ -418,4 +436,4 @@ function tnPass(xs, T, opts = {}) {
     maxL, maxU, first: real.length ? real[0].at : null, events: real, fL, fU };
 }
 
-if (typeof module !== "undefined") module.exports = { TN, tnHarm, tnOctave, tnRange, tnTurn, tnCross, tnF2, tnOwn, tnPrior, tnPass, tnFit, wmed, tnMed, tnStart, F1_PRIOR, VOWELS, tnSmooth, tnFits, tnTrend };
+if (typeof module !== "undefined") module.exports = { TN, tnHarm, tnRead, tnOctave, tnRange, tnTurn, tnCross, tnF2, tnOwn, tnPrior, tnPass, tnFit, wmed, tnMed, tnStart, F1_PRIOR, VOWELS, tnSmooth, tnFits, tnTrend };
