@@ -20,6 +20,9 @@ const TN = {
   // f1Read: F1–F3's Hz are shown only on a note up to this (Hz) and under a third of F1 (one frame's LPC F1 is within about
   // 60 Hz at f0 100–300 Hz, much worse from 350: Monsen & Engebretson 1983)
   f1Read: 300,
+  // downKeep: a frame that can't be read, or isn't voiced, keeps the frame before's octave (tnHold) while the line's moved
+  // less than this (st) since: shown, a yell put right doesn't flick to the octave above between its frames
+  downKeep: 1,
   // tnF2: F1's crossing within f1Span of the vowel's usual one; F2's f2Gap (F2/F1 1.3) to f2Far (2.0) above it; with
   // f2Notes read or more, and F2's crossing f2Seen under the top note read; the bandwidths tried (Hz); the fit's floor
   // (dB², about 0.3 dB rms)
@@ -134,6 +137,14 @@ function tnRead(db, binHz, f0) {
   const lo = b && b.high ? tnBands(db, binHz, f0 / 2) : null;
   if (lo && !lo.oct && lo.seen[0] && lo.seen[2]) return { h: tnHarmOf(lo, f0 / 2), oct: false, down: true };
   return { h: null, oct: !!b, down: false };
+}
+// The octave a frame's line is shown at (the Lab's note, keys and EQ). was: the frame before's {down, at} (down: put right
+// an octave down; at: its line); r: tnRead's, or null for a frame not voiced (YIN missed it, or the note's ending and the
+// line's only kept); line: the line now (MIDI, or null). A frame read says it itself; one that can't be, or isn't voiced,
+// keeps the frame before's while the line's within TN.downKeep of it; with no line, nothing's kept.
+function tnHold(was, r, line) {
+  if (line == null) return { down: false, at: null };
+  return { down: r && !r.oct ? r.down : !!was.down && was.at != null && Math.abs(line - was.at) < TN.downKeep, at: line };
 }
 // tnHarm's reading of a frame's bands (tnBands', none of them off)
 function tnHarmOf(bands, f0) {
@@ -442,4 +453,4 @@ function tnPass(xs, T, opts = {}) {
     maxL, maxU, first: real.length ? real[0].at : null, events: real, fL, fU };
 }
 
-if (typeof module !== "undefined") module.exports = { TN, tnHarm, tnRead, tnOctave, tnRange, tnTurn, tnCross, tnF2, tnOwn, tnPrior, tnPass, tnFit, wmed, tnMed, tnStart, F1_PRIOR, VOWELS, tnSmooth, tnFits, tnTrend };
+if (typeof module !== "undefined") module.exports = { TN, tnHarm, tnRead, tnHold, tnOctave, tnRange, tnTurn, tnCross, tnF2, tnOwn, tnPrior, tnPass, tnFit, wmed, tnMed, tnStart, F1_PRIOR, VOWELS, tnSmooth, tnFits, tnTrend };

@@ -14,18 +14,19 @@ const vcGet = (o, v) => (Array.isArray(o[v]) ? o[v] : []); // (to read)
 // an: the Spectrogram's and EQ's analyser (8192, smoothed); tn: Turn's own (4096, unsmoothed: a step isn't blurred, and the
 // frame rate doesn't matter); td, tdHz, tlag: its dB, the Hz a bin, how far behind now its FFT is centred (ms); fr: what's
 // been read, the last 15 s ({t, w, m, v, L, p2, c, u, h12, raw, tt}: js/turn.js; m: the line, put right where it read an
-// octave high; raw: the frame's own reading); down: the last frame's line read an octave high and was put right (tnRead;
-// downAt: the line on the frame before, voiced);
+// octave high; raw: the frame's own reading); hold: the octave the last frame's line was shown at ({down, at}: tnHold;
+// down: it read an octave high and was put right);
 // mute: till when the piano's still sounding (nothing is read); p2: P2 now, smoothed (p2At: when read); h12, db, fm, env:
 // the side's numbers and the EQ's vowel (fmAt: the note fm was last read on); filt: what the browser still does to the
-// mic's sound (vcLock; relockAt: when the mic was last opened again for the Lab, inKey: what's said of it). mode: "find" or
+// mic's sound (vcLock; inKey: what's said of it). mode: "find" or
 // "smooth"; vowel; target: Find's first note; centre: Smooth's (mine: picked, by a key or a set's breaks, not only where
 // the vowel's turn is expected); run: the step-up or the set going on; done: how the last
 // Find ended; set, sres: this set's passes (1 even, 0 a problem, −1 not read) and how each read; cur, prev: the last two
-// passes, drawn; msg: the status lines say something of their own (else what's idle is said); view: the view shown
+// passes, drawn; msg: the status lines say something of their own (else what's idle is said; "lock": the input lock's,
+// till it's lifted: paintLock); view: the view shown
 const VC = { an: null, data: null, hz: 0, h12: null, db: null, last: null, painted: 0, live: null,
-  tn: null, td: null, tdHz: 0, tlag: 43, fr: [], down: false, downAt: null, mute: 0, p2: null, p2At: 0, frAt: 0,
-  filt: [], relockAt: 0, inKey: null,
+  tn: null, td: null, tdHz: 0, tlag: 43, fr: [], hold: { down: false, at: null }, mute: 0, p2: null, p2At: 0, frAt: 0,
+  filt: [], inKey: null,
   mode: store.get("voiceMode", "find"), vowel: store.get("voiceVowel", "a"),
   target: 48, centre: null, mine: false, run: null, done: null, prev: null, cur: null, set: [], sres: [], msg: false,
   runs: vcLoad("voiceRuns"), days: vcLoad("voiceSmooth"), guide: null, view: "spec" };
@@ -83,15 +84,14 @@ function voiceFrame() {
   const hearing = !!ac && (micOn || !!testOsc);
   if (hearing) { vcAnalyser().getFloatFrequencyData(VC.data); VC.tn.getFloatFrequencyData(VC.td); }
   const voiced = hearing && cur != null && level > S.gate && micQ != null;
-  vcLock(now);
+  vcLock();
   const raw = !VC.filt.length; // (nothing of the browser's own on the sound: its harmonics, level and tone are read)
   // (r.oct: the pitch read an octave off, heard but not kept; r.down: read an octave high, as a yell's strong H2 makes it,
-  // and kept an octave down. A frame that can't be read keeps the frame before's way of taking the line while the line
-  // hasn't leapt: shown, the note doesn't flick to the octave above between frames put right)
+  // and kept an octave down. A frame that can't be read, or isn't voiced, keeps the frame before's octave while the line
+  // hasn't moved (tnHold): shown, the note doesn't flick to the octave above between frames put right)
   const r = voiced ? tnRead(VC.td, VC.tdHz, mf(cur)) : null, h = r && raw ? r.h : null;
-  VC.down = !!r && (r.oct ? VC.down && VC.downAt != null && Math.abs(cur - VC.downAt) < 1 : r.down);
-  VC.downAt = r ? cur : null;
-  const m = voiced && !r.oct ? (VC.down ? cur - 12 : cur) : null;
+  VC.hold = tnHold(VC.hold, r, cur);
+  const m = voiced && !r.oct ? (VC.hold.down ? cur - 12 : cur) : null;
   if (h) {
     if (h.h12 != null) VC.h12 = VC.h12 == null ? h.h12 : VC.h12 + (h.h12 - VC.h12) * (1 - Math.exp(-dt / 150));
     VC.db = 20 * Math.log10(level);
@@ -110,7 +110,7 @@ function voiceFrame() {
   }
   if (!hearing || !raw) VC.p2 = null;
   while (VC.fr.length && now - VC.fr[0].t > 15000) VC.fr.shift();
-  if (VC.run && VC.run.mode === "find" && vcFiltered()) { vcAbort(); vcSay(...vcLockSay()); paintTurn(); } // (Find reads only harmonics)
+  if (VC.run && VC.run.mode === "find" && vcFiltered()) { vcAbort(); vcSay(...vcLockSay(), "lock"); paintTurn(); } // (Find reads only harmonics)
   if (VC.run && !hearing) { vcAbort(); paintTurn(); } // (the mic turned off: the run's stopped, not left waiting)
   if (VC.run) (VC.run.mode === "find" ? vcFindTick : vcPassTick)(now);
   if (SV.run) { if (!hearing) scAbort(); else scTick(now, voiced, dt); } // (Scales' set: js/voice-scale.js)
@@ -120,16 +120,16 @@ function voiceFrame() {
   if (now - VC.painted > 100) { VC.painted = now; paintVoiceRead(); }
   vcKeys(vcCur());
 }
-// The note read now, as the Lab reads it: the line, an octave down where it read a yell an octave high (VC.down)
-const vcCur = () => (cur != null && VC.down ? cur - 12 : cur);
+// The note read now, as the Lab reads it: the line, an octave down where it read a yell an octave high (VC.hold)
+const vcCur = () => (cur != null && VC.hold.down ? cur - 12 : cur);
 
 // The input lock. While the Lab's shown the mic runs with nothing of the browser's own on its sound: openMic has noise
 // suppression, gain control and voice isolation off, and the echo filter's off here too (micEcho), so a mic opened with
-// it is opened again (once every 3 s at most, should that fail). What the track says it still does (getSettings) is read
-// every frame; with anything on, the harmonics, the level and the tone aren't read, only the pitch (vcFiltered: and
-// said, once no new stream's on its way). Left, the mic's opened again as the rest of the app has it (voiceHide).
-function vcLock(now) {
-  if (micOn && !micSwap && micAsked !== micEcho() && now - VC.relockAt > 3000) { VC.relockAt = now; restartMic(); }
+// it is opened again (micKeep: at once, then every 3 s should that fail). What the track says it still does
+// (getSettings) is read every frame; with anything on, the harmonics, the level and the tone aren't read, only the pitch
+// (vcFiltered: and said, once no new stream's on its way). Left, the mic's opened again as the rest of the app has it
+// (voiceHide).
+function vcLock() {
   VC.filt = micOn ? micFilters() : [];
 }
 const vcFiltered = () => micOn && !micSwap && VC.filt.length > 0;
@@ -137,8 +137,11 @@ const vcFiltered = () => micOn && !micSwap && VC.filt.length > 0;
 const vcLockSay = () => ["Mic still filtered: {what}", { what: () => VC.filt.map((k) => tr(MIC_FILTERS[k])).join(", ") },
   window.pitchroom?.desktop ? "Only pitch is read. Turn the mic off and on." : "Only pitch is read. The desktop app reads tone too.", null];
 // Under the numbers, what they're read from: that (vcLockSay), or with the mic on, a line for singers coming in through a
-// DAW (its effects and the distance to the mic move the harmonics and the level as much as the voice does)
+// DAW (its effects and the distance to the mic move the harmonics and the level as much as the voice does). Turn's
+// status, saying the lock's on, goes once it's lifted (the idle line back): the mic off, or on with nothing still on (not
+// while a new stream's only on its way: it may come filtered too).
 function paintLock() {
+  if (VC.msg === "lock" && (!micOn || (!micSwap && !VC.filt.length))) { VC.msg = false; paintTurn(); }
   const key = !micOn ? "" : vcFiltered() ? VC.filt.join() : "dry";
   if (VC.inKey === key) return;
   VC.inKey = key;
@@ -149,9 +152,9 @@ function paintLock() {
 
 // ---------- what's said ----------
 // The status line and the one under it (what to do), each English with its {placeholders}. keep: it stays till something
-// else happens; else it's what's said while idle, said again on every change (paintTurn). tone: the status in the colour
-// of what it reports, as it's marked on the canvas ("good": a turn found, a pass or a whole set even; "bad": a break; "step": a step in
-// loudness or tone), whatever your accent.
+// else happens ("lock": or the input lock's lifted, paintLock); else it's what's said while idle, said again on every
+// change (paintTurn). tone: the status in the colour of what it reports, as it's marked on the canvas ("good": a turn
+// found, a pass or a whole set even; "bad": a break; "step": a step in loudness or tone), whatever your accent.
 function vcSay(st, sv, d, dv, keep = true, tone = "") {
   say($("#vcSay"), st, sv || undefined); say($("#vcDo"), d, dv || undefined);
   if ($("#vcSay").dataset.tone !== tone) $("#vcSay").dataset.tone = tone;
@@ -195,7 +198,7 @@ function vcCue(ms, step, dur) {
   if (VC.run) VC.run.cueEnd = VC.mute;
 }
 function vcFindStart() {
-  if (vcFiltered()) { vcSay(...vcLockSay()); paintTurn(); return; } // (it reads only harmonics)
+  if (vcFiltered()) { vcSay(...vcLockSay(), "lock"); paintTurn(); return; } // (it reads only harmonics)
   VC.done = null;
   VC.run = { mode: "find", start: VC.target, notes: [], hold: null, cueEnd: 0, unread: 0 };
   vcCue([VC.target], 0, 0.6);
@@ -783,11 +786,11 @@ function vcKeys(m) {
 }
 
 
-// Shown (route): the keyboard's samples, and the keys around middle C in view; the mic without the echo filter (vcLock). A
+// Shown (route): the keyboard's samples, and the keys around middle C in view; the mic without the echo filter (micKeep). A
 // run left going when the page was left (nothing was read meanwhile) is stopped.
 function voiceShow() {
   loadSamples();
-  VC.relockAt = 0; vcLock(performance.now());
+  micKeep(performance.now(), true); vcLock(); VC.hold = { down: false, at: null };
   if (VC.run) { vcAbort(); paintTurn(); }
   if (SV.run) scAbort();
   const wrap = $("#vcKeys").parentElement, k = vcKeyEls.get(60);

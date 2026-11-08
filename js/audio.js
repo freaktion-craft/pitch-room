@@ -184,13 +184,19 @@ async function openMic(echo = micEcho()) {
   return navigator.mediaDevices.getUserMedia({ audio });
 }
 // The echo filter the mic's opened with: as set (Filter out speaker sound), but never in the Lab, whose levels and
-// harmonics it bends. micAsked: what the open mic was asked for (the Lab opens it again when that's not its own: vcLock).
+// harmonics it bends. micAsked: what the open mic was asked for (opened again when that's not the page's: micKeep).
 const micEcho = () => S.echo && view !== "voice";
 let micAsked = false;
 // Another input while the mic is on, or the echo filter on or off: the new stream goes under the analyser before the old
 // one stops, so the chip stays on and the spectrum and pitch carry on. One at a time (micSwap: the one opening); asked
 // again meanwhile, it opens once more after, as things are by then.
 let micSwap = null, micAgain = false;
+// The mic as the page has it (micEcho), from the main loop on every page: one that isn't (a reopen that failed, or one
+// opened as the page changed) is opened again, once every 3 s at most (soon: at once, as the Lab's shown)
+let micKeptAt = 0;
+function micKeep(now, soon = false) {
+  if (micOn && !micSwap && micAsked !== micEcho() && (soon || now - micKeptAt > 3000)) { micKeptAt = now; restartMic(); }
+}
 function restartMic() {
   if (micSwap) { micAgain = true; return micSwap; }
   return (micSwap = (async () => { do { micAgain = false; await micReopen(); } while (micAgain); })().finally(() => { micSwap = null; }));
@@ -198,8 +204,10 @@ function restartMic() {
 async function micReopen() {
   if (!micOn) return;
   const echo = micEcho();
-  let s;
-  try { s = await openMic(echo); } catch (e) { return; }
+  let s = null;
+  try { s = await openMic(echo); } catch (e) {}
+  if (micEcho() !== echo) micAgain = true; // (into or out of the Lab while it opened: opened once more, as the page now has it)
+  if (!s) return; // (not to be had: tried again, micKeep)
   if (!micOn) { s.getTracks().forEach((t) => t.stop()); return; } // turned off meanwhile
   const oldStream = micStream, oldNode = micNode;
   micStream = s; micAsked = echo; micNode = ac.createMediaStreamSource(s); micNode.connect(micBus); onMicEnd(s);

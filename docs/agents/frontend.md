@@ -165,7 +165,9 @@ working without it.
   clashes with `SAVED`, `SAVED_LIB`, `SAVED_UPDATE`, `WELCOME_*`, `ONBOARD_*` or `EMPTY_LIBRARY` goes undetected.
 - The mic is one stream for the whole app, opened with the browser's noise suppression, gain control and voice isolation
   off. Its echo filter follows Settings everywhere but the Lab (`micEcho`): entering or leaving the Lab opens it again
-  (`restartMic`, one at a time), and the Lab reads only pitch while `getSettings()` reports any of them on (`vcLock`).
+  (`restartMic`, one at a time, once more if the page changed while it opened). The main loop retries a mic that still
+  isn't as the page has it every 3 s (`micKeep`). The Lab reads only pitch while `getSettings()` reports any of them on
+  (`vcLock`).
   Open the mic with `openMic()`'s default unless a measurement needs it unfiltered (`measureDelay`).
 - The piano samples come from a CDN (tonejs.github.io), fonts from jsDelivr.
 - The desktop build minifies JS with terser (top-level names kept, locals mangled: don't rely on a local function's

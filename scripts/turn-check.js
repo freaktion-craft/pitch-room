@@ -2,14 +2,14 @@
 // Offline checks for js/turn.js (the Lab's Turn view): synthetic voices only, no dependencies, seeded.
 //   node scripts/turn-check.js
 // A. tnHarm (and A6, tnRead) on 4096-sample frames (48 kHz, Blackman, dB as an AnalyserNode gives them) built from known
-//    harmonic levels.
+//    harmonic levels; A7, tnHold on the frames a yell's line goes through.
 // B. tnTurn on step-ups through a source-filter model (a −12 dB/oct source × a resonance at F1, and F2 near it), with
 //    level jitter.
 // C. tnPass on siren sample streams at 30–144 frames a second, clean and with a crack, a gap, a level step or a tone step;
 //    and on sirens made as sound (a steady source through the vowel's resonances), read frame by frame as the Lab does.
 // Prints a line per check and exits 1 if any fails. If one fails, change the model or a TN constant, never one signal.
 const path = require("path");
-const { TN, tnHarm, tnRead, tnOctave, tnTurn, tnPass, tnStart, tnPrior, F1_PRIOR } = require(path.join(__dirname, "..", "js", "turn.js"));
+const { TN, tnHarm, tnRead, tnHold, tnOctave, tnTurn, tnPass, tnStart, tnPrior, F1_PRIOR } = require(path.join(__dirname, "..", "js", "turn.js"));
 
 let failed = 0;
 const check = (name, ok, info = "") => { console.log(`${ok ? "pass" : "FAIL"}  ${name}${info ? "  (" + info + ")" : ""}`); if (!ok) failed++; };
@@ -160,6 +160,18 @@ const p2Of = (c1, c2, c3) => c2 - (c1 + 0.6309 * (c3 - c1));
   check("A6 yells read at their own pitch → read as they are, every frame", kept === ny, pct(kept, ny));
   check("A6 whoops (breathy, falsetto, modal) → never moved down", moved === 0, `${pct(moved, nw)} moved; read ${pct(wRead, nw)}`);
   check("A6 anything read an octave low → never moved down", lowMoved === 0, pct(lowMoved, nLow));
+}
+// A7. tnHold, frame by frame, as the Lab shows the line: a yell put right keeps its octave through frames that can't be
+// read (oct) and frames not voiced (null: YIN missed one, or the note's ending and the line's only kept) while the line
+// stays put; a frame read cleanly says its own; the line moving TN.downKeep or more, or gone, lets go.
+{
+  const down = { h: null, oct: false, down: true }, clean = { h: null, oct: false, down: false }, oct = { h: null, oct: true, down: false };
+  const shown = (frames) => { let s = { down: false, at: null }; return frames.map(([r, line]) => { s = tnHold(s, r, line); return line == null ? "–" : +(line - (s.down ? 12 : 0)).toFixed(2); }); };
+  const held = shown([[down, 74], [null, 74], [oct, 74.05], [null, 74.1], [down, 74], [null, 74], [null, 74], [null, 74]]);
+  check("A7 a yell put right keeps its octave through unread and unvoiced frames while the line stays", held.every((m) => m !== "–" && m < 63), held.join(" "));
+  const leap = shown([[down, 74], [oct, 74 + TN.downKeep]]), gone = shown([[down, 74], [null, null], [oct, 74]]), as = shown([[down, 74], [clean, 74]]);
+  check("A7 the line moving TN.downKeep, gone, or read cleanly lets go", leap[1] === 74 + TN.downKeep && gone[2] === 74 && as[1] === 74,
+    `leap ${leap.join(" ")}; gone ${gone.join(" ")}; read ${as.join(" ")}`);
 }
 
 // ---------- B. tnTurn ----------

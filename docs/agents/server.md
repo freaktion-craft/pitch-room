@@ -11,8 +11,9 @@
   otherwise it starts `server.serve` on that free port and opens Chrome or the default browser.
 - `server.py [port]`: runs the server directly, with no install and no port scan. The desktop app runs it this way.
 - `serve(port)` binds 127.0.0.1 only. On start it calls `stems.freshen_finders()` (pip-upgrades yt-dlp once a day when
-  `PITCHROOM_DATA` is set and the Python is a venv: the desktop app, but also a scratch source run) and, if no update
-  question is pending, `stems.start_upgrades()`.
+  `PITCHROOM_DATA` is set and the Python is a venv: the desktop app, but also a scratch source run),
+  `stems.sweep_unfinished()` (removes the folders of adds cut off by quitting, below) and, if no update question is
+  pending, `stems.start_upgrades()`.
 - A source run logs to its console; the desktop app's server logs to `logs/server.log` in its data folder.
 - `_prefer_newer_vc_runtime` at the top of `server.py` is a Windows fix for Anaconda's old VC runtime. It must run before
   numpy or torch load: keep `import stems` below it and don't import numpy at the top of `server.py`.
@@ -72,16 +73,22 @@ The `id` is 12 hex characters. The docstring at the top of `stems.py` gives a pa
   render settings means deleting them.
 - `takes/<tid>.flac`, `.json`, `.pitch.json`.
 
+A folder with no `meta.json` is a song whose adding was cut off. `library()` skips it. `sweep_unfinished` removes it when
+the server starts, if it holds only what an add writes (`_ADDING_FILES`: no takes or notes) and nothing in it changed
+within the hour.
+
 ## Jobs and the queue
 
 - Jobs live in memory (`_jobs`, lost on restart). `_new_job` creates one; `_run(job, fn)` runs it in a thread.
   Kinds: separate (adding a song), install, split, lyrics, melody, key.
 - `Cancelled` is a `BaseException` raised at `_check` and `_stage` checkpoints, so `except Exception` around optional
   steps lets it through.
-- One GPU model at a time: `_work_lock`, and `_turn(job)` for an ordered queue. Call `_free_gpu()` after GPU work.
-  Opportunistic work (`get_melody`) takes the GPU only if free, else runs on the CPU.
-- Up to 2 downloads run ahead of the queue (`_download_slots`). Playlist songs lower the process priority while they
-  work (`_low_priority`).
+- One GPU model at a time: `_work_lock`, and `_turn(job)` for an ordered queue (`_in_line`, then `_held`). Call
+  `_free_gpu()` after GPU work. Opportunistic work (`get_melody`) takes the GPU only if free, else runs on the CPU.
+- A song being added is in the queue (`_line`) from its start, so songs are split in the order they were sent, and
+  every one waiting gets `ahead`. It downloads once it's among the first three songs in line (`_fetch_turn`), so at
+  most 2 (`FETCH_AHEAD`) are downloaded ahead of the one being split. One downloaded ahead stays `queued` till its turn.
+  Playlist songs lower the process priority while they work (`_low_priority`).
 - Jobs are deduped through dicts of job ids: `_lyrics_jobs` and `_split_jobs` keyed by song id, `_key_jobs` by
   (song id, semitones, speed).
 
@@ -89,7 +96,7 @@ The `id` is 12 hex characters. The docstring at the top of `stems.py` gives a pa
 
 `start_youtube` → `_pipeline` → `_lyrics_phase`:
 
-1. Download the audio (outside the queue).
+1. Join the queue, then download the audio once its turn is near (`_fetch_turn`).
 2. In its turn: decode, Demucs (`_separate`), lead vocal (`_lead_vocal`), melody, beats, key.
 3. Encode mp3s, write `meta.json` with `adding: true`. A failure deletes the folder.
 4. Background naming and covers start (`_want_lookup`).

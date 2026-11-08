@@ -405,7 +405,7 @@ function watchJob(id, kind, forSong) {
   if (pollers[id]) return;
   let skip = 0; // a song with others ahead of it in line is asked after less often (a playlist's can be many)
   pollers[id] = setInterval(async () => {
-    if (skip-- > 0) return;
+    if (skip-- > 0 && !adding.get(id)?.stopping) return; // (one being cancelled: asked at once, so its row goes as it stops)
     let j;
     try { j = await (await fetch("/api/jobs/" + id, { cache: "no-store" })).json(); } catch (e) { return; }
     if (!j.status) j = { status: "error", error: "That didn’t work.", progress: 0, stage: "" }; // the server doesn't know it any more (restarted)
@@ -431,8 +431,8 @@ function watchJob(id, kind, forSong) {
       const had = adding.get(id); // (a playlist's song: sent by its name, its link known once it's found; its candidates asked then)
       if (had && link && YT_LINK.test(link) && !had.early && !had.findAsked) { had.findAsked = true; findEarly(id, link); }
       skip = status === "queued" && ahead > 1 ? 4 : 0;
-      const was = adding.get(id), now = performance.now(); // (its time left: timed from when it started going, again from where it is if it went back)
-      const etaAt = status !== "running" ? null : !was?.etaAt || progress < was.etaAt.p ? { t: now, p: progress } : was.etaAt;
+      const was = adding.get(id), now = performance.now(); // (its time left: timed from when it started going, again from where it is if it went back or waited)
+      const etaAt = status !== "running" || waiting ? null : !was?.etaAt || progress < was.etaAt.p ? { t: now, p: progress } : was.etaAt;
       const arrive = status === "done" && !needLyrics && !needPick && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
       addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), etaAt, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError, waiting: !!waiting, needPick: !!needPick,
         done: status === "done" && !needLyrics && !needPick, ...(arrive ? { arrived: true } : {}) });
