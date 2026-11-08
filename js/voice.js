@@ -17,7 +17,7 @@ const vcGet = (o, v) => (Array.isArray(o[v]) ? o[v] : []); // (to read)
 // octave high; raw: the frame's own reading); down: the last frame's line read an octave high and was put right (tnRead;
 // downAt: the line on the frame before, voiced);
 // mute: till when the piano's still sounding (nothing is read); p2: P2 now, smoothed (p2At: when read); h12, db, fm, env:
-// the side's numbers and the EQ's vowel. mode: "find" or
+// the side's numbers and the EQ's vowel (fmAt: the note fm was last read on). mode: "find" or
 // "smooth"; vowel; target: Find's first note; centre: Smooth's (mine: picked, by a key or a set's breaks, not only where
 // the vowel's turn is expected); run: the step-up or the set going on; done: how the last
 // Find ended; set, sres: this set's passes (1 even, 0 a problem, −1 not read) and how each read; cur, prev: the last two
@@ -93,7 +93,7 @@ function voiceFrame() {
     VC.db = 20 * Math.log10(level);
     const fm = vcFormants(); // (smoothed, each formant to the one read near it)
     VC.env = fm;
-    if (fm) VC.fm = fm.f.map((v, i) => (VC.fm && VC.fm[i] != null && Math.abs(VC.fm[i] - v) < 400 ? VC.fm[i] + (v - VC.fm[i]) * 0.3 : v));
+    if (fm) { VC.fm = fm.f.map((v, i) => (VC.fm && VC.fm[i] != null && Math.abs(VC.fm[i] - v) < 400 ? VC.fm[i] + (v - VC.fm[i]) * 0.3 : v)); VC.fmAt = m; }
     VC.last = { t: now };
   } else if (VC.last && now - VC.last.t > 120) VC.h12 = VC.fm = VC.env = null;
   if (hearing && now >= VC.mute) { // (nothing while the piano sounds)
@@ -603,10 +603,10 @@ function drawSpec(now, hearing) {
 // The EQ view: the spectrum as an EQ's analyser shows it, 30 Hz to 16 kHz on an octave scale, tilted 4.5 dB an octave about
 // 1 kHz (as Pro-Q's is: a voice's falling top end drawn level), a soft curve over the harmonics' tops that falls back
 // gently. Over it the note's first four harmonics where they are, the loudest of H1–H3 lit, and "H2 stands out" once P2
-// reaches TN.p2Out (F1 on H2, as in a yell); the formants' envelope, F1–F3 as dots with their Hz, but only while the note's
-// under a third of F1 (above that the harmonics are too far apart to read the vowel, as the side's "~" says: the envelope
-// faint, unmarked); the note's name in the gutter along the bottom, with the Hz. Freeze keeps a moment, its harmonics' tops
-// dashed under what's heard now: two ways of singing one note side by side (a whoop and a yell, say).
+// reaches TN.p2Out (F1 on H2, as in a yell); the formants' envelope, F1–F3 as dots with their Hz, but only while the vowel
+// can be read (vcVowelRead; else, as the side's "~" says, the envelope faint, unmarked); the note's name in the gutter along
+// the bottom, with the Hz. Freeze keeps a moment, its harmonics' tops dashed under what's heard now: two ways of singing
+// one note side by side (a whoop and a yell, say).
 const EQ = { lo: 30, hi: 16000, top: 10, span: 80, tilt: 4.5, fall: 0.85, gutter: 22, lead: 200 }; // Hz; dB at the top; dB down to the bottom; dB/oct; per frame; px; ms
 let eqCols = null;
 function drawEq(now, hearing) {
@@ -654,7 +654,7 @@ function drawEq(now, hearing) {
     const pts = [], m = cols.length, floor = EQ.top - EQ.span + 3, cx = (c) => ((c + 0.5) / m) * W;
     for (let c = 0; c < m; c++) {
       const f = fOf(cx(c)), half = Math.max(f * 0.03, (step || 200) * 0.45);
-      const a = Math.max(0, Math.floor((xOf(f - half) / W) * m)), b = Math.min(m - 1, Math.ceil((xOf(f + half) / W) * m));
+      const a = Math.max(0, Math.floor((xOf(Math.max(1, f - half)) / W) * m)), b = Math.min(m - 1, Math.ceil((xOf(f + half) / W) * m));
       let top = true; for (let j = a; j <= b && top; j++) if (cols[j] > cols[c]) top = false;
       if (top && cols[c] > floor && (!pts.length || cx(c) - pts[pts.length - 1][0] > 3)) pts.push([cx(c), yOf(cols[c])]);
     }
@@ -696,13 +696,13 @@ function drawEq(now, hearing) {
     const lead = lv[0].length ? m3.indexOf(Math.max(...m3)) + 1 : 0;
     g.textAlign = "center";
     for (let k = 1; k <= 4 && k * f0 < EQ.hi; k++) {
-      const x = xOf(k * f0); g.strokeStyle = g.fillStyle = k === lead ? C.voice : C.muted; g.lineWidth = k === lead ? 2 : 1;
+      const x = xOf(k * f0); g.strokeStyle = k === lead ? C.voice : C.muted; g.fillStyle = k === lead ? C["voice-ink"] : C.muted; g.lineWidth = k === lead ? 2 : 1;
       g.beginPath(); g.moveTo(x, Hp); g.lineTo(x, Hp - 26); g.stroke(); g.fillText("H" + k, x, Hp - 30);
     }
-    if (VC.p2 != null && now - VC.p2At < 300 && VC.p2 >= TN.p2Out) chip(tr("H2 stands out"), xOf(2 * f0), Hp - 44, C.surface, C.voice);
+    if (VC.p2 != null && now - VC.p2At < 300 && VC.p2 >= TN.p2Out) chip(tr("H2 stands out"), xOf(2 * f0), Hp - 44, C["on-voice"], C.voice);
   }
   // the envelope, and the formants as dots on it with their Hz on a tab above (only while the vowel can be read)
-  const blur = f0 != null && fm.length > 0 && f0 > fm[0] / 3;
+  const blur = !vcVowelRead();
   if (env.length) { g.strokeStyle = C.ink; g.lineWidth = 2; g.globalAlpha = blur ? 0.35 : 1; line(env.map(([f, v]) => [xOf(f), yOf(v)])); g.stroke(); g.globalAlpha = 1; }
   let lx = -1e9, row = 0;
   if (!blur) fm.forEach((f, i) => {
@@ -711,12 +711,20 @@ function drawEq(now, hearing) {
     chip(`F${i + 1} ${Math.round(f)}`, x, y - 10 - row * 22, C.ink, C["surface-2"]);
   });
   // the note's fundamental, named on the Hz line in the gutter
-  if (f0) chip(absName(sung + 12 * Math.log2(A4 / 440)), xOf(f0), H - 2, C.surface, C.voice);
+  if (f0) chip(absName(sung + 12 * Math.log2(A4 / 440)), xOf(f0), H - 2, C["on-voice"], C.voice);
   g.textAlign = "left";
 }
 
-// Beside the view: the note and how far off it is (in cents, against A440), H1−H2, the level, and F1 · F2 ("~" once the
-// note's above a third of F1: the harmonics are too far apart there to read the vowel's shape)
+// The vowel's shape can be read off the harmonics, so F1–F3's Hz are shown (on the EQ and beside it): the note they were
+// read on (fmAt) at most TN.f1Read and under a third of F1. That F1 the lower of the one read and the vowel's own (its
+// newest turn's, else its usual one): on a higher note one frame's F1 is pulled to a harmonic, so it isn't taken at its word.
+function vcVowelRead() {
+  if (!VC.fm || !VC.fm.length || VC.fmAt == null) return false;
+  const t = vcTurns(VC.vowel).pop(), own = t ? 2 * mf(t.t) : F1_PRIOR[VC.vowel] || F1_PRIOR.a, f0 = mf(VC.fmAt);
+  return f0 <= TN.f1Read && 3 * f0 <= Math.min(VC.fm[0], own);
+}
+// Beside the view: the note and how far off it is (in cents, against A440), H1−H2, the level, and F1 · F2 ("~" where the
+// vowel can't be read: vcVowelRead)
 function paintVoiceRead() {
   const sung = vcCur(), m = sung == null ? null : sung + 12 * Math.log2(A4 / 440);
   setText("vcNote", m == null ? "–" : absName(m)); setText("vcTgt", absName(vcShown())); // (the names as set now)
@@ -726,8 +734,7 @@ function paintVoiceRead() {
   $("#vcNeedle").style.opacity = c == null ? 0 : 1;
   const db = (v) => (v == null ? "–" : (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " dB");
   setText("vcH12", db(VC.h12)); setText("vcLvl", db(VC.h12 == null ? null : VC.db));
-  const high = sung != null && VC.fm && VC.fm.length && mf(sung) > VC.fm[0] / 3;
-  setText("vcF12", VC.fm && VC.fm.length >= 2 ? (high ? "~" : `${Math.round(VC.fm[0])} · ${Math.round(VC.fm[1])} Hz`) : "–");
+  setText("vcF12", VC.fm && VC.fm.length >= 2 ? (vcVowelRead() ? `${Math.round(VC.fm[0])} · ${Math.round(VC.fm[1])} Hz` : "~") : "–");
   vcTitles();
 }
 

@@ -17,6 +17,9 @@ const TN = {
   // p2Out: from this P2 (dB) the EQ says H2 stands out, F1 on H2 as in a yell (synthetic notes: every yell, whatever the
   // source, and nothing else; the source moved P2 1–3 dB against 4.5–12 for H1−H2, so H1 the loudest names nothing)
   p2Out: 6,
+  // f1Read: F1–F3's Hz are shown only on a note up to this (Hz) and under a third of F1 (one frame's LPC F1 is within about
+  // 60 Hz at f0 100–300 Hz, much worse from 350: Monsen & Engebretson 1983)
+  f1Read: 300,
   // tnF2: F1's crossing within f1Span of the vowel's usual one; F2's f2Gap (F2/F1 1.3) to f2Far (2.0) above it; with
   // f2Notes read or more, and F2's crossing f2Seen under the top note read; the bandwidths tried (Hz); the fit's floor
   // (dB², about 0.3 dB rms)
