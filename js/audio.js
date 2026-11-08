@@ -158,37 +158,60 @@ async function micStart() {
     notice(tr("The mic doesn’t work from this address. Open the app at http://localhost instead.")); return false;
   }
   ensureCtx();
+  const echo = micEcho();
   try {
-    micStream = await openMic();
+    micStream = await openMic(echo); micAsked = echo;
   } catch (e) {
     notice(e && e.name === "NotAllowedError" ? (() => { const b = micBlocked(); return `${tr("Microphone access is blocked.")} ${tr(b.how, { link: b.link ? tr(b.link) : "" })}`; })() : tr("No microphone found. Check it’s connected, then try again."));
     return false;
   }
   stopTest();
   micNode = ac.createMediaStreamSource(micStream); micNode.connect(micBus); onMicEnd(micStream);
-  micOn = true; renderMic(); listMics(); liveCable(); return true; // (Live's cable too: the devices' names come with the mic's permission)
+  micOn = true; renderMic(); listMics(); liveCable(); // (Live's cable too: the devices' names come with the mic's permission)
+  if (micAsked !== micEcho()) restartMic(); // (into or out of the Lab while it opened: as the page now has it)
+  return true;
 }
-// The chosen input if it's still there, else the system default: an unplugged mic is no error. echo: the browser's echo
-// filter (Filter out speaker sound), as set unless asked otherwise.
-async function openMic(echo = S.echo) {
+// The chosen input if it's still there, else the system default: an unplugged mic is no error. The browser's own
+// processing off (noise suppression, gain control, and voice isolation where the browser has it: they'd move the levels
+// and the harmonics the Lab reads, and a take's sound); echo: its echo filter (micEcho, unless asked otherwise).
+async function openMic(echo = micEcho()) {
   const audio = { echoCancellation: echo, noiseSuppression: false, autoGainControl: false };
+  if (navigator.mediaDevices.getSupportedConstraints?.().voiceIsolation) audio.voiceIsolation = false;
   if (S.mic) {
     try { return await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: S.mic } } }); }
     catch (e) { if (e && e.name === "NotAllowedError") throw e; }
   }
   return navigator.mediaDevices.getUserMedia({ audio });
 }
-// Another input while the mic is on: the new stream goes under the analyser before the old one stops, so the chip
-// stays on and the spectrum and pitch carry on.
-async function restartMic() {
+// The echo filter the mic's opened with: as set (Filter out speaker sound), but never in the Lab, whose levels and
+// harmonics it bends. micAsked: what the open mic was asked for (the Lab opens it again when that's not its own: vcLock).
+const micEcho = () => S.echo && view !== "voice";
+let micAsked = false;
+// Another input while the mic is on, or the echo filter on or off: the new stream goes under the analyser before the old
+// one stops, so the chip stays on and the spectrum and pitch carry on. One at a time (micSwap: the one opening); asked
+// again meanwhile, it opens once more after, as things are by then.
+let micSwap = null, micAgain = false;
+function restartMic() {
+  if (micSwap) { micAgain = true; return micSwap; }
+  return (micSwap = (async () => { do { micAgain = false; await micReopen(); } while (micAgain); })().finally(() => { micSwap = null; }));
+}
+async function micReopen() {
   if (!micOn) return;
+  const echo = micEcho();
   let s;
-  try { s = await openMic(); } catch (e) { return; }
+  try { s = await openMic(echo); } catch (e) { return; }
   if (!micOn) { s.getTracks().forEach((t) => t.stop()); return; } // turned off meanwhile
   const oldStream = micStream, oldNode = micNode;
-  micStream = s; micNode = ac.createMediaStreamSource(s); micNode.connect(micBus); onMicEnd(s);
+  micStream = s; micAsked = echo; micNode = ac.createMediaStreamSource(s); micNode.connect(micBus); onMicEnd(s);
   oldNode.disconnect(); oldStream.getTracks().forEach((t) => t.stop());
   listMics();
+}
+// What the browser does to the mic's sound that the Lab needs off (getSettings: the track's own word; one it doesn't
+// report is taken as asked): their keys, none with no mic
+const MIC_FILTERS = { echoCancellation: "echo cancellation", noiseSuppression: "noise suppression", autoGainControl: "auto gain", voiceIsolation: "voice isolation" };
+function micFilters(stream = micStream) {
+  const s = stream?.getAudioTracks()[0]?.getSettings?.() || {};
+  return Object.keys(MIC_FILTERS).filter((k) => s[k] === true);
 }
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }

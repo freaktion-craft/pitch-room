@@ -199,6 +199,8 @@ const EMPTY_LIBRARY = false;
           <div><dt>Level</dt><dd id="vcLvl">–</dd></div>
           <div title="Formants, the vowel's shape: F1 rises as the mouth opens, F2 as the tongue comes forward. Less sure on high notes, where the harmonics are far apart"><dt>F1 · F2</dt><dd id="vcF12">–</dd></div>
         </dl>
+        <!-- what the numbers are read from: the browser still filtering the mic, or a line for singers coming in through a DAW (paintLock) -->
+        <div class="vc-in" id="vcIn" hidden><p id="vcInSay"></p><p id="vcInDo"></p></div>
         <div class="vc-vowels" id="vcVowels" role="radiogroup" aria-label="Vowel"></div>
       </aside>
     </div>
