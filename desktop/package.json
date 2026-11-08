@@ -12,7 +12,8 @@
     "code": "node scripts/prepare-code.mjs",
     "start": "electron .",
     "dist": "node scripts/prepare-code.mjs && electron-builder --publish never",
-    "release": "node scripts/prepare-code.mjs && electron-builder --publish always"
+    "release": "node scripts/prepare-code.mjs && electron-builder --publish always",
+    "release-mac": "node scripts/release-mac.mjs"
   },
   "devDependencies": {
     "electron": "45.2.2",

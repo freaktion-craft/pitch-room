@@ -103,7 +103,24 @@ Only on the owner's explicit yes.
 Verify: `gh release view vX.Y.Z --repo freaktion-craft/pitchroom-releases --json assets,isDraft,url` (or the API).
 `gh release list` shows a leftover draft first, so it can look as if the release is still a draft.
 
-**macOS and a Windows-only release:** it becomes "latest" with no `.dmg`. The site then finds no Mac file and sends
+**The Mac files, on a Mac (while Actions is unavailable):** `npm run release-mac` in `desktop/` (`node
+scripts/release-mac.mjs [vX.Y.Z]`; the latest published release by default) adds a release's Mac files to it.
+
+- It builds the tag as tagged, in a worktree of its own under the temp folder with its own `npm ci`, never this
+  checkout's `node_modules`.
+- It builds Apple silicon, then Intel. The app's Python is per processor (`fetch-python.mjs --arch`); bytecode is made
+  once.
+- It makes the two builds' update files one `latest-mac.yml`, Intel's files first, as electron-builder writes it when
+  building both at once.
+- It uploads the dmg, zip and blockmaps of each, and `latest-mac.yml`, into that release by its id, replacing ones of the
+  same name. The release stays latest or not, as it was.
+- Needs macOS, Node 22.12+, and `gh` signed in with write access to `pitchroom-releases`. An Apple silicon Mac also
+  needs Rosetta for the Intel build (`softwareupdate --install-rosetta`); an Intel Mac makes the Intel files only.
+- `--dry-run` says what it would do, on any system. `--no-upload` builds only (kept in the worktree). `--keep` keeps
+  the worktree.
+- Like the Windows build made here, it includes `icons.local.js` when this checkout has it.
+
+**macOS and a Windows-only release:** it becomes "latest" with no `.dmg` (until `release-mac` adds the Mac files). The site then finds no Mac file and sends
 Mac visitors to a releases page without one, and the macOS app's update check offers a version it can't get.
 1.0.12-1.0.14 carried the previous release's Mac files over; 1.0.15 on did not. Which practice to keep is the owner's
 call: ask.
