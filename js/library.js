@@ -598,7 +598,7 @@ function putCover(box, m, src) {
   img.addEventListener("load", () => setTimeout(put, 120)); // a page not being drawn (in the background) doesn't decode: in a moment after it's loaded
   return true;
 }
-const coverSrc = (m, small) => `/library/${m.id}/${small && m.cover.thumb ? `cover-${m.cover.thumb}` : "cover"}.jpg?v=${m.cover.at}`;
+const coverSrc = (m, small) => (!m.cover ? "" : `/library/${m.id}/${small && m.cover.thumb ? `cover-${m.cover.thumb}` : "cover"}.jpg?v=${m.cover.at}`); // (none yet: "", and putCover puts nothing)
 function paintCover(tile, m) {
   if (!putCover(tile, m, coverSrc(m, true))) return; // the small one: as sharp at 48 px, and decoded in no time
   tile.dataset.full = coverSrc(m, false); // up close (showCover), the whole of it
