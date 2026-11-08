@@ -320,7 +320,7 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
 .crumb[aria-current] { color: var(--ink); } /* where you are: only its colour differs */
 .crumb-sep { color: var(--faint); }
 .bb-acts { display: flex; align-items: center; gap: var(--space-2); } /* the song's own: Download (what you hear, an MP3), then Practice */
-.lib-head { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-bottom: var(--space-4); } /* 28 px to what's next (New, or the list) with the group's 12; search and Add song together at the right */
+.lib-head { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-bottom: var(--space-4); } /* 28 px to what's next (New, Continue practising, or the list) with the group's 12; search and Add song together at the right */
 /* Search, heading the list in place of a "Library" that said nothing: the songs whose title or artist has every word
    typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
    to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. At the
@@ -422,7 +422,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 /* folding away (shutNew), its contents fading first */
 .lib-new.shut > * { opacity: 0; translate: 0 -8px; }
 /* opening out (openNew): evenly, not all at once (its contents come in meanwhile) */
-.lib-new.opening, .lib-new.opening + #sLib { transition-duration: 440ms; transition-timing-function: cubic-bezier(0.45, 0, 0.2, 1); }
+.lib-new.opening, .lib-new.opening ~ :is(#sLib, #sCont) { transition-duration: 440ms; transition-timing-function: cubic-bezier(0.45, 0, 0.2, 1); } /* (~: Continue practising between them) */
 /* while it's pulled back (pullUp): a ring in the middle of the search's line, over the room there, so nothing moves */
 .lib-head { position: relative; }
 .lib-title { margin: 0 auto 0 0; font-weight: var(--weight-regular); } /* the list's name at the left, the rest at the right: as the
@@ -467,8 +467,8 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .ln-pull.on { opacity: 1; }
 .ln-pull .ring { width: var(--icon-lg); height: var(--icon-lg); transform: rotate(-90deg); }
 .ln-pull .ring circle + circle { stroke: var(--ink); }
-#sLib { transition: margin-top 320ms var(--ease); } /* up into the gap New leaves as it folds */
-@media (prefers-reduced-motion: reduce) { .lib-new, .lib-new.opening, #sLib, .lib-new.opening + #sLib { transition: none; } }
+:is(#sLib, #sCont) { transition: margin-top 320ms var(--ease); } /* up into the gap New leaves as it folds (Continue practising, when it's under New) */
+@media (prefers-reduced-motion: reduce) { .lib-new, .lib-new.opening, :is(#sLib, #sCont), .lib-new.opening ~ :is(#sLib, #sCont) { transition: none; } }
 .ln-head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .ln-head h2 { margin: 0; } /* a heading in full, like Takes', so the new songs stand out from the list */
 .ln-n { margin-left: var(--space-1); color: var(--muted); font-variant-numeric: tabular-nums; } /* how many */
@@ -492,6 +492,43 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .ln-card b, .ln-card small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ln-card b { font-weight: var(--weight-medium); font-size: var(--text-md); line-height: 20px; }
 .ln-card small { color: var(--muted); font-size: var(--text-sm); line-height: 18px; }
+/* Continue practising (paintCont): the three songs last practised, under New and over the list, going up under the
+   search's line as New does (z-index 3, as .lib-new; paintFade cuts it at the search's line). Spaced by what's seen:
+   its heading 8 px over the first row, so the heading's text is as far over the first cover as the column heads' over
+   the list's (31 px, 30); no margin under it, its last row's 16 px under the cover and the group's 12 putting what's
+   next 28 px down, as under the search's line (.lib-head) */
+.lib-cont { position: relative; z-index: 3; display: grid; gap: var(--space-2); }
+.lc-head { display: flex; align-items: center; min-height: var(--space-8); }
+.lc-head h2 { margin: 0; }
+/* its rows as the list's (#sLib .row), flat on the page: 12 px past its edges for a hover fill, the cover (the list's
+   own rules, 48 px) and the title where the list has them */
+.lc-list { display: grid; margin-inline: calc(var(--space-3) * -1); }
+/* (the title keeps 128 px at least: Practice saying what it's doing, a long line, shortens with "…" rather than
+   pushing it out) */
+.lc-item { display: grid; grid-template-columns: auto minmax(min(calc(var(--space-16) * 2), 100%), 1fr) minmax(0, auto); align-items: center; column-gap: var(--space-4); padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-md); cursor: pointer; transition: background-color var(--duration-fast); }
+.lc-item:hover { background: var(--fill); }
+:is(.lc-item.pending, .lc-item.pending a) { cursor: not-allowed; }
+.lc-item.pending:hover { background: none; }
+/* its song: title and artist on one line (a long title takes the artist's room first), when it was practised under them */
+.lc-item > .song { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); align-items: baseline; column-gap: var(--space-2); row-gap: var(--space-half); }
+.lc-item .song a { display: block; min-width: 0; }
+.lc-item .song :is(b, small) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-item .song b { display: block; line-height: 20px; } /* a block, as the list's: its 20 px line alone (not its link's 24), and cut short with "…" */
+.lc-item > .song > small { font-size: var(--text-sm); line-height: 20px; color: var(--muted); }
+.lc-item .song small:empty { display: none; }
+.lc-line { grid-column: 1 / -1; min-height: 1lh; font-size: var(--text-xs); line-height: 18px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-line .yours { color: var(--voice-ink); } /* your key and tempo, as the Studio's changed tempo is */
+/* Practice, shown with its row's hover as the list's ⋮ is, or reached with Tab; and while it says what it's doing
+   (singSong: aria-busy) or why it couldn't (.said), pointed at or not; always on a touch screen. None on a song whose
+   update's still to come (it couldn't open) */
+.lc-sing { min-width: 0; max-width: 100%; white-space: nowrap; opacity: 0; transition: opacity var(--duration-fast), background-color var(--duration-fast), color var(--duration-fast); }
+.lc-sing .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+:is(.lc-item:hover .lc-sing, .lc-sing:focus-visible, .lc-sing.said, .lc-sing[aria-busy="true"]) { opacity: 1; }
+.lc-sing[aria-busy="true"] { color: var(--muted); pointer-events: auto; cursor: progress; }
+.lc-item.pending .lc-sing { visibility: hidden; }
+@media (hover: none) { .lc-sing { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { :is(.lc-item, .lc-sing) { transition: none; } }
 /* The list: flat, nothing behind it or between songs. It reaches 12 px past the page's edges, so a song's hover fill
    has room round it, while what's in the rows keeps to the edges. */
 #sLib { margin-inline: calc(var(--space-3) * -1); background: none; box-shadow: none; border-radius: 0; }
@@ -541,24 +578,24 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
   #sLib .row, #sLib .lib-cols { grid-template-columns: 48px minmax(0, 1fr) 76px; }
   #sLib .wide, #sLib .lib-cols .sort.wide { display: none; } /* the heads too, over their own display */
 }
-#sLib .cover { position: relative; width: 48px; height: 48px; border-radius: var(--radius-sm); overflow: hidden; background: var(--fill);
+:is(#sLib, #sContList) .cover { position: relative; width: 48px; height: 48px; border-radius: var(--radius-sm); overflow: hidden; background: var(--fill);
   background-size: cover; } /* its blur (putCover) stretched over it until the cover's in */
-#sLib .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 0.25px var(--fg-30); } /* a fine stroke round it */
-#sLib .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-slow); }
-#sLib .cover img.in { opacity: 1; }
+:is(#sLib, #sContList) .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 0.25px var(--fg-30); } /* a fine stroke round it */
+:is(#sLib, #sContList) .cover img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-slow); }
+:is(#sLib, #sContList) .cover img.in { opacity: 1; }
 /* being brought up to date (paintUpgrade): the picture dimmed, a ring of how far it's got over its middle */
-#sLib .cover.upgrading img.in { filter: brightness(0.38) saturate(0.6); transition: filter var(--duration-slow); } /* dark enough, any cover, for the ring to show */
-#sLib .cover .ring { position: absolute; inset: 0; width: var(--icon-lg); height: var(--icon-lg); margin: auto; transform: rotate(-90deg); filter: drop-shadow(0 0 2px oklch(0 0 0 / 0.6)); }
-#sLib .cover .ring circle { stroke-width: 2.5; }
+:is(#sLib, #sContList) .cover.upgrading img.in { filter: brightness(0.38) saturate(0.6); transition: filter var(--duration-slow); } /* dark enough, any cover, for the ring to show */
+:is(#sLib, #sContList) .cover .ring { position: absolute; inset: 0; width: var(--icon-lg); height: var(--icon-lg); margin: auto; transform: rotate(-90deg); filter: drop-shadow(0 0 2px oklch(0 0 0 / 0.6)); }
+:is(#sLib, #sContList) .cover .ring circle { stroke-width: 2.5; }
 /* its update's still to come (paintPending): not to be opened till it's done, the cursor saying so */
 #sLib .row.pending, #sLib .row.pending a, .ln-card.pending { cursor: not-allowed; }
 #sLib .row.pending:hover { background: none; }
 .ln-card.pending .cover img { filter: brightness(0.38) saturate(0.6); }
-#sLib .cover .ring circle:first-child { stroke: var(--on-media-dim); }
-#sLib .cover .ring circle + circle { stroke: var(--on-media); transition: stroke-dasharray var(--duration-slower) var(--ease); }
-#sLib .cover img.now { transition: none; }
-#sLib .cover[role="button"] { cursor: pointer; }
-#sLib .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+:is(#sLib, #sContList) .cover .ring circle:first-child { stroke: var(--on-media-dim); }
+:is(#sLib, #sContList) .cover .ring circle + circle { stroke: var(--on-media); transition: stroke-dasharray var(--duration-slower) var(--ease); }
+:is(#sLib, #sContList) .cover img.now { transition: none; }
+:is(#sLib, #sContList) .cover[role="button"] { cursor: pointer; }
+:is(#sLib, #sContList) .cover[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 /* A cover, pressed: it flies up from the list to the middle of the page (.cv-fly) and faces you there. As the pointer
    comes near it leans a little (.cv-card), pressed where the pointer is, like a card held in the hand; a light from
    the upper left gleams off it where the tilt puts the light's reflection, and a sheen slides across as it turns. A

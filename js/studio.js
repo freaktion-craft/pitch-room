@@ -16,6 +16,7 @@ async function openSong(m) {
   closeSong();
   ensureCtx();
   P.song = m; P.offset = 0; P.ph = null; labelKeys();
+  noteSong(m.id, "o"); // (the library's Continue practising asks its takes again)
   $("#pSing").hidden = !m.stems.includes("vocals");
   paintCrumbs();
   keyOf(m).then(() => { if (P.song === m) paintKey(); });
@@ -119,6 +120,7 @@ const fadeIn = (g, at, to = 1) => { g.setValueAtTime(0, at); g.linearRampToValue
 const fadeOut = (g, now) => { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + FADE); };
 function playSong() {
   if (!P.song || !Object.keys(P.buffers).length || songBusy()) return;
+  if (view === "practice") noteSong(P.song.id, "p"); // (practised: the library's Continue practising)
   ensureCtx();
   listenStop(); // a take that's playing gives way to the song
   if (P.offset >= songDur() - 0.05) P.offset = 0;

@@ -284,6 +284,7 @@ function reveal(at, nameThere = false) {
     $("#sNew").querySelectorAll(".ln-card").forEach((c, i) => rise(c, t + 60 + Math.min(i, 8) * 50, 6, 6));
     t += 90;
   }
+  if (!$("#sCont").hidden) { rise($("#sCont .lc-head"), t); rise($("#sContList"), t + 60, 6, 6); t += 90; } // Continue practising's heading, then its songs
   rise($("#sLib .lib-cols"), t); // the column heads on their own: they're sticky, and one in a rising list isn't drawn till it's risen, then shows at once
   const items = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums").querySelectorAll(".al-card") : $("#sLib").querySelectorAll(".row, .lib-group, .al-bar");
   [...items].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6)); // (the rows, the Artist view's headings with them, or the Album view's cards)
