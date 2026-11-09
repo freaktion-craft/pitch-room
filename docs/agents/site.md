@@ -1,7 +1,8 @@
 # The download page (pitchroom.dev)
 
-`site/index.html` is one static file, plus `site/favicon.svg` and `site/img/installer-icon.png`. No build step. Fonts
-(Pretendard, Geist Serif) load from cdn.jsdelivr.net.
+`site/index.html` is one static file, plus `site/favicon.svg`, `site/img/installer-icon.png` and `site/img/og.png`
+(the link preview: one 28 px line at its top left on the page's dark, 1200 × 630, named in the `og:` tags). No build
+step. Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
 
 ## What it does
 
