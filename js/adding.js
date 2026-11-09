@@ -22,17 +22,22 @@ function pixBar() {
   }
   return bar;
 }
-// the blocks newly filled grow in one after another (from nothing to their size), not all at once: a step apart, the
-// whole lot within PX_GROW ms however many there are
+// the blocks newly filled turn from gray to the accent one after another (a small pop as each turns), not all at once:
+// a step apart, the whole lot within PX_GROW ms however many there are. Each stays gray till its turn (never empty)
 const PX_STEP = 18, PX_GROW = 700;
 function paintPix(bar, p, going, paused) { // (paused: stopped till it's told something: its next block blinks orange, the rest as it was)
   const n = Math.round(Math.max(0, Math.min(1, p)) * PX_COLS * PX_ROWS), was = +(bar.dataset.n || 0), cells = bar.children;
+  const turning = n > was && !stillMotion() && bar.isConnected;
   bar.dataset.n = n; bar.classList.toggle("going", !!going); bar.classList.toggle("paused", !!paused); // (going: being worked on; waiting its turn, it's still: no wave, no blink)
   [...cells].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", (going || paused) && k === n); });
-  if (n > was && !stillMotion()) {
+  if (turning) {
+    const cs = getComputedStyle(bar), gray = cs.getPropertyValue("--fill").trim(), lit = cs.getPropertyValue("--voice").trim(); // (the tokens, not a cell's colour: that may be mid-blink or mid-wave)
     const step = Math.min(PX_STEP, PX_GROW / (n - was));
-    for (let k = was; k < n; k++) cells[k].animate([{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1.25)", opacity: 1, offset: 0.6 }, { transform: "none", opacity: 1 }],
-      { duration: 280, delay: (k - was) * step, easing: "ease-out", fill: "backwards" });
+    for (let k = was; k < n; k++) {
+      const c = cells[k]; c.style.transition = "none"; // (the CSS fade would show the accent at once, over the wait)
+      c.animate([{ backgroundColor: gray, transform: "none" }, { backgroundColor: lit, transform: "scale(1.25)", offset: 0.5 }, { backgroundColor: lit, transform: "none" }],
+        { duration: 280, delay: (k - was) * step, easing: "ease-out", fill: "backwards" }).finished.then(() => (c.style.transition = ""), () => (c.style.transition = ""));
+    }
   }
   bar.setAttribute("aria-valuenow", Math.round(p * 100));
 }

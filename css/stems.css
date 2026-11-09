@@ -99,7 +99,7 @@
 /* a song's progress in pixels (pixBar): 3 rows, filled a column at a time from the left; the next one blinking while it goes */
 .px { display: grid; grid-template-rows: repeat(5, auto); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
 .px i { aspect-ratio: 1; border-radius: 1px; background: var(--fill); transition: background-color var(--duration-base); }
-.px i.on { background: var(--ink); }
+.px i.on { background: var(--voice); } /* done: the accent (paintPix turns each from gray in its turn) */
 .px i.next { animation: px-blink 1s steps(1, end) infinite; }
 /* the empty ones while it's going: a faint glow passing over them on the diagonal, like a wave (--d: column + row) */
 .px.going i:not(.on):not(.next) { animation: px-wave 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * 40ms); } /* (only while it's being worked on: paintPix) */
@@ -107,7 +107,7 @@
 @media (prefers-reduced-motion: reduce) { .px i { animation: none !important; } }
 @keyframes px-blink { 50% { background: var(--fg-30); } }
 /* stopped for its lyrics (none found, or finding them failed): orange where it stopped, and the way to paste them */
-/* paused (paintPix's paused: wanting its lyrics): the bar as it was, white and gray, its next block alone blinking orange */
+/* paused (paintPix's paused: wanting its lyrics): the bar as it was, accent and gray, its next block alone blinking orange */
 .px.paused i.next { animation: px-pause 1s steps(1, end) infinite; }
 @keyframes px-pause { 0% { background: var(--orange); } 50% { background: var(--fill); } }
 .job.need .top .st { color: var(--orange); white-space: normal; }
