@@ -163,10 +163,11 @@ function createWindow() {
     width: b.width || Math.min(room.width, 1520), height: b.height || Math.min(room.height, 960), x: b.x, y: b.y,
     title: app.name, backgroundColor: BG[shade()], show: false, autoHideMenuBar: true,
     accentColor: BG[shade()], // Windows 11: its edge the page's own colour (a pale line, or a dark one, round the window otherwise)
-    // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css)
+    // macOS: no title bar, the window's buttons alone in the corner above the page, which stays where it is (html.desktop-mac, base.css),
+    // in from the window's edge as far as the page is (its 24 px, .app): the red button's left edge on the name's
     // Windows: no title bar of the system's either, its three buttons drawn over the page's top right corner, on the
     // page, in its ink, as tall as the strip along the top that moves the window (html.desktop-win, base.css)
-    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" }
+    ...(process.platform === "darwin" ? { titleBarStyle: "hidden", trafficLightPosition: { x: 24, y: 9 } } // (y: about where macOS has them)
       : win32 ? { titleBarStyle: "hidden", titleBarOverlay: { color: "#00000000", symbolColor: SYMBOL[shade()], height: TITLEBAR } } : {}), // (clear: on what's there, the first steps' picture too)
     // DevTools in development only: a released app has no way into its page
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, devTools: !app.isPackaged },
