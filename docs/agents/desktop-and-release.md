@@ -19,7 +19,7 @@ Windows and macOS only.
   - Asks before quitting while jobs or an install are running.
   - Self-update (Windows, packaged, not WIP): `updateFirst` runs in the splash before the server starts and downloads
     the whole installer, then `standIn` shows a PowerShell stand-in splash (`update-splash.ps1`) while the installer
-    runs. macOS and dev runs get a "newer version" dialog that opens the release page (`checkUpdates`).
+    runs. macOS and dev runs get a "newer version" dialog that opens pitchroom.dev (`checkUpdates`).
   - The automatic update check runs 8 s after start on builds that don't self-update (and not WIP). "Check for
     Updates…" (File menu on Windows, the app menu on macOS) runs it by hand on every build.
   - Menu: Help → Show Log, Third-Party Notices, Open Data Folder, Pitchroom Releases.
