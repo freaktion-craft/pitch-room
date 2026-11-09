@@ -388,8 +388,9 @@ html.desktop-mac #jobsPop { --drawer-top: var(--space-6); --head-top: calc(var(-
    (an opacity on the box would cut the blurs off from what's behind it). */
 #listFade, #listFadeTop { position: fixed; left: 0; right: 0; z-index: 5; height: 0; pointer-events: none; --dir: to bottom; } /* height: paintFade */
 #listFade { bottom: 0; }
-/* and the same under the library's pinned top, the other way up, while rows have gone under it */
-#listFadeTop { top: var(--mast, 0px); z-index: 3; --dir: to top; }
+/* and the same under the library's pinned top, the other way up, while rows have gone under it (or Continue practising
+   under the search's line, paintFade): over the band and the sections going up (3), under the pinned parts (4, later) */
+#listFadeTop { top: var(--mast, 0px); z-index: 4; --dir: to top; }
 :is(#listFade, #listFadeTop) > * { position: absolute; inset: 0; opacity: 0; transition: opacity var(--duration-base); }
 :is(#listFade, #listFadeTop).on > * { opacity: 1; }
 :is(#listFade, #listFadeTop).now > * { transition: none; }
