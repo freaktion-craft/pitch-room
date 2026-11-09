@@ -1,19 +1,29 @@
 "use strict";
 // The Lab's Scales view: the piano plays a warm-up pattern from the start note (js/scale.js's SC_PATS), then you sing it
-// back on the vowel picked beside it, and each note is judged in cents (scJudge). Clean, the pattern moves up a semitone;
+// back on the vowel picked beside it, or a lip or tongue trill, and each note is judged in cents (scJudge). Clean, the
+// pattern moves up a semitone;
 // not, the same key once more, then back down to the start (scStep): as a teacher runs scales at the piano. Call and
 // response: nothing's read while the piano sounds (VC.mute, as Turn's cues), so a note on pitch can only be the singer's.
 // The vowel's turn, where Turn has found one, is drawn across the pattern. The measures are js/scale.js's; this is the page.
 
 // Kept: voiceScales ({v: 1, [pattern]: rows}, a row a day: [yyyymmdd, notes judged, good, the day's highest clean top (the
-// key sung) or null], sixty a pattern); voiceScalePat; voiceScaleStart (only once the singer sets it).
-// pat: the pattern; start: its first key; run: the set going on; last: the key last judged ({N, res, xs, pat}), drawn;
-// keys: this set's results, and flip: where it turned round (the strip by Go); best: the pattern's highest clean top, as
-// the set began; o: the octave last sung (12 from the piano, or 0); msg: the lines say something of their own; at: the
-// last frame (a gap: the page was hidden)
-const SV = { pat: "p3", start: 48, data: vcLoad("voiceScales"), run: null, last: null, keys: [], flip: -1, best: null, o: 0, msg: false, at: 0 };
+// key sung) or null], sixty a pattern); voiceScalePat; voiceScaleStart (only once the singer sets it); voiceScaleOn.
+// pat: the pattern; start: its first key; on: what it's sung on ("" the vowel, else a trill's: SC_ON); run: the set going
+// on; last: the key last judged ({N, res, xs, pat}), drawn; keys: this set's results, and flip: where it turned round (the
+// strip by Go); best: the pattern's highest clean top, as the set began; o: the octave last sung (12 from the piano, or
+// 0); msg: the lines say something of their own; at: the last frame (a gap: the page was hidden)
+const SV = { pat: "p3", start: 48, on: "", data: vcLoad("voiceScales"), run: null, last: null, keys: [], flip: -1, best: null, o: 0, msg: false, at: 0 };
+// Sung on beside the vowels, in Scales only: a trill's pitch is read as a vowel's, but it has no vowel, so no turn
+const SC_ON = [["lip", "lip trill"], ["tongue", "tongue trill"]];
+const SC_GRPS = [["up", "Up"], ["down", "Down"], ["leap", "Leaps"]];
 
 const scPat = () => SC_PATS[SV.pat];
+// what it's sung on, said: the vowel ("on “ah”") or the trill ("on a lip trill"), in the language now
+function scOnSay(listen) {
+  const t = SC_ON.find(([k]) => k === SV.on);
+  if (!t) return [listen ? "Listen, then sing it back on “{v}”." : "Sing it back on “{v}”.", { v: vcV() }];
+  return [listen ? "Listen, then sing it back on a {v}." : "Sing it back on a {v}.", { v: () => tr(t[1]) }];
+}
 const scRows = (p) => vcGet(SV.data, p).filter((r) => Array.isArray(r) && r.length >= 3 && r.slice(0, 3).every(Number.isFinite));
 function scBest(p) { let b = null; for (const r of scRows(p)) if (Number.isFinite(r[3]) && (b == null || r[3] > b)) b = r[3]; return b; }
 function scDayRow(p) {
@@ -29,8 +39,9 @@ function scDay(res) {
   store.set("voiceScales", SV.data);
 }
 const scClamp = (m) => Math.max(KEY_LO, Math.min(KEY_HI - scSpan(scPat()), Math.round(m)));
-// the vowel's newest turn (a key), or null
-const scTurnT = () => { const t = vcTurns(VC.vowel).pop(); return t ? t.t : null; };
+// the vowel's newest turn, or null (none, or on a trill); its key
+const scTurn = () => (SV.on ? null : vcTurns(VC.vowel).pop() || null);
+const scTurnT = () => { const t = scTurn(); return t ? t.t : null; };
 // the start with none set: the first key under the vowel's turn, so every climb crosses it; else Find's floor
 const scDefault = () => { const t = scTurnT(); return scClamp(t != null ? Math.round(t) - scSpan(scPat()) - 3 : vcStored()); };
 function scSetStart(m) { SV.start = scClamp(m); store.set("voiceScaleStart", SV.start); SV.last = null; SV.msg = false; vcGuide(); paintScale(); }
@@ -41,8 +52,10 @@ function scSetPat(p) {
   SV.last = null; SV.keys = []; SV.flip = -1; SV.msg = false;
   vcGuide(); paintScale();
 }
-// another vowel (vcSetVowel): a set going on carries on (from the next call); a start not set follows the vowel's turn
+// another vowel (vcSetVowel) or trill: a set going on carries on (from the next call); a start not set follows the
+// vowel's turn
 function scVowel() { if (!SV.run && !Number.isFinite(store.get("voiceScaleStart", null))) { SV.start = scDefault(); vcGuide(); } paintScale(); }
+function scSetOn(on) { SV.on = on; store.set("voiceScaleOn", on); paintTurn(); scVowel(); }
 
 // ---------- what's said ----------
 // The status line and the one under it, as Turn's (vcSay): keep, or what's said while idle; tone, the status's colour
@@ -55,7 +68,7 @@ function scSay(st, sv, d, dv, keep = true, tone = "") {
 function scIdle() {
   const rows = scRows(SV.pat), r = rows[rows.length - 1], best = scBest(SV.pat), p = r && r[1] ? Math.round((100 * r[2]) / r[1]) : null;
   const st = best != null && p != null ? ["Top {note} · last time {p}%", { note: absName(best), p }] : p != null ? ["Last time {p}%", { p }] : ["From {note}", { note: absName(SV.start) }];
-  scSay(st[0], st[1], "Listen, then sing it back on “{v}”.", { v: vcV() }, false);
+  scSay(st[0], st[1], ...scOnSay(true), false);
 }
 // A key's lines: [status, its vars, what to do, its vars, tone]
 function scWords(res) {
@@ -84,7 +97,7 @@ function scGo() {
 function scStart() {
   SV.best = scBest(SV.pat); SV.keys = []; SV.flip = -1; SV.last = null;
   SV.run = { pat: SV.pat, step: { root: SV.start, dir: 1, retried: false, unread: 0, start: SV.start }, N: null, beat: 0, phase: "call",
-    callAt: 0, waitFrom: 0, t0: 0, last: 0, next: 0, along: 0, vAt: null, first: true, early: false, peakAt: null, o0: null, o: SV.o,
+    callAt: 0, waitFrom: 0, t0: 0, last: 0, next: 0, along: 0, vAt: null, first: true, early: false, peakAt: null, tops: 0, onTop: false, o0: null, o: SV.o,
     status: null, advice: null, voices: [], judged: 0, good: 0, top: null, tz: { k: 0, n: 0 }, rs: { k: 0, n: 0 } };
   scCall();
 }
@@ -94,7 +107,7 @@ function scCall() {
   R.N = p.st.map((s) => R.step.root + s); R.beat = p.beat;
   R.voices = R.N.map((m, j) => playKey(m, j === K - 1 ? 2 * p.beat : 0.9 * p.beat, j * p.beat));
   VC.mute = now + scCallLen(p) * 1000 + TN.mute;
-  R.phase = "call"; R.callAt = now; R.along = 0; R.vAt = null; R.first = true; R.early = false; R.peakAt = null; R.o0 = null; SV.at = now;
+  R.phase = "call"; R.callAt = now; R.along = 0; R.vAt = null; R.first = true; R.early = false; R.peakAt = null; R.tops = 0; R.onTop = false; R.o0 = null; SV.at = now;
   vcGuide();
   const st = R.status || ["From {note}", { note: absName(R.step.root) }, ""], a = R.advice;
   scSay(st[0], st[1], a ? a[0] : "Listen.", a ? a[1] : null, true, st[2]);
@@ -102,7 +115,8 @@ function scCall() {
 }
 // A frame of the set (voiceFrame). call: till the piano's died away (voice heard meanwhile: sung along); wait: for the
 // response's start (TN.wait at most; voiced as reading began, and begun with it: came in early); sing: till the last
-// note's been held SC.lastHold ms, all of it after the top was reached, or SC.endGap ms of nothing voiced, or the cap;
+// note's been held SC.lastHold ms, all of it after the top was reached (as often as the pattern reaches it), or
+// SC.endGap ms of nothing voiced, or the cap;
 // rest: then the next key. A gap in the frames (the page hidden) stops it.
 function scTick(now, voiced, dt) {
   const R = SV.run;
@@ -110,12 +124,12 @@ function scTick(now, voiced, dt) {
   SV.at = now;
   if (R.phase === "call") {
     if (voiced) { R.along += dt; R.vAt = now; }
-    if (now >= VC.mute) { R.phase = "wait"; R.waitFrom = now; say($("#scDo"), "Sing it back on “{v}”.", { v: vcV() }); vcTitles(); }
+    if (now >= VC.mute) { R.phase = "wait"; R.waitFrom = now; say($("#scDo"), ...scOnSay(false)); vcTitles(); }
   } else if (R.phase === "wait") {
     const t0 = scOnset(VC.fr, R.waitFrom);
     if (t0 != null) {
       R.early = R.first && R.vAt != null && R.waitFrom - R.vAt <= SC.early && t0 - R.waitFrom <= SC.early;
-      R.t0 = t0; R.last = now; R.phase = "sing"; R.peakAt = null; R.o0 = null;
+      R.t0 = t0; R.last = now; R.phase = "sing"; R.peakAt = null; R.tops = 0; R.onTop = false; R.o0 = null;
     } else if (now - R.waitFrom > TN.wait) {
       if (R.along >= SC.along) scQuit("Sang with the piano", "Sing after it, not with it.");
       else scQuit("Didn’t hear you", "Press Start when you’re ready.");
@@ -128,8 +142,14 @@ function scTick(now, voiced, dt) {
       const w = wmed(VC.fr, "m", R.t0, R.t0 + 250);
       R.o0 = 12 * Math.max(-1, Math.min(1, Math.round((w.v - R.N[0]) / 12)));
     }
-    const o = R.o0 ?? R.o, K = R.N.length, cap = Math.max(SC.capMin, SC.capX * scCallLen(SC_PATS[R.pat]) * 1000);
-    if (R.peakAt == null && R.o0 != null && scHeld(VC.fr, now, Math.max(...R.N) + o, 150)) R.peakAt = now;
+    const o = R.o0 ?? R.o, K = R.N.length, cap = scCap(SC_PATS[R.pat]);
+    // the top reached as often as the pattern reaches it (and left between: an alternation's, where the last note is
+    // sung, and could be held, before the end)
+    const tm = Math.max(...R.N) + o, tt = scTopTol(R.N);
+    if (R.peakAt == null && R.o0 != null) {
+      if (!R.onTop && scHeld(VC.fr, now, tm, 150, tt)) { R.onTop = true; if (++R.tops >= scTops(SC_PATS[R.pat])) R.peakAt = now; }
+      else if (R.onTop && scAway(VC.fr, now, tm, 150, tt)) R.onTop = false;
+    }
     const why = R.peakAt != null && now - R.peakAt >= SC.lastHold && scHeld(VC.fr, now, R.N[K - 1] + o, SC.lastHold) ? "hold"
       : now - R.last >= SC.endGap ? "gap" : now - R.t0 >= cap ? "cap" : null;
     if (why) scKeyDone(now, why);
@@ -140,7 +160,7 @@ function scTick(now, voiced, dt) {
 function scKeyDone(now, why) {
   const R = SV.run, xs = VC.fr.filter((s) => s.t >= R.t0 - 100 && s.t <= now);
   const res = scJudge(xs, R.N, { turn: scTurnT(), early: R.early });
-  if (scFalse(res, why)) { R.phase = "wait"; R.waitFrom = now; R.first = R.early = false; R.peakAt = R.o0 = null; return; }
+  if (scFalse(res, why)) { R.phase = "wait"; R.waitFrom = now; R.first = R.early = false; R.peakAt = R.o0 = null; R.tops = 0; R.onTop = false; return; }
   if (res.ok >= 0) {
     R.o = SV.o = res.o; scDay(res);
     R.judged += res.judged; R.good += res.good;
@@ -196,7 +216,7 @@ function scAbort() {
   if (!SV.run) return;
   scHush(SV.run);
   if (SV.run.judged) scSetEnd();
-  else { SV.run = null; scSay("Stopped", null, "Listen, then sing it back on “{v}”.", { v: vcV() }); vcGuide(); }
+  else { SV.run = null; scSay("Stopped", null, ...scOnSay(true)); vcGuide(); }
   paintScale();
 }
 // the call's notes still sounding or queued, faded out in a few tens of ms
@@ -216,7 +236,10 @@ function scNow(now) {
 
 // ---------- drawing ----------
 function paintScale() {
-  for (const b of $("#scPat").children) b.setAttribute("aria-checked", String(b.dataset.p === SV.pat));
+  say($("#scPatName"), scPat().name);
+  for (const b of $("#scPats").querySelectorAll("button")) b.setAttribute("aria-checked", String(b.dataset.p === SV.pat));
+  // the trills, under the vowels in Scales only; one of them picked, no vowel is (paintTurn)
+  for (const b of $("#vcVowels").querySelectorAll("[data-on]")) { b.hidden = VC.view !== "scale"; b.setAttribute("aria-checked", String(b.dataset.on === SV.on)); }
   say($("#scGo"), SV.run ? "Stop" : "Start");
   if (VC.view === "scale") { say($("#vcStepLbl"), SV.run ? "Key" : "Start note"); vcGuide(); } // (in a set, the key it's on)
   if (!SV.run && !SV.msg) scIdle();
@@ -274,8 +297,8 @@ function drawScale(now) {
   // the grid: a line at each target, named
   g.lineWidth = 1; g.strokeStyle = C.line; g.fillStyle = C.muted; g.font = font(11); g.textAlign = "right";
   for (const m of [...new Set(T)]) { const y = Math.round(Y(m)) + 0.5; g.beginPath(); g.moveTo(P.l, y); g.lineTo(P.r, y); g.stroke(); g.fillText(absName(m), P.l - 6, y + 4); }
-  // the vowel's turn: a dashed line at its note, or a band over its span
-  const tn = vcTurns(VC.vowel).pop();
+  // the vowel's turn: a dashed line at its note, or a band over its span (none on a trill)
+  const tn = scTurn();
   if (tn && tn.t >= lo && tn.t <= hi) {
     let yl;
     if (tn.lo != null && tn.hi != null) { const y0 = Y(Math.min(hi, tn.hi + 0.5)), y1 = Y(Math.max(lo, tn.lo - 0.5)); g.fillStyle = C.ink; g.globalAlpha = 0.06; g.fillRect(P.l, y0, P.r - P.l, y1 - y0); g.globalAlpha = 1; yl = y0; }
@@ -360,11 +383,51 @@ function drawScale(now) {
   }
 }
 
+// The patterns' menu, under the pattern's button: a column a group, each pattern its name and its degrees. Picked, or
+// Escape, or a click away, it closes; ↑ ↓ move through it.
+function scMenu(on) {
+  const menu = $("#scPats"), b = $("#scPat");
+  menu.hidden = !on; b.setAttribute("aria-expanded", String(on)); b.classList.toggle("open", on);
+  if (!on) return;
+  const r = b.getBoundingClientRect();
+  menu.style.top = r.bottom + floatGap() + "px"; menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + "px";
+  (menu.querySelector('[aria-checked="true"]') || menu.querySelector("button")).focus();
+}
 function initScales() {
-  const p = store.get("voiceScalePat", "p3"), s = store.get("voiceScaleStart", null);
+  const p = store.get("voiceScalePat", "p3"), s = store.get("voiceScaleStart", null), on = store.get("voiceScaleOn", "");
   SV.pat = SC_PATS[p] ? p : "p3";
+  SV.on = SC_ON.some(([k]) => k === on) ? on : "";
   SV.start = Number.isFinite(s) ? scClamp(s) : scDefault();
-  for (const b of $("#scPat").children) b.onclick = () => { if (b.dataset.p !== SV.pat) scSetPat(b.dataset.p); };
+  const menu = $("#scPats");
+  for (const [g, label] of SC_GRPS) {
+    const col = el("div", "sc-col"), head = el("b");
+    say(head, label); col.append(head);
+    for (const id of SC_ORDER.filter((id) => SC_PATS[id].grp === g)) {
+      const q = SC_PATS[id], b = el("button"), name = el("span"), deg = el("span", "sc-deg");
+      b.type = "button"; b.setAttribute("role", "menuitemradio"); b.dataset.p = id;
+      say(name, q.name); deg.textContent = q.deg.join(" ");
+      b.append(name, deg);
+      b.onclick = () => { scMenu(false); $("#scPat").focus(); if (id !== SV.pat) scSetPat(id); };
+      col.append(b);
+    }
+    menu.append(col);
+  }
+  $("#scPat").append(icon("chevronDown"));
+  $("#scPat").onclick = (e) => { e.stopPropagation(); scMenu(menu.hidden); };
+  addEventListener("pointerdown", (e) => { if (!menu.hidden && !e.target.closest("#scPats, #scPat")) scMenu(false); }, true);
+  menu.onkeydown = (e) => {
+    const all = [...menu.querySelectorAll("button")], i = all.indexOf(document.activeElement);
+    if (e.key === "Escape") { e.preventDefault(); scMenu(false); $("#scPat").focus(); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); all[(i + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length].focus(); }
+  };
+  // the trills, as rows under the vowels (shown in Scales only: paintScale); a vowel picked there is back on the vowel
+  for (const [k, label] of SC_ON) {
+    const b = el("button"), name = el("span");
+    b.type = "button"; b.setAttribute("role", "radio"); b.dataset.on = k; b.hidden = true;
+    say(name, label); b.append(name);
+    b.onclick = () => { if (k !== SV.on) scSetOn(k); };
+    $("#vcVowels").append(b);
+  }
   $("#scGo").onclick = scGo;
   paintScale();
 }

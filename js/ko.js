@@ -222,6 +222,10 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Didn’t hear a steady note. Try again.": "일정한 음이 들리지 않았어요. 다시 해 보세요.", "Too close to tell apart. Try a lighter head voice.": "둘이 너무 비슷해요. 가성을 더 가볍게 내 보세요.",
   // Lab: scales
   "Scales": "스케일", "Pattern": "패턴", "3 notes": "3음", "5 notes": "5음", "Arpeggio": "아르페지오",
+  "Up": "상행", "Down": "하행", "Leaps": "도약", "Triad": "3화음", "Octave scale": "옥타브 스케일", "9 notes": "9음", "1.5 octaves": "1.5옥타브", "2 octaves": "2옥타브",
+  "5 down": "5음 하행", "Arpeggio down": "아르페지오 하행", "Octave down": "옥타브 하행", "9 down": "9음 하행",
+  "Seconds": "2도 왕복", "Fifths": "5도 왕복", "Fourth leap": "4도 도약", "Octaves": "옥타브 왕복", "Octave leap, chord": "옥타브 도약·화음", "Octave leap, scale": "옥타브 도약·스케일",
+  "lip trill": "립트릴", "tongue trill": "텅트릴", "Listen, then sing it back on a {v}.": "듣고 나서 {v}로 따라 불러요.", "Sing it back on a {v}.": "{v}로 따라 불러요.",
   "Top {note} · last time {p}%": "최고음 {note} · 지난번 {p}%", "Last time {p}%": "지난번 {p}%", "From {note}": "{note}부터",
   "Listen, then sing it back on “{v}”.": "듣고 나서 “{v}”로 따라 불러요.", "Listen.": "들어 봐요.", "Sing it back on “{v}”.": "“{v}”로 따라 불러요.",
   "Again, same key.": "같은 키로 다시.", "Coming back down.": "이제 내려가요.",

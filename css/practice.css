@@ -261,6 +261,18 @@
 .vc-bars i { flex: 1; min-height: 1px; border-radius: 1px; background: var(--good); }
 .vc-bars i.thin:not(.none) { opacity: .55; }
 .vc-bars i.none { background: var(--line); }
+/* Scales' trills under the vowels: a name alone (no turn, no days); the first a line off them */
+.vc-vowels button[data-on] { grid-template-columns: 1fr; }
+.vc-vowels [data-v] + [data-on] { margin-top: var(--space-2); }
+/* Scales' pattern: its name on a button, its menu the groups side by side, each pattern its name over its degrees */
+.sc-pat.open { background: var(--fill); }
+.sc-pats { grid-template-columns: repeat(3, auto); gap: var(--space-1); max-height: calc(100vh - var(--space-8)); overflow-y: auto; }
+.sc-col { display: grid; align-content: start; gap: var(--space-half); }
+.sc-col b { padding: var(--space-2) var(--space-3) var(--space-1); font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--muted); }
+.sc-pats button { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-half); height: auto; min-height: 44px; padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
+.sc-pats button[aria-checked="true"] { background: var(--surface-2); }
+.sc-deg { font: var(--text-xs) var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .sc-pats { grid-template-columns: minmax(0, 1fr); } }
 /* the note to sing (Find's first, Smooth's centre) between a semitone down and up, in the keyboard's card beside the keys
    at the right; held on pitch in Find, its button fills from the left */
 .vc-keys { display: flex; align-items: center; gap: var(--space-8); }

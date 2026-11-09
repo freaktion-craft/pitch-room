@@ -28,10 +28,13 @@ const SC = {
                                 //   near its pitch (some sign it was sung there; 0.25 took 2% of dropped notes for misses)
   squeeze: 0.5,                 // a run under this share of its note's time is a sliver (squeezed)
   octSlip: 11,                  // st: a core this far from its target is an octave slip (sung or tracked): unread
+  octFit: 3,                    // st: in finding the octave sung, a sample's distance to its nearest note counts this far
+                                //   at most (a semitone off still fits better than a fourth; a wrong note can't swing it)
   start: 80, startWin: 120,     // ms pitched within ms: the response has begun
   early: 150,                   // ms: voiced this near reading's start, the response begun with it: came in early
   endGap: 500, lastHold: 700,   // ms: silence that ends it (a breath between notes is shorter); the last note held
-  capX: 2.5, capMin: 6000,      // the response's cap: max(capMin, capX × the call)
+  capX: 2.5, capMin: 6000,      // the response's cap: max(capMin, capX × the call, capNote a note, the last two)
+  capNote: 1000,                //   (a long scale sung slower than its quick call: 17 notes at 900 ms outrun 2.5 × 5.4 s)
   rest: 1200, along: 500, stall: 500, // ms
   unread: 0.4, readMin: 0.6,    // a key with more than 40% of its notes unread is unread; clean needs ≥ 60% read
   drift: 20, driftMin: 10, driftShare: 0.75, // whole key off one way: the median beyond 20 c, 75% of read notes past 10 c,
@@ -43,17 +46,59 @@ const SC = {
 const SCT = typeof module !== "undefined" ? require("./turn.js") : { wmed, tnMed };
 const scMedian = (a) => { const s = a.slice().sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
 
-// The patterns: semitones from the root (all major), the degrees shown under them, a beat (s). No note repeats the one
-// before it, which the aligner relies on. Narrow to wide, the order a teacher warms up in.
+// The patterns: semitones from the root, its lowest note (all major), the degrees shown under them, a beat (s), and a
+// group: up (from the root and back), down (from the top), leap (wide intervals and alternations, for the registers). No
+// note repeats the one before it, which the aligner relies on. Each is a teacher's, from where it's written down; narrow
+// to wide in its group, the order a teacher warms up in. (Moved up a semitone a key, as teachers transpose them.)
 const SC_PATS = {
-  p3: { id: "p3", name: "3 notes", st: [0, 2, 4, 2, 0], deg: [1, 2, 3, 2, 1], beat: 0.5 },
-  p5: { id: "p5", name: "5 notes", st: [0, 2, 4, 5, 7, 5, 4, 2, 0], deg: [1, 2, 3, 4, 5, 4, 3, 2, 1], beat: 0.4 },
-  arp: { id: "arp", name: "Arpeggio", st: [0, 4, 7, 12, 7, 4, 0], deg: [1, 3, 5, 8, 5, 3, 1], beat: 0.5 }
+  // the NATS pattern sheets for Karen Hall, So You Want to Sing Music Theater (2014): Three-Note Scale
+  p3: { id: "p3", grp: "up", name: "3 notes", st: [0, 2, 4, 2, 0], deg: [1, 2, 3, 2, 1], beat: 0.5 },
+  // Five-Note Scale (Hall); the commonest warm-up of all (Gish et al., J Voice 26, 2012)
+  p5: { id: "p5", grp: "up", name: "5 notes", st: [0, 2, 4, 5, 7, 5, 4, 2, 0], deg: [1, 2, 3, 4, 5, 4, 3, 2, 1], beat: 0.4 },
+  // Triad (Hall); Saunders-Barton's staccato triads, light, from C4 (Hall's head register Ex. 5)
+  tri: { id: "tri", grp: "up", name: "Triad", st: [0, 4, 7, 4, 0], deg: [1, 3, 5, 3, 1], beat: 0.45 },
+  // Marchesi, Exercices élémentaires Op. 1 (1881) No. 10; García, Hints on Singing (1894) §23
+  p8: { id: "p8", grp: "up", name: "Octave scale", st: [0, 2, 4, 5, 7, 9, 11, 12, 11, 9, 7, 5, 4, 2, 0], deg: [1, 2, 3, 4, 5, 6, 7, 8, 7, 6, 5, 4, 3, 2, 1], beat: 0.3 },
+  // Octave Arpeggio (Hall); on a lip trill, Singing Success's (Brett Manning)
+  arp: { id: "arp", grp: "up", name: "Arpeggio", st: [0, 4, 7, 12, 7, 4, 0], deg: [1, 3, 5, 8, 5, 3, 1], beat: 0.5 },
+  // Marchesi Op. 1 No. 11; García's scale of the ninth (§23)
+  p9: { id: "p9", grp: "up", name: "9 notes", st: [0, 2, 4, 5, 7, 9, 11, 12, 14, 12, 11, 9, 7, 5, 4, 2, 0], deg: [1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 7, 6, 5, 4, 3, 2, 1], beat: 0.3 },
+  // Riggs, Singing for the Stars Ex. 6, 8, 9 ("nay", "mum"…); Marchesi Op. 1 No. 112; Manning's "Rossini", on trills
+  ros: { id: "ros", grp: "up", name: "1.5 octaves", st: [0, 4, 7, 12, 16, 19, 17, 14, 11, 7, 5, 2, 0], deg: [1, 3, 5, 8, 10, 12, 11, 9, 7, 5, 4, 2, 1], beat: 0.3 },
+  // Reid, Functional Vocal Training: "the double octave arpeggio", indispensable, for the registers' balance; Marchesi No. 115
+  arp2: { id: "arp2", grp: "up", name: "2 octaves", st: [0, 4, 7, 12, 16, 19, 24, 19, 16, 12, 7, 4, 0], deg: [1, 3, 5, 8, 10, 12, 15, 12, 10, 8, 5, 3, 1], beat: 0.35 },
+  // Saunders-Barton's head register Ex. 3 (Hall): five notes down from the top, light, carried down by half steps
+  d5: { id: "d5", grp: "down", name: "5 down", st: [7, 5, 4, 2, 0], deg: [5, 4, 3, 2, 1], beat: 0.45 },
+  // Riggs Ex. 12: the arpeggio down from the octave
+  da8: { id: "da8", grp: "down", name: "Arpeggio down", st: [12, 7, 4, 0], deg: [8, 5, 3, 1], beat: 0.55 },
+  // Marchesi Op. 1 No. 22
+  d8: { id: "d8", grp: "down", name: "Octave down", st: [12, 11, 9, 7, 5, 4, 2, 0], deg: [8, 7, 6, 5, 4, 3, 2, 1], beat: 0.4 },
+  // Marchesi, Exercises for blending the registers (Op. 31 No. 39; Op. 1 No. 18): down from above the upper break
+  d9: { id: "d9", grp: "down", name: "9 down", st: [14, 12, 11, 9, 7, 5, 4, 2, 0], deg: [9, 8, 7, 6, 5, 4, 3, 2, 1], beat: 0.35 },
+  // García §19, blending the registers: back and forth across the break by a tone; Marchesi Op. 1 No. 4
+  alt2: { id: "alt2", grp: "leap", name: "Seconds", st: [0, 2, 0, 2, 0], deg: [1, 2, 1, 2, 1], beat: 0.5 },
+  // Saunders-Barton's head register Ex. 4 (Hall): do to sol and back, again and again
+  alt5: { id: "alt5", grp: "leap", name: "Fifths", st: [0, 7, 0, 7, 0], deg: [1, 5, 1, 5, 1], beat: 0.55 },
+  // Bozeman, The Role of the First Formant (J Singing 66, 2010) step 3: sol-do-ti-la-sol, a leap over the turn, then
+  // down to open again (here in the key of its lowest note)
+  lp4: { id: "lp4", grp: "leap", name: "Fourth leap", st: [0, 5, 4, 2, 0], deg: [1, 4, 3, 2, 1], beat: 0.45 },
+  // Reid: octave jumps, the low note in chest, the top in head
+  alt8: { id: "alt8", grp: "leap", name: "Octaves", st: [0, 12, 0, 12, 0], deg: [1, 8, 1, 8, 1], beat: 0.6 },
+  // Reid: "the octave interval with a descending arpeggio", firm below, light on top, the weight back on the way down
+  lp8a: { id: "lp8a", grp: "leap", name: "Octave leap, chord", st: [0, 12, 7, 4, 0], deg: [1, 8, 5, 3, 1], beat: 0.5 },
+  // Marchesi Op. 1 No. 25
+  lp8s: { id: "lp8s", grp: "leap", name: "Octave leap, scale", st: [0, 12, 11, 9, 7, 5, 4, 2, 0], deg: [1, 8, 7, 6, 5, 4, 3, 2, 1], beat: 0.4 }
 };
-const SC_ORDER = ["p3", "p5", "arp"];
+const SC_ORDER = Object.keys(SC_PATS);
 const scSpan = (p) => Math.max(...p.st);
+// how often the pattern reaches its top (an alternation, more than once); how near the top the voice counts as on it (st):
+// a semitone, or half the step to the next note under it (the octave scale's 7th isn't its top)
+const scTops = (p) => p.st.filter((s) => s === scSpan(p)).length;
+const scTopTol = (st) => { const t = Math.max(...st); return Math.min(1, Math.min(...st.filter((s) => s !== t).map((s) => t - s)) / 2); };
 // the call's length (s): a beat a note, the last held two
 const scCallLen = (p) => (p.st.length + 1) * p.beat;
+// the response's cap (ms): the longest it's listened to (SC.capX, SC.capNote)
+const scCap = (p) => Math.max(SC.capMin, SC.capX * scCallLen(p) * 1000, SC.capNote * (p.st.length + 1));
 
 // Where the response begins: the start of the first pitched sample after from with SC.start ms pitched within
 // SC.startWin ms of it; null if none yet
@@ -73,6 +118,12 @@ function scHeld(xs, now, m, ms, tol = 1) {
   let on = 0;
   for (let i = xs.length - 1; i >= 0 && xs[i].t > now - ms; i--) { const s = xs[i]; if (s.t <= now && s.m != null && Math.abs(s.m - m) <= tol) on += s.w; }
   return on >= 0.8 * ms;
+}
+// Nothing of the last ms pitched within tol st of m: the voice has left it (an alternation's top, reached again only once
+// it's been left)
+function scAway(xs, now, m, ms, tol = 1) {
+  for (let i = xs.length - 1; i >= 0 && xs[i].t > now - ms; i--) { const s = xs[i]; if (s.t <= now && s.m != null && Math.abs(s.m - m) <= tol) return false; }
+  return true;
 }
 // Where a note's core sits: the time-weighted mean of its pitched samples (t in (a, b]) within clip st of their median (a
 // slip, a crack or a scoop's tail left out). A mean, not the median: a core is one or two vibrato cycles, and over a cycle
@@ -221,6 +272,20 @@ function scAlign(P, T) {
   return out;
 }
 
+// The octave the response was sung in (−12, 0 or 12 from the piano): the one its pitch fits the pattern's notes best in,
+// each sample against the nearest note (off by at most SC.octFit st: a slip or a wrong note can't swing it). Not the
+// median against the notes' median: 1-5-1-5-1 sung with its 5s held puts the median on the 5, and 1-8-1-8-1's on the 8,
+// read as the whole of it an octave off. A tie stays with the piano's.
+function scOctave(P, N) {
+  const cl = SC.octFit * SC.octFit;
+  let best = 0, bc = Infinity;
+  for (const o of [0, -12, 12]) {
+    let c = 0;
+    for (const s of P) { let d = Infinity; for (const m of N) d = Math.min(d, Math.abs(s.m - m - o)); c += s.w * Math.min(d * d, cl); }
+    if (c < bc - 1e-9) { bc = c; best = o; }
+  }
+  return best;
+}
 // One key's response, judged. xs: its samples {t, w, m, v} (m null: not pitched, or pitched an octave off; v: voiced);
 // N: the notes played (keys); opts.turn: the vowel's turn (or null); opts.early: the singer came in before reading began.
 // The whole response's octave o first (sung an octave from the piano is judged there); then each note's core (scCentre:
@@ -238,8 +303,7 @@ function scJudge(xs, N, opts = {}) {
     res.unread = K;
     return res;
   }
-  const sung = SCT.tnMed(P.map((s) => [s.m, s.w])).v, ref = SCT.tnMed(N.map((m, k) => [m, k === K - 1 ? 2 : 1])).v;
-  const o = 12 * Math.max(-1, Math.min(1, Math.round((sung - ref) / 12)));
+  const o = scOctave(P, N);
   const T = N.map((m) => m + o);
   res.o = o; res.T = T;
   const seg = scAlign(P, T), vis = [];
@@ -270,10 +334,23 @@ function scJudge(xs, N, opts = {}) {
     const ac = Math.abs(note.c);
     note.st = ac <= SC.good ? "good" : ac <= SC.close ? "close" : "miss";
   }
+  // an unread note whose little core sits on a neighbour's note (as near it as good is, and over half a step from its
+  // own) where that neighbour was sung good: a piece of the neighbour's run (cut off it where they're a semitone apart,
+  // and too short to read), so not sung: skipped (unread, it would let a key with a note left out be clean). (Not beside
+  // a close one: a key sung sharp throughout gives its notes' runs to the semitone above, and that's for drift to say.)
+  res.notes.forEach((nt, k) => {
+    if (nt.st !== "unread" || nt.m == null || Math.abs(nt.m - nt.tgt) <= 0.5) return;
+    const by = [k - 1, k + 1].find((j) => j >= 0 && j < K && res.notes[j].st === "good" && 100 * Math.abs(nt.m - T[j]) <= SC.good);
+    if (by != null) { nt.st = "skip"; nt.m = null; }
+  });
   // heard: the notes heard at all (one or none: no response, a sound before it: scFalse); came in early: the notes before
-  // the first heard were sung while nothing was read (not skipped: not heard)
+  // the first heard were sung while nothing was read (not skipped: not heard), and of the first heard only its end was,
+  // falling off: judged only where it's good, else unread (a pattern from its top: its top)
   res.heard = res.notes.filter((nt) => nt.st !== "skip").length;
-  if (opts.early) for (const nt of res.notes) { if (nt.st !== "skip" && nt.st !== "short") break; nt.st = "unread"; }
+  if (opts.early) for (const nt of res.notes) {
+    if (nt.st !== "skip" && nt.st !== "short") { if (nt.st === "miss" || nt.st === "close") nt.st = "unread"; break; }
+    nt.st = "unread";
+  }
   for (const nt of res.notes) res[nt.st]++;
   res.judged = res.good + res.close + res.miss + res.skip + res.short;
   if (res.unread > SC.unread * K) { res.ok = -1; }
@@ -333,4 +410,4 @@ function scStep(st, ok, lim) {
   return down("down");
 }
 
-if (typeof module !== "undefined") module.exports = { SC, SC_PATS, SC_ORDER, scSpan, scCallLen, scOnset, scHeld, scCentre, scAlign, scJudge, scFalse, scStep };
+if (typeof module !== "undefined") module.exports = { SC, SC_PATS, SC_ORDER, scSpan, scTops, scTopTol, scCallLen, scCap, scOctave, scOnset, scHeld, scAway, scCentre, scAlign, scJudge, scFalse, scStep };
