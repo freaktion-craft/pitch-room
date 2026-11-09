@@ -94,6 +94,21 @@ def _itunes(q: str) -> list[dict]:
                     re.sub(r"/\d+x\d+bb\.", "/600x600bb.", t["artworkUrl100"])) for t in d.get("results", []) if t.get("artworkUrl100")]
 
 
+def store_name(artist: str) -> str:
+    """An artist's name as the stores spell it, for one the title writes in Hangul, kana or kanji: iTunes's first artist
+    for it (윤종신 is "Yoon Jong Shin", 아이유 "IU", 백현 "BAEKHYUN"), or "" (none found, or the site out of reach). The
+    stores list most Korean and Japanese artists so, and a record by "Yoon Jong Shin" wasn't his for a title saying
+    윤종신: a compilation's copy, a second nearer in length, was taken over his own (가수연합's "좋니")."""
+    if not CJK.search(artist or ""):
+        return ""
+    try:
+        d = json.loads(fetch("https://itunes.apple.com/search?" + urllib.parse.urlencode({"term": artist, "entity": "musicArtist", "limit": 1})) or b"{}")
+    except (RuntimeError, ValueError):
+        return ""
+    found = d.get("results") or []
+    return " ".join(INVISIBLE.sub("", found[0].get("artistName") or "").split()) if found else ""
+
+
 def _deezer(q: str) -> list[dict]:
     d = json.loads(fetch("https://api.deezer.com/search?" + urllib.parse.urlencode({"q": q, "limit": 10})) or b"{}")
     return [_record(t["artist"]["name"], t["title"], t["album"]["title"], t.get("duration") or 0, t["album"]["cover_big"])
@@ -293,8 +308,9 @@ def search_records(title: str, duration: float, hint: str = "", cover: bool = Fa
         title = COVER.sub(" ", COVER_BY.sub(" ", title))
     artist, song = lyrics.split_title(title)
     who = "" if artist or hint else channel_artist(channel)
-    tw = _w(f"{title} {hint} {who}")
-    named_by, whole = tw - NAMELESS, _compact(f"{title} {hint} {who}")
+    spelt = "" if cover else store_name(artist or who)  # the artist named in Hangul or kana, as the stores spell them: "Yoon Jong Shin" theirs too
+    tw = _w(f"{title} {hint} {who} {spelt}")
+    named_by, whole = tw - NAMELESS, _compact(f"{title} {hint} {who} {spelt}")
     by = [f"{n} {song or title}" for n in ([who, *_spellings(who)] if who else [])]
     qs = list(dict.fromkeys(by + ([hint] if hint else []) + lyrics.queries(title)))
     latin = not cover and bool(song) and not CJK.search(f"{artist} {song}")  # the title all in Latin letters
