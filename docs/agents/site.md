@@ -1,8 +1,9 @@
 # The download page (pitchroom.dev)
 
 `site/index.html` is one static file, plus `site/favicon.svg`, `site/img/installer-icon.png` and `site/img/og.png`
-(the link preview: the name, 88 px Geist Serif, centred on the page's dark with blueprint lines round it, 1200 × 630,
-named in the `og:` tags). No build step. Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
+(the link preview: the name, 88 px Geist Serif, centred on the page's dark with blueprint lines round it, 1200 × 600,
+named in the `og:` tags; 2:1, as KakaoTalk crops anything else itself; bump its `?v=` when it changes). No build step.
+Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
 
 ## What it does
 
