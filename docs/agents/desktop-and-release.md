@@ -39,7 +39,7 @@ Windows and macOS only.
 
 ## Building
 
-In `desktop/` (Node 22.12+, which Electron 45 requires; CI uses 22). A fresh worktree has no `node_modules`.
+In `desktop/` (Node 22.12+, which Electron 45 requires). A fresh worktree has no `node_modules`.
 
 1. `npm ci` (downloads Electron). In a worktree too: never junction another checkout's `node_modules` into it.
    Through a junction electron-builder can't find electron-updater's own dependencies; 1.0.18 shipped without them
@@ -84,34 +84,31 @@ A standalone build of the current code with its own data folder (`Pitchroom WIP`
 
 Only on the owner's explicit yes.
 
-**Normal path (GitHub Actions):**
+Releases are built on the owner's own computers: Windows on the Windows PC, macOS on the Mac. There are no GitHub
+Actions builds (they needed paid minutes; dropped after 1.0.24).
 
-- `gh workflow run release.yml --ref main -f bump=patch` (`minor`/`major` too). It must run on `main` (the version job
-  checks). Add `-f notes="..."` only with text the owner gave: notes are public.
-- `release.yml` bumps the version with `npm version`, commits "Desktop x.y.z" to `main`, tags `vx.y.z`, builds every
-  platform through `desktop.yml` into a draft in the public `pitchroom-releases` repo, checks every asset, then publishes
-  it as latest.
-- Watch with `gh run watch`; rerun failures with `gh run rerun <id> --failed`. Then check the release and pull `main`.
+**Windows, on the PC:**
 
-**While GitHub Actions is unavailable (billing):** the release is Windows only, built locally.
-
-1. In `desktop/`: `npm version patch --no-git-tag-version` (package.json and lock together).
-2. Commit "Desktop x.y.z" to `main` with the body "Built on the developer's PC for Windows only (Actions blocked by
-   billing).", and push. **Ask the owner about the tag:** a pushed `v*` tag starts `desktop.yml`, which (when Actions
-   runs) builds every platform into the same draft. History: 1.0.13-1.0.16 were released without a tag; 1.0.12 and
-   1.0.17 have one.
-3. Run fetch-python and fetch-vbcable if needed, then prepare-code.
-4. `npx electron-builder --win --publish always` with `GH_TOKEN` from `gh auth token` (it needs write access to
-   `pitchroom-releases`), at below-normal priority.
+1. In `desktop/`: `npm version patch --no-git-tag-version` (`minor`/`major` too; package.json and lock together).
+2. Commit "Desktop x.y.z" to `main`, tag `vx.y.z`, push both.
+3. Run fetch-python and fetch-vbcable if needed (above).
+4. `npm run code`, then `npx electron-builder --win --publish always` with `GH_TOKEN` from `gh auth token` (it needs
+   write access to `pitchroom-releases`), at below-normal priority.
 5. electron-builder can split into two drafts. The `.blockmap`, `latest.yml` and `pitchroom_install.exe` must end up in
-   one draft, published as latest. Then delete the leftover near-empty draft, with the owner's ok (old releases still
-   have one beside them).
-6. A local build includes `icons.local.js` when present; a CI build has the free icons.
+   one draft, published as latest. Upload by the release's id (uploads.github.com), not `gh release upload vX.Y.Z`,
+   which may pick the wrong draft. Then delete the leftover near-empty draft, with the owner's ok.
+
+**Windows files for a release made on the Mac:** in `desktop/`, `npm run dist` at below-normal priority, then upload
+`dist/pitchroom_install.exe`, its `.blockmap` and `dist/latest.yml` into that release by its id, replacing the ones of
+the same name. Check `latest.yml`'s `version` first: 1.0.21-1.0.24 went out carrying 1.0.20's Windows files, so Windows
+users weren't offered them.
+
+A local build includes `icons.local.js` when present.
 
 Verify: `gh release view vX.Y.Z --repo freaktion-craft/pitchroom-releases --json assets,isDraft,url` (or the API).
 `gh release list` shows a leftover draft first, so it can look as if the release is still a draft.
 
-**The Mac files, on a Mac (while Actions is unavailable):** `npm run release-mac` in `desktop/` (`node
+**The Mac files, on a Mac:** `npm run release-mac` in `desktop/` (`node
 scripts/release-mac.mjs [vX.Y.Z]`; the latest published release by default) adds a release's Mac files to it.
 
 - It builds the tag as tagged, in a worktree of its own under the temp folder with its own `npm ci`, never this
@@ -136,9 +133,8 @@ call: ask.
 Notes:
 
 - Only published releases count: the updater and the site never see a draft.
-- The Windows installer is `pitchroom_install.exe` (no version). Renaming it breaks the site's file regex and
-  `release.yml`'s asset check.
-- Tags are incomplete (above); use the `pitchroom-releases` repo's published releases for history.
+- The Windows installer is `pitchroom_install.exe` (no version). Renaming it breaks the site's file regex.
+- Tags are incomplete (1.0.13-1.0.16 have none); use the `pitchroom-releases` repo's published releases for history.
 - Pins are deliberate: the Python build in `fetch-python.mjs`, the VB-CABLE hash, exact npm versions. Moving the bundled
   Python to a new minor version makes every user reinstall the 3-4 GB of song tools.
 - Builds are unsigned (macOS ad-hoc), so macOS can't self-update and both systems warn on first open.
