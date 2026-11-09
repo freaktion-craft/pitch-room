@@ -71,8 +71,6 @@ html.desktop-mac .app { padding-top: calc(var(--space-6) + var(--space-3)); } /*
 html.desktop-mac #app > header { -webkit-app-region: drag; }
 /* onboarding left for Settings, unfinished (welcome()): the header only the mic and Settings, which takes you back to it */
 html.ob-left #app > header > :not(.brand, #micBtn, .tabs, .pop), html.ob-left .tabs > :not(#micSetBtn) { display: none; } /* (of the tabs, Settings alone) */
-html.desktop-mac #app > header .brand { margin-left: -15px; } /* its left edge under the red button's (9 px from the window's) */
-html.desktop-mac .brand .egg { left: -9px; right: -9px; } /* the egg's box, kept inside the window */
 html.desktop-mac #app > header > * { -webkit-app-region: no-drag; }
 html.desktop-mac::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: var(--space-6); z-index: 100; -webkit-app-region: drag; }
 /* On Windows (html.desktop-win): no title bar of the system's either; its three buttons over the page's top right
