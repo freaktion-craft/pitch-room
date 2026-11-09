@@ -14,6 +14,7 @@ const path = require("node:path");
 const { autoUpdater } = require("electron-updater");
 
 const RELEASES = "freaktion-craft/pitchroom-releases"; // public, the installers only (the code's repo is private)
+const SITE = "https://pitchroom.dev/"; // the download page (site/index.html): a newer version's offered from there
 const PORTS = [5278, 5298]; // a range of its own, so a copy started from the repo (5178…) is never taken for this one
 // the page's theme (its Theme setting: shade()): the window before the page paints in its --bg (oklch(0.165 0 0), oklch(0.965 0 0)),
 // the Windows title bar's buttons in its --ink (oklch(0.94 0 0), oklch(0.2 0 0))
@@ -298,7 +299,7 @@ async function checkUpdates(asked) {
         message: `Pitchroom ${v} is out`, detail: `You have ${app.getVersion()}. Download it, then open the new one in place of this.`,
         buttons: ["Download", "Later"], defaultId: 0, cancelId: 1,
       });
-      if (response === 0) shell.openExternal(rel.html_url);
+      if (response === 0) shell.openExternal(SITE); // the download page: the right file for this system in one click, not a list of them
     } else if (asked) dialog.showMessageBox(win, { message: "You have the latest Pitchroom", detail: `Version ${app.getVersion()}.` });
   } catch (e) {
     if (asked) dialog.showMessageBox(win, { type: "warning", message: "Couldn't check for updates", detail: e.message });
