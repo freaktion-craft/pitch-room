@@ -383,16 +383,16 @@ function obColour() {
   paint();
 }
 
-// The song tools, coming: a box each for what's being got (its name, what it's for, how it's going: from the install's
+// The song tools, coming: a box each for what's being got (its name, and under it how it's going: from the install's
 // own log, pip's "Collecting / Downloading / Successfully installed", or where it's got to in all where there's no log),
 // then a box for the song, split by them as soon as they're in (obSendLater) and followed here. Nothing to go on to
 // till it's all done: then "Job done", and the app asks to be looked at, should you be elsewhere meanwhile.
 const TOOL_BOXES = [
-  { pkg: "torch", name: "PyTorch", what: "Runs the models", to: 0.45 }, { pkg: "torchaudio", name: "torchaudio", what: "Reads the audio", to: 0.5 },
-  { pkg: "demucs", name: "Demucs", what: "Voice from band", to: 0.6 }, { pkg: "audio-separator", name: "audio-separator", what: "Lead from backing", to: 0.7 },
-  { pkg: "librosa", name: "librosa", what: "Beat and key", to: 0.75 }, { pkg: "openai-whisper", name: "Whisper", what: "Hears the lyrics", to: 0.83 },
-  { pkg: "stable-ts", name: "stable-ts", what: "Times each word", to: 0.9 }, { key: "lyrics-model", name: "Lyrics model", what: "Whisper’s, for the words", to: 0.99 },
-  { key: "melody-model", name: "Melody model", what: "RMVPE, for the pitch", to: 1 },
+  { pkg: "torch", name: "PyTorch", to: 0.45 }, { pkg: "torchaudio", name: "torchaudio", to: 0.5 },
+  { pkg: "demucs", name: "Demucs", to: 0.6 }, { pkg: "audio-separator", name: "audio-separator", to: 0.7 },
+  { pkg: "librosa", name: "librosa", to: 0.75 }, { pkg: "openai-whisper", name: "Whisper", to: 0.83 },
+  { pkg: "stable-ts", name: "stable-ts", to: 0.9 }, { key: "lyrics-model", name: "Lyrics model", to: 0.99 },
+  { key: "melody-model", name: "Melody model", to: 1 },
 ];
 // each box: waiting | getting | got (down, waiting to be put in) | setting (being set up) | done | later (a model left
 // for the first song). From the install's own account of each (stems.py, job.pkgs), so each says done as it is; a
@@ -420,9 +420,9 @@ async function obTools() {
   song.hidden = true; // (its cover's in the middle of the right half, or its box below)
   $("#obDlNote").hidden = true;
   const word = { waiting: "Waiting", getting: "Getting it", got: "Downloaded", setting: "Setting up", done: "✓", later: "With your first song" };
-  const box = (cls) => { const d = el("div", "ob-box" + (cls ? " " + cls : "")); d.append(el("b"), el("small"), el("span", "st")); boxes.append(d); return d; };
+  const box = (cls, line = true) => { const d = el("div", "ob-box" + (cls ? " " + cls : "")); d.append(el("b"), ...(line ? [el("small")] : []), el("span", "st")); boxes.append(d); return d; }; // (line: the song's, under its name)
   boxes.replaceChildren();
-  const tb = TOOL_BOXES.map((t) => { const d = box(); say(d.querySelector("b"), t.name); say(d.querySelector("small"), t.what); return d; });
+  const tb = TOOL_BOXES.map((t) => { const d = box("", false); say(d.querySelector("b"), t.name); return d; }); // a tool's: its name, how it's going under it
   let sb = null;
   if (OB.first) {
     sb = box("song"); const img = el("img"); img.alt = ""; img.src = OB.first.art || ""; sb.prepend(img); sb.append(pixBar()); // (the drawer's pixels: adding.js)
