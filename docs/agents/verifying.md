@@ -3,7 +3,7 @@
 How to check a change without touching the owner's library, settings or speakers, and what is too heavy to run
 casually.
 
-There is no test suite, no JS test runner and no lint config. CI only builds. Don't invent a test suite unasked.
+There is no test suite, no JS test runner, no lint config and no CI. Don't invent a test suite unasked.
 Verification is: syntax checks, `scripts/contrast.py`, the Lab's two check scripts, and looking at the page offscreen.
 
 ## Quick checks (read-only, seconds)

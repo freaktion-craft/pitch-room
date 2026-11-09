@@ -41,7 +41,6 @@ Platforms are **Windows and macOS only**. Linux was dropped (PR 48): don't add L
 | `scripts/turn-check.js`, `scripts/scale-check.js` | Offline checks of the Lab's measures (`js/turn.js`, `js/scale.js`) on synthetic voices |
 | `desktop/` | Electron app: `main.js`, `preload.js`, splash, build scripts in `desktop/scripts/` |
 | `site/` | pitchroom.dev download page |
-| `.github/workflows/` | `release.yml` (version bump and release), `desktop.yml` (builds) |
 | `README.md` | User-facing readme |
 
 Gitignored data that may sit in a checkout: `library/`, `models/`, `settings.json`, `.venv/`, `.tools/` (uv's
@@ -124,8 +123,8 @@ Details and recipes: `docs/agents/verifying.md`.
 - PRs merge into `main` with merge commits ("Merge pull request #N"). To catch up, merge `main` into the branch; don't
   rebase shared branches.
 - **Merges, releases and site deploys happen only on the owner's explicit yes.**
-- Release: `gh workflow run release.yml --ref main -f bump=patch`, then watch it and pull `main`. See
-  `docs/agents/desktop-and-release.md` for the local Windows build used while GitHub Actions is unavailable.
+- Releases are built locally (no GitHub Actions: it needs paid minutes): Windows on the owner's PC, macOS on their
+  Mac. Steps: `docs/agents/desktop-and-release.md`.
 - Don't commit `.wrangler/`, scratch scripts or screenshots.
 - Style details (comments, naming, line endings, CSS, copy): `docs/agents/style.md`.
 

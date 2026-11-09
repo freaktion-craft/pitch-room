@@ -24,7 +24,7 @@ Python comes inside it, so there's nothing else to install. The first time a son
 
 **Updates:** it checks GitHub once it opens and offers a newer version as a download (also **Check for Updates…** in the menu).
 
-**Building it** (in `desktop/`, Node 20 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. To release a version: **Actions → Release → Run workflow** (or `gh workflow run release.yml -f bump=patch`), picking patch, minor or major. It bumps `"version"` in `desktop/package.json`, commits and tags it on `main`, builds macOS and Windows into a release in [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (public, the installers only), and publishes it once every build is in. A tag pushed by hand (`git tag v1.0.1 && git push origin v1.0.1`) still builds into a draft, published from its Releases page. It needs a `RELEASES_TOKEN` secret here: a fine-grained token with Contents read and write on that repo alone.
+**Building it** (in `desktop/`, Node 22.12 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. Releases are built on the developer's own computers into [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (public, the installers only): Windows on a Windows PC, macOS on a Mac (`npm run release-mac`). Steps: `docs/agents/desktop-and-release.md`.
 
 ## Get it
 
