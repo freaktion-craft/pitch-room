@@ -183,13 +183,13 @@ def ink_mix(t, accent):
 # ---------- the pairs ----------
 # (text, on, at least): text on a background, each a token or a colour; a background that's itself see-through is laid
 # over the next one along (a chip over the card): "a|b".
-ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "blue", "violet", "pink"]
+ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "sky", "blue", "violet", "pink"]
 PAIRS = []
 for bg in ["--bg", "--surface"]:
     for fg in ["--ink", "--muted", "--faint", "--bad", "--orange", "--warn-ink", "--good"]:
         PAIRS.append((fg, bg, 4.5))
     for k in ACCENTS:  # your colour as a line, a dot, a fill and large text (a sung word): 3:1; as small text, mixed
-        PAIRS.append((f"--voice-{k}", bg, 1.5 if k == "pink" else 3))  # with the ink as --voice-ink is: 4.5:1 (pink: baby pink, a pastel, by choice)
+        PAIRS.append((f"--voice-{k}", bg, 1.5 if k in ("pink", "sky") else 3))  # with the ink as --voice-ink is: 4.5:1 (pink, sky: pastels, by choice)
         PAIRS.append((f"mix:--voice-{k}", bg, 4.5))
 PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--hover-2", 4.5),
           ("--on-ink", "--ink", 4.5), ("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),

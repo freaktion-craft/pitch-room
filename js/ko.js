@@ -150,7 +150,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Your pitch and the highlights": "내 음정과 강조 표시", "What you sing into": "노래할 때 쓰는 마이크",
   "How loud a sound must be to count as singing": "노래로 들을 소리의 크기", "For speakers; leave it off with headphones": "스피커용이에요. 헤드폰을 쓸 땐 꺼 두세요",
   "Mark where Practice’s phrases should split or join": "연습 구절을 나누거나 합칠 곳 표시",
-  "Mono": "모노", "Theme": "테마", "Light or dark": "밝게 또는 어둡게", "System": "시스템", "Light": "라이트", "Dark": "다크", "Blue": "파랑", "Violet": "보라", "Pink": "분홍", "Coral": "코랄", "Orange": "주황", "Amber": "앰버", "Green": "초록", "Teal": "청록",
+  "Mono": "모노", "Theme": "테마", "Light or dark": "밝게 또는 어둡게", "System": "시스템", "Light": "라이트", "Dark": "다크", "Blue": "파랑", "Violet": "보라", "Pink": "분홍", "Coral": "코랄", "Orange": "주황", "Amber": "앰버", "Green": "초록", "Teal": "청록", "Sky": "하늘",
 
   "Can’t use the microphone": "마이크를 쓸 수 없어요", "The song still plays — you just won’t see your own pitch.": "곡은 계속 재생돼요. 내 음정만 보이지 않아요.",
   "The mic doesn’t work from this address. Open the app at http://localhost instead.": "이 주소에서는 마이크가 작동하지 않아요. http://localhost에서 앱을 여세요.",
