@@ -430,8 +430,9 @@ function paintTurn() {
   $("#vcAxH2").hidden = VC.mode !== "find"; $("#vcAxT").hidden = $("#vcAxL").hidden = VC.mode !== "smooth" || VC.filt.length > 0;
   if (!VC.run) $("#vcTgt").style.setProperty("--p", "0%");
   for (const b of $("#vcVowels").children) { // each vowel: its newest turn, and its last 8 days' even passes
+    if (!b.dataset.v) continue; // (Scales' trills: paintScale)
     const v = b.dataset.v, t = vcTurns(v).pop(), days = vcDays(v).slice(-8), bars = b.children[2].children;
-    b.setAttribute("aria-checked", String(v === VC.vowel));
+    b.setAttribute("aria-checked", String(v === VC.vowel && !(VC.view === "scale" && SV.on)));
     b.children[1].textContent = t ? vcTurnName(t) : "–";
     for (let i = 0; i < 8; i++) {
       const r = days[i - (8 - days.length)];
@@ -832,8 +833,8 @@ function initVoice() {
     say(name, label); t.className = "vt"; bars.className = "vc-bars"; bars.setAttribute("aria-hidden", "true");
     for (let i = 0; i < 8; i++) bars.append(document.createElement("i"));
     b.append(name, t, bars);
-    b.onclick = () => { if (v !== VC.vowel) vcSetVowel(v); };
-    $("#vcVowels").append(b);
+    b.onclick = () => { if (VC.view === "scale" && SV.on) scSetOn(""); if (v !== VC.vowel) vcSetVowel(v); }; // (in Scales, off a trill)
+    $("#vcVowels").insertBefore(b, $("#vcVowels [data-on]")); // (Scales' trills below the vowels: initScales)
   }
   $("#vcDown").append(icon("prev")); $("#vcUp").append(icon("next"));
   $("#vcDown").onclick = () => vcStart(vcShown() - 1, true);

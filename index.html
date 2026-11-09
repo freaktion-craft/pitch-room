@@ -187,10 +187,12 @@ const EMPTY_LIBRARY = false;
       <!-- Scales: a pattern played from the start note, then sung back, a key at a time up and back down (js/voice-scale.js) -->
       <section class="vc-scale" aria-label="Scales" hidden>
         <canvas id="scPad" aria-hidden="true"></canvas>
-        <div class="seg vc-mode" id="scPat" role="radiogroup" aria-label="Pattern"><button type="button" role="radio" data-p="p3">3 notes</button><button type="button" role="radio" data-p="p5">5 notes</button><button type="button" role="radio" data-p="arp">Arpeggio</button></div>
+        <button class="btn sm vc-mode sc-pat" id="scPat" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="scPats"><span id="scPatName">3 notes</span></button>
         <button class="btn sm primary vc-go" id="scGo" type="button">Start</button>
         <div class="vc-say"><p id="scSay" aria-live="polite"></p><p id="scDo"></p></div>
       </section>
+      <!-- the patterns (js/voice-scale.js scMenu): Up, Down and Leaps side by side, each pattern its name and degrees -->
+      <div class="menu sc-pats" id="scPats" role="menu" aria-label="Pattern" hidden></div>
       <aside class="vc-side">
         <div class="vc-note"><b id="vcNote">–</b><span id="vcCents"></span></div>
         <div class="vc-cents" aria-hidden="true"><i id="vcNeedle"></i></div>
