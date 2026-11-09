@@ -759,7 +759,16 @@ function paintFade(now) {
   const below = document.documentElement.scrollHeight - (scrollY + innerHeight);
   // the New row and Continue practising, over the band behind the pinned top while they go up: cut off where they reach the search's line
   for (const nw of [$("#sNew"), $("#sCont")]) if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
-  for (const [f, px, here] of [[$("#listFade"), below, lib || song || set], [$("#listFadeTop"), set ? scrollY : scrollY - topRoom(), lib || set]]) {
+  // the top's fade: under the column heads as rows go under them; before that, Continue practising (a part of the list)
+  // going under the search's line, there at that line, as tall as it's gone under and as there's of it left below
+  // (drawn back by the time the list reaches the column heads)
+  let top = set ? scrollY : scrollY - topRoom(), at = "";
+  if (lib && top <= 0 && !$("#sCont").hidden) {
+    const line = $("#sLibPage .lib-head").getBoundingClientRect().bottom, r = $("#sCont").getBoundingClientRect();
+    top = Math.min(line - r.top, r.bottom - line); at = line + "px";
+  }
+  $("#listFadeTop").style.top = at;
+  for (const [f, px, here] of [[$("#listFade"), below, lib || song || set], [$("#listFadeTop"), top, lib || set]]) {
     if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
     f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
     f.classList.toggle("on", here && px > 0);
