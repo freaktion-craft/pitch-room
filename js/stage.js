@@ -50,7 +50,7 @@ readColors();
 // swatches in the settings.
 // in the order of their hues round the wheel (coral's 32° to pink's 353°), white before them
 // ("white" is Mono: white in the dark theme, near-black in the light; its key kept, as settings have it)
-const ACCENTS = { white: "Mono", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal", blue: "Blue", violet: "Violet", pink: "Pink" };
+const ACCENTS = { white: "Mono", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal", sky: "Sky", blue: "Blue", violet: "Violet", pink: "Pink" };
 let accent = store.get("accent", "white");
 if (!(accent in ACCENTS)) accent = "white";
 // on <html>, and on each part that stays dark (.theme-dark), so it's that theme's shade of it there
