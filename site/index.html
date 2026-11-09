@@ -51,6 +51,8 @@ a { -webkit-user-drag: none; }
 .get[data-os="win"] svg { width: 13px; height: 13px; shape-rendering: crispEdges; } /* (its panes' edges on the pixel grid, wherever the button lands) */
 /* and each set on the text by its body, not its box: the apple up a pixel (its leaf above it) */
 .get[data-os="mac"] svg { width: 15px; height: 19px; transform: translateY(-1px); }
+/* macOS for now (macLater): greyed out, nothing to press */
+.get.off { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.55); pointer-events: none; }
 /* the line at the page's foot, 24 px up as the app's column is in from its sides */
 .note { position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
   margin: 0; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 13px/1.45 var(--font); }
@@ -135,6 +137,14 @@ async function detectMacArch() {
   return "arm64";
 }
 
+// macOS isn't offered for now (the app isn't signed, so each update would mean macOS's warnings again): the button
+// greyed out, saying so, going nowhere
+function macLater() {
+  const get = document.getElementById("get");
+  get.removeAttribute("href"); get.setAttribute("aria-disabled", "true"); get.classList.add("off");
+  document.getElementById("getLabel").textContent = ko ? "macOS 버전 준비 중" : "macOS version in development";
+}
+
 (async () => {
   if (ko) document.getElementById("note").textContent = "노래 연습을 하고 싶은 사람들을 위한 취미 프로젝트예요.";
   if (ko) document.getElementById("desktop").textContent = "데스크톱에서 방문해 주세요";
@@ -143,6 +153,7 @@ async function detectMacArch() {
   label.textContent = !os ? (ko ? "다운로드" : "Download") : ko ? `${NAMES[os]}용 다운로드` : `Download for ${NAMES[os]}`;
   if (os) logo(os);
   if (!os) return; // a phone, or unknown: the button stays on the releases page
+  if (os === "mac") return macLater();
   const key = os === "mac" ? `mac-${await detectMacArch()}` : os;
   try {
     const r = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });

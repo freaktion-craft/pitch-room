@@ -14,6 +14,8 @@ Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
 - `detectOS` and `detectMacArch` (userAgentData, else the WebGL renderer, else arm64) choose the file.
 - An inline script swaps the button's `href` to the asset's download URL. On a phone, an unknown OS, offline or when
   rate-limited, the link stays on the releases page.
+- macOS isn't offered for now: Mac visitors get the button greyed out, "macOS version in development", with no link
+  (`macLater`). Remove that line in the page's script to offer the `.dmg` again.
 - Phones and tablets see "Please visit from a desktop". Korean copy when the browser language starts with `ko`.
 - A "Downloading…" tip and a flying animation aim at the browser's downloads icon with fixed offsets per browser.
 - Dark only. A few app tokens are copied inline and must be kept in step with `css/tokens.css` by hand.
