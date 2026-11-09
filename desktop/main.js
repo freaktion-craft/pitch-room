@@ -228,8 +228,10 @@ function permissions() {
 // ---------- updates ----------
 // Windows updates itself, in the splash before the engine starts: the latest release's
 // latest.yml looked up (≤ 5 s, or it's skipped this time), a newer version downloaded, installed silently and opened.
-// macOS can't till the app's signed (Squirrel.Mac checks the signature): a newer release is offered as a download.
+// macOS updates itself too, there, by its own means (Squirrel.Mac takes only a signed app: mac-update.js); where it
+// can't (an app it can't put a new one in place of), or should that fail, a newer release is offered as a download.
 const SELF_UPDATES = app.isPackaged && !WIP && win32; // (WIP: never a release over it)
+const MAC_UPDATES = app.isPackaged && !WIP && process.platform === "darwin";
 const within = (ms, p) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(`no answer in ${ms / 1000} s`)), ms))]);
 async function updateFirst() { // true: it's installing, the app's about to quit
   autoUpdater.autoDownload = false;
@@ -258,6 +260,33 @@ async function updateFirst() { // true: it's installing, the app's about to quit
     return true;
   } catch (e) {
     console.error("update skipped:", e.message); // and the app starts as it is
+    return false;
+  }
+}
+// macOS: as Windows' (updateFirst), by mac-update.js. True: the new one's going in, the app's about to quit.
+async function updateMac() {
+  const mu = require("./mac-update");
+  const bundle = mu.bundleOf(process.execPath);
+  if (!bundle) return false; // somewhere a new one can't be put in its place: offered as a download instead (checkUpdates)
+  try {
+    status("Checking for updates…");
+    const text = await within(5000, fetch(`https://github.com/${RELEASES}/releases/latest/download/latest-mac.yml`)
+      .then((r) => { if (!r.ok) throw new Error(`latest-mac.yml: ${r.status}`); return r.text(); }));
+    const { version: v, files } = mu.parseInfo(text), file = mu.zipFor(files, process.arch);
+    if (!v || !file || !newer(v, app.getVersion())) return false;
+    const dir = path.join(app.getPath("temp"), `pitchroom-update-${v}`);
+    fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
+    status(`Updating to ${v}`, 0);
+    await mu.download(`https://github.com/${RELEASES}/releases/download/v${v}/${file.url}`, path.join(dir, file.url), file,
+      (p) => status(`Updating to ${v} · ${Math.floor(p)}%`, p));
+    status("Installing…");
+    const fresh = await mu.unpack(path.join(dir, file.url), dir, v);
+    quitting = true;
+    mu.swapAfter(process.pid, bundle, fresh, dir); // waits for this app to end, then puts the new one in and opens it
+    setImmediate(() => app.quit());
+    return true;
+  } catch (e) {
+    console.error("update skipped:", e.message); // and the app starts as it is (checkUpdates offers it as a download)
     return false;
   }
 }
@@ -376,6 +405,7 @@ else {
     menu();
     showSplash();
     if (SELF_UPDATES && (await updateFirst())) return;
+    if (MAC_UPDATES && (await updateMac())) return;
     status("Starting…");
     try { await startServer(); } catch (e) {
       closeSplash();

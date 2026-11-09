@@ -19,7 +19,15 @@ Windows and macOS only.
   - Asks before quitting while jobs or an install are running.
   - Self-update (Windows, packaged, not WIP): `updateFirst` runs in the splash before the server starts and downloads
     the whole installer, then `standIn` shows a PowerShell stand-in splash (`update-splash.ps1`) while the installer
-    runs. macOS and dev runs get a "newer version" dialog that opens pitchroom.dev (`checkUpdates`).
+    runs.
+  - Self-update (macOS, packaged, not WIP): `updateMac` (`desktop/mac-update.js`), in the splash too. The app's unsigned,
+    so not electron-updater (Squirrel.Mac takes only a signed app): `latest-mac.yml` read, this Mac's zip downloaded
+    to the temp folder and its sha512 checked, unpacked with `ditto` and its version checked, then a detached `sh`
+    script waits for the app to quit, moves the old `.app` aside, puts the new one in its place (the old one back if
+    that fails) and opens it. Skipped where it can't swap the app (run from a disk image, App Translocation, a folder
+    it can't write) or on any failure: the app starts as it is.
+  - Dev runs, and a Mac that couldn't update itself, get a "newer version" dialog that opens pitchroom.dev
+    (`checkUpdates`).
   - The automatic update check runs 8 s after start on builds that don't self-update (and not WIP). "Check for
     Updates…" (File menu on Windows, the app menu on macOS) runs it by hand on every build.
   - Menu: Help → Show Log, Third-Party Notices, Open Data Folder, Pitchroom Releases.

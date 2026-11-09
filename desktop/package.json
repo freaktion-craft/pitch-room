@@ -33,6 +33,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "mac-update.js",
       "splash.html",
       "update-splash.ps1",
       "package.json"
