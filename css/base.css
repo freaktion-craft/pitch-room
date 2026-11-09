@@ -68,6 +68,9 @@ header { display: flex; align-items: center; gap: var(--space-2); margin-bottom:
    little more room above the page so the name clears them (desktop/main.js). The header's empty part and a strip along the top move the
    window, as a title bar would. */
 html.desktop-mac .app { padding-top: calc(var(--space-6) + var(--space-3)); } /* room under the buttons, above the name */
+/* and the whole window wide, not 1440 in its middle: its left edge stays under the buttons (in as far as it is,
+   trafficLightPosition, desktop/main.js), its right at the window's, the scrollbar alone beside it, however wide it's made */
+html.desktop-mac .app { max-width: none; margin-left: 0; }
 html.desktop-mac #app > header { -webkit-app-region: drag; }
 /* onboarding left for Settings, unfinished (welcome()): the header only the mic and Settings, which takes you back to it */
 html.ob-left #app > header > :not(.brand, #micBtn, .tabs, .pop), html.ob-left .tabs > :not(#micSetBtn) { display: none; } /* (of the tabs, Settings alone) */
