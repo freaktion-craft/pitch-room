@@ -264,7 +264,10 @@
 /* Scales' trills under the vowels: a name alone (no turn, no days); the first a line off them */
 .vc-vowels button[data-on] { grid-template-columns: 1fr; }
 .vc-vowels [data-v] + [data-on] { margin-top: var(--space-2); }
-/* Scales' pattern: its name on a button, its menu the groups side by side, each pattern its name over its degrees */
+/* Scales' pattern: its name on a button, its menu the groups side by side, each pattern its name over its degrees; beside
+   it, your line hidden while you sing, pressed as Freeze is */
+.sc-top { display: flex; gap: var(--space-2); }
+.sc-hide[aria-pressed="true"] { background: color-mix(in oklab, var(--voice-act) 35%, var(--fill)); color: var(--ink); }
 .sc-pat.open { background: var(--fill); }
 .sc-pats { grid-template-columns: repeat(3, auto); gap: var(--space-1); max-height: calc(100vh - var(--space-8)); overflow-y: auto; }
 .sc-col { display: grid; align-content: start; gap: var(--space-half); }

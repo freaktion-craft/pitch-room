@@ -187,7 +187,8 @@ const EMPTY_LIBRARY = false;
       <!-- Scales: a pattern played from the start note, then sung back, a key at a time up and back down (js/voice-scale.js) -->
       <section class="vc-scale" aria-label="Scales" hidden>
         <canvas id="scPad" aria-hidden="true"></canvas>
-        <button class="btn sm vc-mode sc-pat" id="scPat" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="scPats"><span id="scPatName">3 notes</span></button>
+        <!-- the pattern, and beside it your own line hidden while you sing, or not (scHidden) -->
+        <div class="vc-mode sc-top"><button class="btn sm sc-pat" id="scPat" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="scPats"><span id="scPatName">3 notes</span></button><button class="btn sm icon sc-hide" id="scHide" type="button" aria-pressed="false" aria-label="Hide my line while I sing" title="Hide my line while I sing"></button></div>
         <button class="btn sm primary vc-go" id="scGo" type="button">Start</button>
         <div class="vc-say"><p id="scSay" aria-live="polite"></p><p id="scDo"></p></div>
       </section>

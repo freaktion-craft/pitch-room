@@ -7,12 +7,14 @@
 // The vowel's turn, where Turn has found one, is drawn across the pattern. The measures are js/scale.js's; this is the page.
 
 // Kept: voiceScales ({v: 1, [pattern]: rows}, a row a day: [yyyymmdd, notes judged, good, the day's highest clean top (the
-// key sung) or null], sixty a pattern); voiceScalePat; voiceScaleStart (only once the singer sets it); voiceScaleOn.
+// key sung) or null], sixty a pattern); voiceScalePat; voiceScaleStart (only once the singer sets it); voiceScaleOn;
+// voiceScaleHide.
 // pat: the pattern; start: its first key; on: what it's sung on ("" the vowel, else a trill's: SC_ON); run: the set going
 // on; last: the key last judged ({N, res, xs, pat}), drawn; keys: this set's results, and flip: where it turned round (the
 // strip by Go); best: the pattern's highest clean top, as the set began; o: the octave last sung (12 from the piano, or
-// 0); msg: the lines say something of their own; at: the last frame (a gap: the page was hidden)
-const SV = { pat: "p3", start: 48, on: "", data: vcLoad("voiceScales"), run: null, last: null, keys: [], flip: -1, best: null, o: 0, msg: false, at: 0 };
+// 0); msg: the lines say something of their own; at: the last frame (a gap: the page was hidden); hide: your own line
+// hidden while you sing (scHidden)
+const SV = { pat: "p3", start: 48, on: "", hide: false, data: vcLoad("voiceScales"), run: null, last: null, keys: [], flip: -1, best: null, o: 0, msg: false, at: 0 };
 // Sung on beside the vowels, in Scales only: a trill's pitch is read as a vowel's, but it has no vowel, so no turn
 const SC_ON = [["lip", "lip trill"], ["tongue", "tongue trill"]];
 const SC_GRPS = [["up", "Up"], ["down", "Down"], ["leap", "Leaps"]];
@@ -56,6 +58,11 @@ function scSetPat(p) {
 // vowel's turn
 function scVowel() { if (!SV.run && !Number.isFinite(store.get("voiceScaleStart", null))) { SV.start = scDefault(); vcGuide(); } paintScale(); }
 function scSetOn(on) { SV.on = on; store.set("voiceScaleOn", on); paintTurn(); scVowel(); }
+// Your own line hidden while you sing, if you choose (results after, not a meter watched meanwhile): in a set, your trace
+// (only a dot at the plot's foot while you're heard: drawScale), the side's note, cents and needle (paintVoiceRead) and
+// the key lit as you sing it (voiceFrame) aren't shown. Each key's marks and its trace still come as it's judged.
+const scHidden = () => SV.hide && !!SV.run;
+function scSetHide(on) { SV.hide = on; store.set("voiceScaleHide", on); paintScale(); }
 
 // ---------- what's said ----------
 // The status line and the one under it, as Turn's (vcSay): keep, or what's said while idle; tone, the status's colour
@@ -88,6 +95,12 @@ function scWords(res) {
   if (wn.st === "short") return ["{k} of {n} on pitch · {note} too short", { ...kn, ...nm }, "Give every note its beat.", null, "step"];
   return [wn.c > 0 ? "{k} of {n} on pitch · {note} sharp" : "{k} of {n} on pitch · {note} flat", { ...kn, ...nm },
     ...(near ? at : [wn.c > 0 ? "Aim lower on {note}." : "Aim higher on {note}.", nm]), "step"];
+}
+// A retry's line: the key's tip after "Again:" (its first word lower-cased; a note name, as Korean's tips begin with,
+// kept), or with none, "Again, same key."
+function scAgain(d, dv) {
+  if (!d) return ["Again, same key."];
+  return ["Again: {tip}", { tip: () => { const t = tr(d, dv); return /^\p{Lu}\p{Ll}/u.test(t) ? t[0].toLowerCase() + t.slice(1) : t; } }];
 }
 
 // ---------- the set ----------
@@ -177,7 +190,7 @@ function scKeyDone(now, why) {
   else if (R.early) w.splice(2, 2, "Wait for the piano to finish.", null);
   R.status = [w[0], w[1], w[4]]; R.step = n.st;
   if (n.st.dir !== dir) SV.flip = SV.keys.length - 1;
-  R.advice = R.early ? [w[2], w[3]] : n.say === "retry" ? ["Again, same key."] : n.say === "down" ? ["Coming back down."] : n.say === "same" ? ["Louder, nearer the mic."] : w[2] ? [w[2], w[3]] : null;
+  R.advice = R.early ? [w[2], w[3]] : n.say === "retry" ? scAgain(w[2], w[3]) : n.say === "down" ? ["Coming back down."] : n.say === "same" ? ["Louder, nearer the mic."] : w[2] ? [w[2], w[3]] : null;
   if (n.end === "unread") scQuit("Couldn’t read that one", "Louder, nearer the mic.");
   else if (n.end) scSetEnd();
   else { scSay(w[0], w[1], R.advice ? R.advice[0] : "Listen.", R.advice ? R.advice[1] : null, true, w[4]); R.phase = "rest"; R.next = now + SC.rest; vcGuide(); }
@@ -244,6 +257,7 @@ function paintScale() {
   // the trills, under the vowels in Scales only; one of them picked, no vowel is (paintTurn)
   for (const b of $("#vcVowels").querySelectorAll("[data-on]")) { b.hidden = VC.view !== "scale"; b.setAttribute("aria-checked", String(b.dataset.on === SV.on)); }
   say($("#scGo"), SV.run ? "Stop" : "Start");
+  $("#scHide").setAttribute("aria-pressed", String(SV.hide));
   if (VC.view === "scale") { say($("#vcStepLbl"), SV.run ? "Key" : "Start note"); vcGuide(); } // (in a set, the key it's on)
   if (!SV.run && !SV.msg) scIdle();
   vcTitles();
@@ -266,7 +280,8 @@ function scMark(g, st, x, y, c) {
   else scHalo(g, C.muted, (u) => { g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); if (!u) { g.lineWidth = 1.5; g.setLineDash([2, 2]); } g.stroke(); g.setLineDash([]); });
 }
 // Scales: a column a note of the key, its target a grey bar (as tall as ±25 c: on pitch inside it), the vowel's turn across
-// (a place, so grey); your trace in your colour, live as you sing, then each note's warped into its column with its mark
+// (a place, so grey); your trace in your colour, live as you sing (unless it's hidden: scHidden), then each note's warped
+// into its column with its mark
 // (good a green dot, close an orange ▲ sharp or ▼ flat, too short an orange dash, a miss or a skip a red ×, an octave off
 // a red arrow up or down on its target, unread a dashed ring). The set's keys by Go.
 function drawScale(now) {
@@ -276,9 +291,10 @@ function drawScale(now) {
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0);
   const W = r.width, H = r.height;
-  // the strip (this set's keys, or the pattern's days): between the pattern and Go; where that's too narrow (a phone), a
-  // row of its own under the two lines, the plot below it
-  let x1 = $("#scGo").offsetLeft - 16, xMin = $("#scPat").offsetLeft + $("#scPat").offsetWidth + 16, ys = 28, top = SC_IN.t;
+  // the strip (this set's keys, or the pattern's days): between the pattern (and the toggle beside it) and Go; where
+  // that's too narrow (a phone), a row of its own under the two lines, the plot below it
+  const tl = $(".sc-top");
+  let x1 = $("#scGo").offsetLeft - 16, xMin = tl.offsetLeft + tl.offsetWidth + 16, ys = 28, top = SC_IN.t;
   if (x1 - xMin < 40) { x1 = W - SC_IN.r - 4; xMin = SC_IN.l; ys = SC_IN.t + 4; top = SC_IN.t + 16; }
   const P = { l: SC_IN.l, r: W - SC_IN.r, t: top, b: H - SC_IN.b };
   g.clearRect(0, 0, W, H);
@@ -286,10 +302,11 @@ function drawScale(now) {
   const font = (px) => `${px}px ${VC.font}`;
   g.lineCap = "round"; g.lineJoin = "round";
   // what's shown: the key going on; else the key last judged; else the pattern from the start note
-  const R = SV.run, L = SV.last;
+  // (your line hidden: the key in the octave it began in, not moved to the one you're heard in)
+  const R = SV.run, L = SV.last, hide = scHidden();
   let pat, T, res = null, xs = null, lit = -1, live = false;
   if (R && R.phase !== "rest") {
-    pat = SC_PATS[R.pat]; T = R.N.map((m) => m + (R.o0 ?? R.o)); live = R.phase === "sing";
+    pat = SC_PATS[R.pat]; T = R.N.map((m) => m + (hide ? R.o : R.o0 ?? R.o)); live = R.phase === "sing";
     const ti = now - R.callAt - heardLag() * 1000; // (the last note's held two beats)
     if (R.phase === "call" && ti >= 0 && ti < scCallLen(pat) * 1000) lit = Math.min(R.N.length - 1, Math.floor(ti / (R.beat * 1000)));
   } else if (L) { pat = SC_PATS[L.pat]; res = L.res; xs = L.xs; T = res.T; }
@@ -319,7 +336,7 @@ function drawScale(now) {
   // your trace
   g.save(); g.beginPath(); g.rect(P.l, P.t, P.r - P.l, P.b - P.t); g.clip();
   g.strokeStyle = g.fillStyle = vcMine(); g.lineWidth = 2;
-  if (live) {
+  if (live && !hide) {
     const span = Math.max(scCallLen(pat) * 1000, now - R.t0), xOf = (t) => P.l + ((t - R.t0) / span) * (P.r - P.l);
     let on = false, pt = null, head = null;
     g.beginPath();
@@ -349,6 +366,12 @@ function drawScale(now) {
     }
   }
   g.restore();
+  // your line hidden: only that you're heard, a dot at the plot's foot under where its head would be, while a voice comes
+  // in (its pitch read or not)
+  if (live && hide) {
+    const s = VC.fr[VC.fr.length - 1], span = Math.max(scCallLen(pat) * 1000, now - R.t0);
+    if (s && s.v && s.t >= R.t0 && now - s.t < 120) { g.fillStyle = vcMine(); g.beginPath(); g.arc(P.l + ((s.t - R.t0) / span) * (P.r - P.l), P.b, 4, 0, Math.PI * 2); g.fill(); }
+  }
   // the marks, and how far off a close note or a miss is (only the worst's, where the columns are narrow)
   if (res && !live) {
     for (const q of res.notes) {
@@ -401,6 +424,7 @@ function initScales() {
   const p = store.get("voiceScalePat", "p3"), s = store.get("voiceScaleStart", null), on = store.get("voiceScaleOn", "");
   SV.pat = SC_PATS[p] ? p : "p3";
   SV.on = SC_ON.some(([k]) => k === on) ? on : "";
+  SV.hide = store.get("voiceScaleHide", false) === true;
   SV.start = Number.isFinite(s) ? scClamp(s) : scDefault();
   const menu = $("#scPats");
   for (const [g, label] of SC_GRPS) {
@@ -432,6 +456,8 @@ function initScales() {
     b.onclick = () => { if (k !== SV.on) scSetOn(k); };
     $("#vcVowels").append(b);
   }
+  $("#scHide").append(icon("hide"));
+  $("#scHide").onclick = () => scSetHide(!SV.hide);
   $("#scGo").onclick = scGo;
   paintScale();
 }

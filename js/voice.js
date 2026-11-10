@@ -118,7 +118,7 @@ function voiceFrame() {
   if ($("#vcOff").hidden !== !off) $("#vcOff").hidden = !off;
   drawTurn(now); drawScale(now); drawSpec(now, hearing); drawEq(now, hearing);
   if (now - VC.painted > 100) { VC.painted = now; paintVoiceRead(); }
-  vcKeys(vcCur());
+  vcKeys(scHidden() ? null : vcCur()); // (none in a Scales set with your line hidden: scHidden)
 }
 // The note read now, as the Lab reads it: the line, an octave down where it read a yell an octave high (VC.hold)
 const vcCur = () => (cur != null && VC.hold.down ? cur - 12 : cur);
@@ -758,10 +758,10 @@ function vcVowelRead() {
   const t = vcTurns(VC.vowel).pop(), own = t ? 2 * mf(t.t) : F1_PRIOR[VC.vowel] || F1_PRIOR.a, f0 = mf(VC.fmAt);
   return f0 <= TN.f1Read && 3 * f0 <= Math.min(VC.fm[0], own);
 }
-// Beside the view: the note and how far off it is (in cents, against A440), H1−H2, the level, and F1 · F2 ("~" where the
-// vowel can't be read: vcVowelRead)
+// Beside the view: the note and how far off it is (in cents, against A440; neither in a Scales set with your line hidden:
+// scHidden), H1−H2, the level, and F1 · F2 ("~" where the vowel can't be read: vcVowelRead)
 function paintVoiceRead() {
-  const sung = vcCur(), m = sung == null ? null : sung + 12 * Math.log2(A4 / 440);
+  const sung = scHidden() ? null : vcCur(), m = sung == null ? null : sung + 12 * Math.log2(A4 / 440);
   setText("vcNote", m == null ? "–" : absName(m)); setText("vcTgt", absName(vcShown())); // (the names as set now)
   const c = m == null ? null : Math.round((m - Math.round(m)) * 100);
   setText("vcCents", c == null ? "" : (c > 0 ? "+" : c < 0 ? "−" : "±") + Math.abs(c) + "¢");
