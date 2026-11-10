@@ -12,7 +12,7 @@
 :root, .theme-dark {
   /* surfaces and ink */
   --bg: oklch(0.165 0 0); --surface: oklch(0.2 0 0); --surface-2: oklch(0.275 0 0); --hover-2: oklch(0.315 0 0); /* buttons and fields stand clear of the card */
-  --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0); --knob: oklch(0.87 0 0); --knob-hot: oklch(0.66 0 0);
+  --ink: oklch(0.94 0 0); --ink-strong: oklch(1 0 0); --on-ink: oklch(0.165 0 0); --on-ink-muted: rgba(0, 0, 0, 0.56); --knob: oklch(0.87 0 0); --knob-hot: oklch(0.66 0 0);
   /* the ink's tints: white at n % (--fg-n), the steps every translucent fill, line and text below is drawn from */
   --fg: 255, 255, 255;
   --fg-2: rgba(var(--fg), 0.02); --fg-6: rgba(var(--fg), 0.06); --fg-8: rgba(var(--fg), 0.08); --fg-12: rgba(var(--fg), 0.12);
@@ -87,7 +87,7 @@
    (--voice-ink, 4.5:1, pink's too); text on them is dark, as in the dark theme (Mono's, near-black, white). ---- */
 :root[data-theme="light"] {
   --bg: oklch(0.965 0 0); --surface: oklch(1 0 0); --surface-2: oklch(0.935 0 0); --hover-2: oklch(0.9 0 0);
-  --ink: oklch(0.2 0 0); --ink-strong: oklch(0 0 0); --on-ink: oklch(0.99 0 0); --knob: oklch(1 0 0); --knob-hot: oklch(0.5 0 0);
+  --ink: oklch(0.2 0 0); --ink-strong: oklch(0 0 0); --on-ink: oklch(0.99 0 0); --on-ink-muted: rgba(255, 255, 255, 0.5); --knob: oklch(1 0 0); --knob-hot: oklch(0.5 0 0);
   --fg: 0, 0, 0;
   --muted: rgba(var(--fg), 0.62); --faint: rgba(var(--fg), 0.56); --placeholder: rgba(var(--fg), 0.44); --dim: rgba(var(--fg), 0.3);
   --fill: var(--fg-6); --line: var(--fg-8); --ring: var(--fg-12); --track: var(--fg-12);

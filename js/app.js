@@ -443,10 +443,10 @@ async function riffleName(brand) {
 }
 $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
-// Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest
-// still play, seek and step (Record clicked, then Space, plays rather than ending the take). One reached with Tab
-// keeps its own keys, so a button presses with Space and a slider goes to its ends with Home and End. Text fields and
-// an open list or menu always keep theirs.
+// Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest still
+// play, seek and step (Shift+← and Shift+→, or Home and End, to the start and the end; Record clicked, then Space, plays
+// rather than ending the take). One reached with Tab keeps its own keys, so a button presses with Space and a slider goes
+// to its ends with Home and End. Text fields and an open list or menu always keep theirs.
 let tabbed = false;
 addEventListener("pointerdown", () => { tabbed = false; }, true);
 addEventListener("keydown", (e) => { if (e.key === "Tab") tabbed = true; }, true);
@@ -457,12 +457,13 @@ document.addEventListener("keydown", (e) => {
   if (ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (view === "stems" && stemsPage === "song" && P.song) {
     if (e.code === "Space") { e.preventDefault(); if (!e.repeat) P.playing ? pauseSong() : playSong(); }
-    else if (e.code === "Home" || e.code === "End") { e.preventDefault(); if (e.code === "Home") seekSong(0); else seekEnd(); }
+    else if (e.code === "Home" || (e.shiftKey && e.code === "ArrowLeft")) { e.preventDefault(); seekSong(0); }
+    else if (e.code === "End" || (e.shiftKey && e.code === "ArrowRight")) { e.preventDefault(); seekEnd(); }
     return;
   }
   if (view === "practice" && K.on) {
     if (e.repeat && /^(Space|KeyL|KeyR|KeyM)$/.test(e.code)) { e.preventDefault(); return; }
-    const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
+    const act = { Space: songToggle, ArrowLeft: e.shiftKey ? songStart : () => phraseStep(-1), ArrowRight: e.shiftKey ? songEnd : () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
       Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: S.dev && !e.repeat ? () => dropNote(e) : null,
       BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }

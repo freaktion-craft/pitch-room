@@ -320,7 +320,7 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
 .crumb[aria-current] { color: var(--ink); } /* where you are: only its colour differs */
 .crumb-sep { color: var(--faint); }
 .bb-acts { display: flex; align-items: center; gap: var(--space-2); } /* the song's own: Download (what you hear, an MP3), then Practice */
-.lib-head { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-bottom: var(--space-4); } /* 28 px to what's next (New, Continue practising, or the list) with the group's 12; search and Add song together at the right */
+.lib-head { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); margin-bottom: var(--space-4); } /* 28 px to what's next (New, Continue practising, or the list) with the group's 12; search and Add song together at the right, 8 px apart as every field is from its button */
 /* Search, heading the list in place of a "Library" that said nothing: the songs whose title or artist has every word
    typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes
    to it, its keys shown at its right end until it's in use (not where there's no keyboard); Esc empties it. At the
