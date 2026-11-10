@@ -286,7 +286,7 @@
 .track.off .ico { opacity: 0.35; }
 .track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
 .tog { height: var(--control-sm); min-width: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill); font: var(--weight-medium) var(--text-xs) var(--mono); color: var(--muted); }
-.tog[aria-pressed="true"].m { background: var(--ink); color: var(--on-ink); }
+.tog[aria-pressed="true"].m { background: var(--voice-mark); color: var(--on-voice); } /* on (Practice's Loop and click): your colour; a track's M has its own (.ms) */
 .tog[aria-pressed="true"].s { background: var(--solo); color: var(--on-solo); }
 .tog:hover { background: var(--fg-8); }
 /* A track's mute and solo: one pair, flat as the buttons beside them (the click's 4/4, Shift accent), a hairline of the

@@ -120,6 +120,9 @@ play outside Studio and Practice.
   window.
 - Accents: `ACCENTS` in `stage.js`. `"white"` is the stored key for Mono; keep it, saved settings use it. `paintAccent`
   sets `--voice`, `--voice-act` and `--on-voice` on `<html>` and each `.theme-dark`.
+- `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills, switches on,
+  Loop on), never on what you press; `tokens.css` works it out from `--voice-act` (no lighter than L 0.66 in the light
+  theme), so no script sets it.
 - `--on-voice` and `--on-voice-mono` may take `--on-accent`, but `--on-voice-mono` must never refer to `--on-voice`
   (or anything that leads back to it). Mono sets `--on-voice: var(--on-voice-mono)`, so a cycle leaves no colour at
   all. (The comment in `tokens.css` overstates this as "never one another's".)

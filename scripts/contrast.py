@@ -4,6 +4,7 @@
 
 Each theme's tokens are read from tokens.css as the browser would have them on <html>: the dark ones (:root), the
 light ones over them (:root[data-theme="light"]), and each again with its wide-gamut accents (@media (color-gamut: p3)).
+What's set under @supports is read as a browser that has it (the desktop app's does).
 A colour with alpha is laid over what's under it in sRGB, as the browser does. Contrast is WCAG 2's.
 """
 import math
@@ -91,7 +92,7 @@ def over(top, under):
 
 # ---------- the tokens ----------
 def blocks(css):
-    """[(selector, media, {name: value})] for each rule in the file, in order (one level of @media)."""
+    """[(selector, media, {name: value})] for each rule in the file, in order (one level of @media or @supports)."""
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     out, i, media = [], 0, None
     stack = []
@@ -100,7 +101,7 @@ def blocks(css):
         ch = css[i]
         if ch == "{":
             sel = css[sel_start:i].strip()
-            if sel.startswith("@media"):
+            if sel.startswith(("@media", "@supports")):
                 stack.append(("media", sel))
                 media = sel
                 sel_start = i + 1
@@ -129,9 +130,9 @@ def blocks(css):
 
 def theme(css, light, p3):
     """The tokens as <html> has them: :root's (with its P3 accents on a P3 screen), then, for light, the light block's
-    over them (it outranks :root wherever it is: its specificity's higher), its own P3 ones last."""
+    over them (it outranks :root wherever it is: its specificity's higher), its own @supports and P3 ones last."""
     bl, t = blocks(css), {}
-    on = lambda media: not media or ("p3" in media and p3)
+    on = lambda media: not media or media.startswith("@supports") or ("p3" in media and p3)
     for sel_want in ([":root"], [':root[data-theme="light"]']) if light else ([":root"],):
         for want_media in (False, True):
             for sel, media, decls in bl:
@@ -156,6 +157,8 @@ def resolve(t, v, depth=0):
 def colour(t, name, p3):
     if name.startswith("mix:"):  # an accent as small text: as --voice-ink has it (a color-mix with the ink, or itself)
         return parse_colour(ink_mix(t, name[4:]), p3)
+    if name.startswith("mark:"):  # an accent as a mark: as --voice-mark has it (its lightness held down, or itself)
+        return parse_colour(voice_mark(t, name[5:]), p3)
     v = resolve(t, t[name]) if name.startswith("--") else name
     c = parse_colour(v, p3)
     if c is None:
@@ -180,6 +183,21 @@ def ink_mix(t, accent):
     return f"oklch({L} {math.hypot(x, y)} {math.degrees(math.atan2(y, x)) % 360})"
 
 
+def voice_mark(t, accent):
+    """--voice-mark for this accent, from its --voice-act (the accent, or the ink for Mono: paintAccent): that as it is
+    where it's var(--voice-act), or with its lightness held to N where it's "oklch(from var(--voice-act) min(l, N) c h)".
+    It reads no other form."""
+    act = resolve(t, "var(--ink)" if accent == "--voice-white" else t[accent])
+    v = t["--voice-mark"].strip()
+    if v == "var(--voice-act)":
+        return act
+    m = re.fullmatch(r"oklch\(from var\(--voice-act\) min\(l, ([\d.]+)\) c h\)", v)
+    if not m:
+        raise ValueError(f"--voice-mark: can't read {v!r}")
+    L, c, h = (num(x) for x in re.findall(r"[\d.]+%?", act.split("(", 1)[1])[:3])
+    return f"oklch({min(L, float(m[1]))} {c} {h})"
+
+
 # ---------- the pairs ----------
 # (text, on, at least): text on a background, each a token or a colour; a background that's itself see-through is laid
 # over the next one along (a chip over the card): "a|b".
@@ -191,12 +209,17 @@ for bg in ["--bg", "--surface"]:
     for k in ACCENTS:  # your colour as a line, a dot, a fill and large text (a sung word): 3:1; as small text, mixed
         PAIRS.append((f"--voice-{k}", bg, 1.5 if k in ("pink", "sky") else 3))  # with the ink as --voice-ink is: 4.5:1 (pink, sky: pastels, by choice)
         PAIRS.append((f"mix:--voice-{k}", bg, 4.5))
+        # as a mark (--voice-mark: the section's line, a switch on, a slider's fill): 3:1; the pastels, by choice, are
+        # 2.76 (sky) and 2.95 (pink) on the light theme's page, at the others' lightness (3.06, 3.26 on the card)
+        PAIRS.append((f"mark:--voice-{k}", bg, 2.7 if bg == "--bg" and k in ("pink", "sky") else 3))
 PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--hover-2", 4.5),
           ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
           ("--on-solo", "--solo", 4.5), ("--solo", "--tog-down", 3),
           ("--placeholder", "--surface-2", 3), ("--on-media", "oklch(0.25 0 0)", 4.5)]
 for k in ACCENTS:
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5))
+    PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"mark:--voice-{k}", 4.5))  # on a mark's fill (a take playing, Loop on)
+    PAIRS.append(("--on-ink", f"mark:--voice-{k}", 2.9 if k in ("pink", "sky") else 3))  # a switch's knob, on (sky's 2.97 in the light theme)
 
 
 def chip_pairs(t, p3):

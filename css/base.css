@@ -51,13 +51,13 @@ a { color: inherit; text-decoration: none; }
 header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-18); } /* the chips 8 px apart, as buttons side by side are elsewhere */
 .brand { font: 400 var(--text-xl)/1 var(--font-brand); letter-spacing: -0.01em; }
 /* The sections, right of the name: Library (its song pages and Practice in it too) and Lab, the one you're in lit (route()) */
-/* words, a size up from the buttons', no fill; the one you're in in ink, and one stroke under it that slides over to
-   the other as you go there (paintTabLine), fading where it is while you're in neither (Settings) */
+/* words, a size up from the buttons', no fill; the one you're in in ink, and one stroke under it in your colour that
+   slides over to the other as you go there (paintTabLine), fading where it is while you're in neither (Settings) */
 .tabs { position: relative; display: flex; gap: var(--space-2); margin: 0 auto 0 var(--space-5); }
 .tab.btn { background: transparent; color: var(--muted); font-size: var(--text-lg); transition: color var(--duration-fast); }
 .tab.btn:hover { background: transparent; color: var(--ink); }
 .tab.btn.on { color: var(--ink); }
-.tab-line { position: absolute; left: 0; bottom: 2px; width: 0; height: 2px; border-radius: var(--radius-pill); background: var(--ink); opacity: 0; pointer-events: none;
+.tab-line { position: absolute; left: 0; bottom: 2px; width: 0; height: 2px; border-radius: var(--radius-pill); background: var(--voice-mark); opacity: 0; pointer-events: none;
   transition: transform 0.36s var(--ease), width 0.36s var(--ease), opacity var(--duration-fast); }
 .tab-line.on { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .tab-line { transition: opacity var(--duration-fast); } }
@@ -151,7 +151,9 @@ header { position: relative; }
 .set-nav button { height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: none; color: var(--muted);
   font: var(--text-md)/20px var(--font); text-align: left; cursor: pointer; transition: background-color var(--duration-fast), color var(--duration-fast); }
 .set-nav button:hover { background: var(--fill); color: var(--ink); }
-.set-nav button[aria-current="true"] { background: var(--fill); color: var(--ink); }
+.set-nav button[aria-current="true"] { position: relative; background: var(--fill); color: var(--ink); }
+/* the one being read: a short bar at its left in your colour (3 px wide, 7 px in from its top and bottom: drawing) */
+.set-nav button[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: var(--radius-pill); background: var(--voice-mark); }
 .set-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 @media (max-width: 720px) { .set-layout { grid-template-columns: minmax(0, 1fr); } .set-nav { display: none; } }
 /* Song tools (paintTools): its buttons side by side; under the row, while it's busy or after a Check, the install's bar
@@ -501,7 +503,7 @@ html.welcome #boot, html.asking #welcome { display: none; }
 .ob-progress button:disabled { cursor: default; } /* a step not been to yet */
 .ob-progress button[hidden] { display: none; } /* a step there isn't (the mic allowed already) */
 .ob-progress button.done::before { background: var(--fg-46); }
-.ob-progress button[aria-current="step"]::before { background: var(--ink); }
+.ob-progress button[aria-current="step"]::before { background: var(--voice-mark); } /* the one you're on, in your colour */
 .ob-progress button:focus-visible { outline: 2px solid var(--voice-act); outline-offset: 2px; border-radius: var(--radius-xs); }
 html.welcome .brand { visibility: hidden; } /* till the name gets there */
 /* Page intro: the title, set apart from what follows */
@@ -549,16 +551,16 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(-
 .ring.spin { animation: ring-spin 0.9s linear infinite; }
 @keyframes ring-spin { to { transform: rotate(270deg); } }
 @media (prefers-reduced-motion: reduce) { .ring.spin { animation: none; } }
-.pick-list [aria-selected="true"] .ico { visibility: visible; }
-/* Sliders: a thin line, filled up to the handle (--p, which sliderTips keeps in step: Chrome has no style for that part),
-   and a small round handle that turns a muted grey under the pointer or while it's held */
+.pick-list [aria-selected="true"] .ico { visibility: visible; color: var(--voice-mark); } /* the tick, in your colour */
+/* Sliders: a thin line, filled in your colour up to the handle (--p, which sliderTips keeps in step: Chrome has no style
+   for that part), and a small round handle in ink that turns a muted grey under the pointer or while it's held */
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; max-width: 100%; height: 20px; margin: 0; background: transparent; --p: 0%; }
-input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: var(--radius-pill); background: linear-gradient(to right, var(--ink) var(--p), var(--track) var(--p)); }
+input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: var(--radius-pill); background: linear-gradient(to right, var(--voice-mark) var(--p), var(--track) var(--p)); }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: calc(var(--space-1) * -1); border: 0; border-radius: 50%; background: var(--ink);
   transition: background-color var(--duration-fast), transform var(--duration-fast) var(--ease); }
 input[type="range"].hot::-webkit-slider-thumb { background: var(--knob-hot); transform: scale(1.17); }
 input[type="range"]::-moz-range-track { height: 4px; border-radius: var(--radius-pill); background: var(--track); }
-input[type="range"]::-moz-range-progress { height: 4px; border-radius: var(--radius-pill); background: var(--ink); }
+input[type="range"]::-moz-range-progress { height: 4px; border-radius: var(--radius-pill); background: var(--voice-mark); }
 input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--ink); }
 input[type="range"].hot::-moz-range-thumb { background: var(--knob-hot); }
 input[type="range"]:disabled { opacity: 0.4; }
@@ -573,7 +575,7 @@ input[type="range"]:disabled { opacity: 0.4; }
   margin: 0; cursor: pointer; transition: background-color var(--duration-base) var(--ease); flex: none; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--knob);
   box-shadow: var(--shadow-knob); transition: transform var(--duration-base) var(--ease); }
-.switch:checked { background: var(--ink); }
+.switch:checked { background: var(--voice-mark); } /* on: your colour, its knob dark in the dark theme and white in the light */
 .switch:checked::after { transform: translateX(16px); background: var(--on-ink); }
 .hint { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
 .credit { margin: var(--space-3) 0 0; color: var(--faint); font-size: var(--text-xs); }

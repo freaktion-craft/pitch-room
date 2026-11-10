@@ -108,7 +108,8 @@ writing; match them.
 - A new colour token needs a dark value (`:root, .theme-dark`), its own light value (`:root[data-theme="light"]`), and
   a P3 value if it's an accent.
 - If text sits on it or it is read as text, add the pair to `PAIRS` in `scripts/contrast.py` (it doesn't find pairs by
-  itself), run it, and quote the result. It only understands `color-mix()` in the exact form `--voice-ink` uses.
+  itself), run it, and quote the result. It only understands `color-mix()` in the exact form `--voice-ink` uses, and
+  relative colour only in `--voice-mark`'s form (`oklch(from var(--voice-act) min(l, N) c h)`, under `@supports`).
 - The accent list must match in `tokens.css`, `stage.js` `ACCENTS` and `contrast.py`.
 - Pink is a pastel by the owner's choice: its contrast minimum is relaxed on purpose. Don't "fix" it.
 - `--on-voice` and `--on-voice-mono` may take `--on-accent`, but `--on-voice-mono` must never refer to `--on-voice`

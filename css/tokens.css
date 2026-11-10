@@ -43,6 +43,10 @@
   /* --voice-act: your colour on a button or what one's doing (pressed, a focus ring): --voice, but Mono at the ink's
      full strength, the toning down being for what isn't one (set with --voice, by setAccent) */
   --voice-act: var(--ink);
+  /* --voice-mark: your colour as a mark that has to be seen (a line, a fill, a bar: 3:1), for where you are and what's
+     on; nothing you press to do something takes it. --voice-act as it is here (Mono the ink), deepened in the light
+     theme (below); worked out from it here, not set by paintAccent */
+  --voice-mark: var(--voice-act);
   /* text on an accent (--on-accent: on any of the colours, in either theme), on yours (--on-voice), and on Mono's
      (--on-voice-mono), which Mono puts in --on-voice (stage.js): each its own value, never one another's (a loop of
      them is no colour at all) */
@@ -83,6 +87,7 @@
    fills, the sung words: L 0.63–0.67, near the dark ones' 0.68–0.77), each 95 % as vivid as sRGB has there (and P3
    below), so they look like the same colours. Pink is baby pink, as the dark theme's is (the owner's pick): a pastel
    can't be 3:1 on white, so it's soft as a line (1.6:1), and deeper where it's read (the sung words, --sung-hi).
+   Marking where you are or what's on (--voice-mark), each is no lighter than L 0.66: the pastels 2.8–3.3:1 there.
    Orange and amber a little deeper, as they must be on white. As small text they're mixed half with the ink
    (--voice-ink, 4.5:1, pink's too); text on them is dark, as in the dark theme (Mono's, near-black, white). ---- */
 :root[data-theme="light"] {
@@ -98,6 +103,7 @@
   --voice-sky: oklch(0.8 0.09 236); /* sky blue, a pastel as baby pink is */
   --on-voice: var(--on-accent); --on-voice-mono: oklch(1 0 0);
   --voice-ink: color-mix(in oklab, var(--voice) 50%, var(--ink));
+  --voice-mark: var(--voice-act); /* deepened where the browser can (below) */
   --good: oklch(0.52 0.13 155); --warn: oklch(0.68 0.15 75); --orange: oklch(0.55 0.15 50); --bad: oklch(0.55 0.2 27);
   --solo: oklch(0.56 0.12 80); --on-solo: oklch(1 0 0); --tog-down: oklch(0.88 0 0);
   --glow-mix: 45%;
@@ -114,6 +120,10 @@
   --shadow-lift: 0 24px 64px rgba(0, 0, 0, 0.28);
   color-scheme: light;
 }
+/* your colour as a mark in the light theme: no lighter than L 0.66, which leaves the vivid ones about as they are and
+   deepens the pastels, as the sung words are (--sung-hi). Where the browser can't work it out, --voice-act as it is
+   (the light block's). At the light block's specificity, after it, so it wins */
+@supports (color: oklch(from red l c h)) { :root[data-theme="light"] { --voice-mark: oklch(from var(--voice-act) min(l, 0.66) c h); } }
 :root {
   /* ---- type: Pretendard throughout, but for the library's heading in English (Geist Serif, above); what was set in
      a monospace (times, levels, M/S) keeps its digits in line with tabular-nums ---- */
