@@ -449,6 +449,57 @@ for (const [c, need] of [[50, 0.97], [100, 0.85]]) {
   const s5 = seq([1, 1, 1, 1], 52);
   check("12f. the limit reached: down", s5 === "up up down null", s5);
   check("12g. start = lim: one key, then the end", seq([1], 50) === "end:done", seq([1], 50));
+  // What the singer asks for during a key, taken at the next (scAsk): a key is its result and what was asked, d (come
+  // down) and s (stay): "1d", "0s", "1sd"; each step said with the key it goes to (say@root)
+  const asked = (keys, lim, start = 50) => {
+    let st = { root: start, dir: 1, retried: false, unread: 0, start }, out = [];
+    for (const k of keys) {
+      const f = String(k), r = scStep({ ...st, down: !!st.down || f.includes("d"), stay: !!st.stay || f.includes("s") }, parseInt(f, 10), lim);
+      st = r.st; out.push(r.end ? "end:" + r.end : (r.say ?? "null") + "@" + st.root); if (r.end) break;
+    }
+    return out.join(" ");
+  };
+  const is = (name, got, want) => check(name, got === want, got);
+  is("12h. come down mid-climb, a clean key: down from there to the start", asked([1, 1, "1d", 1, 1, 1], 60), "up@51 up@52 back@51 null@50 end:done");
+  is("12h. … an unclean key: down at once, not retried", asked([1, "0d", 1, 1], 60), "up@51 back@50 end:done");
+  is("12i. come down at the first key: that key, then the end", asked(["1d"], 60) + " / " + asked(["0d"], 60), "end:done / end:done");
+  is("12j. come down at the top: the keys as without it (clean), or at once (unclean)", asked([1, 1, "1d", 1, 1], 52) + " / " + asked([1, 1, "0d", 1, 1], 52), "up@51 up@52 back@51 null@50 end:done / up@51 up@52 back@51 null@50 end:done");
+  is("12k. stay on the way up, a clean key: it again, then up", asked([1, "1s", 1, 1], 60), "up@51 stay@51 up@52 up@53");
+  is("12k. … the stay not clean: retried, then down", asked([1, "1s", 0, 0, 1], 60), "up@51 stay@51 retry@51 down@50 end:done");
+  is("12l. stay on an unclean key: it again, its retry still to come", asked([1, "0s", 0, 0, 1], 60), "up@51 stay@51 retry@51 down@50 end:done");
+  is("12l. … the stay clean: up", asked([1, "0s", 1], 60), "up@51 stay@51 up@52");
+  is("12l. … on the retry: once more, then down", asked([1, 0, "0s", 0, 1], 60), "up@51 retry@51 stay@51 down@50 end:done");
+  is("12m. stay on the way down: it again, then down", asked([1, 1, 0, 0, "1s", 0, 1], 60), "up@51 up@52 retry@52 down@51 stay@51 null@50 end:done");
+  is("12n. stay, then come down on the stay: down after it", asked([1, "1s", "1d", 1], 60), "up@51 stay@51 back@50 end:done");
+  is("12n. … both on one key: the stay first, then down", asked([1, "1sd", 1, 1], 60), "up@51 stay@51 back@50 end:done");
+  is("12o. unread: a stay is the key again anyway; down, down even so; two unread still end it", [asked(["-1s", 1], 60), asked([1, "-1d", 1], 60), asked([1, "-1d", -1], 60)].join(" / "),
+    "same@50 up@51 / up@51 back@50 end:done / up@51 back@50 end:unread");
+  is("12p. come down on the way down: nothing", asked([1, 1, 0, 0, "1d", 1, 1], 60), asked([1, 1, 0, 0, 1, 1, 1], 60));
+  // 12q. Asked nothing, a set steps as it did before these (the rule as it was, 2000 random sets)
+  const before = (st, ok, lim) => {
+    const s = { ...st };
+    if (ok === -1) { s.unread++; return s.unread >= 2 ? { st: s, say: null, end: "unread" } : { st: s, say: "same", end: false }; }
+    s.unread = 0;
+    const down = (say) => { s.dir = -1; s.root--; s.retried = false; return { st: s, say, end: s.root < s.start ? "done" : false }; };
+    if (s.dir < 0) return down(null);
+    if (ok === 1) { if (s.root + 1 <= lim) { s.root++; s.retried = false; return { st: s, say: "up", end: false }; } return down("down"); }
+    if (!s.retried) { s.retried = true; return { st: s, say: "retry", end: false }; }
+    return down("down");
+  };
+  let same = 0;
+  const R = rng(12);
+  for (let i = 0; i < 2000; i++) {
+    const start = 45 + Math.floor(R() * 10), lim = start + Math.floor(R() * 13);
+    let a = { root: start, dir: 1, retried: false, unread: 0, start }, b = { ...a }, ok = true;
+    for (let j = 0; j < 40 && ok; j++) {
+      const r = [-1, 0, 1, 1, 1][Math.floor(R() * 5)], x = scStep(a, r, lim), y = before(b, r, lim);
+      ok = x.say === y.say && x.end === y.end && ["root", "dir", "retried", "unread"].every((k) => x.st[k] === y.st[k]);
+      if (x.end) break;
+      a = x.st; b = y.st;
+    }
+    if (ok) same++;
+  }
+  check("12q. nothing asked: as before", same === 2000, pct(same, 2000));
 }
 
 // 13. Came in early: the singer starts before reading does (the piano's last note ends TN.mute before it). The notes
@@ -535,6 +586,29 @@ for (const [fps, need] of [[20, 1], [15, 0.95], [12, 0.85]]) {
     else if (bad.length < 3) bad.push(`${pat.id}@${fps}#${seed} ${r && r.why} good ${r && r.res.good}/${K}`);
   }, 10);
   check("18. slow singer: ended by the last note's hold, every note good", a === n, pct(a, n) + (bad.length ? "; " + bad.join(", ") : ""));
+}
+
+// 19. The slow call (SC.slow): each beat SC.slow times the pattern's. Its length, and the cap after it, at that beat (the
+// longest patterns' named); a singer at its tempo (each note 0.9–1.1 of its beat, the last two) and one slower still
+// (1.5–1.7 beats, the last 1–1.4 s): ended by the last note's hold, inside the cap, every note good
+{
+  let n = 0, a = 0, lens = 0, lN = 0, bad = [];
+  const long = ["p9", "ros", "arp2"].map((id) => { const p = SC_PATS[id], b = p.beat * SC.slow; return `${id} ${scCallLen(p, b).toFixed(2)} s, cap ${(scCap(p, b) / 1000).toFixed(1)} s`; });
+  for (const id of SC_ORDER) {
+    const p = SC_PATS[id], K = p.st.length, b = p.beat * SC.slow, slow = { ...p, beat: b };
+    lN++; if (Math.abs(scCallLen(p, b) - (K + 1) * p.beat * SC.slow) < 1e-9 && scCallLen(slow) === scCallLen(p, b) && scCap(slow) === scCap(p, b) && scCap(p, b) >= scCap(p)) lens++;
+  }
+  each((pat, root, fps, seed) => {
+    const K = pat.st.length, slow = { ...pat, beat: pat.beat * SC.slow }, b = slow.beat * 1000;
+    for (const [lo, hi, last] of [[0.9, 1.1, null], [1.5, 1.7, [1000, 1400]]]) {
+      const { sim, r } = run(slow, root, { len: (k, R) => (k === K - 1 ? (last ? last[0] + (last[1] - last[0]) * R() : 2 * b) : b * (lo + (hi - lo) * R())) }, fps, seed);
+      n++;
+      if (r && r.why === "hold" && r.tEnd - r.t0 < sim.cap && r.res.ok === 1 && r.res.good === K) a++;
+      else if (bad.length < 3) bad.push(`${pat.id}@${fps}#${seed} ×${lo} ${r && r.why} good ${r && r.res.good}/${K}`);
+    }
+  }, 10);
+  check("19a. the slow call: (K + 1) beats of SC.slow × the pattern's, the cap at that beat", lens === lN, `${lens}/${lN}; ${long.join("; ")}`);
+  check("19b. sung at the slow call's tempo, or slower still: ended by the last note's hold, inside the cap, every note good", a === n, pct(a, n) + (bad.length ? "; " + bad.join(", ") : ""));
 }
 
 console.log(`${failed ? failed + " FAILED" : "all passed"}  (${((Date.now() - t0Clock) / 1000).toFixed(1)} s)`);

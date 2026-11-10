@@ -2,19 +2,21 @@
 // The Lab's Scales view: the piano plays a warm-up pattern from the start note (js/scale.js's SC_PATS), then you sing it
 // back on the vowel picked beside it, or a lip or tongue trill, and each note is judged in cents (scJudge). Clean, the
 // pattern moves up a semitone;
-// not, the same key once more, then back down to the start (scStep): as a teacher runs scales at the piano. Call and
-// response: nothing's read while the piano sounds (VC.mute, as Turn's cues), so a note on pitch can only be the singer's.
+// not, the same key once more, then back down to the start (scStep): as a teacher runs scales at the piano. And as the
+// singer would have the teacher do, from the next key: come down from here, this key again (scAsk), the piano slower
+// (scSetSlow). Call and response: nothing's read while the piano sounds (VC.mute, as Turn's cues), so a note on pitch
+// can only be the singer's.
 // The vowel's turn, where Turn has found one, is drawn across the pattern. The measures are js/scale.js's; this is the page.
 
 // Kept: voiceScales ({v: 1, [pattern]: rows}, a row a day: [yyyymmdd, notes judged, good, the day's highest clean top (the
 // key sung) or null], sixty a pattern); voiceScalePat; voiceScaleStart (only once the singer sets it); voiceScaleOn;
-// voiceScaleHide.
+// voiceScaleHide; voiceScaleSlow.
 // pat: the pattern; start: its first key; on: what it's sung on ("" the vowel, else a trill's: SC_ON); run: the set going
 // on; last: the key last judged ({N, res, xs, pat}), drawn; keys: this set's results, and flip: where it turned round (the
 // strip by Go); best: the pattern's highest clean top, as the set began; o: the octave last sung (12 from the piano, or
 // 0); msg: the lines say something of their own; at: the last frame (a gap: the page was hidden); hide: your own line
-// hidden while you sing (scHidden)
-const SV = { pat: "p3", start: 48, on: "", hide: false, data: vcLoad("voiceScales"), run: null, last: null, keys: [], flip: -1, best: null, o: 0, msg: false, at: 0 };
+// hidden while you sing (scHidden); slow: the piano slower (SC.slow), from the next call
+const SV = { pat: "p3", start: 48, on: "", hide: false, slow: false, data: vcLoad("voiceScales"), run: null, last: null, keys: [], flip: -1, best: null, o: 0, msg: false, at: 0 };
 // Sung on beside the vowels, in Scales only: a trill's pitch is read as a vowel's, but it has no vowel, so no turn
 const SC_ON = [["lip", "lip trill"], ["tongue", "tongue trill"]];
 const SC_GRPS = [["up", "Up"], ["down", "Down"], ["leap", "Leaps"]];
@@ -63,6 +65,13 @@ function scSetOn(on) { SV.on = on; store.set("voiceScaleOn", on); paintTurn(); s
 // the key lit as you sing it (voiceFrame) aren't shown. Each key's marks and its trace still come as it's judged.
 const scHidden = () => SV.hide && !!SV.run;
 function scSetHide(on) { SV.hide = on; store.set("voiceScaleHide", on); paintScale(); }
+// The piano slower (SC.slow), if you choose: from the next call (scCall), a set going on or not; during a key, said, so
+// the call going on at its own speed isn't a surprise
+function scSetSlow(on) {
+  SV.slow = on; store.set("voiceScaleSlow", on);
+  if (SV.run && SV.run.phase !== "rest") { say($("#scDo"), on ? "Slower from the next key." : "Usual speed from the next key."); vcTitles(); }
+  paintScale();
+}
 
 // ---------- what's said ----------
 // The status line and the one under it, as Turn's (vcSay): keep, or what's said while idle; tone, the status's colour
@@ -110,24 +119,57 @@ function scGo() {
   if (!micOn && !testOsc) { startMic(); return; }
   scStart();
 }
+// (step: scStep's, with what's asked for during the key; was: the key last sung, {st: its step, ok, w: its words, early},
+// for the next (scNext); slow: this call at the slow speed; sk, fk: the keys read at it ({n, k clean}) and at the usual)
 function scStart() {
   SV.best = scBest(SV.pat); SV.keys = []; SV.flip = -1; SV.last = null;
-  SV.run = { pat: SV.pat, step: { root: SV.start, dir: 1, retried: false, unread: 0, start: SV.start }, N: null, beat: 0, phase: "call",
+  SV.run = { pat: SV.pat, step: { root: SV.start, dir: 1, retried: false, unread: 0, start: SV.start, stay: false, down: false }, was: null, N: null, beat: 0, slow: false, phase: "call",
     callAt: 0, waitFrom: 0, t0: 0, last: 0, next: 0, along: 0, vAt: null, first: true, early: false, peakAt: null, tops: 0, onTop: false, o0: null, o: SV.o,
-    status: null, advice: null, voices: [], judged: 0, good: 0, top: null, tz: { k: 0, n: 0 }, rs: { k: 0, n: 0 } };
+    status: null, advice: null, voices: [], judged: 0, good: 0, top: null, tz: { k: 0, n: 0 }, rs: { k: 0, n: 0 }, sk: { n: 0, k: 0 }, fk: 0 };
   scCall();
 }
-// The call: each note a beat (the last two), and nothing read till it's died away. (Its notes' gains kept: scHush.)
+// The call: each note a beat (the last two; slower, SC.slow, if that's picked), and nothing read till it's died away.
+// (Its notes' gains kept: scHush.)
 function scCall() {
   const R = SV.run, p = SC_PATS[R.pat], K = p.st.length, now = performance.now();
-  R.N = p.st.map((s) => R.step.root + s); R.beat = p.beat;
-  R.voices = R.N.map((m, j) => playKey(m, j === K - 1 ? 2 * p.beat : 0.9 * p.beat, j * p.beat));
-  VC.mute = now + scCallLen(p) * 1000 + TN.mute;
+  R.slow = SV.slow; R.beat = p.beat * (R.slow ? SC.slow : 1);
+  R.N = p.st.map((s) => R.step.root + s);
+  R.voices = R.N.map((m, j) => playKey(m, j === K - 1 ? 2 * R.beat : 0.9 * R.beat, j * R.beat));
+  VC.mute = now + scCallLen(p, R.beat) * 1000 + TN.mute;
   R.phase = "call"; R.callAt = now; R.along = 0; R.vAt = null; R.first = true; R.early = false; R.peakAt = null; R.tops = 0; R.onTop = false; R.o0 = null; SV.at = now;
   vcGuide();
-  const st = R.status || ["From {note}", { note: absName(R.step.root) }, ""], a = R.advice;
-  scSay(st[0], st[1], a ? a[0] : "Listen.", a ? a[1] : null, true, st[2]);
+  const st = R.status || ["From {note}", { note: absName(R.step.root) }, ""], d = R.advice || scDoing();
+  scSay(st[0], st[1], d[0], d[1], true, st[2]);
   paintScale();
+}
+// What the singer's asked for (scStep's stay and down): during a key, for the step after it; in the rest after one, for
+// the step just made (made again: scNext). Come down only on the way up (in the rest, while the set's climbing on, or
+// coming down as asked).
+const scAsked = () => (SV.run.phase === "rest" ? SV.run.was.st : SV.run.step);
+function scCanDown() {
+  const R = SV.run;
+  if (!R) return false;
+  return R.phase === "rest" ? R.was.st.dir > 0 && (R.step.dir > 0 || !!R.was.st.down) : R.step.dir > 0;
+}
+// Come down from here, or this key again (k: "down", "stay"); asked again, taken back. Never the key going on, but the
+// next: in the rest, it's worked out again and said; during a key, what's asked is said (scDoing)
+function scAsk(k) {
+  const R = SV.run;
+  if (!R || (k === "down" && !scCanDown())) return;
+  const a = scAsked();
+  a[k] = !a[k];
+  if (R.phase === "rest") scNext();
+  else { say($("#scDo"), ...scDoing()); vcTitles(); }
+  paintScale();
+}
+// The line under the status during a key: what's been asked for (a stay first: it's next), else the phase's own (in the
+// call, what the key before said, or at the set's first key, when to come down; then what to sing it on)
+function scDoing() {
+  const R = SV.run, a = R.step;
+  if (a.stay) return ["Same key again next."];
+  if (a.down) return [a.root === a.start ? "Stopping after this key." : "Coming down after this key."];
+  if (R.phase !== "call") return scOnSay(false);
+  return R.advice || [SV.keys.length ? "Listen." : "Come down once it stops feeling easy."];
 }
 // A frame of the set (voiceFrame). call: till the piano's died away (voice heard meanwhile: sung along); wait: for the
 // response's start (TN.wait at most; voiced as reading began, and begun with it: came in early); sing: till the last
@@ -140,7 +182,7 @@ function scTick(now, voiced, dt) {
   SV.at = now;
   if (R.phase === "call") {
     if (voiced) { R.along += dt; R.vAt = now; }
-    if (now >= VC.mute) { R.phase = "wait"; R.waitFrom = now; say($("#scDo"), ...scOnSay(false)); vcTitles(); }
+    if (now >= VC.mute) { R.phase = "wait"; R.waitFrom = now; say($("#scDo"), ...scDoing()); vcTitles(); }
   } else if (R.phase === "wait") {
     const t0 = scOnset(VC.fr, R.waitFrom);
     if (t0 != null) {
@@ -158,7 +200,7 @@ function scTick(now, voiced, dt) {
       const w = wmed(VC.fr, "m", R.t0, R.t0 + 250);
       R.o0 = 12 * Math.max(-1, Math.min(1, Math.round((w.v - R.N[0]) / 12)));
     }
-    const o = R.o0 ?? R.o, K = R.N.length, cap = scCap(SC_PATS[R.pat]);
+    const o = R.o0 ?? R.o, K = R.N.length, cap = scCap(SC_PATS[R.pat], R.beat);
     // the top reached as often as the pattern reaches it (and left between: an alternation's, where the last note is
     // sung, and could be held, before the end)
     const tm = Math.max(...R.N) + o, tt = scTopTol(R.N);
@@ -171,8 +213,9 @@ function scTick(now, voiced, dt) {
     if (why) scKeyDone(now, why);
   } else if (R.phase === "rest" && now >= R.next) scCall();
 }
-// A key sung: judged, kept for the day, said; then the next key (or the set's end). A false start (scFalse: a sound
-// before the singing) isn't: the response is waited for again, from there.
+// A key sung: judged, kept for the day (as it was sung, whatever's asked for next: coming down as asked isn't a miss, and
+// takes nothing from a top), said; then the next key (or the set's end). A false start (scFalse: a sound before the
+// singing) isn't: the response is waited for again, from there.
 function scKeyDone(now, why) {
   const R = SV.run, xs = VC.fr.filter((s) => s.t >= R.t0 - 100 && s.t <= now);
   const res = scJudge(xs, R.N, { turn: scTurnT(), early: R.early });
@@ -182,19 +225,28 @@ function scKeyDone(now, why) {
     R.judged += res.judged; R.good += res.good;
     R.tz.k += res.tz.k; R.tz.n += res.tz.n; R.rs.k += res.rs.k; R.rs.n += res.rs.n;
     if (res.top != null) R.top = R.top == null ? res.top : Math.max(R.top, res.top);
+    if (R.slow) { R.sk.n++; if (res.ok === 1) R.sk.k++; } else R.fk++;
   }
   SV.last = { N: R.N, res, xs, pat: R.pat }; SV.keys.push(res);
-  const w = scWords(res), dir = R.step.dir, n = scStep(R.step, res.ok, scTopRoot());
+  const w = scWords(res);
   // came in early: with the piano most of the way (and not clean), sung with it; else said before anything else
   if (R.early && R.along >= SC.along && res.ok !== 1) w.splice(0, 5, "Sang with the piano", null, "Sing after it, not with it.", null, "");
   else if (R.early) w.splice(2, 2, "Wait for the piano to finish.", null);
+  R.was = { st: R.step, ok: res.ok, w, early: R.early }; R.next = now + SC.rest;
+  scNext();
+  paintScale();
+}
+// The next key, from the key last sung (R.was) and what's asked for: its lines, then the rest before it; or the set's end.
+// Again for something asked in that rest (scAsk): the turn-round mark on the strip (SV.flip) follows.
+function scNext() {
+  const R = SV.run, { st, ok, w, early } = R.was, n = scStep(st, ok, scTopRoot()), at = SV.keys.length - 1;
   R.status = [w[0], w[1], w[4]]; R.step = n.st;
-  if (n.st.dir !== dir) SV.flip = SV.keys.length - 1;
-  R.advice = R.early ? [w[2], w[3]] : n.say === "retry" ? scAgain(w[2], w[3]) : n.say === "down" ? ["Coming back down."] : n.say === "same" ? ["Louder, nearer the mic."] : w[2] ? [w[2], w[3]] : null;
+  if (n.st.dir !== st.dir) SV.flip = at; else if (SV.flip === at) SV.flip = -1;
+  R.advice = early ? [w[2], w[3]] : n.say === "retry" || n.say === "stay" ? scAgain(w[2], w[3]) : n.say === "down" || n.say === "back" ? ["Coming back down."]
+    : n.say === "same" ? ["Louder, nearer the mic."] : w[2] ? [w[2], w[3]] : null;
   if (n.end === "unread") scQuit("Couldn’t read that one", "Louder, nearer the mic.");
   else if (n.end) scSetEnd();
-  else { scSay(w[0], w[1], R.advice ? R.advice[0] : "Listen.", R.advice ? R.advice[1] : null, true, w[4]); R.phase = "rest"; R.next = now + SC.rest; vcGuide(); }
-  paintScale();
+  else { scSay(w[0], w[1], R.advice ? R.advice[0] : "Listen.", R.advice ? R.advice[1] : null, true, w[4]); R.phase = "rest"; vcGuide(); }
 }
 // The highest root the set may climb to: SC.up keys, the keyboard, and SC.past semitones over the pattern's best (sung)
 function scTopRoot() {
@@ -202,15 +254,17 @@ function scTopRoot() {
   return Math.max(st, Math.min(st + SC.up, KEY_HI - s, SV.best != null ? SV.best + SC.past - s - R.o : Infinity));
 }
 // The set so far: its top (new, if higher than ever) and its share on pitch, [status, vars, tone] (null: nothing judged);
-// and what next (Smooth, where it was hardest at the turn; with nothing climbed, the piano's note if the last key was sung
-// off one way throughout, else lower)
+// and what next (Smooth, where it was hardest at the turn; sung all at the slow speed, and clean (SC.slowUp), the usual
+// one, while the piano's still slow; with nothing climbed, the piano's note if the last key was sung off one way
+// throughout, else lower)
 function scSummary(R) {
   const p = R.judged ? Math.round((100 * R.good) / R.judged) : null, top = R.top, last = SV.keys[SV.keys.length - 1];
   const newTop = top != null && (SV.best == null || top > SV.best);
   const st = top != null ? [newTop ? "New top {note} · {p}% on pitch" : "Top {note} · {p}% on pitch", { note: absName(top), p }, newTop ? "good" : ""]
     : p != null ? ["{p}% on pitch", { p }, ""] : null;
   const hard = R.tz.n >= SC.tzMin && R.rs.n > 0 && (100 * R.tz.k) / R.tz.n <= (100 * R.rs.k) / R.rs.n - SC.tzGap;
-  return { st, d: hard ? "Hardest at your turn: try Smooth." : top == null ? (last && last.drift ? "Match the first note to the piano." : "Again, a few notes lower.") : "Again, or rest a minute." };
+  const up = SV.slow && !R.fk && R.sk.n > 0 && R.sk.k >= SC.slowUp * R.sk.n;
+  return { st, d: hard ? "Hardest at your turn: try Smooth." : up ? "Now try it at the usual speed." : top == null ? (last && last.drift ? "Match the first note to the piano." : "Again, a few notes lower.") : "Again, or rest a minute." };
 }
 // The set's end, as it came, or stopped (scAbort) once something's been judged
 function scSetEnd() {
@@ -257,12 +311,17 @@ function paintScale() {
   // the trills, under the vowels in Scales only; one of them picked, no vowel is (paintTurn)
   for (const b of $("#vcVowels").querySelectorAll("[data-on]")) { b.hidden = VC.view !== "scale"; b.setAttribute("aria-checked", String(b.dataset.on === SV.on)); }
   say($("#scGo"), SV.run ? "Stop" : "Start");
-  $("#scHide").setAttribute("aria-pressed", String(SV.hide));
+  // the toggles: your line hidden and the piano slower, any time; in a set, come down (on the way up) and this key again,
+  // pressed while they're asked for (scAsk)
+  const a = SV.run && scAsked();
+  $("#scHide").setAttribute("aria-pressed", String(SV.hide)); $("#scSlow").setAttribute("aria-pressed", String(SV.slow));
+  $("#scDown").hidden = !scCanDown(); $("#scStay").hidden = !SV.run;
+  $("#scDown").setAttribute("aria-pressed", String(!!(a && a.down))); $("#scStay").setAttribute("aria-pressed", String(!!(a && a.stay)));
   if (VC.view === "scale") { say($("#vcStepLbl"), SV.run ? "Key" : "Start note"); vcGuide(); } // (in a set, the key it's on)
   if (!SV.run && !SV.msg) scIdle();
   vcTitles();
 }
-const SC_IN = { t: 96, b: 28, l: 48, r: 16 }; // the plot's inset, px (above it: the pattern, the strip, Go and the two lines; on a phone the strip under them, 16 more)
+const SC_IN = { t: 96, b: 28, l: 48, r: 16 }; // the plot's inset, px (above it: the pattern, the strip, Go and the two lines; on a phone the top row in two, 40 more, and the strip under the lines, 16)
 function scRound(g, x, y, w, h, r) {
   r = Math.min(r, w / 2, h / 2);
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
@@ -291,11 +350,12 @@ function drawScale(now) {
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0);
   const W = r.width, H = r.height;
-  // the strip (this set's keys, or the pattern's days): between the pattern (and the toggle beside it) and Go; where
-  // that's too narrow (a phone), a row of its own under the two lines, the plot below it
-  const tl = $(".sc-top");
-  let x1 = $("#scGo").offsetLeft - 16, xMin = tl.offsetLeft + tl.offsetWidth + 16, ys = 28, top = SC_IN.t;
-  if (x1 - xMin < 40) { x1 = W - SC_IN.r - 4; xMin = SC_IN.l; ys = SC_IN.t + 4; top = SC_IN.t + 16; }
+  // the strip (this set's keys, or the pattern's days): between the pattern (and the toggles beside it) and Go (and what
+  // runs the set beside that); where that's too narrow, or the top row's in two (a phone: dy, the second's height, the two
+  // lines that much lower), a row of its own under the two lines, the plot below it
+  const bar = $(".sc-bar"), tl = $(".sc-top"), dy = bar.offsetHeight - $("#scGo").offsetHeight;
+  let x1 = bar.offsetLeft + $(".sc-run").offsetLeft - 16, xMin = bar.offsetLeft + tl.offsetLeft + tl.offsetWidth + 16, ys = 28, top = SC_IN.t;
+  if (dy > 0 || x1 - xMin < 40) { x1 = W - SC_IN.r - 4; xMin = SC_IN.l; ys = SC_IN.t + dy + 4; top = SC_IN.t + dy + 16; }
   const P = { l: SC_IN.l, r: W - SC_IN.r, t: top, b: H - SC_IN.b };
   g.clearRect(0, 0, W, H);
   VC.font ??= getComputedStyle(cv).fontFamily;
@@ -308,7 +368,7 @@ function drawScale(now) {
   if (R && R.phase !== "rest") {
     pat = SC_PATS[R.pat]; T = R.N.map((m) => m + (hide ? R.o : R.o0 ?? R.o)); live = R.phase === "sing";
     const ti = now - R.callAt - heardLag() * 1000; // (the last note's held two beats)
-    if (R.phase === "call" && ti >= 0 && ti < scCallLen(pat) * 1000) lit = Math.min(R.N.length - 1, Math.floor(ti / (R.beat * 1000)));
+    if (R.phase === "call" && ti >= 0 && ti < scCallLen(pat, R.beat) * 1000) lit = Math.min(R.N.length - 1, Math.floor(ti / (R.beat * 1000)));
   } else if (L) { pat = SC_PATS[L.pat]; res = L.res; xs = L.xs; T = res.T; }
   else { pat = scPat(); T = pat.st.map((s) => SV.start + s + SV.o); }
   const K = T.length;
@@ -337,7 +397,7 @@ function drawScale(now) {
   g.save(); g.beginPath(); g.rect(P.l, P.t, P.r - P.l, P.b - P.t); g.clip();
   g.strokeStyle = g.fillStyle = vcMine(); g.lineWidth = 2;
   if (live && !hide) {
-    const span = Math.max(scCallLen(pat) * 1000, now - R.t0), xOf = (t) => P.l + ((t - R.t0) / span) * (P.r - P.l);
+    const span = Math.max(scCallLen(pat, R.beat) * 1000, now - R.t0), xOf = (t) => P.l + ((t - R.t0) / span) * (P.r - P.l);
     let on = false, pt = null, head = null;
     g.beginPath();
     for (const s of VC.fr) {
@@ -369,7 +429,7 @@ function drawScale(now) {
   // your line hidden: only that you're heard, a dot at the plot's foot under where its head would be, while a voice comes
   // in (its pitch read or not)
   if (live && hide) {
-    const s = VC.fr[VC.fr.length - 1], span = Math.max(scCallLen(pat) * 1000, now - R.t0);
+    const s = VC.fr[VC.fr.length - 1], span = Math.max(scCallLen(pat, R.beat) * 1000, now - R.t0);
     if (s && s.v && s.t >= R.t0 && now - s.t < 120) { g.fillStyle = vcMine(); g.beginPath(); g.arc(P.l + ((s.t - R.t0) / span) * (P.r - P.l), P.b, 4, 0, Math.PI * 2); g.fill(); }
   }
   // the marks, and how far off a close note or a miss is (only the worst's, where the columns are narrow)
@@ -425,6 +485,7 @@ function initScales() {
   SV.pat = SC_PATS[p] ? p : "p3";
   SV.on = SC_ON.some(([k]) => k === on) ? on : "";
   SV.hide = store.get("voiceScaleHide", false) === true;
+  SV.slow = store.get("voiceScaleSlow", false) === true;
   SV.start = Number.isFinite(s) ? scClamp(s) : scDefault();
   const menu = $("#scPats");
   for (const [g, label] of SC_GRPS) {
@@ -458,6 +519,10 @@ function initScales() {
   }
   $("#scHide").append(icon("hide"));
   $("#scHide").onclick = () => scSetHide(!SV.hide);
+  $("#scSlow").onclick = () => scSetSlow(!SV.slow);
+  // in a set: come down from here (an arrow down, ↓) and this key again (again's arrow round, R: app.js's keys)
+  $("#scDown").append(icon("sortDown")); $("#scStay").append(icon("retry"));
+  $("#scDown").onclick = () => scAsk("down"); $("#scStay").onclick = () => scAsk("stay");
   $("#scGo").onclick = scGo;
   paintScale();
 }

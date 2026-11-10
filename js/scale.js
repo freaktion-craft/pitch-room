@@ -45,8 +45,15 @@ const SC = {
   start: 80, startWin: 120,     // ms pitched within ms: the response has begun
   early: 150,                   // ms: voiced this near reading's start, the response begun with it: came in early
   endGap: 500, lastHold: 700,   // ms: silence that ends it (a breath between notes is shorter); the last note held
-  capX: 2.5, capMin: 6000,      // the response's cap: max(capMin, capX × the call, capNote a note, the last two)
+  capX: 2.5, capMin: 6000,      // the response's cap: max(capMin, capX × the call (at its beat), capNote a note, the last two)
   capNote: 1000,                //   (a long scale sung slower than its quick call: 17 notes at 900 ms outrun 2.5 × 5.4 s)
+  slow: 1.5,                    // the slow call, if the singer picks it: each beat this many times its pattern's, two thirds
+                                //   the tempo (the quickest, 0.3 s a note, 200 a minute, to 0.45 s, 133; the slowest, 0.6 s, to
+                                //   0.9 s). Slow practice lowers the load till the notes come right unaided (Maxfield 2018,
+                                //   J Singing, slow practice; Nix 2017, J Singing 74(2), motor learning in the studio). The
+                                //   factor is no source's: a guess. The cap grows with the call (9 notes: 8.1 s, cap 20.3 s)
+  slowUp: 1,                    // share of a set's keys clean, every one at the slow call, for the line after it to suggest the
+                                //   usual speed: slow practice teaches only if the tempo then comes back up (Maxfield 2018)
   rest: 1200, along: 500, stall: 500, // ms
   unread: 0.4, readMin: 0.6,    // a key with more than 40% of its notes unread is unread; clean needs ≥ 60% read
   drift: 20, driftMin: 10, driftShare: 0.75, // whole key off one way: the median beyond 20 c, 75% of read notes past 10 c,
@@ -107,10 +114,10 @@ const scSpan = (p) => Math.max(...p.st);
 // a semitone, or half the step to the next note under it (the octave scale's 7th isn't its top)
 const scTops = (p) => p.st.filter((s) => s === scSpan(p)).length;
 const scTopTol = (st) => { const t = Math.max(...st); return Math.min(1, Math.min(...st.filter((s) => s !== t).map((s) => t - s)) / 2); };
-// the call's length (s): a beat a note, the last held two
-const scCallLen = (p) => (p.st.length + 1) * p.beat;
-// the response's cap (ms): the longest it's listened to (SC.capX, SC.capNote)
-const scCap = (p) => Math.max(SC.capMin, SC.capX * scCallLen(p) * 1000, SC.capNote * (p.st.length + 1));
+// the call's length (s): a beat a note, the last held two (beat: the pattern's own, or slower: SC.slow)
+const scCallLen = (p, beat = p.beat) => (p.st.length + 1) * beat;
+// the response's cap (ms): the longest it's listened to (SC.capX, SC.capNote), after a call at that beat
+const scCap = (p, beat = p.beat) => Math.max(SC.capMin, SC.capX * scCallLen(p, beat) * 1000, SC.capNote * (p.st.length + 1));
 
 // Where the response begins: the start of the first pitched sample after from with SC.start ms pitched within
 // SC.startWin ms of it; null if none yet
@@ -418,18 +425,25 @@ function scJudge(xs, N, opts = {}) {
 // throat cleared, "okay"). It's not judged; the response is waited for again.
 const scFalse = (res, why) => why === "gap" && res.heard <= 1;
 
-// The set's next key. st: {root, dir: 1 up | −1 down, retried, unread, start}; ok: the key's result; lim: the highest root
-// allowed. Up while clean; unclean, the same key once more ("retry"), then down; down a key at a time (no retries: the
-// cool-down) to below the start, where it ends. Two unread keys in a row end it. say: "up", "retry", "down" (turned
-// round), "same" (unread, again), or null (on down).
+// The set's next key. st: {root, dir: 1 up | −1 down, retried, unread, start, stay, down}; ok: the key's result; lim: the
+// highest root allowed. Up while clean; unclean, the same key once more ("retry"), then down; down a key at a time (no
+// retries: the cool-down) to below the start, where it ends. Two unread keys in a row end it. And what the singer asked
+// for during the key (or in the rest after it), each taken once: stay, this key once more, whatever its result (the key
+// it was asked on moves nothing: the set goes on from the stay's result as it would have from that key's, its retry still
+// to come); down, on the way up, back down from here to the start, as after a retry not sung clean, but not for a miss
+// (at once, or after a stay asked with it). say: "up", "retry", "down" (turned round: the top, or the retry), "back"
+// (turned round, as asked), "stay" (as asked), "same" (unread, again: a stay's that too), or null (on down).
 function scStep(st, ok, lim) {
-  const s = { ...st };
+  const s = { ...st, stay: false, down: !!st.down && st.dir > 0 };
+  const down = (say) => { s.dir = -1; s.root--; s.retried = false; s.down = false; return { st: s, say, end: s.root < s.start ? "done" : false }; };
   if (ok === -1) {
     s.unread++;
-    return s.unread >= 2 ? { st: s, say: null, end: "unread" } : { st: s, say: "same", end: false };
+    if (s.unread >= 2) return { st: s, say: null, end: "unread" };
+    return s.down && !st.stay ? down("back") : { st: s, say: "same", end: false };
   }
   s.unread = 0;
-  const down = (say) => { s.dir = -1; s.root--; s.retried = false; return { st: s, say, end: s.root < s.start ? "done" : false }; };
+  if (st.stay) return { st: s, say: "stay", end: false };
+  if (s.down) return down("back");
   if (s.dir < 0) return down(null);
   if (ok === 1) {
     if (s.root + 1 <= lim) { s.root++; s.retried = false; return { st: s, say: "up", end: false }; }

@@ -161,8 +161,8 @@ function vcSay(st, sv, d, dv, keep = true, tone = "") {
   VC.msg = keep;
   vcTitles();
 }
-// a cut-off line has its whole text as its title (and only then)
-function vcTitles() { for (const el of [$("#vcSay"), $("#vcDo"), $("#scSay"), $("#scDo")]) { const t = el.scrollWidth > el.clientWidth ? el.textContent : ""; if (el.title !== t) el.title = t; } }
+// a cut-off line has its whole text as its title (and only then); Scales' pattern's name too (a phone, in a set)
+function vcTitles() { for (const el of [$("#vcSay"), $("#vcDo"), $("#scSay"), $("#scDo"), $("#scPatName")]) { const t = el.scrollWidth > el.clientWidth ? el.textContent : ""; if (el.title !== t) el.title = t; } }
 const vcV = (v = VC.vowel) => { const l = (VOWELS.find(([k]) => k === v) || VOWELS[0])[1]; return () => tr(l); }; // (said again in the language now)
 const vcSlide = (T) => ["Slide “{v}” {lo}–{hi} and back, slowly.", { v: vcV(), lo: absName(T - 4), hi: absName(T + 4) }];
 // a vowel's runs that found a turn, newest last; a turn's name (a span where H2 rode a wide F1)
