@@ -114,6 +114,36 @@ function resetOnDblClick(input, def) {
   addEventListener("blur", () => hide());
 })();
 
+// Segmented controls: the picked one's surface (the .seg's ::before) slides from the last pick to this one. Put in
+// place at once when a .seg is first drawn, shown again, resized or refilled, so only a pick moves it. Any .seg, any
+// time: it watches for aria-checked changing, so the code that picks stays as it was.
+(function segSlide() {
+  const place = (seg, move) => {
+    const b = seg.querySelector(':scope > button[aria-checked="true"]'), r = b?.getBoundingClientRect();
+    if (!r?.width) { seg.classList.remove("seg-slid"); return; } // (out of sight: its own button's surface till it's back)
+    const snap = !move || !seg.classList.contains("seg-slid");
+    if (snap) seg.classList.add("seg-snap");
+    const s = seg.getBoundingClientRect();
+    seg.style.setProperty("--seg-x", r.left - s.left - seg.clientLeft + "px");
+    seg.style.setProperty("--seg-w", r.width + "px");
+    seg.classList.add("seg-slid");
+    if (snap) { void seg.offsetWidth; seg.classList.remove("seg-snap"); }
+  };
+  const seen = new WeakSet(), ro = new ResizeObserver((es) => { for (const e of es) place(e.target, false); });
+  const watch = (seg) => { if (!seen.has(seg)) { seen.add(seg); ro.observe(seg); } place(seg, false); };
+  new MutationObserver((ms) => {
+    const moved = new Set(), drawn = new Set();
+    for (const m of ms) {
+      const p = m.type === "attributes" ? m.target.parentElement : m.target;
+      if (p?.classList?.contains("seg")) (m.type === "attributes" ? moved : drawn).add(p);
+      for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.classList.contains("seg")) drawn.add(n); for (const s of n.querySelectorAll(".seg")) drawn.add(s); }
+    }
+    for (const s of drawn) watch(s);
+    for (const s of moved) if (!drawn.has(s)) place(s, true);
+  }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-checked"] });
+  for (const s of document.querySelectorAll(".seg")) watch(s);
+})();
+
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
 // whole name, for its tooltip, side: a note at the row's end (tone: "accent" or "faint" for its colour), prog: how far
 // it has got (0…1) when it takes a while, shown where its tick goes, btn: what the button says when it's chosen, if
