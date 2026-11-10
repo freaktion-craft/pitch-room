@@ -36,13 +36,14 @@
 .lylist p.now { opacity: 1; }
 /* filled as it's sung, a soft edge running through the word (renderLyrics: --p, past either end of it when it's not on
    it); the line before keeps its fill, so it doesn't flash back to plain as it leaves, and stays lit while it's still
-   being sung */
+   being sung. A word in syllable boxes (.sys, below) isn't filled itself: each syllable is, the edge at its place in it
+   (in px), so it runs on through the word as one */
 @supports (color: oklch(from red l c h)) { .lylist, .countin { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) c h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi); the count-in's dots in it too */
-.lylist p:is(.now, .b1) span { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
+.lylist p:is(.now, .b1) span:not(.sys) { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
-/* what's not sung yet of the line, a shade under the ink (three quarters of it): the sung part stands out by more than its
-   colour (the brackets' words keep their own grey) */
-.lylist p:is(.now, .b1) span:not(.bg) { --un: color-mix(in oklab, var(--ink) 75%, transparent); }
+/* what's not sung yet of the line, well under the ink (six tenths of it: at three quarters it still read as black): the
+   sung part stands out by more than its colour (the brackets' words keep their own grey; a syllable takes its word's) */
+.lylist p:is(.now, .b1) span:not(.bg, .sy) { --un: color-mix(in oklab, var(--ink) 60%, transparent); }
 .lylist.still, .lylist.still p { transition: none; } /* new lines (renderLyrics): there at once */
 .lylist p.n1 { opacity: 0.55; } /* 5.3:1, read without effort like --muted */
 .lylist p.n1.soon { opacity: 0.8; } /* its turn is coming: time to read it */
@@ -51,18 +52,21 @@
 .lylist p.b1.live { opacity: 1; transition: none; }
 /* backing vocals, in brackets in the lyrics: smaller, quieter, still filled as they're heard */
 .lylist .bg { --un: var(--muted); font-size: 0.85em; font-weight: var(--weight-medium); color: var(--muted); }
-/* a syllable held a long time: a glow that grows as it's held (the letters stay still) */
+/* a syllable held a long time: a glow that grows as it's held (the letters stay still); in boxes, on the syllable held */
 .lylist span { transition: filter var(--duration-slow); } /* let go of, it fades */
 .lylist .held { transition: none; filter: drop-shadow(0 0 calc(var(--g, 0) * 7px) color-mix(in oklab, var(--voice) var(--glow-mix), transparent)); }
-/* the word being sung rises a touch as the fill reaches it and stays up while its line's sung, then the line settles
-   (renderLyrics: --r, 0 to 1, eased, on the song's time). By top, which moves a word where it's drawn and nothing else: no
-   row, no word beside it and no line's height changes (a transform doesn't take on a word, and inline-block would change
-   where a long one breaks). A tenth of the lyrics' size (--ly), in whole px: letters are drawn on whole pixels, so every
-   row rises as far, and risen they're as sharp as they were (1 px at 15 px, 2 px from 16 to 25, 3 px above; the
-   brackets' smaller words a tenth of theirs). The count-in stays still: it counts, it isn't sung */
-@media (prefers-reduced-motion: no-preference) {
-  .lylist p:is(.now, .b1) span { position: relative; top: calc(var(--r, 0) * round(-0.1em, 1px)); }
-}
+/* each syllable rises a touch as the fill reaches it and stays up while its line's sung, then the line settles
+   (renderLyrics: a transform each, on the song's time). A transform takes on a box, not on letters in a row, so while its
+   line's sung (and the one before) a word's syllables are boxes of their own (lyBox), in a word that doesn't break. Laid
+   out as the plain words were: each box's right margin ends it where the next syllable's letters start in the plain text
+   (kerning and all), and the line's measured again; one that would lay out differently stays plain words, and doesn't
+   rise. Padding past the letters, the margin taking it back, so a letter reaching past its box is still filled. The
+   count-in stays still: it counts, it isn't sung */
+.lylist .sys { white-space: nowrap; }
+/* each a layer of its own, so it moves by fractions of a pixel (drawn in with the rest, letters land on whole pixels: it
+   would go up in steps); only the two lines' syllables, and from where it rests (renderLyrics), so it's drawn there as
+   sharp as the plain word, and as sharp risen a whole number of pixels */
+.lylist .sy { display: inline-block; padding: 0 var(--space-1); margin-left: calc(-1 * var(--space-1)); will-change: transform; }
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
    drawn there during an intro or break, while the coming bars arrive from the right */
