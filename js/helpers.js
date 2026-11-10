@@ -16,7 +16,7 @@ function resetOnDblClick(input, def) {
 // held, or moved with the keys, a tip over the handle says the level: a volume out of 100 for full (up to 150), others
 // (data-tip="pos") as how far along they are, out of 100, and data-tip="ms" its value in ms, signed. It also keeps each slider's filled part (--p) in step.
 (function sliderTips() {
-  const THUMB = 12, tip = el("output", "slider-tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
+  const tip = el("output", "slider-tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
   document.body.append(tip);
   let held = null, keyTimer = 0;
   const frac = (s) => { const f = (s.value - s.min) / (s.max - s.min || 1); return s.dir === "rtl" ? 1 - f : f; }; // how far along, from the left
@@ -30,6 +30,8 @@ function resetOnDblClick(input, def) {
     for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches('input[type="range"]')) paint(n); n.querySelectorAll('input[type="range"]').forEach(paint); }
   }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener("input", (e) => { if (e.target.type === "range") paint(e.target); }, true);
+  // the handle's middle: every slider's is a fader's cap, --thumb wide (tokens.css; read once, as the styles load before this runs)
+  const THUMB = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--thumb"));
   const thumbX = (s) => { const r = s.getBoundingClientRect(); return r.left + THUMB / 2 + frac(s) * (r.width - THUMB); };
   function show(s) {
     if (!s) { tip.hidden = true; return; }
@@ -71,9 +73,10 @@ function resetOnDblClick(input, def) {
   addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true, capture: true }); // (a box scrolled too: Settings' list)
 })();
 // Tooltips: a title drawn as the phrase strip's tip is (an ink chip over the thing, a moment after the pointer rests
-// on it; at once while one's just been showing), not the system's. While it's pointed at, its title waits in
-// data-tipped (so the system's doesn't show too) and goes back after, so code that sets or reads titles is as it was.
-// A key in brackets, "(L)", is set apart in the chip, muted.
+// on it; at once while one's just been showing, so sliding along the piano's keys names each as it's reached, with no
+// frame between them without one), not the system's. None while a button's held (a drag, a glissando on the keys).
+// While it's pointed at, its title waits in data-tipped (so the system's doesn't show too) and goes back after, so code
+// that sets or reads titles is as it was. A key in brackets, "(L)", is set apart in the chip, muted.
 (function tooltips() {
   const DELAY = 500, WARM = 400, GAP = 8, EDGE = 8;
   const KEY = /\s?\(((?:(?:Ctrl|Shift|Alt|⌘)\+)*(?:[A-Z0-9←→↑↓]|Space|Home|End|Enter|Esc|Tab))\)/;
@@ -97,12 +100,12 @@ function resetOnDblClick(input, def) {
     if (!keep && on) { give(on); on = null; }
   }
   document.addEventListener("pointerover", (e) => {
-    const n = e.pointerType === "touch" ? null : e.target.closest?.("[title], [data-tipped]");
+    const n = e.pointerType === "touch" || e.buttons ? null : e.target.closest?.("[title], [data-tipped]");
     if (n === on) return;
     hide();
     if (!n) return;
     on = n; take(n);
-    timer = setTimeout(() => show(n), Date.now() - lastShown < WARM ? 0 : DELAY);
+    if (Date.now() - lastShown < WARM) show(n); else timer = setTimeout(() => show(n), DELAY); // (at once, not a task later: slid from one to the next, no frame goes by without a tip)
   }, true);
   document.addEventListener("pointerout", (e) => { if (on && !on.contains(e.relatedTarget)) hide(); }, true);
   document.addEventListener("pointermove", () => { if (on && on.hasAttribute("title")) take(on); }, { passive: true, capture: true }); // retitled while pointed at (the mic, pressed)
@@ -261,6 +264,7 @@ Object.assign(ICONS, {
   record: '<circle cx="12" cy="12" r="8"/>', // Record
   compare: '<path d="M19 9H6.65856C5.65277 9 5.14987 9 5.02472 8.69134C4.89957 8.38268 5.25517 8.01942 5.96637 7.29289L8.21091 5"/><path d="M5 15H17.3414C18.3472 15 18.8501 15 18.9753 15.3087C19.1004 15.6173 18.7448 15.9806 18.0336 16.7071L15.7891 19"/>', // Arrow Data Transfer Horizontal
   retry: '<path d="M18.8078 3.5V6.1624C18.8078 6.4121 18.4955 6.5252 18.3356 6.3333C16.7792 4.5944 14.5174 3.5 12 3.5C7.3056 3.5 3.5 7.3056 3.5 12C3.5 16.6944 7.3056 20.5 12 20.5C16.6944 20.5 20.5 16.6944 20.5 12"/>', // Refresh, drawn at 85 % about the centre: as the set has it, its ring fills the box edge to edge (20 of 24) and looks a size up on the icons beside it
+  hide: '<path d="M19.439 15.439C20.3636 14.5212 21.0775 13.6091 21.544 12.955C21.848 12.5287 22 12.3155 22 12C22 11.6845 21.848 11.4713 21.544 11.045C20.1779 9.12944 16.6892 5 12 5C11.0922 5 10.2294 5.15476 9.41827 5.41827M6.74742 6.74742C4.73118 8.1072 3.24215 9.94266 2.45604 11.045C2.15201 11.4713 2 11.6845 2 12C2 12.3155 2.15201 12.5287 2.45604 12.955C3.8221 14.8706 7.31078 19 12 19C13.9908 19 15.7651 18.2557 17.2526 17.2526"/><path d="M9.85786 10C9.32783 10.53 9 11.2623 9 12.0711C9 13.6887 10.3113 15 11.9289 15C12.7377 15 13.47 14.6722 14 14.1421"/><path d="M3 3L21 21"/>', // ViewOffSlash
   backing: '<path d="M16 21C15.7668 18.0685 13.3422 15.7477 10.3085 15.5521L9.49999 15.5C9.21121 15.5076 8.94209 15.5178 8.68816 15.5298C5.68124 15.6723 3.23089 18.0974 3 21"/><path d="M12.75 9.75C12.75 11.5449 11.2949 13 9.5 13C7.70508 13 6.25 11.5449 6.25 9.75C6.25 7.95507 7.70508 6.5 9.5 6.5C11.2949 6.5 12.75 7.95507 12.75 9.75Z"/><path d="M21 17.501C20.7709 14.6314 18.4541 12.2748 15.5 11.9961"/><path d="M15.9877 9C16.8965 8.42434 17.5001 7.40788 17.5001 6.25C17.5001 4.45507 16.0496 3 14.2602 3C13.3811 3 12.5838 3.35121 12.0001 3.92139"/>', // UserMultiple
 });
 Object.assign(ICONS, window.ICONS_LOCAL);

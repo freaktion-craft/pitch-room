@@ -49,10 +49,12 @@ function notice(msg) {
   clearTimeout(notice.timer); notice.timer = setTimeout(() => { box.hidden = true; }, 4000);
 }
 
-// keyboards: Practice's, and the one on Chest & head voice
+// keyboards: Practice's, and the one on Chest & head voice. Each key's named (aria-label), and the name shows as you point
+// at it (its title: tooltips), so you know the note before you press it: in the note names you picked, spelt as the
+// song's key has them (again on a change: the names, the key)
 const KEY_LO = 36, KEY_HI = 84, KW = 26;
 const keyEls = new Map(), vcKeyEls = new Map();
-const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
+const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => { const n = absName(m); b.setAttribute("aria-label", n); b.title = n; }); };
 function buildKeys(box, keyEls, onPress = playKey) {
   let wi = 0;
   for (let m = KEY_LO; m <= KEY_HI; m++) {
@@ -447,7 +449,8 @@ $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startM
 // Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest still
 // play, seek and step (Shift+← and Shift+→, or Home and End, to the start and the end; Record clicked, then Space, plays
 // rather than ending the take). One reached with Tab keeps its own keys, so a button presses with Space and a slider goes
-// to its ends with Home and End. Text fields and an open list or menu always keep theirs.
+// to its ends with Home and End. Text fields and an open list or menu always keep theirs. In the Lab's Scales, in a set,
+// ↓ comes down after the key being sung, and R sings it again (scAsk).
 let tabbed = false;
 addEventListener("pointerdown", () => { tabbed = false; }, true);
 addEventListener("keydown", (e) => { if (e.key === "Tab") tabbed = true; }, true);
@@ -468,6 +471,10 @@ document.addEventListener("keydown", (e) => {
       Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: S.dev && !e.repeat ? () => dropNote(e) : null,
       KeyN: !e.repeat ? noteMenuKey : null, BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }
+  }
+  if (view === "voice" && VC.view === "scale" && SV.run && !e.shiftKey) {
+    const k = { ArrowDown: scCanDown() ? "down" : null, KeyR: "stay" }[e.code];
+    if (k) { e.preventDefault(); if (!e.repeat) scAsk(k); }
   }
 });
 

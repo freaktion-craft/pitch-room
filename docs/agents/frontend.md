@@ -122,6 +122,15 @@ play outside Studio and Practice.
   window.
 - Accents: `ACCENTS` in `stage.js`. `"white"` is the stored key for Mono; keep it, saved settings use it. `paintAccent`
   sets `--voice`, `--voice-act` and `--on-voice` on `<html>` and each `.theme-dark`.
+- `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches on,
+  Loop on), never on what you press but the round Play (`.btn.primary.round`); `tokens.css` works it out from
+  `--voice-act` (no lighter than L 0.66 in the light theme), so no script sets it.
+- The greys follow `--voice` too: under `@supports` (relative colour) `tokens.css` gives the surfaces (`--bg`,
+  `--surface`, `--surface-2`, `--hover-2`, `--tog-down`) and the tints that fill, line and mark (`--fg-2` to `--fg-38`,
+  so `--fill`, `--line`, `--ring`, `--track`, `--dim`) a trace of its hue; text and ink stay neutral, and Mono comes out
+  as plain grey. Such a token's text (`getPropertyValue`) is then an unworked `oklch(from ...)`: a canvas or script reads
+  the colour the browser works out instead (an element's `color` set to `var(--token)`, read with `getComputedStyle`, as
+  `readColors()` does through `readColors.probe`).
 - `--on-voice` and `--on-voice-mono` may take `--on-accent`, but `--on-voice-mono` must never refer to `--on-voice`
   (or anything that leads back to it). Mono sets `--on-voice: var(--on-voice-mono)`, so a cycle leaves no colour at
   all. (The comment in `tokens.css` overstates this as "never one another's".)
@@ -136,6 +145,10 @@ play outside Studio and Practice.
   phrases, Record, takes, Takes Studio).
 - Shared controls: `.btn` (size `.sm`/`.xs`, tone `.primary`/`.quiet`/`.ghost`, shape `.icon`/`.round`), `.tog`, `.pick`
   (`makePick`), `.switch`, `.seg`, `.pop`, `.menu`, `.set-row`. Show and hide with the `hidden` attribute.
+- Sliders: every `input[type="range"]` is a fader (`base.css`, no class): a bar `--fader` tall filled in your colour up
+  to an ink cap `--thumb` wide (both in `tokens.css`; `sliderTips` reads `--thumb` to put the level's tip over the cap).
+  A place greys its faders by setting `--fader-fill` on what holds them (a Studio track out of the mix). The mic's gate
+  and Takes Studio's Sync restyle theirs in place (a threshold over a meter; a fill from zero).
 - Page-wide states are classes on `<html>` (`desktop-mac`, `desktop-win`, `welcome`, `asking`, `theming`, ...).
 - Respect `prefers-reduced-motion` (`stillMotion()` in `library.js`, the CSS media blocks).
 - CSS transitions use the token durations (`--duration-*`) and `--ease`. `el.animate` calls carry their own literal
