@@ -42,6 +42,8 @@ if (SAVED_UPDATE) document.documentElement.classList.add("asking");
   document.documentElement.dataset.theme = t === "light" || t === "dark" ? t : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; })();
 /* the picked accent colour before first paint, so it doesn't start out blue (unknown names fall back to blue) */
 try { const a = SAVED && SAVED.accent != null ? SAVED.accent : JSON.parse(localStorage.getItem("stem:accent")); if (/^[a-z]+$/.test(a)) { document.documentElement.style.setProperty("--voice", `var(--voice-${a}, var(--voice-white))`); document.documentElement.style.setProperty("--voice-act", a === "white" ? "var(--ink)" : `var(--voice-${a}, var(--ink))`); if (a === "white") document.documentElement.style.setProperty("--on-voice", "var(--on-voice-mono)"); document.documentElement.toggleAttribute("data-pastel", a === "pink" || a === "sky"); } } catch (e) {}
+/* Vibrant (Settings) before first paint: your colour through the whole app, not just its points */
+try { if ((SAVED && SAVED.vibrant != null ? SAVED.vibrant : JSON.parse(localStorage.getItem("stem:vibrant"))) === true) document.documentElement.dataset.tone = "vibrant"; } catch (e) {}
 /* the welcome (welcome()): the first time Pitchroom opens, its pages riffle through the accent colours under the name, back
    to black, and the name goes to its place in the header; then the first steps there (onboard(): what it is, the mic, a
    colour, a first song), and the page comes in round the name. WELCOME_ALWAYS: on every load, reloads too, while it's being made; false once it's done. With
@@ -240,6 +242,7 @@ const EMPTY_LIBRARY = false;
             <div class="set-row"><div class="set-what"><b>Note names</b><small>On the stage and the keyboard</small></div><button class="pick" id="names" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Theme</b><small>Light or dark</small></div><button class="pick" id="theme" type="button"></button></div>
             <div class="set-row"><div class="set-what"><b>Accent color</b><small>Your pitch and the highlights</small></div><div class="swatches" id="swatches" role="group" aria-label="Accent color"></div></div>
+            <label class="set-row"><span class="set-what"><b>Vibrant</b><small>Your color through the whole app, not just its highlights</small></span><input type="checkbox" class="switch" id="vibrantOn"></label>
             <label class="set-row"><span class="set-what"><b>Aurora</b><small>The glow behind Practice, as the song plays</small></span><input type="checkbox" class="switch" id="auroraOn"></label>
             <!-- where every song starts (studio.js, initStartVol): a 4/4 click plays while it's moved -->
             <div class="set-row"><div class="set-what"><b>Volume</b><small>Where every song starts; a click plays while you set it</small></div><input type="range" class="set-vol" id="setVol" min="0" max="1" step="0.01" aria-label="Volume every song starts at"></div>
