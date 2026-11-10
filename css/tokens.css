@@ -83,8 +83,9 @@
   --stem-vocals: var(--stem-lead); --stem-click: var(--ink);
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   /* depth, in colour */
-  --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2); /* a switch's knob */
+  --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2); /* a switch's knob, and the picked part of a segmented control */
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.25); /* a control over a waveform */
+  --seg-on: var(--hover-2); /* the picked part of a segmented control: raised off its track, lighter than the card's buttons */
   /* a panel, menu or list over the page: set off by its tone, not drawn round (a card's hairline, a faint light along
      its top, a soft shadow close under it) */
   --shadow-float: 0 0 0 1px var(--line), inset 0 1px 0 var(--fg-6), 0 8px 24px rgba(0, 0, 0, 0.32);
@@ -151,6 +152,7 @@
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.24), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.16);
+  --seg-on: var(--surface); /* white on its grey track, as a switch's knob (the light buttons' grey read as pressed in) */
   --shadow-float: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.12);
   --shadow-lift: 0 24px 64px rgba(0, 0, 0, 0.28);
   color-scheme: light;
