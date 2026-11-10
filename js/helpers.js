@@ -78,21 +78,29 @@ function resetOnDblClick(input, def) {
 // While it's pointed at, its title waits in data-tipped (so the system's doesn't show too) and goes back after, so code
 // that sets or reads titles is as it was. A key in brackets, "(L)", is set apart in the chip, muted.
 (function tooltips() {
-  const DELAY = 500, WARM = 400, GAP = 8, EDGE = 8;
+  const DELAY = 500, WARM = 400, GAP = 8, EDGE = 8, SLIDE = 240; // (SLIDE: px, the farthest one glides from)
   const KEY = /\s?\(((?:(?:Ctrl|Shift|Alt|⌘)\+)*(?:[A-Z0-9←→↑↓]|Space|Home|End|Enter|Esc|Tab))\)/;
   const tip = el("div", "tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
   document.body.append(tip);
-  let on = null, timer = 0, lastShown = 0;
+  let on = null, timer = 0, lastShown = 0, lastAt = null; // (lastAt: where the last one stood, so the next slides from there)
   const take = (n) => { const t = n.getAttribute("title"); if (t != null) { n.removeAttribute("title"); n.dataset.tipped = t; } return n.dataset.tipped || ""; };
   const give = (n) => { if (!n.hasAttribute("title") && n.dataset.tipped != null) n.setAttribute("title", n.dataset.tipped); delete n.dataset.tipped; };
-  function show(n) {
+  // slide: shown straight after another (along the piano's keys, say), it glides over from where that one stood rather
+  // than blinking from one to the next; not from far off (it'd sweep across the page)
+  function show(n, slide) {
     const t = take(n); if (!t || !n.isConnected) return;
     const m = t.match(KEY);
     if (m) tip.replaceChildren(t.slice(0, m.index), el("span", "tip-key", m[1]), t.slice(m.index + m[0].length)); else tip.replaceChildren(t);
+    tip.classList.remove("tip-slide");
     tip.style.left = tip.style.top = "0"; tip.hidden = false; // (measured at the left, where it has its full width)
     const r = n.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
-    tip.style.left = Math.max(EDGE, Math.min(document.documentElement.clientWidth - w - EDGE, r.left + r.width / 2 - w / 2)) + "px"; // (the scrollbar left out)
-    tip.style.top = (r.top - h - GAP >= EDGE ? r.top - h - GAP : r.bottom + GAP) + "px"; // over it, or under it at the window's top
+    const x = Math.max(EDGE, Math.min(document.documentElement.clientWidth - w - EDGE, r.left + r.width / 2 - w / 2)); // (the scrollbar left out)
+    const y = r.top - h - GAP >= EDGE ? r.top - h - GAP : r.bottom + GAP; // over it, or under it at the window's top
+    if (slide && lastAt && Math.hypot(x - lastAt[0], y - lastAt[1]) < SLIDE) {
+      tip.style.left = lastAt[0] + "px"; tip.style.top = lastAt[1] + "px";
+      void tip.offsetWidth; tip.classList.add("tip-slide"); // (from there, then on: base.css times it)
+    }
+    tip.style.left = x + "px"; tip.style.top = y + "px"; lastAt = [x, y];
   }
   function hide(keep) {
     clearTimeout(timer);
@@ -105,7 +113,7 @@ function resetOnDblClick(input, def) {
     hide();
     if (!n) return;
     on = n; take(n);
-    if (Date.now() - lastShown < WARM) show(n); else timer = setTimeout(() => show(n), DELAY); // (at once, not a task later: slid from one to the next, no frame goes by without a tip)
+    if (Date.now() - lastShown < WARM) show(n, true); else timer = setTimeout(() => show(n), DELAY); // (at once, not a task later: slid from one to the next, no frame goes by without a tip)
   }, true);
   document.addEventListener("pointerout", (e) => { if (on && !on.contains(e.relatedTarget)) hide(); }, true);
   document.addEventListener("pointermove", () => { if (on && on.hasAttribute("title")) take(on); }, { passive: true, capture: true }); // retitled while pointed at (the mic, pressed)
