@@ -232,7 +232,7 @@ function tsWave() {
   const x = cv.getContext("2d"); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
   if (!P.peaks) { x.fillStyle = C.muted; x.globalAlpha = 0.3; x.fillRect(0, cv.height / 2, cv.width, d); x.globalAlpha = 1; return; }
   const prog = (songDur() ? tsHeard() / songDur() : 0);
-  x.fillStyle = C.ink; waveBars(x, cv.width, cv.height, d, P.peaks, r.height - 8, prog, 0.75, 0.3, 1e9, C.wave); // risen already; played in --wave, as the Studio's
+  x.fillStyle = C.ink; waveBars(x, cv.width, cv.height, d, P.peaks, r.height - 8, prog, 0.75, 0.3, 1e9); // risen already
 }
 function tsPos() { return TS.playing ? Math.min(songDur(), TS.pos + Math.max(0, ac.currentTime - TS.at) * tsSpeed()) : TS.pos; }
 // …as heard (heardLag): where the playhead and the lit waveform are drawn

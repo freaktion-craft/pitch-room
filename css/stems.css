@@ -276,7 +276,7 @@
 .track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
 #sPlayer .track.off { --fader-fill: var(--dim); } /* and its fader's fill grey (every slider's a fader: base.css) */
 .tog { height: var(--control-sm); min-width: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill); font: var(--weight-medium) var(--text-xs) var(--mono); color: var(--muted); }
-.tog[aria-pressed="true"].m { background: var(--voice-btn); color: var(--on-fill); } /* on (Practice's Loop and click): your colour; a track's M has its own (.ms) */
+.tog[aria-pressed="true"].m { background: var(--play); color: var(--on-play); } /* on (Practice's Loop and click): your colour, as Play is; a track's M has its own (.ms) */
 .tog[aria-pressed="true"].s { background: var(--solo); color: var(--on-solo); }
 .tog:hover { background: var(--fg-8); }
 /* A track's mute and solo: one pair, flat as the buttons beside them (the click's 4/4, Shift accent), a hairline of the
@@ -557,7 +557,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .lc-sing { min-width: 0; max-width: 100%; white-space: nowrap; opacity: 0; transition: opacity var(--duration-fast), background-color var(--duration-fast), color var(--duration-fast); }
 .lc-sing .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 :is(.lc-item:hover .lc-sing, .lc-sing:focus-visible, .lc-sing.said, .lc-sing[aria-busy="true"]) { opacity: 1; }
-.lc-sing[aria-busy="true"] { color: var(--muted); pointer-events: auto; cursor: progress; }
+.lc-sing[aria-busy="true"] { pointer-events: auto; cursor: progress; } /* (its text as it was: muted would be lost on the ink) */
 .lc-item.pending .lc-sing { visibility: hidden; }
 @media (hover: none) { .lc-sing { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { :is(.lc-item, .lc-sing) { transition: none; } }

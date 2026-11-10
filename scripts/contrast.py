@@ -10,16 +10,17 @@ The greys take a trace of your colour (--voice), so each theme is worked out onc
 it on <html> (--voice, --voice-act, --on-voice), and every pair is checked with each; a pair that names an accent, only
 with that one (and one that names a theme too, only in that one). Relative colour is read in one form, oklch(from <an
 oklch() colour> L C H [/ A]), each of them a number, l, c or h, or min(), max(), clamp(), calc() or cos() (of an
-angle in deg) of those, and color-mix() as two oklch() mixed in oklab; anything else stops it with an error. Mono has no chroma, so what's worked out
-from it under @supports must come out exactly as the plain values have it (a browser without relative colour): that's
-checked too.
+angle in deg) of those, and color-mix() as two oklch() mixed in oklab; anything else stops it with an error. Mono has
+no chroma, so what's worked out from it under @supports must come out exactly as the plain values have it (a browser
+without relative colour): that's checked too.
 A colour with alpha is laid over what's under it in sRGB, as the browser does. Contrast is WCAG 2's.
-And each colour worked out from your colour (HUED: the marks, the fills and what's on them, the tints, the piano's keys
-from css/stage.css) keeps its hue: one the screen can't show is clipped to its gamut channel by channel, which turns the
+And each colour worked out from your colour (HUED: the mark, Play, a label's fill, the tints, the piano's keys from
+css/stage.css) keeps its hue: one the screen can't show is clipped to its gamut channel by channel, which turns the
 hue, so each is worked out as the screen shows it (inside sRGB, or P3 in the wide-gamut themes) and fails when that's
 more than 3 degrees off the accent's own hue (where it has chroma enough to tell: over 0.02). Play pointed at
-(--voice-btn-hot) fails too if it's greyer than Play: its chroma falling faster than its lightness, or at all on a pale
-fill (a pastel's). Mono has no hue: it's skipped there.
+(--play-hover) fails too if it's greyer than Play: its chroma falling faster than its lightness, or at all on a pale
+fill (a pastel's). Mono has no hue: it's skipped there. Tone on tone's ink and text (TONE) are checked the same way
+and listed apart, without failing the run.
 """
 import math
 import os
@@ -230,13 +231,13 @@ def relative(v):
             x = total()
             take(("op", ")"))
             return x
-        if kind == "fn" and val in ("min", "max"):
+        if (kind, val) in (("fn", "min"), ("fn", "max")):
             xs = [total()]
             while peek() == ("op", ","):
                 take()
                 xs.append(total())
             take(("op", ")"))
-            return (min if val == "min" else max)(xs)
+            return min(xs) if val == "min" else max(xs)
         if (kind, val) == ("fn", "clamp"):  # clamp(lo, x, hi): x held between them (lo wins, as in CSS)
             lo = total()
             take(("op", ","))
@@ -375,13 +376,13 @@ def resolve(t, v, depth=0):
 def colour(t, name, p3):
     if name.startswith("mix:"):  # an accent as small text: as --voice-ink has it (a color-mix with the ink, or itself)
         return parse_colour(ink_mix(t, name[4:]), p3)
-    kind, sep, rest = name.partition(":")
-    if sep and kind in WORKED:  # an accent as a mark, a button's fill (pointed at too) or a label's: as --voice-mark,
-        # --voice-btn, --voice-btn-hot or --voice-fill has it for that accent (worked out from it, or itself);
-        # "<kind>:<accent>/N%": N % of that, seen through, as "color-mix(in oklab, var(--voice-mark) N%, transparent)" has it
-        accent, _, w = rest.partition("/")
-        c, a = parse_colour(worked(t, WORKED[kind], accent), p3)
+    if name.startswith("mark:"):  # an accent as a mark: as --voice-mark has it (its lightness held down, or itself);
+        # "mark:<accent>/N%": N % of that, seen through, as "color-mix(in oklab, var(--voice-mark) N%, transparent)" has it
+        accent, _, w = name[5:].partition("/")
+        c, a = parse_colour(voice_mark(t, accent), p3)
         return c, a * (num(w) if w else 1)
+    if name.startswith("fill:"):  # an accent as a label's fill: as --voice-fill has it for that accent
+        return parse_colour(resolve(painted(t, name[5:].removeprefix("--voice-")), t["--voice-fill"]), p3)
     v = resolve(t, t[name]) if name.startswith("--") else name
     c = parse_colour(v, p3)
     if c is None:
@@ -398,22 +399,18 @@ def ink_mix(t, accent):
     if not m:
         return acc
     w = float(m[1]) / 100
-    def lab(s):
-        L, c, h = (num(x) for x in re.findall(r"[\d.]+%?", s.split("(", 1)[1])[:3])
+    def lab(s):  # (the ink may be relative, a shade of your hue: read as the browser works it out)
+        L, c, h, _ = oklch_of(s)
         return L, c * math.cos(math.radians(h)), c * math.sin(math.radians(h))
     A, B = lab(acc), lab(resolve(t, t["--ink"]))
     L, x, y = (A[i] * w + B[i] * (1 - w) for i in range(3))
     return f"oklch({L} {math.hypot(x, y)} {math.degrees(math.atan2(y, x)) % 360})"
 
 
-WORKED = {"mark": "--voice-mark", "btn": "--voice-btn", "hot": "--voice-btn-hot", "fill": "--voice-fill"}  # the names a pair gives them by
-
-
-def worked(t, name, accent):
-    """A token tokens.css works out from your colour (--voice-mark, --voice-btn, ...) for this accent: with
-    --voice and --voice-act as paintAccent sets them (Mono's --voice-act the ink), as it is or a relative colour from
-    them (relative())."""
-    return resolve(painted(t, accent.removeprefix("--voice-")), t[name])
+def voice_mark(t, accent):
+    """--voice-mark for this accent, as tokens.css works it out from --voice-act (the accent, or the ink for Mono:
+    paintAccent): var(--voice-act) as it is, or a relative colour from it (relative())."""
+    return resolve({**t, "--voice-act": "var(--ink)" if accent == "--voice-white" else f"var({accent})"}, t["--voice-mark"])
 
 
 def painted(t, k):
@@ -449,24 +446,24 @@ for bg in ["--bg", "--surface"]:
         PAIRS.append((fg, bg, 4.5))
     for k in ACCENTS:  # your colour as a line, a dot, a fill and large text (a sung word): 3:1; as small text, mixed
         PAIRS.append((f"--voice-{k}", bg, 1.5 if k in ("pink", "sky") else 3, k))  # with the ink as --voice-ink is: 4.5:1 (pink, sky: pastels, by choice)
-        PAIRS.append((f"mix:--voice-{k}", bg, 4.5, k))
+        PAIRS.append((f"mix:--voice-{k}", bg, 3 if k in ("pink", "sky") else 4.5, k))  # (the pastels mixed with their soft ink: kept soft, PASTELS)
         # as a mark (--voice-mark: the section's line, a switch on): 3:1; the pastels, by choice, are
         # 2.77 (sky) and 2.94 (pink) on the light theme's page, at the others' lightness (3.06, 3.26 on the card)
         PAIRS.append((f"mark:--voice-{k}", bg, 2.7 if bg == "--bg" and k in ("pink", "sky") else 3, k))
-        # a button or a label in your colour, against what it's on: 3:1. Its fill is what's seen (a button's,
-        # --voice-btn: Play, Loop on; a label's, --voice-fill: the playhead's time), but the pastels' in the light theme
-        # is a pale tint of them by the owner's pick (about 1.2-1.3:1 on the card), so there what's on it (--on-fill)
-        # is what's seen; in the dark theme theirs is the accent as it is, seen as the others' are
+        # a label in your colour (--voice-fill: the playhead's time), against what it's on: 3:1; the light theme's
+        # pastels' is the pastel itself (data-pastel), soft on the page by the owner's pick, so there what's seen is the
+        # deep shade on it (--on-fill)
         if k in ("pink", "sky"):
-            PAIRS += [(f"btn:--voice-{k}", bg, 3, k, "dark"), (f"fill:--voice-{k}", bg, 3, k, "dark"), ("--on-fill", bg, 3, k, "light")]
+            PAIRS += [(f"fill:--voice-{k}", bg, 3, k, "dark"), ("--on-fill", bg, 3, k, "light")]
         else:
-            PAIRS += [(f"btn:--voice-{k}", bg, 3, k), (f"fill:--voice-{k}", bg, 3, k)]
-PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--hover-2", 4.5),
-          ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
+            PAIRS.append((f"fill:--voice-{k}", bg, 3, k))
+PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--seg-on", 4.5), ("--ink", "--hover-2", 4.5),
+          ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5), ("--on-primary", "--primary", 4.5), ("--on-primary", "--primary-hover", 4.5), ("--on-play", "--play", 3),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
           ("--on-solo", "--solo", 4.5), ("--solo", "--tog-down", 3),
           ("--placeholder", "--surface-2", 3), ("--on-media", "oklch(0.25 0 0)", 4.5)]
-# the song's waveform played (--wave: the ink, a pastel's its own shade), a mark on its box (#pWave's: the page): 3:1
-PAIRS.append(("--wave", "--bg", 3))
+# Play's glyph on it pointed at (a glyph: 3:1), and a label's text on its fill (the playhead's time, the version you're
+# in, the Lab's chips: 4.5:1); the light theme's pastels', soft by the owner's call, as PASTEL_NEED has them
+PAIRS += [("--on-play", "--play-hover", 3), ("--on-fill", "--voice-fill", 4.5)]
 # text on the fills that take your colour, over the page and the card: a field (its text, its hint), a quiet button and
 # a toggle (--fill, --fg-8 pointed at), the search's glyph and keys (--faint, on the page; on the card it'd be 4.4:1, as
 # it is in grey); and on a field or a tempo pointed at (--hover-2). --dim isn't text: as a mark it's 2.7:1 on the dark
@@ -476,11 +473,8 @@ PAIRS += [("--ink", "--fill|--bg", 4.5), ("--ink", "--fill|--surface", 4.5), ("-
           ("--faint", "--fill|--bg", 4.5), ("--placeholder", "--fill|--bg", 3), ("--placeholder", "--fill|--surface", 3),
           ("--placeholder", "--hover-2", 3), ("--muted", "--hover-2", 4.5)]
 for k in ACCENTS:
-    PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5, k))  # text (4.5:1) on the accent as it is: the piano's key pressed, the name's riffle, a word sung in the lyric editor
-    PAIRS.append(("--on-fill", f"btn:--voice-{k}", 3, k))  # glyph (3:1) on a button's fill: Play and Pause, Loop and the click on, a take playing, Compare
-    PAIRS.append(("--on-fill", f"hot:--voice-{k}", 3, k))  # glyph (3:1) on Play and Pause pointed at (--voice-btn-hot)
-    PAIRS.append(("--on-fill", f"fill:--voice-{k}", 4.5, k))  # text (4.5:1) on a label's fill: the playhead's time, the version you're in, the Lab's tabs
-    PAIRS.append(("--on-mark", f"mark:--voice-{k}", 3, k))  # glyph (3:1): a switch's knob, on the mark
+    PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5, k))
+    PAIRS.append(("--on-mark", f"mark:--voice-{k}", 3, k))  # a switch's knob, on: dark in the dark theme, white in the light
     PAIRS.append(("--ink", f"mark:--voice-{k}/50%", 3, k))  # a fader's cap on its fill (base.css: half the mark, over the card; Mono's 3.2 in the dark theme, 2.85 at 55 %)
 
 
@@ -516,12 +510,27 @@ def key_pairs(t, k):
             ("key w label", resolve(t, t["--on-key-down"]), w, 4.5)]
 
 
+# the pastels in the light theme: their ink and text are soft shades of them (tokens.css), kept for their look over
+# contrast (the owner's call), so text there is held to 3:1 and a field's hint and marks to 2.5:1
+PASTELS = ("pink", "sky")
+PASTEL_NEED = {4.5: 3, 3: 2.5}
+
+
+def pastel(t, css, light, k):
+    """t with data-pastel's blocks over it, for a pastel in the light theme (set with the accent: stage.js)."""
+    if light and k in PASTELS:
+        for sel, media, decls in blocks(css):
+            if not media and ':root[data-theme="light"][data-pastel]' in [s.strip() for s in sel.split(",")]:
+                t.update(decls)
+    return t
+
+
 def rows(css, ks, light, p3):
     """Every pair in this theme with each accent picked: [(accent, pair, contrast or None, at least, why)]. ks: the
     keys' colours (keys())."""
     out, t0 = [], {**theme(css, light, p3), **ks}
     for k in ACCENTS:
-        t = painted(t0, k)
+        t = pastel(painted(t0, k), css, light, k)
         base = colour(t, "--surface", p3)
         for fg, bg, need, *only in PAIRS:
             if (only and only[0] != k) or (only[1:] and only[1] != ("light" if light else "dark")):
@@ -531,6 +540,8 @@ def rows(css, ks, light, p3):
                 f = over(colour(t, fg, p3), b)
             except KeyError as e:
                 out.append((k, f"{fg} on {bg}", None, need, f"missing {e}")); continue
+            if light and k in PASTELS and not only:  # their softness kept over contrast in the light theme (the owner's call)
+                need = PASTEL_NEED.get(need, need)
             out.append((k, f"{fg} on {bg}", contrast_rgb(f[0], b[0]), need, ""))
         for label, ink, bg in chip_pairs(t, p3):
             b = over(parse_colour(bg, p3), base)
@@ -560,25 +571,28 @@ def mono(css):
 
 
 # ---------- hue ----------
-# every colour worked out from your colour: the mark, a button's fill and pointed at, a label's, what's on them, the
-# waveform played, small text, the backing vocals, the ink's tints (--fg-2 to --fg-38 are one colour at their own
-# alpha: --fg-38's stands for them), and the piano's keys (keys())
-HUED = ["--voice-mark", "--voice-btn", "--voice-btn-hot", "--voice-fill", "--on-fill", "--wave", "--voice-ink",
-        "--stem-backing", "--fg-38", "--key-w-voice", "--key-b-voice", "--key-w-hover", "--key-b-hover"]
+# every colour worked out from your colour: the mark, Play and Play pointed at, a label's fill, small text, the backing
+# vocals, the ink's tints (--fg-2 to --fg-38 are one colour at their own alpha: --fg-38's stands for them), and the
+# piano's keys (keys())
+HUED = ["--voice-mark", "--play", "--play-hover", "--voice-fill", "--voice-ink", "--stem-backing", "--fg-38",
+        "--key-w-voice", "--key-b-voice", "--key-w-hover", "--key-b-hover"]
+# ...and tone on tone's, the ink and text in a shade of your hue (and what's on Play and a label, which is a main
+# button's text for a pastel in the light theme): listed for the owner, not yet held to it (they don't fail the run)
+TONE = ["--ink", "--ink-strong", "--muted", "--primary", "--primary-hover", "--on-primary", "--on-play", "--on-fill"]
 HUE_OFF, HUE_GREY = 3, 0.02  # degrees off the accent's hue that fail; under this chroma, too little hue to tell
 
 
-def hues(css, ks, light, p3):
-    """Each colour in HUED with each accent but Mono (no hue), as written and as the screen shows it: [(accent, token,
+def hues(css, ks, light, p3, names=HUED):
+    """Each colour in names with each accent but Mono (no hue), as written and as the screen shows it: [(accent, token,
     (L, C, H) written, (L, C, H) shown, degrees the shown hue is off the accent's or None (too grey to tell),
     whether it's outside the gamut)]."""
     out, t0, gamut = [], {**theme(css, light, p3), **ks}, "p3" if p3 else "srgb"
     for k in ACCENTS:
         if k == "white":
             continue
-        t = painted(t0, k)
+        t = pastel(painted(t0, k), css, light, k)
         h0 = oklch_of(resolve(t, "var(--voice)"))[2]
-        for name in HUED:
+        for name in names:
             v = resolve(t, t[name])
             lch = oklch_of(v) if v.startswith("oklch(") else mix_oklab(v)
             if not lch:
@@ -590,16 +604,19 @@ def hues(css, ks, light, p3):
     return out
 
 
-def greyer(hs):
-    """Play pointed at (--voice-btn-hot) against Play (--voice-btn), as each is shown (hues()): [(accent, Play's (L,
-    C), pointed at's (L, C), greyer)]. A deeper step of a colour as vivid as the screen has it can't keep its chroma
-    where the screen holds less at its lightness (below a hue's brightest: orange to teal), but its shade, chroma falling
-    as lightness does, it can always show; so it's greyer if its chroma falls faster than its lightness, or, on a pale
-    fill (lighter than L 0.8: a pastel's), at all (a pale tint's shade is grey; it has room for more)."""
+def greyer(hs, fill="--play", hot="--play-hover", only=None):
+    """A fill pointed at against the fill (Play's, by default), as each is shown (hues()), for each accent (or those
+    in only): [(accent, the fill's (L, C), pointed at's (L, C), greyer)]. A deeper step of a colour as vivid as the
+    screen has it can't keep its chroma where the screen holds less at its lightness (below a hue's brightest: orange
+    to teal), but its shade, chroma falling as lightness does, it can always show; so it's greyer if its chroma falls
+    faster than its lightness, or, on a pale fill (lighter than L 0.8: a pastel's), at all (a pale tint's shade is
+    grey; it has room for more)."""
     at = {(k, n): s for k, n, _, s, _, _ in hs}
     out = []
     for k in dict.fromkeys(k for k, *_ in hs):
-        (bl, bc, _), (hl, hc, _) = at[k, "--voice-btn"], at[k, "--voice-btn-hot"]
+        if only is not None and k not in only:
+            continue
+        (bl, bc, _), (hl, hc, _) = at[k, fill], at[k, hot]
         least = bc * (1 if bl >= 0.8 else min(1, hl / bl))
         out.append((k, (bl, bc), (hl, hc), hc < least * (1 - 1e-6)))  # (float rounding)
     return out
@@ -623,25 +640,32 @@ def main():
                     if v or cr is None or cr < need:
                         ratio = cr if cr is None else round(cr, 3 if round(cr, 2) == need else 2)  # (2.999 isn't "3.0")
                         print(f"  {'FAIL' if cr is None or cr < need else '    '} {named(k):<6} {label:<34} {ratio} (needs {need}) {why}")
-                # each colour worked out from yours keeps its hue as it's shown; Play pointed at isn't greyer than Play
-                hs = hues(css, ks, light, p3)
-                gs = greyer(hs)
-                far = [r for r in hs if r[4] is not None and r[4] > HUE_OFF]
-                grey = [g for g in gs if g[3]]
-                bad += len(far) + len(grey)
-                top = max((r for r in hs if r[4] is not None), key=lambda r: r[4])
-                print(f"{name}: hue kept in {len(hs) - len(far)}/{len(hs)} ({len(HUED)} colours x {len(gs)} accents, Mono "
-                      f"has none); most off {top[4]:.1f} deg ({top[1]}, {named(top[0])}); outside the screen "
-                      f"{sum(r[5] for r in hs)}; Play pointed at greyer {len(grey)}/{len(gs)}")
-                for k, n, (L, C, H), (sl, sc, sh), off, out in hs:
-                    if v or (off is not None and off > HUE_OFF):
-                        print(f"  {'FAIL' if off is not None and off > HUE_OFF else '    '} {named(k):<6} {n:<16} "
-                              f"L {L:.3f} C {C:.4f} h {H:5.1f}  shown L {sl:.3f} C {sc:.4f} h {sh:5.1f}  "
-                              f"{'-' if off is None else f'{off:.1f}'} deg off{'  (outside: clipped)' if out else ''}")
-                for k, (bl, bc), (hl, hc), g in gs:
-                    if v or g:
-                        print(f"  {'FAIL' if g else '    '} {named(k):<6} Play pointed at  L {bl:.3f} -> {hl:.3f}, "
-                              f"C {bc:.4f} -> {hc:.4f}{'  greyer' if g else ''}")
+                # each colour worked out from yours keeps its hue as it's shown; Play pointed at isn't greyer than Play.
+                # Tone on tone's (TONE; a main button pointed at, for the light theme's pastels) the same, listed apart
+                for tone in (False, True):
+                    hs = hues(css, ks, light, p3, TONE if tone else HUED)
+                    gs = greyer(hs, "--primary", "--primary-hover", PASTELS if light else ()) if tone else greyer(hs)
+                    far = [r for r in hs if r[4] is not None and r[4] > HUE_OFF]
+                    grey = [g for g in gs if g[3]]
+                    if not tone:
+                        bad += len(far) + len(grey)
+                    top = max((r for r in hs if r[4] is not None), key=lambda r: r[4], default=None)
+                    print(f"{name}{', tone on tone (listed, not counted)' if tone else ''}: hue kept in "
+                          f"{len(hs) - len(far)}/{len(hs)} ({len(TONE if tone else HUED)} colours x {len(hs) // len(TONE if tone else HUED)} "
+                          f"accents, Mono has none); most off {'-' if not top else f'{top[4]:.1f} deg ({top[1]}, {named(top[0])})'}; "
+                          f"outside the screen {sum(r[5] for r in hs)}; "
+                          f"{'a main button' if tone else 'Play'} pointed at greyer {len(grey)}/{len(gs)}")
+                    for k, n, (L, C, H), (sl, sc, sh), off, out in hs:
+                        if v or (off is not None and off > HUE_OFF) or (tone and out and sc > HUE_GREY):
+                            flag = ("FAIL" if not tone else "MAIN") if off is not None and off > HUE_OFF else "    "
+                            print(f"  {flag} {named(k):<6} {n:<16} "
+                                  f"L {L:.3f} C {C:.4f} h {H:5.1f}  shown L {sl:.3f} C {sc:.4f} h {sh:5.1f}  "
+                                  f"{'-' if off is None else f'{off:.1f}'} deg off{'  (outside: clipped)' if out else ''}")
+                    for k, (bl, bc), (hl, hc), g in gs:
+                        if v or g:
+                            print(f"  {('FAIL' if not tone else 'MAIN') if g else '    '} {named(k):<6} "
+                                  f"{'main button' if tone else 'Play'} pointed at  L {bl:.3f} -> {hl:.3f}, "
+                                  f"C {bc:.4f} -> {hc:.4f}{'  greyer' if g else ''}")
     except ValueError as e:  # a value it can't read: stop, rather than pass it
         sys.exit(f"contrast.py: {e}")
     sys.exit(1 if bad else 0)

@@ -276,10 +276,10 @@ function drawWave() {
   const rise = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
   if (P.peaks) {
     const soloed = Object.keys(P.tracks).filter((k) => P.tracks[k].solo && P.trackPeaks && P.trackPeaks[k]);
-    const bars = (peaks, played, ahead, fill) => waveBars(x, c.width, Math.round(H * d), d, peaks, H - 16, prog, played, ahead, rise, fill);
-    if (!soloed.length) bars(P.peaks, 1, 0.18, C.wave); // played in --wave (the ink, a pastel's own shade), the rest in the ink
+    const bars = (peaks, played, ahead) => waveBars(x, c.width, Math.round(H * d), d, peaks, H - 16, prog, played, ahead, rise);
+    if (!soloed.length) bars(P.peaks, 1, 0.18);
     else { // the mix faded behind the soloed tracks, each in its icon's colour
-      bars(P.peaks, 0.16, 0.08, C.wave);
+      bars(P.peaks, 0.16, 0.08);
       for (const k of soloed) { x.fillStyle = stemColor(k); bars(P.trackPeaks[k], 1, 0.4); }
     }
   } else { x.globalAlpha = 0.18; x.fillRect(0, (H - 1) / 2, W, 1); }
@@ -317,26 +317,20 @@ function paintClock(prog, W) {
 }
 // A waveform's bars into canvas context x (cw × Hd device pixels, d of them per CSS px), each up to maxH CSS px: on whole
 // device pixels, 2 px wide and 1 px apart (at 1×), each the loudest of the peaks it covers, the ones before prog (0…1)
-// at alpha played (in fill, if it's given: the song's own, --wave), the rest at ahead (in x's fill), rising in after the
-// song opens (rise: ms since). A bar per peak came out under a pixel wide at fractional places, alternately crisp and
-// smeared: a striped waveform. Waveforms as wide as each other get their bars in the same places, so the tracks' line
-// up with the song's.
-function waveBars(x, cw, Hd, d, peaks, maxH, prog, played, ahead, rise, fill) {
+// at alpha played, the rest at ahead, rising in after the song opens (rise: ms since). A bar per peak came out under a
+// pixel wide at fractional places, alternately crisp and smeared: a striped waveform. Waveforms as wide as each other
+// get their bars in the same places, so the tracks' line up with the song's.
+function waveBars(x, cw, Hd, d, peaks, maxH, prog, played, ahead, rise) {
   const n = peaks.length, bw = Math.max(1, Math.round(2 * d)), pitch = bw + Math.max(1, Math.round(d)), m = Math.floor(cw / pitch);
-  let back = fill ? x.fillStyle : null; // x's fill, for the rest: the played ones come first, so it changes back once
-  if (fill) x.fillStyle = fill;
   x.setTransform(1, 0, 0, 1, 0, 0);
   for (let j = 0; j < m; j++) {
     let pk = 0;
     for (let i = Math.floor((j * n) / m), e = Math.max(i + 1, Math.floor(((j + 1) * n) / m)); i < e; i++) if (peaks[i] > pk) pk = peaks[i];
     const h = Math.max(1, Math.round((1 + (Math.max(1, pk * maxH) - 1) * waveRise(j, m, rise)) * d));
-    const done = (j + 0.5) / m < prog;
-    if (back && !done) { x.fillStyle = back; back = null; }
-    x.globalAlpha = done ? played : ahead;
+    x.globalAlpha = (j + 0.5) / m < prog ? played : ahead;
     x.fillRect(j * pitch, (Hd - h) >> 1, bw, h);
   }
   x.setTransform(d, 0, 0, d, 0, 0); x.globalAlpha = 1;
-  if (back) x.fillStyle = back; // (every bar played: x's fill as it was)
 }
 // Each track's own waveform, under its row, as wide as the song's and in line with it: in the track's colour, the
 // played part solid; faded while the track can't be heard. Each is scaled to its own loudest moment (up to 3× the

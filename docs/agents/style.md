@@ -108,8 +108,9 @@ writing; match them.
 - A new colour token needs a dark value (`:root, .theme-dark`), its own light value (`:root[data-theme="light"]`), and
   a P3 value if it's an accent.
 - A new grey follows the tint rule: a surface, or a tint that fills, lines or marks, takes a trace of your colour under
-  `@supports` (its lightness kept, its chroma capped like its neighbours', Mono exactly the plain value); text and what's
-  drawn in ink stay neutral, so a text role never points at a tinted step (`--placeholder` has its own `rgba`).
+  `@supports` (its lightness kept, its chroma capped like its neighbours', Mono exactly the plain value); the ink and
+  text take a shade of it of their own (tone on tone), so a text role never points at a fill's tinted step
+  (`--placeholder` has its own).
 - If text sits on it or it is read as text, add the pair to `PAIRS` in `scripts/contrast.py` (it doesn't find pairs by
   itself), run it, and quote the result. It works each theme out once per accent (as `paintAccent` sets `--voice`) and
   runs every pair with each (a pair that names an accent, with that one only; one that names a theme too, in that one
@@ -120,7 +121,8 @@ writing; match them.
 - A colour worked out from the accent keeps the accent's hue, in every state: lightness and chroma may change, hue may
   not, so its chroma must be one the screen can show at its lightness for all ten accents (inside sRGB, and P3 in the
   wide-gamut themes), or the browser clips it and the hue turns (going darker, `c * min(1, L' / l)` always fits).
-  Add it to `HUED` in `scripts/contrast.py`, which fails any shown more than 3 degrees off the accent's hue.
+  Add it to `HUED` in `scripts/contrast.py`, which fails any shown more than 3 degrees off the accent's hue (tone on
+  tone's ink and text, `TONE`, it lists without failing, for the owner to decide).
 - The accent list must match in `tokens.css`, `stage.js` `ACCENTS` and `contrast.py`.
 - Pink is a pastel by the owner's choice: its contrast minimum is relaxed on purpose. Don't "fix" it.
 - `--on-voice` and `--on-voice-mono` may take `--on-accent`, but `--on-voice-mono` must never refer to `--on-voice`

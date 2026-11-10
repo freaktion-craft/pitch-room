@@ -3,8 +3,9 @@
    drawing (a waveform's line, the piano's keys) or an optical correction, and says so.
    Layout: one column, settings as hairline-separated rows. Colours are OKLCH, in two themes: dark (:root) and light
    (:root[data-theme="light"], set before first paint from the Theme setting: the script in index.html's head). The
-   light ones aren't the dark ones turned over: each is its own, checked by scripts/contrast.py. In both, the greys
-   that are surfaces, fills and lines take a trace of your colour (--voice), worked out here; text stays grey. */
+   light ones aren't the dark ones turned over: each is its own, checked by scripts/contrast.py. In both, tone on tone:
+   the greys that are surfaces, fills and lines take a trace of your colour (--voice), and the ink and text a deeper
+   shade of its hue (a dark one in the light theme, a pale one in the dark), worked out here. */
 /* Geist Serif, for the app's name: one weight, so it's drawn at 400 whatever weight it's set at */
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 :root { --font-brand: "Geist Serif", var(--font); } /* the name's in Latin letters in either language */
@@ -48,20 +49,13 @@
      full strength, the toning down being for what isn't one (set with --voice, by setAccent) */
   --voice-act: var(--ink);
   /* --voice-mark: your colour as a mark that has to be seen (a line, a fill, a bar: 3:1), for where you are and what's
-     on; a button in your colour has its own (--voice-btn). --voice-act as it is here (Mono the ink), deepened in the
-     light theme (below); worked out from it here, not set by paintAccent */
+     on; nothing you press to do something takes it but the round Play (base.css). --voice-act as it is here (Mono the
+     ink), deepened in the light theme (below); worked out from it here, not set by paintAccent */
   --voice-mark: var(--voice-act);
-  /* your colour under what's on it: a button's fill, under a glyph (--voice-btn: Play and Pause, Loop and the click on,
-     a take playing, Compare), a label's, under text (--voice-fill: the playhead's time, the version you're in, the
-     Lab's chips), and what's on them (--on-fill); a switch's knob on the mark (--on-mark). Here the mark, your colour and
-     the dark text on it, as they were (Mono's its own: paintAccent); worked out where the browser can (below) */
-  --voice-btn: var(--voice-mark); --voice-fill: var(--voice); --on-fill: var(--on-voice); --on-mark: var(--on-voice);
-  /* Play and Pause pointed at (--voice-btn-hot): a deeper step of the button's fill in its own hue, worked out where
-     the browser can (below); here a step towards the strongest ink, as it was */
-  --voice-btn-hot: color-mix(in oklab, var(--voice-btn) 85%, var(--ink-strong));
-  /* the played part of the song's waveform (a song page's overview, Takes Studio's: waveBars): the ink; a pastel's its
-     own shade, beside its Play, worked out where the browser can (below) */
-  --wave: var(--ink);
+  /* a label in your colour, under text (--voice-fill: the playhead's time, the version you're in, the Lab's chips), the
+     text on it (--on-fill), and a switch's knob on the mark (--on-mark): your colour and the dark text on it here; white
+     on a deeper fill in the light theme (below) */
+  --voice-fill: var(--voice); --on-fill: var(--on-voice); --on-mark: var(--on-voice);
   /* text on an accent (--on-accent: on any of the colours, in either theme), on yours (--on-voice), and on Mono's
      (--on-voice-mono), which Mono puts in --on-voice (stage.js): each its own value, never one another's (a loop of
      them is no colour at all) */
@@ -96,6 +90,10 @@
   /* depth, in colour */
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2); /* a switch's knob */
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.25); /* a control over a waveform */
+  --primary: var(--ink); --on-primary: var(--on-ink); --primary-hover: var(--ink-strong); /* a main button's fill, its text, pointed at: the ink (the light theme's pastels: below) */
+  --play: var(--voice-mark); --on-play: var(--on-voice); --play-hover: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong)); /* the round Play: your colour as a mark, its glyph, pointed at */
+  --seg-on: var(--hover-2); /* the picked part of a segmented control: raised off its track, lighter than the card's buttons */
+  --shadow-seg: 0 1px 1px rgba(0, 0, 0, 0.12); /* its hairline lift (a knob's shadow was too much) */
   /* a panel, menu or list over the page: set off by its tone, not drawn round (a card's hairline, a faint light along
      its top, a soft shadow close under it) */
   --shadow-float: 0 0 0 1px var(--line), inset 0 1px 0 var(--fg-6), 0 8px 24px rgba(0, 0, 0, 0.32);
@@ -106,11 +104,17 @@
    little of its chroma: 0.008 at most on the page, 0.01 on the card (and a toggle held), 0.014 on a button or field,
    0.016 pointed at. The ink's tints that fill, line and mark (--fg-2 to --fg-38, so --fill, --line, --ring, --track
    and --dim) are a near-white of your colour, chroma 0.05 at most, a little less light (L 0.88 at that) and a little
-   more opaque, so a fill's about as light as white's was. Text and what's drawn in ink stay grey: a tint there costs
-   legibility for nothing. Mono has no chroma, so it comes out as it was, as it does where the browser can't work it
-   out (the plain values above). On .theme-dark too, so a part that stays dark works it out from its own --voice */
+   more opaque, so a fill's about as light as white's was. Tone on tone, the ink and text take its hue too: the ink
+   (and what's on it) at chroma 0.02 at most, the text steps (--fg-46, 55, 80: muted, faint) as the fills are. Mono has
+   no chroma, so it comes out as it was, as it does where the browser can't work it out (the plain values above). On
+   .theme-dark too, so a part that stays dark works it out from its own --voice */
 @supports (color: oklch(from red l c h)) {
   :root, .theme-dark {
+    --ink: oklch(from var(--voice) 0.94 min(c, 0.02) h); --ink-strong: oklch(from var(--voice) calc(1 - min(c, 0.012)) min(c, 0.012) h);
+    --on-ink: oklch(from var(--voice) 0.165 min(c, 0.012) h);
+    --fg-46: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.46 * (1 + min(c, 0.05) * 4.4)));
+    --fg-55: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.55 * (1 + min(c, 0.05) * 4.4)));
+    --fg-80: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.8 * (1 + min(c, 0.05) * 4.4)));
     --bg: oklch(from var(--voice) 0.165 min(c, 0.008) h); --surface: oklch(from var(--voice) 0.2 min(c, 0.01) h);
     --surface-2: oklch(from var(--voice) 0.275 min(c, 0.014) h); --hover-2: oklch(from var(--voice) 0.315 min(c, 0.016) h);
     --tog-down: oklch(from var(--voice) 0.21 min(c, 0.01) h);
@@ -132,8 +136,8 @@
    can't be 3:1 on white, so it's soft as a line (1.6:1), and deeper where it's read (the sung words, --sung-hi).
    Marking where you are or what's on (--voice-mark), each is no lighter than L 0.66: the pastels 2.8–3.3:1 there.
    Orange and amber a little deeper, as they must be on white. As small text they're mixed half with the ink
-   (--voice-ink, 4.5:1, pink's too); text on them is dark, as in the dark theme (Mono's, near-black, white), but on a
-   button or a label in yours (--on-fill) white, or a pastel's a deep shade of it (below). ---- */
+   (--voice-ink, 4.5:1, pink's too); text on them is dark, as in the dark theme (Mono's, near-black, white), but white
+   on Play and a label in yours where the browser can work it out (below). ---- */
 :root[data-theme="light"] {
   --bg: oklch(0.965 0 0); --surface: oklch(1 0 0); --surface-2: oklch(0.935 0 0); --hover-2: oklch(0.9 0 0);
   --ink: oklch(0.2 0 0); --ink-strong: oklch(0 0 0); --on-ink: oklch(0.99 0 0); --on-ink-muted: rgba(255, 255, 255, 0.5); --knob: oklch(1 0 0); --knob-hot: oklch(0.5 0 0);
@@ -148,9 +152,6 @@
   --on-voice: var(--on-accent); --on-voice-mono: oklch(1 0 0);
   --voice-ink: color-mix(in oklab, var(--voice) 50%, var(--ink));
   --voice-mark: var(--voice-act); /* deepened where the browser can (below) */
-  --voice-btn: var(--voice-mark); --voice-fill: var(--voice); --on-fill: var(--on-voice); --on-mark: var(--on-voice); /* the accent as it is, dark on it; worked out where the browser can (below) */
-  --voice-btn-hot: color-mix(in oklab, var(--voice-btn) 70%, var(--ink-strong)); /* Play pointed at: towards black, as far as Mono's goes where the browser works it out (0.2 to 0.14) */
-  --wave: var(--ink); /* the song's waveform played: the ink; a pastel's a deep shade of it where the browser can (below) */
   --good: oklch(0.52 0.13 155); --warn: oklch(0.68 0.15 75); --orange: oklch(0.55 0.15 50); --bad: oklch(0.55 0.2 27);
   --solo: oklch(0.56 0.12 80); --on-solo: oklch(1 0 0); --tog-down: oklch(0.88 0 0);
   --glow-mix: 45%;
@@ -166,63 +167,39 @@
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.24), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.16);
+  --seg-on: var(--surface); /* white on its grey track, as a switch's knob (the light buttons' grey read as pressed in) */
+  --shadow-seg: 0 1px 1px rgba(0, 0, 0, 0.05), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
   --shadow-float: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.12);
   --shadow-lift: 0 24px 64px rgba(0, 0, 0, 0.28);
   color-scheme: light;
 }
 /* your colour as a mark in the light theme: no lighter than L 0.66, which leaves the vivid ones about as they are and
    deepens the pastels, as the sung words are (--sung-hi). Where the browser can't work it out, --voice-act as it is
-   (the light block's). At the light block's specificity, after it, so it wins.
-   And what's on your colour, worked out from it. Each keeps your colour's hue: lightness and chroma may change, the hue
-   may not. A colour the screen can't show is clipped to one it can, which turns its hue, so one that's darker or
-   lighter than yours takes only the chroma every colour can have there (contrast.py checks each, with each accent).
-   A pastel (sky, pink) is told from the rest by its own lightness and
-   chroma, written out in each as clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) (0.81 in the dark theme): 1 for
-   a pastel, 0 for a vivid one (L 0.62–0.77) and for Mono (no chroma). In the light theme a vivid one's glyph is white on
-   the mark (--voice-btn: 3.3–3.5:1 at L 0.66, enough for a glyph or a knob, not for text) and its text white on a
-   deeper fill (--voice-fill: no lighter than L 0.545, where white's 4.5:1 on each, green's 4.6).
-   Made deeper, a colour keeps its chroma if the screen holds it there; but orange to teal are as vivid as the screen has
-   them at their lightness, and lighter than their brightest (a yellow's brightest is near white), so deeper the
-   screen holds less: theirs falls with their lightness, as the colour's shade does (c × l′/l, which the screen can
-   always show; 1.04 × that for the fill, as the light theme's colours are 95 % of the most it has). Which they are is
-   their hue, so the rule asks it: a switch on h, clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1), 1 from about 50 to
-   200 degrees (orange 58 to teal 195) and 0 for coral, sky, blue, violet and pink, written out where it's used (the
-   white key held, stage.css). The fill's reaches round to coral (+ 0.25 for - 0.15, 1 from about 20 to 230 degrees):
-   in the light theme coral's at its brightest already, so the fill 0.12 deeper holds less of it too (12 % less on P3);
-   the pastels have their own fill, so it doesn't reach them. A pastel's, the owner's pick, is a paler tint of
-   it (0.1 lighter, half the chroma) with a deep shade of its hue on it (0.35 darker, 1.07 × the chroma, the most sky's
-   hue has there, one rule for both: 5.5–5.6:1 on the tint, and it's what's seen on the card, 7.2–7.3:1, the tint only
-   1.3). In the dark theme the fills are your colour as it is, dark on it as before, a pastel's a deep shade of its hue
-   (L 0.32, 0.91 × the chroma, sky's most there: 8.3:1). A switch's knob is white on the mark in the light theme
-   (--on-mark: 3.06 on sky's at the least).
-   Play and Pause pointed at (--voice-btn-hot) is a deeper step of the button in its hue, 0.06 darker, never a greyer
-   one: a vivid colour's chroma falls with its lightness, as its shade's does (below its brightest, orange to teal, the
-   screen holds less chroma the darker it is; 1.04 × the shade in the light theme, as the fill), a pastel's rises 1.35 ×
-   (its pale tint has room, and its shade went a muddy grey), and Mono's goes as it did: in the dark theme a step
-   lighter (15 % of the way to white: written out for no chroma, as the pastel's switch is), in the light one 0.2 to
-   0.14. Its glyph (--on-fill) is 4.2:1 on it at the least.
-   The song's waveform played (--wave) is the ink but for a pastel's: beside its soft Play and time the ink's too black,
-   so it's the deep shade that's on them in the light theme (6.5–6.6:1 on the page, 4.5 on the part not played) and
-   the pastel as it is in the dark one, as its Play is. It's the ink's lightness (0.2, 0.94: written out, as the ink
-   can't be read in here; contrast.py's Mono check holds them to it) moved all the way to that for a pastel and not at
-   all for the rest, so theirs is the ink.
-   Mono comes out as it was. The dark theme's on :root and .theme-dark (a part that stays dark works it out from its own
-   --voice), the light theme's after it, at its block's specificity. It asks for cos() of the hue as well (the shade
-   switch, above): a browser without it has the plain values, all of them */
+   (the light block's). At the light block's specificity, after it, so it wins */
+@supports (color: oklch(from red l c h)) { :root[data-theme="light"] { --voice-mark: oklch(from var(--voice-act) min(l, 0.66) c h); } }
+/* what's worked out from your colour keeps its hue: lightness and chroma may change, the hue may not (a colour the
+   screen can't show is clipped to one it can, which turns its hue; contrast.py checks each, with each accent).
+   Play pointed at (--play-hover) is a step deeper, 0.06, never a greyer one (the step towards the ink was): it keeps its
+   chroma where the screen holds it there, but orange to teal are as vivid as the screen has them and lighter than their
+   brightest, so deeper it holds less, and theirs falls as their lightness does, as their shade's would (c × l′/l, which
+   the screen can always show; 1.04 × that in the light theme, whose colours are 95 % of the most it has). Which they
+   are is their hue, so the rule asks it: a switch on h, clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1), 1 from about
+   50 to 200 degrees (orange 58 to teal 195) and 0 for coral, sky, blue, violet and pink (the white key held has it too:
+   stage.css). In the light theme it reaches round to coral (+ 0.25 for - 0.15, 1 from about 20 to 230 degrees): coral's
+   at its brightest there already. Mono's goes as it did, 15 % of the way to the strongest ink (written out for no
+   chroma), and the light theme's pastels' as a main button's (below).
+   In the light theme what's on your colour is white: Play's glyph and a switch's knob on the mark (--on-play, --on-mark:
+   3.06–3.5:1, enough for a glyph, not for text), a label's text (--on-fill) on a deeper fill (--voice-fill: no lighter
+   than L 0.545, where white's 4.5:1 on each, its chroma held as Play's pointed at is); the pastels have their own
+   (data-pastel, below). This asks for cos() of the hue as well: a browser without it has the plain values, all of them */
 @supports (color: oklch(from red l calc(c * cos(h * 1deg)) h)) {
   :root, .theme-dark {
-    --on-fill: oklch(from var(--voice) calc(0.165 + clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * 0.155) calc(clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * c * 0.91) h);
-    --wave: oklch(from var(--voice) calc(0.94 - clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * (0.94 - l)) calc(clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * c) h);
-    --voice-btn-hot: oklch(from var(--voice-btn) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 + 0.15 * (1 - l))) calc(c * (clamp(0, (l - 0.81) * 100, 1) * 1.35 + (1 - clamp(0, (l - 0.81) * 100, 1)) * (l - 0.06) / l)) h);
+    --play-hover: oklch(from var(--play) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 + 0.15 * (1 - l))) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1) * 0.06 / l)) h);
   }
   :root[data-theme="light"] {
-    --voice-mark: oklch(from var(--voice-act) min(l, 0.66) c h);
-    --voice-btn: oklch(from var(--voice-act) calc(min(l, 0.66) + clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * (l + 0.1 - 0.66)) calc(c * (1 - 0.5 * clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1))) h);
-    --voice-fill: oklch(from var(--voice) calc(min(l, 0.545) + clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * (l + 0.1 - 0.545)) calc(c * (1 - 0.5 * clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1)) * (1 - clamp(0, (cos((h - 126) * 1deg) + 0.25) * 8, 1) * (1 - min(1, 1.04 * 0.545 / l + clamp(0, (l - 0.74) * 100, 1))))) h);
-    --on-fill: oklch(from var(--voice) calc(1 - clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * (1.35 - l)) calc(clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * c * 1.07) h);
-    --on-mark: oklch(1 0 0);
-    --wave: oklch(from var(--voice) calc(0.2 + clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * (l - 0.35 - 0.2)) calc(clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * c * 1.07) h);
-    --voice-btn-hot: oklch(from var(--voice-btn) calc(l - 0.06) calc(c * (clamp(0, (l - 0.81) * 100, 1) * 1.35 + (1 - clamp(0, (l - 0.81) * 100, 1)) * min(1, 1.04 * (l - 0.06) / l))) h);
+    --play-hover: oklch(from var(--play) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 - 0.15 * l)) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) + 0.25) * 8, 1) * (1 - min(1, 1.04 * (l - 0.06) / l)))) h);
+    --on-play: oklch(1 0 0); --on-mark: oklch(1 0 0); --on-fill: oklch(1 0 0);
+    --voice-fill: oklch(from var(--voice) min(l, 0.545) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) + 0.25) * 8, 1) * (1 - min(1, 1.04 * 0.545 / l)))) h);
   }
 }
 /* the light theme's greys in a trace of your colour, as the dark one's are (above): the page, a button or field, one
@@ -231,9 +208,25 @@
    a line on it (coral and violet were 3.00 on the grey). The tints a near-black of your colour, L 0.3 at most and
    chroma 0.05 at most (at L 0.3 about the most teal's hue has: more and it's clipped, which turns its hue), a little
    more opaque. Every step tinted above is set again here, or the dark theme's would stay (they're set on :root, and
-   the light theme sets no steps of its own: it has them from --fg); 46, 55 and 80 stay black. Mono comes out as it was */
+   the light theme sets no steps of its own: it has them from --fg). Tone on tone, the ink's a dark shade of your hue
+   (chroma 0.04 at most, and a share of your colour's own: or Pink's goes maroon), a step up off black with your colour
+   (L 0.27–0.3) so its hue shows; the text (muted, faint, a field's hint) a near-black of it (L 0.18 at most). The
+   pastels (Pink, Sky: L over 0.7) keep their softness, contrast or not (the owner's call): the ink a soft deep shade of
+   them, the text lighter and more of their hue, by how pale they are (max(l - 0.7, 0)). Mono comes out as it was */
 @supports (color: oklch(from red l c h)) {
   :root[data-theme="light"] {
+    --ink: oklch(from var(--voice) calc(0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) calc(min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) h);
+    --ink-strong: oklch(from var(--voice) calc(min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2) calc(min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2) h);
+    --on-ink: oklch(from var(--voice) 0.99 min(c, 0.005) h);
+    --primary: oklch(from var(--voice) calc((0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) + (l - (0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) + (c - (min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --on-primary: oklch(from var(--voice) calc(0.99 + ((0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) - 0.99) * min(max((l - 0.7) * 100, 0), 1)) calc(min(c, 0.005) + ((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) - min(c, 0.005)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --primary-hover: oklch(from var(--voice) calc((min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2) + (l - 0.05 - (min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2) + (c - (min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --muted: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.62 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --faint: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.56 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --placeholder: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.44 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-46: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.46 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-55: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.55 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-80: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.8 * (1 + min(c * 0.34, 0.06) * 3.6)));
     --bg: oklch(from var(--voice) calc(0.965 + min(c, 0.006) * 0.1) min(c, 0.006) h); --surface-2: oklch(from var(--voice) 0.935 min(c, 0.01) h);
     --hover-2: oklch(from var(--voice) 0.9 min(c, 0.014) h); --tog-down: oklch(from var(--voice) 0.88 min(c, 0.014) h);
     --fg-2: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.05) h / calc(0.02 * (1 + min(c, 0.06) * 3.6)));
@@ -245,6 +238,13 @@
     --fg-38: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.05) h / calc(0.38 * (1 + min(c, 0.06) * 3.6)));
   }
 }
+/* the pastels (Pink, Sky: data-pastel, set with the accent) in the light theme: the round Play the pastel itself, as
+   a main button's fill is (not deepened to a mark's 0.66, which went mauve), its glyph the deep shade a main button's
+   text is; pointed at, a step deeper in the same hue */
+:root[data-theme="light"][data-pastel] { --play: var(--voice); --on-play: var(--on-primary); --play-hover: var(--primary-hover); }
+/* ...and a label in their colour (the playhead's time, the version you're in, the Lab's chips) the pastel itself with
+   that deep shade on it, as a main button is */
+:root[data-theme="light"][data-pastel] { --voice-fill: var(--voice); --on-fill: var(--on-primary); }
 :root {
   /* ---- type: Pretendard throughout, but for the library's heading in English (Geist Serif, above); what was set in
      a monospace (times, levels, M/S) keeps its digits in line with tabular-nums ---- */
