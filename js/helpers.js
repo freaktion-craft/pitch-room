@@ -78,29 +78,31 @@ function resetOnDblClick(input, def) {
 // While it's pointed at, its title waits in data-tipped (so the system's doesn't show too) and goes back after, so code
 // that sets or reads titles is as it was. A key in brackets, "(L)", is set apart in the chip, muted.
 (function tooltips() {
-  const DELAY = 500, WARM = 400, GAP = 8, EDGE = 8, SLIDE = 240; // (SLIDE: px, the farthest one glides from)
+  const DELAY = 500, WARM = 400, GAP = 8, EDGE = 8, SLIDE = 240, ONE_LINE = 24; // (SLIDE: px, the farthest one glides from; ONE_LINE: a one-line chip's height)
   const KEY = /\s?\(((?:(?:Ctrl|Shift|Alt|⌘)\+)*(?:[A-Z0-9←→↑↓]|Space|Home|End|Enter|Esc|Tab))\)/;
   const tip = el("div", "tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
   document.body.append(tip);
   let on = null, timer = 0, lastShown = 0, lastAt = null; // (lastAt: where the last one stood, so the next slides from there)
   const take = (n) => { const t = n.getAttribute("title"); if (t != null) { n.removeAttribute("title"); n.dataset.tipped = t; } return n.dataset.tipped || ""; };
   const give = (n) => { if (!n.hasAttribute("title") && n.dataset.tipped != null) n.setAttribute("title", n.dataset.tipped); delete n.dataset.tipped; };
-  // slide: shown straight after another (along the piano's keys, say), it glides over from where that one stood rather
-  // than blinking from one to the next; not from far off (it'd sweep across the page)
+  // slide: shown straight after another (along the piano's keys, say), it goes over from where that one stood rather
+  // than blinking from one to the next: its leading edge first, so it stretches, moves and draws in after (each edge
+  // its own time: base.css); one line to one line, and not from far off (it'd sweep across the page)
   function show(n, slide) {
     const t = take(n); if (!t || !n.isConnected) return;
     const m = t.match(KEY);
     if (m) tip.replaceChildren(t.slice(0, m.index), el("span", "tip-key", m[1]), t.slice(m.index + m[0].length)); else tip.replaceChildren(t);
-    tip.classList.remove("tip-slide");
-    tip.style.left = tip.style.top = "0"; tip.hidden = false; // (measured at the left, where it has its full width)
-    const r = n.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
-    const x = Math.max(EDGE, Math.min(document.documentElement.clientWidth - w - EDGE, r.left + r.width / 2 - w / 2)); // (the scrollbar left out)
+    tip.classList.remove("tip-slide", "tip-left");
+    tip.style.right = "auto"; tip.style.left = tip.style.top = "0"; tip.hidden = false; // (measured at the left, where it has its full width)
+    const r = n.getBoundingClientRect(), w = tip.getBoundingClientRect().width, h = tip.offsetHeight, vw = document.documentElement.clientWidth;
+    const x = Math.max(EDGE, Math.min(vw - w - EDGE, r.left + r.width / 2 - w / 2)); // (the scrollbar left out)
     const y = r.top - h - GAP >= EDGE ? r.top - h - GAP : r.bottom + GAP; // over it, or under it at the window's top
-    if (slide && lastAt && Math.hypot(x - lastAt[0], y - lastAt[1]) < SLIDE) {
-      tip.style.left = lastAt[0] + "px"; tip.style.top = lastAt[1] + "px";
-      void tip.offsetWidth; tip.classList.add("tip-slide"); // (from there, then on: base.css times it)
+    if (slide && lastAt && h === lastAt.h && h < 2 * ONE_LINE && Math.hypot(x - lastAt.x, y - lastAt.y) < SLIDE) {
+      tip.style.left = lastAt.x + "px"; tip.style.right = vw - lastAt.x - lastAt.w + "px"; tip.style.top = lastAt.y + "px";
+      void tip.offsetWidth; tip.classList.add("tip-slide"); tip.classList.toggle("tip-left", x < lastAt.x); // (from there, then on)
+      tip.style.right = vw - x - w + "px";
     }
-    tip.style.left = x + "px"; tip.style.top = y + "px"; lastAt = [x, y];
+    tip.style.left = x + "px"; tip.style.top = y + "px"; lastAt = { x, y, w, h };
   }
   function hide(keep) {
     clearTimeout(timer);
@@ -131,9 +133,10 @@ function resetOnDblClick(input, def) {
     if (!r?.width) { seg.classList.remove("seg-slid"); return; } // (out of sight: its own button's surface till it's back)
     const snap = !move || !seg.classList.contains("seg-slid");
     if (snap) seg.classList.add("seg-snap");
-    const s = seg.getBoundingClientRect();
-    seg.style.setProperty("--seg-x", r.left - s.left - seg.clientLeft + "px");
-    seg.style.setProperty("--seg-w", r.width + "px");
+    const s = seg.getBoundingClientRect(), l = r.left - s.left - seg.clientLeft, was = parseFloat(seg.style.getPropertyValue("--seg-l"));
+    seg.classList.toggle("seg-go-l", !snap && l < was); // (going left: its left edge leads, practice.css)
+    seg.style.setProperty("--seg-l", l + "px");
+    seg.style.setProperty("--seg-r", seg.clientWidth - l - r.width + "px");
     seg.classList.add("seg-slid");
     if (snap) { void seg.offsetWidth; seg.classList.remove("seg-snap"); }
   };

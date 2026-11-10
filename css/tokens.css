@@ -42,7 +42,7 @@
      pitch, the playhead, a highlight) it isn't taken for a button or a label, and still far from the greys a thing
      that's off is in (--muted). White here, near-black in the light theme (its key stays "white": settings kept) */
   --voice-white: oklch(0.87 0 0);
-  --voice-blue: oklch(0.68 0.166 262); --voice-violet: oklch(0.7 0.174 295); --voice-pink: oklch(0.86 0.08 353); --voice-coral: oklch(0.72 0.172 32);
+  --voice-blue: oklch(0.68 0.166 262); --voice-violet: oklch(0.7 0.174 295); --voice-pink: oklch(0.86 0.08 353);
   --voice-orange: oklch(0.75 0.175 58); --voice-amber: oklch(0.77 0.156 82); --voice-green: oklch(0.73 0.197 150); --voice-teal: oklch(0.74 0.124 195);
   --voice-sky: oklch(0.86 0.075 236);
   /* --voice-act: your colour on a button or what one's doing (pressed, a focus ring): --voice, but Mono at the ink's
@@ -155,7 +155,7 @@
   --fill: var(--fg-6); --line: var(--fg-8); --ring: var(--fg-12); --track: var(--fg-12);
   --scrim: rgba(0, 0, 0, 0.16); --scrim-strong: rgba(0, 0, 0, 0.4);
   --voice-white: oklch(0.32 0 0);
-  --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.9 0.055 350); --voice-coral: oklch(0.667 0.21 32);
+  --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.9 0.055 350);
   --voice-orange: oklch(0.654 0.149 58); --voice-amber: oklch(0.646 0.126 82); --voice-green: oklch(0.62 0.162 150); --voice-teal: oklch(0.631 0.102 195);
   --voice-sky: oklch(0.9 0.055 236); /* baby sky, a soft blue-white as Pink is (the #b9e4ff asked for, about) */
   --on-voice: var(--on-accent); --on-voice-mono: oklch(1 0 0);
@@ -308,11 +308,11 @@
    lightness and hue, the same lightness, so the same contrast; pink and sky as they are */
 @media (color-gamut: p3) {
   :root, .theme-dark {
-    --voice-blue: oklch(0.68 0.173 262); --voice-violet: oklch(0.7 0.182 295); --voice-coral: oklch(0.72 0.212 32);
+    --voice-blue: oklch(0.68 0.173 262); --voice-violet: oklch(0.7 0.182 295);
     --voice-orange: oklch(0.75 0.195 58); --voice-amber: oklch(0.77 0.174 82); --voice-green: oklch(0.73 0.266 150); --voice-teal: oklch(0.74 0.162 195);
   }
   :root[data-theme="light"] { /* (its own: the one above is at :root's specificity, under the light block's) */
-    --voice-blue: oklch(0.648 0.192 262); --voice-violet: oklch(0.662 0.208 295); --voice-pink: oklch(0.9 0.055 350); --voice-coral: oklch(0.667 0.265 32);
+    --voice-blue: oklch(0.648 0.192 262); --voice-violet: oklch(0.662 0.208 295); --voice-pink: oklch(0.9 0.055 350);
     --voice-orange: oklch(0.654 0.17 58); --voice-amber: oklch(0.646 0.146 82); --voice-green: oklch(0.62 0.19 150); --voice-teal: oklch(0.631 0.105 195);
   }
 }
