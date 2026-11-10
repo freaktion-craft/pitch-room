@@ -16,7 +16,7 @@ function resetOnDblClick(input, def) {
 // held, or moved with the keys, a tip over the handle says the level: a volume out of 100 for full (up to 150), others
 // (data-tip="pos") as how far along they are, out of 100, and data-tip="ms" its value in ms, signed. It also keeps each slider's filled part (--p) in step.
 (function sliderTips() {
-  const THUMB = 12, tip = el("output", "slider-tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
+  const tip = el("output", "slider-tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
   document.body.append(tip);
   let held = null, keyTimer = 0;
   const frac = (s) => { const f = (s.value - s.min) / (s.max - s.min || 1); return s.dir === "rtl" ? 1 - f : f; }; // how far along, from the left
@@ -30,6 +30,8 @@ function resetOnDblClick(input, def) {
     for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches('input[type="range"]')) paint(n); n.querySelectorAll('input[type="range"]').forEach(paint); }
   }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener("input", (e) => { if (e.target.type === "range") paint(e.target); }, true);
+  // the handle's middle: every slider's is a fader's cap, --thumb wide (tokens.css; read once, as the styles load before this runs)
+  const THUMB = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--thumb"));
   const thumbX = (s) => { const r = s.getBoundingClientRect(); return r.left + THUMB / 2 + frac(s) * (r.width - THUMB); };
   function show(s) {
     if (!s) { tip.hidden = true; return; }
