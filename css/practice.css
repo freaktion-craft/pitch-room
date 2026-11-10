@@ -49,12 +49,12 @@
 .phrase-row > .kfield:first-child { margin-right: var(--space-2); } /* the count-in first, a little apart from the phrases' controls */
 .tog:disabled { opacity: 0.4; pointer-events: none; }
 .strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; touch-action: pan-y; }
-.strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--fg-16); cursor: pointer; }
-.strip button:hover { background: var(--fg-30); }
-.strip button[aria-current="true"] { background: color-mix(in oklab, var(--voice-mark) 62%, var(--fg-16)); } /* the one you're in, in your colour: fuller while it loops */
-.strip.looping button[aria-current="true"] { background: var(--voice-mark); }
-.strip button.inspan { background: var(--fg-30); } /* a run of phrases looped together */
-.strip.looping button.inspan:not([aria-current="true"]) { background: color-mix(in oklab, var(--voice-mark) 50%, var(--fg-16)); } /* the rest of the run, a step under it */
+.strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--phrase); cursor: pointer; }
+.strip button:hover { background: var(--phrase-hover); }
+.strip button[aria-current="true"] { background: color-mix(in oklab, var(--play) 85%, var(--phrase)); } /* the one you're in, in your colour (Play's: a pastel as it is), plainly apart from the rest: full while it loops */
+.strip.looping button[aria-current="true"] { background: var(--play); }
+.strip button.inspan { background: var(--phrase-hover); } /* a run of phrases looped together */
+.strip.looping button.inspan:not([aria-current="true"]) { background: color-mix(in oklab, var(--play) 50%, var(--phrase)); } /* the rest of the run, a step under it */
 /* over the strip, at once: the words of the phrase hovered, or reached by a drag */
 .strip-tip { position: fixed; z-index: var(--z-tooltip); transform: translate(-50%, -100%); max-width: min(360px, calc(100vw - 16px)); padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); line-height: 16px; pointer-events: none; }
