@@ -620,8 +620,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .pop .btn.primary:hover { background: var(--hover-2); }
 /* round, it's Play and Pause (a song's page, Practice, Takes Studio): your colour, the one button you press that takes
    it (Mono's the ink), its glyph in the text on it (.pp: currentColor); pointed at, a step towards the strongest ink */
-.btn.primary.round { background: var(--voice-mark); color: var(--on-voice); }
-.btn.primary.round:hover { background: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong)); }
+.btn.primary.round { background: var(--play); color: var(--on-play); }
+.btn.primary.round:hover { background: var(--play-hover); }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
 .btn.quiet:hover { background: var(--fg-8); }
 #app > header .btn.quiet:not(.mic) { color: var(--ink); } /* the header's buttons in ink, the mic's beside them: a grey one there reads as off */

@@ -87,6 +87,7 @@
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2); /* a switch's knob */
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.25); /* a control over a waveform */
   --primary: var(--ink); --on-primary: var(--on-ink); --primary-hover: var(--ink-strong); /* a main button's fill, its text, pointed at: the ink (the light theme's pastels: below) */
+  --play: var(--voice-mark); --on-play: var(--on-voice); --play-hover: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong)); /* the round Play: your colour as a mark, its glyph, pointed at */
   --seg-on: var(--hover-2); /* the picked part of a segmented control: raised off its track, lighter than the card's buttons */
   --shadow-seg: 0 1px 1px rgba(0, 0, 0, 0.12); /* its hairline lift (a knob's shadow was too much) */
   /* a panel, menu or list over the page: set off by its tone, not drawn round (a card's hairline, a faint light along
@@ -206,6 +207,10 @@
     --fg-38: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.38 * (1 + min(c, 0.06) * 3.6)));
   }
 }
+/* the pastels (Pink, Sky: data-pastel, set with the accent) in the light theme: the round Play the pastel itself, as
+   a main button's fill is (not deepened to a mark's 0.66, which went mauve), its glyph the deep shade a main button's
+   text is; pointed at, a step deeper in the same hue */
+:root[data-theme="light"][data-pastel] { --play: var(--voice); --on-play: var(--on-primary); --play-hover: var(--primary-hover); }
 :root {
   /* ---- type: Pretendard throughout, but for the library's heading in English (Geist Serif, above); what was set in
      a monospace (times, levels, M/S) keeps its digits in line with tabular-nums ---- */

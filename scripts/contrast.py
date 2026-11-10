@@ -365,7 +365,7 @@ for bg in ["--bg", "--surface"]:
         # 2.77 (sky) and 2.94 (pink) on the light theme's page, at the others' lightness (3.06, 3.26 on the card)
         PAIRS.append((f"mark:--voice-{k}", bg, 2.7 if bg == "--bg" and k in ("pink", "sky") else 3, k))
 PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--seg-on", 4.5), ("--ink", "--hover-2", 4.5),
-          ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5), ("--on-primary", "--primary", 4.5), ("--on-primary", "--primary-hover", 4.5),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
+          ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5), ("--on-primary", "--primary", 4.5), ("--on-primary", "--primary-hover", 4.5), ("--on-play", "--play", 3),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
           ("--on-solo", "--solo", 4.5), ("--solo", "--tog-down", 3),
           ("--placeholder", "--surface-2", 3), ("--on-media", "oklch(0.25 0 0)", 4.5)]
 # text on the fills that take your colour, over the page and the card: a field (its text, its hint), a quiet button and
@@ -416,6 +416,10 @@ def rows(css, light, p3):
     out, t0 = [], theme(css, light, p3)
     for k in ACCENTS:
         t = painted(t0, k)
+        if light and k in PASTELS:  # data-pastel's block over them (set with the accent: stage.js)
+            for sel, media, decls in blocks(css):
+                if not media and ':root[data-theme="light"][data-pastel]' in [s.strip() for s in sel.split(",")]:
+                    t.update(decls)
         base = colour(t, "--surface", p3)
         for fg, bg, need, *only in PAIRS:
             if only and only[0] != k:
