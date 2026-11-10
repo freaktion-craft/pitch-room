@@ -264,7 +264,26 @@
 /* Scales' trills under the vowels: a name alone (no turn, no days); the first a line off them */
 .vc-vowels button[data-on] { grid-template-columns: 1fr; }
 .vc-vowels [data-v] + [data-on] { margin-top: var(--space-2); }
-/* Scales' pattern: its name on a button, its menu the groups side by side, each pattern its name over its degrees */
+/* Scales' top row, in Turn's mode's and Go's places: at the left the pattern, its name on a button, and beside it your
+   line hidden while you sing and the piano slower; at the right, in a set, come down and this key again, then Go. Each
+   toggle pressed as Freeze is. (Where it's still too narrow, the pattern's name is cut short.) Its menu: the groups side
+   by side, each pattern its name over its degrees */
+.sc-bar { position: absolute; top: var(--space-3); left: var(--space-3); right: var(--space-3); z-index: 1; display: flex; justify-content: space-between; gap: var(--space-2); }
+.sc-top, .sc-run { display: flex; gap: var(--space-2); }
+.sc-top, .sc-pat, #scPatName { min-width: 0; }
+.sc-run, .sc-top > .sc-tog, .sc-pat > .ico { flex: none; }
+#scPatName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-tog[aria-pressed="true"] { background: color-mix(in oklab, var(--voice-act) 35%, var(--fill)); color: var(--ink); }
+/* a phone: two rows, the pattern and Go, then the toggles and what runs the set, so a set's controls don't squeeze the
+   pattern's name to nothing; the two lines a row lower, and the plot (drawScale) */
+@media (max-width: 480px) {
+  .sc-bar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; grid-template-areas: "pat pat pat go go" "hide slow . down stay"; }
+  .sc-top, .sc-run { display: contents; }
+  .sc-pat { grid-area: pat; justify-self: start; max-width: 100%; }
+  #scGo { grid-area: go; justify-self: end; }
+  #scHide { grid-area: hide; } #scSlow { grid-area: slow; } #scDown { grid-area: down; } #scStay { grid-area: stay; }
+  .vc-scale .vc-say { top: calc(var(--space-3) + 2 * var(--control-md) + 2 * var(--space-2)); }
+}
 .sc-pat.open { background: var(--fill); }
 .sc-pats { grid-template-columns: repeat(3, auto); gap: var(--space-1); max-height: calc(100vh - var(--space-8)); overflow-y: auto; }
 .sc-col { display: grid; align-content: start; gap: var(--space-half); }

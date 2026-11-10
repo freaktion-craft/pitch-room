@@ -447,7 +447,8 @@ $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startM
 // Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest still
 // play, seek and step (Shift+← and Shift+→, or Home and End, to the start and the end; Record clicked, then Space, plays
 // rather than ending the take). One reached with Tab keeps its own keys, so a button presses with Space and a slider goes
-// to its ends with Home and End. Text fields and an open list or menu always keep theirs.
+// to its ends with Home and End. Text fields and an open list or menu always keep theirs. In the Lab's Scales, in a set,
+// ↓ comes down after the key being sung, and R sings it again (scAsk).
 let tabbed = false;
 addEventListener("pointerdown", () => { tabbed = false; }, true);
 addEventListener("keydown", (e) => { if (e.key === "Tab") tabbed = true; }, true);
@@ -468,6 +469,10 @@ document.addEventListener("keydown", (e) => {
       Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: S.dev && !e.repeat ? () => dropNote(e) : null,
       BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }
+  }
+  if (view === "voice" && VC.view === "scale" && SV.run && !e.shiftKey) {
+    const k = { ArrowDown: scCanDown() ? "down" : null, KeyR: "stay" }[e.code];
+    if (k) { e.preventDefault(); if (!e.repeat) scAsk(k); }
   }
 });
 
