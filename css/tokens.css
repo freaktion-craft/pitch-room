@@ -88,6 +88,7 @@
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.25); /* a control over a waveform */
   --primary: var(--ink); --on-primary: var(--on-ink); --primary-hover: var(--ink-strong); /* a main button's fill, its text, pointed at: the ink (the light theme's pastels: below) */
   --play: var(--voice-mark); --on-play: var(--on-voice); --play-hover: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong)); /* the round Play: your colour as a mark, its glyph, pointed at */
+  --wave: var(--ink); /* a song's waveform, its played part (Vibrant: your colour, below) */
   --voice-deep: var(--ink); --voice-press: var(--voice); /* a pastel's Play: its glyph and pointed at (light: worked out from it there) */
   --phrase: var(--fg-16); --phrase-hover: var(--fg-30); /* a phrase on Practice's strip, and one pointed at (or in a looped run) */
   --seg-on: var(--hover-2); /* the picked part of a segmented control: raised off its track, lighter than the card's buttons */
@@ -115,6 +116,7 @@
     --fg-46: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.46 * (1 + min(c, 0.05) * 4.4)));
     --fg-55: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.55 * (1 + min(c, 0.05) * 4.4)));
     --fg-80: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.8 * (1 + min(c, 0.05) * 4.4)));
+    --wave: oklch(from var(--voice-act) l c h); /* the waveform's played part in your colour itself (Mono: the ink) */
     --stem-band: oklch(from var(--voice) 0.74 min(c, 0.05) h); /* the band's icons and waveforms, tone on tone with the names beside them (a plain grey stood out) */
     --bg: oklch(from var(--voice) 0.165 min(c, 0.008) h); --surface: oklch(from var(--voice) 0.2 min(c, 0.01) h);
     --surface-2: oklch(from var(--voice) 0.275 min(c, 0.014) h); --hover-2: oklch(from var(--voice) 0.315 min(c, 0.016) h);
@@ -208,6 +210,7 @@
     --fg-80: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.8 * (1 + min(c * 0.34, 0.06) * 3.6)));
     --phrase: oklch(from var(--voice) 0.9 min(c * 0.25, 0.035) h);
     --phrase-hover: oklch(from var(--voice) 0.84 min(c * 0.35, 0.05) h); /* (clear pale tints of your hue, so the one you're in, your colour, stands out of them) */
+    --wave: oklch(from var(--voice-act) calc(min(l, 0.55) + max(l - 0.7, 0) * 0.5) calc(c * (1 + min(max((l - 0.7) * 100, 0), 1) * 0.6)) h); /* the waveform's played part: your colour, deep and full (a pastel's a clear rose or blue, more of its hue; Mono the ink) */
     --stem-band: oklch(from var(--voice) calc(0.55 + max(l - 0.7, 0) * 0.5) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h); /* the band's icons and waveforms in the text's tone (a pastel's softer, as its text is) */
     --bg: oklch(from var(--voice) calc(0.965 + min(c, 0.006) * 0.1) min(c, 0.006) h); --surface-2: oklch(from var(--voice) 0.935 min(c, 0.01) h);
     --hover-2: oklch(from var(--voice) 0.9 min(c, 0.014) h); --tog-down: oklch(from var(--voice) 0.88 min(c, 0.014) h);

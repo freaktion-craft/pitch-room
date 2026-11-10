@@ -13,7 +13,7 @@ function readColors() {
   for (const k of ["vocals","lead","backing","drums","bass","guitar","piano","other","click"]) { probe.style.color = `var(--stem-${k})`; C["stem-" + k] = getComputedStyle(probe).color; }
   // (and your colour as small text, a color-mix in the light theme, and text on it; and the greys with a trace of it,
   // relative colours worked out from it: the card, a button's grey, a line)
-  for (const k of ["voice-ink", "on-voice", "surface", "surface-2", "line"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
+  for (const k of ["voice-ink", "on-voice", "surface", "surface-2", "line", "wave"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
 }
 function resize() {
   const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
