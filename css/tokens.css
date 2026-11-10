@@ -56,6 +56,9 @@
      Lab's chips), and what's on them (--on-fill); a switch's knob on the mark (--on-mark). Here the mark, your colour and
      the dark text on it, as they were (Mono's its own: paintAccent); worked out where the browser can (below) */
   --voice-btn: var(--voice-mark); --voice-fill: var(--voice); --on-fill: var(--on-voice); --on-mark: var(--on-voice);
+  /* the played part of the song's waveform (a song page's overview, Takes Studio's: waveBars): the ink; a pastel's its
+     own shade, beside its Play, worked out where the browser can (below) */
+  --wave: var(--ink);
   /* text on an accent (--on-accent: on any of the colours, in either theme), on yours (--on-voice), and on Mono's
      (--on-voice-mono), which Mono puts in --on-voice (stage.js): each its own value, never one another's (a loop of
      them is no colour at all) */
@@ -143,6 +146,7 @@
   --voice-ink: color-mix(in oklab, var(--voice) 50%, var(--ink));
   --voice-mark: var(--voice-act); /* deepened where the browser can (below) */
   --voice-btn: var(--voice-mark); --voice-fill: var(--voice); --on-fill: var(--on-voice); --on-mark: var(--on-voice); /* the accent as it is, dark on it; worked out where the browser can (below) */
+  --wave: var(--ink); /* the song's waveform played: the ink; a pastel's a deep shade of it where the browser can (below) */
   --good: oklch(0.52 0.13 155); --warn: oklch(0.68 0.15 75); --orange: oklch(0.55 0.15 50); --bad: oklch(0.55 0.2 27);
   --solo: oklch(0.56 0.12 80); --on-solo: oklch(1 0 0); --tog-down: oklch(0.88 0 0);
   --glow-mix: 45%;
@@ -170,15 +174,21 @@
    a pastel, 0 for a vivid one (L 0.62–0.77) and for Mono (no chroma). In the light theme a vivid one's glyph is white on
    the mark (--voice-btn: 3.3–3.5:1 at L 0.66, enough for a glyph or a knob, not for text) and its text white on a
    deeper fill (--voice-fill: no lighter than L 0.545, where white's 4.5:1 on each, green's 4.56); a pastel's, the
-   owner's pick, is a paler tint of it (0.1 lighter, half the chroma) with a deep shade of its hue on it (L 1.35 − l,
+   owner's pick, is a paler tint of it (0.1 lighter, half the chroma) with a deep shade of its hue on it (0.35 darker,
    1.35 × the chroma: 5.3–5.7:1 on the tint, and it's what's seen on the card, 7:1, the tint only 1.3). In the dark
    theme the fills are your colour as it is, dark on it as before, a pastel's a deep shade of its hue (L 0.32, 1.4 × the
-   chroma: 8:1). A switch's knob is white on the mark in the light theme (--on-mark: 3.06 on sky's at the least). Mono
-   comes out as it was. The dark theme's on :root and .theme-dark (a part that stays dark works it out from its own
+   chroma: 8:1). A switch's knob is white on the mark in the light theme (--on-mark: 3.06 on sky's at the least).
+   The song's waveform played (--wave) is the ink but for a pastel's: beside its soft Play and time the ink's too black,
+   so it's the deep shade that's on them in the light theme (6.4–6.6:1 on the page, 4.4–4.5 on the part not played) and
+   the pastel as it is in the dark one, as its Play is. It's the ink's lightness (0.2, 0.94: written out, as the ink
+   can't be read in here; contrast.py's Mono check holds them to it) moved all the way to that for a pastel and not at
+   all for the rest, so theirs is the ink.
+   Mono comes out as it was. The dark theme's on :root and .theme-dark (a part that stays dark works it out from its own
    --voice), the light theme's after it, at its block's specificity */
 @supports (color: oklch(from red l c h)) {
   :root, .theme-dark {
     --on-fill: oklch(from var(--voice) calc(0.165 + clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * 0.155) calc(clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * c * 1.4) h);
+    --wave: oklch(from var(--voice) calc(0.94 - clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * (0.94 - l)) calc(clamp(0, (l - 0.81) * 100, 1) * clamp(0, c * 1000, 1) * c) h);
   }
   :root[data-theme="light"] {
     --voice-mark: oklch(from var(--voice-act) min(l, 0.66) c h);
@@ -186,6 +196,7 @@
     --voice-fill: oklch(from var(--voice) calc(min(l, 0.545) + clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * (l + 0.1 - 0.545)) calc(c * (1 - 0.5 * clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1))) h);
     --on-fill: oklch(from var(--voice) calc(1 - clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * (1.35 - l)) calc(clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * c * 1.35) h);
     --on-mark: oklch(1 0 0);
+    --wave: oklch(from var(--voice) calc(0.2 + clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * (l - 0.35 - 0.2)) calc(clamp(0, (l - 0.74) * 100, 1) * clamp(0, c * 1000, 1) * c * 1.35) h);
   }
 }
 /* the light theme's greys in a trace of your colour, as the dark one's are (above): the page, a button or field, one

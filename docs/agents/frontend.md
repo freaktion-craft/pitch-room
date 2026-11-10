@@ -129,7 +129,9 @@ play outside Studio and Practice.
   a label that holds text (the playhead's time, a version picked, the Lab's tabs) `--voice-fill` with `--on-fill`, and
   a switch's knob `--on-mark` on the mark; in the light theme that's white on a fill deep enough for it, a pastel's a
   deep shade on a paler tint (`tokens.css` works them out under `@supports`). Text on the accent as it is (the piano's
-  pressed key, the lyric editor's sung words) stays `--on-voice`.
+  pressed key, the lyric editor's sung words) stays `--on-voice`. The song's waveform played (`--wave`: the overview,
+  Takes Studio's) is the ink, a pastel's that deep shade (the pastel itself in the dark theme); the canvas reads it
+  through `readColors.probe`.
 - The greys follow `--voice` too: under `@supports` (relative colour) `tokens.css` gives the surfaces (`--bg`,
   `--surface`, `--surface-2`, `--hover-2`, `--tog-down`) and the tints that fill, line and mark (`--fg-2` to `--fg-38`,
   so `--fill`, `--line`, `--ring`, `--track`, `--dim`) a trace of its hue; text and ink stay neutral, and Mono comes out

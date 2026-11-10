@@ -391,6 +391,8 @@ PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--in
           ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
           ("--on-solo", "--solo", 4.5), ("--solo", "--tog-down", 3),
           ("--placeholder", "--surface-2", 3), ("--on-media", "oklch(0.25 0 0)", 4.5)]
+# the song's waveform played (--wave: the ink, a pastel's its own shade), a mark on its box (#pWave's: the page): 3:1
+PAIRS.append(("--wave", "--bg", 3))
 # text on the fills that take your colour, over the page and the card: a field (its text, its hint), a quiet button and
 # a toggle (--fill, --fg-8 pointed at), the search's glyph and keys (--faint, on the page; on the card it'd be 4.4:1, as
 # it is in grey); and on a field or a tempo pointed at (--hover-2). --dim isn't text: as a mark it's 2.7:1 on the dark
