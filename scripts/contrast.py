@@ -143,7 +143,7 @@ def relative(v):
         pos += 1
         return toks[pos - 1]
 
-    def atom():  # a channel: a number, a channel's name, min() or calc()
+    def atom():  # a channel: a number, a channel's name, min(), max() or calc()
         kind, val = take()
         if kind == "num":
             return val
@@ -155,13 +155,13 @@ def relative(v):
             x = total()
             take(("op", ")"))
             return x
-        if (kind, val) == ("fn", "min"):
+        if (kind, val) in (("fn", "min"), ("fn", "max")):
             xs = [total()]
             while peek() == ("op", ","):
                 take()
                 xs.append(total())
             take(("op", ")"))
-            return min(xs)
+            return min(xs) if val == "min" else max(xs)
         raise bad(f"{val!r}")
 
     def factor():
@@ -360,7 +360,7 @@ for bg in ["--bg", "--surface"]:
         PAIRS.append((fg, bg, 4.5))
     for k in ACCENTS:  # your colour as a line, a dot, a fill and large text (a sung word): 3:1; as small text, mixed
         PAIRS.append((f"--voice-{k}", bg, 1.5 if k in ("pink", "sky") else 3, k))  # with the ink as --voice-ink is: 4.5:1 (pink, sky: pastels, by choice)
-        PAIRS.append((f"mix:--voice-{k}", bg, 4.5, k))
+        PAIRS.append((f"mix:--voice-{k}", bg, 3 if k in ("pink", "sky") else 4.5, k))  # (the pastels mixed with their soft ink: kept soft, PASTELS)
         # as a mark (--voice-mark: the section's line, a switch on): 3:1; the pastels, by choice, are
         # 2.77 (sky) and 2.94 (pink) on the light theme's page, at the others' lightness (3.06, 3.26 on the card)
         PAIRS.append((f"mark:--voice-{k}", bg, 2.7 if bg == "--bg" and k in ("pink", "sky") else 3, k))
@@ -405,6 +405,12 @@ def key_pairs(t, k):
             ("key w label", resolve(t, t["--on-key-down"]), w, 4.5)]
 
 
+# the pastels in the light theme: their ink and text are soft shades of them (tokens.css), kept for their look over
+# contrast (the owner's call), so text there is held to 3:1 and a field's hint and marks to 2.5:1
+PASTELS = ("pink", "sky")
+PASTEL_NEED = {4.5: 3, 3: 2.5}
+
+
 def rows(css, light, p3):
     """Every pair in this theme with each accent picked: [(accent, pair, contrast or None, at least, why)]."""
     out, t0 = [], theme(css, light, p3)
@@ -419,6 +425,8 @@ def rows(css, light, p3):
                 f = over(colour(t, fg, p3), b)
             except KeyError as e:
                 out.append((k, f"{fg} on {bg}", None, need, f"missing {e}")); continue
+            if light and k in PASTELS and not only:  # their softness kept over contrast in the light theme (the owner's call)
+                need = PASTEL_NEED.get(need, need)
             out.append((k, f"{fg} on {bg}", contrast_rgb(f[0], b[0]), need, ""))
         for label, ink, bg in chip_pairs(t, p3):
             b = over(parse_colour(bg, p3), base)
