@@ -322,8 +322,8 @@ function vcPassDone(res, xs) {
 // a pass's tone (vcSay), and the colour it's marked in: even, a break, a step (loudness or tone); not read: none
 const vcTone = (res) => (res.ok === 1 ? "good" : res.ok === 0 ? (res.kind === "break" ? "bad" : "step") : "");
 const vcToneC = (t) => ({ good: C.good, bad: C.bad, step: C.orange })[t] || C.muted;
-// your notes and passes: in your colour, unless it's as good as one of those (Green, Coral, Orange): then in ink
-const vcMine = () => (["green", "coral", "orange"].includes(accent) ? C.ink : C.voice);
+// your notes and passes: in your colour, unless it's as good as one of those (Green, Orange): then in ink
+const vcMine = () => (["green", "orange"].includes(accent) ? C.ink : C.voice);
 function vcPassWords(res, T) {
   const at = res.at != null ? { note: absName(res.at) } : null;
   if (res.ok === 1) return ["Even", null, "Again.", null];
