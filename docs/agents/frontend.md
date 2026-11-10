@@ -142,7 +142,8 @@ play outside Studio and Practice.
   `stage.css` (Practice stage, keyboard), `stems.css` (library, Studio, Info, Add drawer), `practice.css` (songbar,
   phrases, Record, takes, Takes Studio).
 - Shared controls: `.btn` (size `.sm`/`.xs`, tone `.primary`/`.quiet`/`.ghost`, shape `.icon`/`.round`), `.tog`, `.pick`
-  (`makePick`), `.switch`, `.seg`, `.pop`, `.menu`, `.set-row`. Show and hide with the `hidden` attribute.
+  (`makePick`), `.switch`, `.seg`, `.pop`, `.menu`, `.set-row`, `.fader` (a range input as a volume: a block filled up
+  to a thin cap, on a song's page and in Practice). Show and hide with the `hidden` attribute.
 - Page-wide states are classes on `<html>` (`desktop-mac`, `desktop-win`, `welcome`, `asking`, `theming`, ...).
 - Respect `prefers-reduced-motion` (`stillMotion()` in `library.js`, the CSS media blocks).
 - CSS transitions use the token durations (`--duration-*`) and `--ease`. `el.animate` calls carry their own literal

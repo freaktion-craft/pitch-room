@@ -380,7 +380,7 @@ for k in ACCENTS:
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5, k))
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"mark:--voice-{k}", 4.5, k))  # on a mark's fill (a take playing, Loop on)
     PAIRS.append(("--on-ink", f"mark:--voice-{k}", 2.9 if k in ("pink", "sky") else 3, k))  # a switch's knob, on (sky's 2.97 in the light theme)
-    PAIRS.append(("--ink", f"mark:--voice-{k}/50%", 3, k))  # a fader's cap on its fill (stems.css: half the mark, over the card; Mono's 3.2 in the dark theme, 2.85 at 55 %)
+    PAIRS.append(("--ink", f"mark:--voice-{k}/50%", 3, k))  # a fader's cap on its fill (base.css: half the mark, over the card; Mono's 3.2 in the dark theme, 2.85 at 55 %)
 
 
 def chip_pairs(t, p3):

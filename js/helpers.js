@@ -30,7 +30,8 @@ function resetOnDblClick(input, def) {
     for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches('input[type="range"]')) paint(n); n.querySelectorAll('input[type="range"]').forEach(paint); }
   }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener("input", (e) => { if (e.target.type === "range") paint(e.target); }, true);
-  const thumbX = (s) => { const r = s.getBoundingClientRect(); return r.left + THUMB / 2 + frac(s) * (r.width - THUMB); };
+  // the handle's middle, by its width: --thumb where the slider gives it (a fader's cap, base.css), else the round one's
+  const thumbX = (s) => { const r = s.getBoundingClientRect(), w = parseFloat(getComputedStyle(s).getPropertyValue("--thumb")) || THUMB; return r.left + w / 2 + frac(s) * (r.width - w); };
   function show(s) {
     if (!s) { tip.hidden = true; return; }
     tip.textContent = s.dataset.tip === "db" ? `${s.value} dB` : s.dataset.tip === "ms" ? `${+s.value > 0 ? "+" : +s.value < 0 ? "−" : ""}${Math.abs(+s.value)} ms`

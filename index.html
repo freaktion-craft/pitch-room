@@ -104,10 +104,10 @@ const EMPTY_LIBRARY = false;
         </div>
         <output id="kTime">0:00 / 0:00</output>
         <div class="sb-vol">
-          <label class="kfield">Guide vocal <input type="range" id="kGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume"></label>
-          <label class="kfield">Band <input type="range" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
+          <label class="kfield">Guide vocal <input type="range" class="fader" id="kGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume"></label>
+          <label class="kfield">Band <input type="range" class="fader" id="kBand" min="0" max="1.5" step="0.05" aria-label="Band volume"></label>
         </div>
-        <div class="keyctl" role="group" aria-label="Key"><span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span></div>
+        <div class="keyctl" role="group" aria-label="Key"><span class="kfield"><button class="tog m icon" id="kClick" type="button" aria-pressed="false" aria-label="Click" title="Click on/off (follows the beat)"></button><input type="range" class="fader" id="kClickVol" min="0" max="1.5" step="0.05" aria-label="Click volume"></span></div>
       </div>
       <!-- the song's timeline, in the card under the play controls -->
       <div class="tl-row">
@@ -158,9 +158,9 @@ const EMPTY_LIBRARY = false;
       <div class="tk-head">
         <div class="tk-title"><h2 class="group-label" id="tkTitle">Takes</h2><span class="tk-n" id="tkCount"></span><button class="btn xs icon ghost disclose" id="tkFold" type="button" aria-expanded="true" hidden></button></div>
         <div class="tk-mix" id="tkMix" role="group" aria-label="How takes sound, played and downloaded" hidden>
-          <label class="kfield">Your voice <input type="range" id="tkVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
-          <label class="kfield">Band <input type="range" id="tkBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
-          <label class="kfield">Guide vocal <input type="range" id="tkGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
+          <label class="kfield">Your voice <input type="range" class="fader" id="tkVoice" min="0" max="2" step="0.05" aria-label="Your voice volume"></label>
+          <label class="kfield">Band <input type="range" class="fader" id="tkBand" min="0" max="1.5" step="0.05" aria-label="Band volume in takes"></label>
+          <label class="kfield">Guide vocal <input type="range" class="fader" id="tkGuide" min="0" max="1.5" step="0.05" aria-label="Guide vocal volume in takes"></label>
         </div>
         <a class="btn sm" id="tkStudio" hidden>Takes Studio</a>
       </div>
@@ -368,7 +368,7 @@ const EMPTY_LIBRARY = false;
         </div>
         <div class="mix">
           <label class="mix-ico" for="pVol" title="Volume"></label>
-          <input type="range" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+          <input type="range" class="fader" id="pVol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
         </div></div>
       </div>
       <div class="wave-wrap" id="pWaveWrap"><canvas id="pWave" height="96" aria-label="Song overview — click to jump"></canvas><i class="ph-line" id="pHead"></i><output class="ph-flag" id="pFlag" hidden></output><div class="wclock" id="pClock" aria-hidden="true"><span class="wc-start">0:00</span><output class="wc-now" id="pClockNow">0:00</output><span class="wc-end" id="pClockEnd">0:00</span></div></div>
