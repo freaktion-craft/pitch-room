@@ -40,6 +40,9 @@
 @supports (color: oklch(from red l c h)) { .lylist, .countin { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) c h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi); the count-in's dots in it too */
 .lylist p:is(.now, .b1) span { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
+/* what's not sung yet of the line, a shade under the ink (three quarters of it): the sung part stands out by more than its
+   colour (the brackets' words keep their own grey) */
+.lylist p:is(.now, .b1) span:not(.bg) { --un: color-mix(in oklab, var(--ink) 75%, transparent); }
 .lylist.still, .lylist.still p { transition: none; } /* new lines (renderLyrics): there at once */
 .lylist p.n1 { opacity: 0.55; } /* 5.3:1, read without effort like --muted */
 .lylist p.n1.soon { opacity: 0.8; } /* its turn is coming: time to read it */
