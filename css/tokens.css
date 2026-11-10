@@ -257,21 +257,20 @@
    holds less: theirs falls as their lightness does, as the colour's shade does (c × l′/l, which the screen can always
    show; 1.04 × that in the light theme, whose colours are 95 % of the most it has). Which they are is their hue, so the
    rule asks it: a switch on h, clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1), 1 from about 50 to 200 degrees
-   (orange 58 to teal 195) and 0 for coral, sky, blue, violet and pink (the white key held has it too: stage.css). In
-   the light theme it reaches round to coral (+ 0.25 for - 0.15, 1 from about 20 to 230 degrees): coral's at its
-   brightest there already. The pastels (Pink, Sky) are as they were (below). This asks for cos() of the hue as well as
+   (orange 58 to teal 195) and 0 for sky, blue, violet and pink (the white key held has it too: stage.css). The
+   pastels (Pink, Sky) are as they were (below). This asks for cos() of the hue as well as
    relative colour: a browser without it has the plain values, all of them */
 @supports (color: oklch(from red l calc(c * cos(h * 1deg)) h)) {
   :root[data-theme="light"] {
     --on-mark: oklch(1 0 0); --on-fill: oklch(1 0 0);
-    --voice-fill: oklch(from var(--voice) min(l, 0.545) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) + 0.25) * 8, 1) * (1 - min(1, 1.04 * 0.545 / l)))) h);
+    --voice-fill: oklch(from var(--voice) min(l, 0.545) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1) * (1 - min(1, 1.04 * 0.545 / l)))) h);
   }
   :root[data-tone="vibrant"], :root[data-tone="vibrant"] .theme-dark {
     --play-hover: oklch(from var(--voice-mark) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 + 0.15 * (1 - l))) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1) * 0.06 / l)) h);
   }
   :root[data-theme="light"][data-tone="vibrant"] {
     --on-play: var(--on-mark);
-    --play-hover: oklch(from var(--voice-mark) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 - 0.15 * l)) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) + 0.25) * 8, 1) * (1 - min(1, 1.04 * (l - 0.06) / l)))) h);
+    --play-hover: oklch(from var(--voice-mark) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 - 0.15 * l)) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1) * (1 - min(1, 1.04 * (l - 0.06) / l)))) h);
   }
 }
 /* the pastels (Pink, Sky) in the light theme: what's on them as it was, dark on the pastel itself (their Play with
