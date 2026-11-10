@@ -3,8 +3,9 @@
    drawing (a waveform's line, the piano's keys) or an optical correction, and says so.
    Layout: one column, settings as hairline-separated rows. Colours are OKLCH, in two themes: dark (:root) and light
    (:root[data-theme="light"], set before first paint from the Theme setting: the script in index.html's head). The
-   light ones aren't the dark ones turned over: each is its own, checked by scripts/contrast.py. In both, the greys
-   that are surfaces, fills and lines take a trace of your colour (--voice), worked out here; text stays grey. */
+   light ones aren't the dark ones turned over: each is its own, checked by scripts/contrast.py. In both, tone on tone:
+   the greys that are surfaces, fills and lines take a trace of your colour (--voice), and the ink and text a deeper
+   shade of its hue (a dark one in the light theme, a pale one in the dark), worked out here. */
 /* Geist Serif, for the app's name: one weight, so it's drawn at 400 whatever weight it's set at */
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 :root { --font-brand: "Geist Serif", var(--font); } /* the name's in Latin letters in either language */
@@ -97,11 +98,17 @@
    little of its chroma: 0.008 at most on the page, 0.01 on the card (and a toggle held), 0.014 on a button or field,
    0.016 pointed at. The ink's tints that fill, line and mark (--fg-2 to --fg-38, so --fill, --line, --ring, --track
    and --dim) are a near-white of your colour, chroma 0.05 at most, a little less light (L 0.88 at that) and a little
-   more opaque, so a fill's about as light as white's was. Text and what's drawn in ink stay grey: a tint there costs
-   legibility for nothing. Mono has no chroma, so it comes out as it was, as it does where the browser can't work it
-   out (the plain values above). On .theme-dark too, so a part that stays dark works it out from its own --voice */
+   more opaque, so a fill's about as light as white's was. Tone on tone, the ink and text take its hue too: the ink
+   (and what's on it) at chroma 0.02 at most, the text steps (--fg-46, 55, 80: muted, faint) as the fills are. Mono has
+   no chroma, so it comes out as it was, as it does where the browser can't work it out (the plain values above). On
+   .theme-dark too, so a part that stays dark works it out from its own --voice */
 @supports (color: oklch(from red l c h)) {
   :root, .theme-dark {
+    --ink: oklch(from var(--voice) 0.94 min(c, 0.02) h); --ink-strong: oklch(from var(--voice) calc(1 - min(c, 0.012)) min(c, 0.012) h);
+    --on-ink: oklch(from var(--voice) 0.165 min(c, 0.012) h);
+    --fg-46: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.46 * (1 + min(c, 0.05) * 4.4)));
+    --fg-55: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.55 * (1 + min(c, 0.05) * 4.4)));
+    --fg-80: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.8 * (1 + min(c, 0.05) * 4.4)));
     --bg: oklch(from var(--voice) 0.165 min(c, 0.008) h); --surface: oklch(from var(--voice) 0.2 min(c, 0.01) h);
     --surface-2: oklch(from var(--voice) 0.275 min(c, 0.014) h); --hover-2: oklch(from var(--voice) 0.315 min(c, 0.016) h);
     --tog-down: oklch(from var(--voice) 0.21 min(c, 0.01) h);
@@ -168,9 +175,19 @@
    white, which holds no chroma. The page is a hair lighter with it (0.0006 at most), so a vivid colour's still 3:1 as
    a line on it (coral and violet were 3.00 on the grey). The tints a near-black of your colour, chroma 0.06 at most (L 0.3 at that), a little
    more opaque. Every step tinted above is set again here, or the dark theme's would stay (they're set on :root, and
-   the light theme sets no steps of its own: it has them from --fg); 46, 55 and 80 stay black. Mono comes out as it was */
+   the light theme sets no steps of its own: it has them from --fg). Tone on tone, the ink's a dark shade of your hue
+   (chroma 0.04 at most), and the text (muted, faint, a field's hint) a near-black of it (L 0.18 at most: the tints'
+   0.3 left faint text under 4.5:1). Mono comes out as it was */
 @supports (color: oklch(from red l c h)) {
   :root[data-theme="light"] {
+    --ink: oklch(from var(--voice) 0.2 min(c, 0.04) h); --ink-strong: oklch(from var(--voice) calc(min(c, 0.03) * 4) min(c, 0.03) h);
+    --on-ink: oklch(from var(--voice) 0.99 min(c, 0.005) h);
+    --muted: oklch(from var(--voice) calc(min(c, 0.06) * 3) min(c, 0.06) h / calc(0.62 * (1 + min(c, 0.06) * 3.6)));
+    --faint: oklch(from var(--voice) calc(min(c, 0.06) * 3) min(c, 0.06) h / calc(0.56 * (1 + min(c, 0.06) * 3.6)));
+    --placeholder: oklch(from var(--voice) calc(min(c, 0.06) * 3) min(c, 0.06) h / calc(0.44 * (1 + min(c, 0.06) * 3.6)));
+    --fg-46: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.46 * (1 + min(c, 0.06) * 3.6)));
+    --fg-55: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.55 * (1 + min(c, 0.06) * 3.6)));
+    --fg-80: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.8 * (1 + min(c, 0.06) * 3.6)));
     --bg: oklch(from var(--voice) calc(0.965 + min(c, 0.006) * 0.1) min(c, 0.006) h); --surface-2: oklch(from var(--voice) 0.935 min(c, 0.01) h);
     --hover-2: oklch(from var(--voice) 0.9 min(c, 0.014) h); --tog-down: oklch(from var(--voice) 0.88 min(c, 0.014) h);
     --fg-2: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.02 * (1 + min(c, 0.06) * 3.6)));

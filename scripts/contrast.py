@@ -313,8 +313,8 @@ def ink_mix(t, accent):
     if not m:
         return acc
     w = float(m[1]) / 100
-    def lab(s):
-        L, c, h = (num(x) for x in re.findall(r"[\d.]+%?", s.split("(", 1)[1])[:3])
+    def lab(s):  # (the ink may be relative, a shade of your hue: read as the browser works it out)
+        L, c, h, _ = oklch_of(s)
         return L, c * math.cos(math.radians(h)), c * math.sin(math.radians(h))
     A, B = lab(acc), lab(resolve(t, t["--ink"]))
     L, x, y = (A[i] * w + B[i] * (1 - w) for i in range(3))
