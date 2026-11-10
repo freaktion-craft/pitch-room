@@ -229,7 +229,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Top {note} · last time {p}%": "최고음 {note} · 지난번 {p}%", "Last time {p}%": "지난번 {p}%", "From {note}": "{note}부터",
   "Listen, then sing it back on “{v}”.": "듣고 나서 “{v}”로 따라 불러요.", "Listen.": "들어 봐요.", "Sing it back on “{v}”.": "“{v}”로 따라 불러요.",
   "Again, same key.": "같은 키로 다시.", "Again: {tip}": "다시: {tip}", "Coming back down.": "이제 내려가요.",
-  "Hide my line while I sing": "부르는 동안 내 선 숨기기", "Slow": "느리게",
+  "Hide my line while I sing": "부르는 동안 내 선 숨기기", "Hide my line while I sing · Watching it helps you now; singing by ear is what stays": "부르는 동안 내 선 숨기기 · 보면서 부르면 그때만 맞고, 귀로 맞춰야 실력으로 남아요", "Slow": "느리게",
   "Come down from here": "여기서 내려가기", "Come down from here (↓)": "여기서 내려가기 (↓)", "Same key again": "같은 키 한 번 더", "Same key again (R)": "같은 키 한 번 더 (R)",
   "Come down once it stops feeling easy.": "편하게 느껴지지 않으면 내려가요.", "Coming down after this key.": "이 키를 부르고 내려가요.",
   "Stopping after this key.": "이 키를 부르고 멈춰요.", "Same key again next.": "다음에도 같은 키로 불러요.",
