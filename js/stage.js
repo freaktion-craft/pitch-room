@@ -11,9 +11,9 @@ function readColors() {
   // the track colours through an element's computed colour, which works out the color-mix() of the backing vocals
   const probe = readColors.probe || (readColors.probe = document.body.appendChild(Object.assign(el("i"), { hidden: true })));
   for (const k of ["vocals","lead","backing","drums","bass","guitar","piano","other","click"]) { probe.style.color = `var(--stem-${k})`; C["stem-" + k] = getComputedStyle(probe).color; }
-  // (and your colour as small text, a color-mix in the light theme, and text on it; and the greys with a trace of it,
-  // relative colours worked out from it: the card, a button's grey, a line)
-  for (const k of ["voice-ink", "on-voice", "surface", "surface-2", "line", "wave"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
+  // (and your colour as small text, a color-mix in the light theme, and as a label with the text on it, the Lab's
+  // chips; and the greys with a trace of it, relative colours worked out from it: the card, a button's grey, a line)
+  for (const k of ["voice-ink", "voice-fill", "on-fill", "surface", "surface-2", "line", "wave"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
 }
 function resize() {
   const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);

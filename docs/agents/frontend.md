@@ -125,6 +125,10 @@ play outside Studio and Practice.
 - `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches on,
   Loop on), never on what you press but the round Play (`.btn.primary.round`); `tokens.css` works it out from
   `--voice-act` (no lighter than L 0.66 in the light theme), so no script sets it.
+- What's on your colour: a glyph on it as a mark (Loop and the click on, a take playing, Compare) is `--on-mark`; a
+  label in it that holds text (the playhead's time, the version you're in, the Lab's chips) is `--voice-fill` with
+  `--on-fill` (the canvas reads both through `readColors.probe`). Both are white in the light theme, the label's fill
+  deeper for it (no lighter than L 0.545), but for Pink and Sky (`data-pastel`), dark on the pastel as before.
 - The greys follow `--voice` too: under `@supports` (relative colour) `tokens.css` gives the surfaces (`--bg`,
   `--surface`, `--surface-2`, `--hover-2`, `--tog-down`) and the tints that fill, line and mark (`--fg-2` to `--fg-38`,
   so `--fill`, `--line`, `--ring`, `--track`, `--dim`) a trace of its hue; text and ink stay neutral, and Mono comes out

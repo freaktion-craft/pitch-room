@@ -52,6 +52,11 @@
      on; nothing you press to do something takes it but the round Play (base.css). --voice-act as it is here (Mono the
      ink), deepened in the light theme (below); worked out from it here, not set by paintAccent */
   --voice-mark: var(--voice-act);
+  /* what's on your colour: a glyph on it as a mark (--on-mark: Loop and the click on, a take playing, Compare), and a
+     label of it under text (--voice-fill, --on-fill: the playhead's time, the version you're in, the Lab's chips). Here
+     your colour and the dark text on it; in the light theme white, on a deeper fill for text, where the browser can
+     work it out (below) */
+  --on-mark: var(--on-voice); --voice-fill: var(--voice); --on-fill: var(--on-voice);
   /* text on an accent (--on-accent: on any of the colours, in either theme), on yours (--on-voice), and on Mono's
      (--on-voice-mono), which Mono puts in --on-voice (stage.js): each its own value, never one another's (a loop of
      them is no colour at all) */
@@ -234,6 +239,38 @@
   --play: var(--voice-mark); --on-play: var(--on-voice); --play-hover: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong));
   --slider-fill: color-mix(in oklab, var(--voice-mark) 50%, transparent);
 }
+/* what's worked out from your colour keeps its hue: lightness and chroma may change, the hue may not (a colour the
+   screen can't show is clipped to one it can, which turns its hue; contrast.py checks each, with each accent).
+   In the light theme what's on your colour is white: a glyph on it as a mark (--on-mark, and Play's with Vibrant:
+   3.3–3.5:1, enough for a glyph, not for text), and text on a label of it, its fill deeper for that (--voice-fill: no
+   lighter than L 0.545, where white's 4.5:1 on each). With Vibrant, Play pointed at (--play-hover) is a step deeper of
+   your colour, 0.06, never a greyer one (the step towards the ink was); Mono's goes as it did, 15 % of the way to the
+   strongest ink (written out for no chroma).
+   Made deeper, a colour keeps its chroma if the screen holds it there; but orange to teal are as vivid as the screen has
+   them at their lightness, and lighter than their brightest (a yellow's brightest is near white), so deeper the screen
+   holds less: theirs falls as their lightness does, as the colour's shade does (c × l′/l, which the screen can always
+   show; 1.04 × that in the light theme, whose colours are 95 % of the most it has). Which they are is their hue, so the
+   rule asks it: a switch on h, clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1), 1 from about 50 to 200 degrees
+   (orange 58 to teal 195) and 0 for coral, sky, blue, violet and pink (the white key held has it too: stage.css). In
+   the light theme it reaches round to coral (+ 0.25 for - 0.15, 1 from about 20 to 230 degrees): coral's at its
+   brightest there already. The pastels (Pink, Sky) are as they were (below). This asks for cos() of the hue as well as
+   relative colour: a browser without it has the plain values, all of them */
+@supports (color: oklch(from red l calc(c * cos(h * 1deg)) h)) {
+  :root[data-theme="light"] {
+    --on-mark: oklch(1 0 0); --on-fill: oklch(1 0 0);
+    --voice-fill: oklch(from var(--voice) min(l, 0.545) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) + 0.25) * 8, 1) * (1 - min(1, 1.04 * 0.545 / l)))) h);
+  }
+  :root[data-tone="vibrant"], :root[data-tone="vibrant"] .theme-dark {
+    --play-hover: oklch(from var(--voice-mark) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 + 0.15 * (1 - l))) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1) * 0.06 / l)) h);
+  }
+  :root[data-theme="light"][data-tone="vibrant"] {
+    --on-play: var(--on-mark);
+    --play-hover: oklch(from var(--voice-mark) calc(l - 0.06 + (1 - clamp(0, c * 1000, 1)) * (0.06 - 0.15 * l)) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) + 0.25) * 8, 1) * (1 - min(1, 1.04 * (l - 0.06) / l)))) h);
+  }
+}
+/* the pastels (Pink, Sky) in the light theme: what's on them as it was, dark on the pastel itself (their Play with
+   Vibrant is the pastels' own, above, and wins over this) */
+:root[data-theme="light"][data-pastel] { --on-mark: var(--on-voice); --voice-fill: var(--voice); --on-fill: var(--on-voice); }
 :root {
   /* ---- type: Pretendard throughout, but for the library's heading in English (Geist Serif, above); what was set in
      a monospace (times, levels, M/S) keeps its digits in line with tabular-nums ---- */

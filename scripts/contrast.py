@@ -9,10 +9,17 @@ What's set under @supports is read as a browser that has it (the desktop app's d
 The greys take a trace of your colour (--voice), so each theme is worked out once for each accent, as paintAccent sets
 it on <html> (--voice, --voice-act, --on-voice), and every pair is checked with each; a pair that names an accent, only
 with that one. Relative colour is read in one form, oklch(from <an oklch() colour> L C H [/ A]), each of them a number,
-l, c or h, or min() or calc() of those; anything else stops it with an error. Mono has no chroma, so what's worked out
+l, c or h, or min(), max(), clamp(), calc() or cos() (of an angle in deg) of those, and color-mix() as two oklch()
+mixed in oklab; anything else stops it with an error. Mono has no chroma, so what's worked out
 from it under @supports must come out exactly as the plain values have it (a browser without relative colour): that's
 checked too.
 A colour with alpha is laid over what's under it in sRGB, as the browser does. Contrast is WCAG 2's.
+And a colour worked out from your colour keeps its hue: one the screen can't show is clipped to its gamut channel by
+channel, which turns the hue, so each is worked out as the screen shows it (inside sRGB, or P3 in the wide-gamut
+themes) and fails when that's more than 3 degrees off the accent's own hue (where it has chroma enough to tell: over
+0.02). Ours (HUED: a label's fill, the piano's keys from css/stage.css, Play pointed at with Vibrant on) fail the run,
+Play pointed at too if it's greyer than Play (its chroma falling faster than its lightness, or at all on a pale fill);
+the rest (THEIRS) are listed apart, without failing it. Mono has no hue: it's skipped there.
 """
 import math
 import os
@@ -21,6 +28,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOKENS = os.path.join(HERE, "..", "css", "tokens.css")
+STAGE = os.path.join(HERE, "..", "css", "stage.css")  # the piano's keys: your colour on them (keys())
 
 
 # ---------- colour ----------
@@ -35,14 +43,37 @@ def oklch_to_lin(L, c, h):
             -0.0041960863 * l_ - 0.7034186147 * m_ + 1.7076147010 * s_)
 
 
-# linear sRGB to linear Display P3
+def lin_to_oklch(rgb):
+    """Linear sRGB to OKLCH (oklch_to_lin's inverse), as (L, C, H)."""
+    r, g, b = rgb
+    cbrt = lambda x: math.copysign(abs(x) ** (1 / 3), x)
+    l_ = cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+    m_ = cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+    s_ = cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+    L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_
+    a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_
+    b_ = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    return L, math.hypot(a, b_), math.degrees(math.atan2(b_, a)) % 360
+
+
+# linear sRGB to linear Display P3, and back (its inverse)
 P3 = ((0.8224621, 0.1775380, 0.0), (0.0331941, 0.9668058, 0.0), (0.0170827, 0.0723974, 0.9105199))
+P3_INV = ((1.2249400, -0.2249401, 0.0), (-0.0420568, 1.0420569, 0.0), (-0.0196377, -0.0786360, 1.0982736))
+times = lambda m, v: tuple(sum(m[i][j] * v[j] for j in range(3)) for i in range(3))
 
 
 def lin_in_gamut(rgb, gamut="srgb", eps=1e-6):
     if gamut == "p3":
-        rgb = tuple(sum(P3[i][j] * rgb[j] for j in range(3)) for i in range(3))
+        rgb = times(P3, rgb)
     return all(-eps <= v <= 1 + eps for v in rgb)
+
+
+def shown(L, c, h, gamut="srgb"):
+    """oklch(L c h) as the screen shows it, in OKLCH: clipped to its gamut (sRGB's or P3's) channel by channel, as the
+    browser does, which turns the hue of a colour outside it."""
+    clip = lambda v: tuple(min(1.0, max(0.0, x)) for x in v)
+    rgb = oklch_to_lin(L, c, h)
+    return lin_to_oklch(times(P3_INV, clip(times(P3, rgb))) if gamut == "p3" else clip(rgb))
 
 
 def lin_to_srgb(v):
@@ -70,11 +101,13 @@ def num(s):
 
 
 def parse_colour(v, p3=False):
-    """A CSS colour as (sRGB 0–1 triple, alpha), or None for what this doesn't read (color-mix, gradients). p3: an
-    oklch() outside sRGB is shown on a P3 screen, so its luminance is from its unclipped linear sRGB."""
+    """A CSS colour as (sRGB 0–1 triple, alpha), or None for what this doesn't read (gradients, a color-mix other than
+    of two oklch() in oklab). p3: an oklch() outside sRGB is shown on a P3 screen, so its luminance is from its
+    unclipped linear sRGB."""
     v = v.strip()
-    if v.startswith("oklch("):
-        L, c, h, a = oklch_of(v)
+    lch = oklch_of(v) if v.startswith("oklch(") else mix_oklab(v) if v.startswith("color-mix(") else None
+    if lch:
+        L, c, h, a = lch
         lin = oklch_to_lin(L, c, h)
         if p3:  # the same luminance, set as an sRGB grey would have it (only luminance is compared)
             y = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
@@ -102,15 +135,43 @@ def oklch_of(v):
     return num(m[1]), float(m[2]), 0.0 if m[3] == "none" else float(m[3]), num(m[4]) if m[4] else 1.0
 
 
-# a relative colour's channels: a number, a function's name and its bracket, a channel's name, or + - * / ( ) ,
-TOKEN = re.compile(r"\s*(?:(\d+(?:\.\d*)?|\.\d+)|([a-z]+)\(|([a-z]+)|([-+*/(),]))")
+def mix_oklab(v):
+    """color-mix(in oklab, <oklch()> [p%], <oklch()> [q%]) worked out, as (L, C, H, alpha) as the browser has it (each
+    weighted by its share and its alpha), or None for any other form (one with transparent, say)."""
+    m = re.fullmatch(r"color-mix\(\s*in oklab\s*,(.*)\)", v.strip(), flags=re.S)
+    if not m:
+        return None
+    parts, depth, start = [], 0, 0
+    for i, ch in enumerate(m[1]):  # its two colours: split at the comma outside brackets
+        depth += (ch == "(") - (ch == ")")
+        if ch == "," and not depth:
+            parts.append(m[1][start:i]); start = i + 1
+    parts.append(m[1][start:])
+    got = [re.fullmatch(r"\s*(oklch\(.*\))\s*(?:([\d.]+)%)?\s*", p, flags=re.S) for p in parts]
+    if len(got) != 2 or not all(got):
+        return None
+    (L1, c1, h1, a1), (L2, c2, h2, a2) = (oklch_of(g[1]) for g in got)
+    p, q = (float(g[2]) / 100 if g[2] else None for g in got)
+    p, q = (0.5, 0.5) if p is None and q is None else (p, 1 - p) if q is None else (1 - q, q) if p is None else (p, q)
+    s = p + q
+    w1, w2 = p / s * a1, q / s * a2  # (a share over 100 % is scaled down; under it, it's see-through by that much)
+    lab = lambda L, c, h: (L, c * math.cos(math.radians(h)), c * math.sin(math.radians(h)))
+    A, B = lab(L1, c1, h1), lab(L2, c2, h2)
+    L, x, y = ((A[i] * w1 + B[i] * w2) / (w1 + w2) for i in range(3))
+    return L, math.hypot(x, y), math.degrees(math.atan2(y, x)) % 360, (w1 + w2) * min(1.0, s)
+
+
+# a relative colour's channels: a number (an angle with deg), a function's name and its bracket, a channel's name, or
+# + - * / ( ) ,
+TOKEN = re.compile(r"\s*(?:(\d+(?:\.\d*)?|\.\d+)(deg)?|([a-z]+)\(|([a-z]+)|([-+*/(),]))")
 
 
 def relative(v):
     """oklch(from <colour> L C H [/ A]) worked out, as (L, C, H, alpha), as the browser does. The colour it's from is an
-    oklch() (relative itself or not); each channel is a number, l, c or h (that colour's), or min() or calc() of them
-    (+ - * / and brackets in calc). A left out is that colour's. L is held to 0–1, C to 0 and up, A to 0–1. Anything
-    else stops it ("can't read"): a channel read wrong would pass silently."""
+    oklch() (relative itself or not); each channel is a number, l, c or h (that colour's), or min(), max(), clamp(),
+    calc() or cos() of them (+ - * / and brackets in calc; cos() of an angle in deg, as (h - 126) * 1deg). A left out
+    is that colour's. L is held to 0–1, C to 0 and up, A to 0–1. Anything else stops it ("can't read"): a channel read
+    wrong would pass silently."""
     def bad(why=""):
         return ValueError(f"can't read {v!r}{': ' + why if why else ''}")
     m = re.fullmatch(r"oklch\(\s*from\s+(.*)\)", v.strip(), flags=re.S)
@@ -129,9 +190,9 @@ def relative(v):
         t = TOKEN.match(s, i)
         if not t:
             raise bad(f"at {s[i:]!r}")
-        toks.append(("num", float(t[1])) if t[1] else ("fn", t[2]) if t[2] else ("kw", t[3]) if t[3] else ("op", t[4]))
+        toks.append(((t[2] or "num"), float(t[1])) if t[1] else ("fn", t[3]) if t[3] else ("kw", t[4]) if t[4] else ("op", t[5]))
         i = t.end()
-    pos = 0
+    pos, angle = 0, {"in": False, "seen": False}  # an angle (Ndeg) only inside cos(), and cos() only of an angle
 
     def peek():
         return toks[pos] if pos < len(toks) else (None, None)
@@ -143,10 +204,24 @@ def relative(v):
         pos += 1
         return toks[pos - 1]
 
-    def atom():  # a channel: a number, a channel's name, min(), max() or calc()
+    def atom():  # a channel: a number, a channel's name, min(), max(), clamp(), calc() or cos()
         kind, val = take()
         if kind == "num":
             return val
+        if kind == "deg":  # degrees, as cos() takes them
+            if not angle["in"]:
+                raise bad("an angle outside cos()")
+            angle["seen"] = True
+            return val
+        if (kind, val) == ("fn", "cos"):  # cos() of an angle written in deg ((h - 126) * 1deg); in radians it'd be misread
+            was = dict(angle)
+            angle.update({"in": True, "seen": False})
+            x = total()
+            take(("op", ")"))
+            if not angle["seen"]:
+                raise bad("cos() of a number: write its angle in deg")
+            angle.update(was)
+            return math.cos(math.radians(x))
         if kind == "kw" and val in chan:
             return chan[val]
         if kind == "op" and val in "+-" and peek()[0] == "num":
@@ -162,6 +237,14 @@ def relative(v):
                 xs.append(total())
             take(("op", ")"))
             return min(xs) if val == "min" else max(xs)
+        if (kind, val) == ("fn", "clamp"):  # clamp(lo, x, hi): x held between them (lo wins, as in CSS)
+            lo = total()
+            take(("op", ","))
+            x = total()
+            take(("op", ","))
+            hi = total()
+            take(("op", ")"))
+            return max(lo, min(x, hi))
         raise bad(f"{val!r}")
 
     def factor():
@@ -301,6 +384,8 @@ def colour(t, name, p3):
         accent, _, w = name[5:].partition("/")
         c, a = parse_colour(voice_mark(t, accent), p3)
         return c, a * (num(w) if w else 1)
+    if name.startswith("fill:"):  # an accent as a label's fill: as --voice-fill has it for that accent
+        return parse_colour(resolve(painted(t, name[5:].removeprefix("--voice-")), t["--voice-fill"]), p3)
     v = resolve(t, t[name]) if name.startswith("--") else name
     c = parse_colour(v, p3)
     if c is None:
@@ -385,6 +470,9 @@ for k in ACCENTS:
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"mark:--voice-{k}", 4.5, k))  # on a mark's fill (a take playing, Loop on)
     PAIRS.append(("--on-ink", f"mark:--voice-{k}", 1.5 if k in ("pink", "sky") else 3, k))  # a switch's knob, on (sky's 2.97 in the light theme)
     PAIRS.append(("--ink", f"mark:--voice-{k}/50%", 3, k))  # a fader's cap on its fill (base.css: half the mark, over the card; Mono's 3.2 in the dark theme, 2.85 at 55 %)
+    PAIRS.append(("--on-mark", f"mark:--voice-{k}", 3, k))  # a glyph on your colour as a mark (Loop and the click on, a take playing, Compare): white in the light theme
+    PAIRS.append(("--on-fill", f"fill:--voice-{k}", 4.5, k))  # text on your colour as a label (the playhead's time, the version you're in, the Lab's chips)
+PAIRS.append(("--on-play", "--play-hover", 3))  # Play's glyph on it pointed at
 
 
 def chip_pairs(t, p3):
@@ -398,13 +486,23 @@ def chip_pairs(t, p3):
     return out
 
 
+def keys(stage):
+    """Your colour on the piano's keys (stage.css's .keys: --key-w-voice, --key-b-voice held, --key-w-hover,
+    --key-b-hover pointed at), as a browser with relative colour has them (its @supports rule over the plain one)."""
+    out = {}
+    for want_media in (False, True):
+        for sel, media, decls in blocks(stage):
+            if bool(media) == want_media and (not media or media.startswith("@supports")) and \
+                    ".keys" in [s.strip() for s in sel.split(",")]:
+                out.update(decls)
+    return out
+
+
 def key_pairs(t, k):
-    """The piano's keys (stage.css) with accent k picked: your colour on a white key at most --key-w-lit light, on a
-    black key at least --key-b-lit (worked out from it as oklch(from ...) has it there), held down: 3:1 on the key; the
-    C's label on it (--on-key-down, with Mono's text on it as stage.js sets it): 4.5:1."""
-    wl, bl = float(resolve(t, t["--key-w-lit"])), float(resolve(t, t["--key-b-lit"]))
-    L, c, h = (num(x) for x in re.findall(r"[\d.]+%?", resolve(t, t[f"--voice-{k}"]).split("(", 1)[1])[:3])
-    w, b = f"oklch({min(L, wl)} {c} {h})", f"oklch({max(L, bl)} {c} {h})"
+    """The piano's keys (stage.css) with accent k picked (t: the tokens with keys()'s over them): your colour on a
+    white key and on a black key as .keys works it out (no lighter than --key-w-lit, no darker than --key-b-lit), held
+    down: 3:1 on the key; the C's label on it (--on-key-down, with Mono's text on it as stage.js sets it): 4.5:1."""
+    w, b = resolve(t, t["--key-w-voice"]), resolve(t, t["--key-b-voice"])
     return [("key w held", w, resolve(t, t["--key-w"]), 3), ("key b held", b, resolve(t, t["--key-b"]), 3),
             ("key w label", resolve(t, t["--on-key-down"]), w, 4.5)]
 
@@ -415,15 +513,23 @@ PASTELS = ("pink", "sky")
 PASTEL_NEED = {4.5: 3, 3: 2.5}
 
 
-def rows(css, light, p3, vibrant=False):
-    """Every pair in this theme with each accent picked: [(accent, pair, contrast or None, at least, why)]."""
-    out, t0 = [], theme(css, light, p3, vibrant=vibrant)
-    for k in ACCENTS:
-        t = painted(t0, k)
-        if light and vibrant and k in PASTELS:  # data-pastel's block over them (set with the accent: stage.js; Vibrant only)
+def pastel(t, css, light, vibrant, k):
+    """t with data-pastel's blocks over it, for a pastel in the light theme (set with the accent: stage.js): the one
+    for either tone, then Vibrant's."""
+    if light and k in PASTELS:
+        for want in [':root[data-theme="light"][data-pastel]'] + ([':root[data-theme="light"][data-pastel][data-tone="vibrant"]'] if vibrant else []):
             for sel, media, decls in blocks(css):
-                if not media and ':root[data-theme="light"][data-pastel][data-tone="vibrant"]' in [s.strip() for s in sel.split(",")]:
+                if not media and want in [s.strip() for s in sel.split(",")]:
                     t.update(decls)
+    return t
+
+
+def rows(css, ks, light, p3, vibrant=False):
+    """Every pair in this theme with each accent picked: [(accent, pair, contrast or None, at least, why)]. ks: the
+    keys' colours (keys())."""
+    out, t0 = [], {**theme(css, light, p3, vibrant=vibrant), **ks}
+    for k in ACCENTS:
+        t = pastel(painted(t0, k), css, light, vibrant, k)
         base = colour(t, "--surface", p3)
         for fg, bg, need, *only in PAIRS:
             if only and only[0] != k:
@@ -463,14 +569,72 @@ def mono(css):
     return bad
 
 
+# ---------- hue ----------
+# the colours worked out from your colour here: a label's fill (--voice-fill), the piano's keys (keys()), and, with
+# Vibrant on, Play pointed at (they fail the run)
+HUED = ["--voice-fill", "--key-w-voice", "--key-b-voice", "--key-w-hover", "--key-b-hover"]
+HUED_VIBRANT = ["--play-hover"]
+# ...and the rest of tokens.css's: your colour as a mark and Play, a pastel's deep shade and step, the waveform played,
+# small text, the backing vocals, the ink's tints (--fg-2 to --fg-38 are one colour at their own alpha: --fg-38's stands
+# for them), and with Vibrant the ink and text, a main button and the phrase strip: listed, not held to it (they don't
+# fail the run). One of ours that's one of these as it is (a pastel's Play pointed at is --voice-press) is listed there
+THEIRS = ["--voice-mark", "--play", "--on-play", "--voice-deep", "--voice-press", "--wave", "--voice-ink",
+          "--stem-backing", "--fg-38", "--ink", "--ink-strong", "--muted", "--primary", "--primary-hover", "--on-primary",
+          "--phrase", "--phrase-hover"]
+HUE_OFF, HUE_GREY = 3, 0.02  # degrees off the accent's hue that fail; under this chroma, too little hue to tell
+
+
+def hues(css, ks, light, p3, vibrant, names, skip=()):
+    """Each colour in names with each accent but Mono (no hue), as written and as the screen shows it, but where it's
+    one in skip as it is (var(--x)): [(accent, token, (L, C, H) written, (L, C, H) shown, degrees the shown hue is off
+    the accent's or None (too grey to tell), whether it's outside the gamut)]."""
+    out, t0, gamut = [], {**theme(css, light, p3, vibrant=vibrant), **ks}, "p3" if p3 else "srgb"
+    for k in ACCENTS:
+        if k == "white":
+            continue
+        t = pastel(painted(t0, k), css, light, vibrant, k)
+        h0 = oklch_of(resolve(t, "var(--voice)"))[2]
+        for name in names:
+            if t[name].strip() in [f"var({x})" for x in skip]:
+                continue
+            v = resolve(t, t[name])
+            lch = oklch_of(v) if v.startswith("oklch(") else mix_oklab(v) if v.startswith("color-mix(") else None
+            if not lch and parse_colour(v):  # an rgba() or hex (a plain grey with Vibrant off)
+                lch = lin_to_oklch(tuple(srgb_to_lin(x) for x in parse_colour(v)[0]))
+            if not lch:
+                raise ValueError(f"{name}: can't read {v!r}")
+            L, C, H = lch[:3]
+            s = shown(L, C, H, gamut)
+            off = abs((s[2] - h0 + 180) % 360 - 180) if s[1] > HUE_GREY else None
+            out.append((k, name, (L, C, H), s, off, not lin_in_gamut(oklch_to_lin(L, C, H), gamut)))
+    return out
+
+
+def greyer(hs, fill, hot, only=None):
+    """A fill pointed at against the fill, as each is shown (hues()), for each accent (or those in only) that has both:
+    [(accent, the fill's (L, C), pointed at's (L, C), greyer)]. A deeper step of a colour as vivid as the screen has it
+    can't keep its chroma where the screen holds less at its lightness (below a hue's brightest: orange to teal), but
+    its shade, chroma falling as lightness does, it can always show; so it's greyer if its chroma falls faster than its
+    lightness, or, on a pale fill (lighter than L 0.8: a pastel's), at all (a pale tint's shade is grey)."""
+    at = {(k, n): s for k, n, _, s, _, _ in hs}
+    out = []
+    for k in dict.fromkeys(k for k, *_ in hs):
+        if (only is not None and k not in only) or (k, fill) not in at or (k, hot) not in at:
+            continue
+        (bl, bc, _), (hl, hc, _) = at[k, fill], at[k, hot]
+        least = bc * (1 if bl >= 0.8 else min(1, hl / bl))
+        out.append((k, (bl, bc), (hl, hc), hc < least * (1 - 1e-6)))  # (float rounding)
+    return out
+
+
 def main():
-    css = open(TOKENS, encoding="utf-8").read()
+    css, stage = (open(f, encoding="utf-8").read() for f in (TOKENS, STAGE))
     try:
-        bad = mono(css)
+        bad, ks = mono(css), keys(stage)
         for vibrant, light in ((False, False), (False, True), (True, False), (True, True)):
             for p3 in (False, True):
                 name = ("light" if light else "dark") + (" P3" if p3 else "") + (" vibrant" if vibrant else "")
-                rs = rows(css, light, p3, vibrant)
+                rs = rows(css, ks, light, p3, vibrant)
                 fails = [r for r in rs if r[2] is None or r[2] < r[3]]
                 bad += len(fails)
                 low = min((r for r in rs if r[2]), key=lambda r: r[2])
@@ -480,6 +644,35 @@ def main():
                     if "-v" in sys.argv or cr is None or cr < need:
                         shown = cr if cr is None else round(cr, 3 if round(cr, 2) == need else 2)  # (2.999 isn't "3.0")
                         print(f"  {'FAIL' if cr is None or cr < need else '    '} {named(k):<6} {label:<34} {shown} (needs {need}) {why}")
+                # each colour worked out from yours keeps its hue as it's shown, and Play pointed at isn't greyer than
+                # Play: ours (HUED) fail the run; the rest (THEIRS: a pastel's Play pointed at, a main button's) listed
+                for theirs in (False, True):
+                    if theirs:
+                        hs = hues(css, ks, light, p3, vibrant, THEIRS)
+                        gs = greyer(hs, "--play", "--voice-press", PASTELS if light and vibrant else ()) + \
+                            greyer(hs, "--primary", "--primary-hover", PASTELS if light and vibrant else ())
+                    else:
+                        hs = hues(css, ks, light, p3, vibrant, HUED + (HUED_VIBRANT if vibrant else []), THEIRS)
+                        gs = greyer(hues(css, ks, light, p3, vibrant, ["--play"]) + hs, "--play", "--play-hover") if vibrant else []
+                    far = [r for r in hs if r[4] is not None and r[4] > HUE_OFF]
+                    grey = [g for g in gs if g[3]]
+                    if not theirs:
+                        bad += len(far) + len(grey)
+                    top = max((r for r in hs if r[4] is not None), key=lambda r: r[4], default=None)
+                    print(f"{name}{', the rest of tokens.css (listed, not counted)' if theirs else ''}: hue kept in "
+                          f"{len(hs) - len(far)}/{len(hs)} (Mono has none); most off "
+                          f"{'-' if not top else f'{top[4]:.1f} deg ({top[1]}, {named(top[0])})'}; outside the screen "
+                          f"{sum(r[5] for r in hs)}; pointed at greyer {len(grey)}/{len(gs)}")
+                    for k, n, (L, C, H), (sl, sc, sh), off, out in hs:
+                        if "-v" in sys.argv or (off is not None and off > HUE_OFF) or (theirs and out and sc > HUE_GREY):
+                            flag = ("MAIN" if theirs else "FAIL") if off is not None and off > HUE_OFF else "    "
+                            print(f"  {flag} {named(k):<6} {n:<16} "
+                                  f"L {L:.3f} C {C:.4f} h {H:5.1f}  shown L {sl:.3f} C {sc:.4f} h {sh:5.1f}  "
+                                  f"{'-' if off is None else f'{off:.1f}'} deg off{'  (outside: clipped)' if out else ''}")
+                    for k, (bl, bc), (hl, hc), g in gs:
+                        if "-v" in sys.argv or g:
+                            print(f"  {('MAIN' if theirs else 'FAIL') if g else '    '} {named(k):<6} pointed at  "
+                                  f"L {bl:.3f} -> {hl:.3f}, C {bc:.4f} -> {hc:.4f}{'  greyer' if g else ''}")
     except ValueError as e:  # a value it can't read: stop, rather than pass it
         sys.exit(f"contrast.py: {e}")
     sys.exit(1 if bad else 0)
