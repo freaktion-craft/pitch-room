@@ -152,7 +152,7 @@
   --voice-white: oklch(0.32 0 0);
   --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.9 0.055 350); --voice-coral: oklch(0.667 0.21 32);
   --voice-orange: oklch(0.654 0.149 58); --voice-amber: oklch(0.646 0.126 82); --voice-green: oklch(0.62 0.162 150); --voice-teal: oklch(0.631 0.102 195);
-  --voice-sky: oklch(0.8 0.09 236); /* sky blue, a pastel as baby pink is */
+  --voice-sky: oklch(0.9 0.055 236); /* baby sky, a soft blue-white as Pink is (the #b9e4ff asked for, about) */
   --on-voice: var(--on-accent); --on-voice-mono: oklch(1 0 0);
   --voice-ink: color-mix(in oklab, var(--voice) 50%, var(--ink));
   --voice-mark: var(--voice-act); /* deepened where the browser can (below) */
