@@ -150,7 +150,7 @@
   --fill: var(--fg-6); --line: var(--fg-8); --ring: var(--fg-12); --track: var(--fg-12);
   --scrim: rgba(0, 0, 0, 0.16); --scrim-strong: rgba(0, 0, 0, 0.4);
   --voice-white: oklch(0.32 0 0);
-  --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.82 0.095 355); --voice-coral: oklch(0.667 0.21 32);
+  --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.9 0.055 350); --voice-coral: oklch(0.667 0.21 32);
   --voice-orange: oklch(0.654 0.149 58); --voice-amber: oklch(0.646 0.126 82); --voice-green: oklch(0.62 0.162 150); --voice-teal: oklch(0.631 0.102 195);
   --voice-sky: oklch(0.8 0.09 236); /* sky blue, a pastel as baby pink is */
   --on-voice: var(--on-accent); --on-voice-mono: oklch(1 0 0);
@@ -184,8 +184,8 @@
 @supports (color: oklch(from red l c h)) { :root[data-theme="light"] { --voice-mark: oklch(from var(--voice-act) calc(min(l, 0.66) + (l - min(l, 0.66)) * min(max((l - 0.7) * 100, 0), 1)) c h); /* (the pastels, L over 0.7, as they are: deepened they went dusty) */
   /* (and for the pastels' Play, either way: a clean deep shade of them for its glyph, and a step deeper pointed at; the
      others' and Mono's as the plain values have them) */
-  --voice-deep: oklch(from var(--voice) calc(0.2 + max(l - 0.7, 0) * 1.6 + min(c * 0.8, 0.1) * min(max((l - 0.7) * 100, 0), 1)) calc(min(max((l - 0.7) * 100, 0), 1) * c * 0.97) h);
-  --voice-press: oklch(from var(--voice) calc(l - max(l - 0.7, 0) * 0.4) c h); } }
+  --voice-deep: oklch(from var(--voice) calc(0.2 + min(max(l - 0.7, 0), 0.12) * 1.6 + min(c * 0.8, 0.1) * min(max((l - 0.7) * 100, 0), 1)) calc(min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.97) h);
+  --voice-press: oklch(from var(--voice) calc(l - min(max(l - 0.7, 0), 0.12) * 0.4) c h); } }
 /* the light theme's greys in a trace of your colour, as the dark one's are (above): the page, a button or field, one
    pointed at and a toggle held keep their lightness and take your colour's hue, chroma 0.006 to 0.014; the card stays
    white, which holds no chroma. The page is a hair lighter with it (0.0006 at most), so a vivid colour's still 3:1 as
@@ -198,22 +198,22 @@
    them, the text lighter and more of their hue, by how pale they are (max(l - 0.7, 0)). Mono comes out as it was */
 @supports (color: oklch(from red l c h)) {
   :root[data-theme="light"][data-tone="vibrant"] {
-    --ink: oklch(from var(--voice) calc(0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) calc(min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) h);
-    --ink-strong: oklch(from var(--voice) calc(min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2) calc(min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2) h);
+    --ink: oklch(from var(--voice) calc(0.2 + min(c * 0.8, 0.1) + min(max(l - 0.7, 0), 0.12) * 1.6) calc(min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.75) h);
+    --ink-strong: oklch(from var(--voice) calc(min(c * 0.17, 0.03) * 4 + min(max(l - 0.7, 0), 0.12) * 1.2) calc(min(c * 0.17, 0.03) + min(max(l - 0.7, 0), 0.12) * 0.2) h);
     --on-ink: oklch(from var(--voice) 0.99 min(c, 0.005) h);
-    --primary: oklch(from var(--voice) calc((0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) + (l - (0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) + (c - (min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75)) * min(max((l - 0.7) * 100, 0), 1)) h);
-    --on-primary: oklch(from var(--voice) calc(0.99 + ((0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) - 0.99) * min(max((l - 0.7) * 100, 0), 1)) calc(min(c, 0.005) + ((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) - min(c, 0.005)) * min(max((l - 0.7) * 100, 0), 1)) h);
-    --primary-hover: oklch(from var(--voice) calc((min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2) + (l - 0.05 - (min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2) + (c - (min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2)) * min(max((l - 0.7) * 100, 0), 1)) h);
-    --muted: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.62 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --faint: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.56 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --placeholder: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.44 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --fg-46: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.46 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --fg-55: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.55 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --fg-80: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.8 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --primary: oklch(from var(--voice) calc((0.2 + min(c * 0.8, 0.1) + min(max(l - 0.7, 0), 0.12) * 1.6) + (l - (0.2 + min(c * 0.8, 0.1) + min(max(l - 0.7, 0), 0.12) * 1.6)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.75) + (c - (min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.75)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --on-primary: oklch(from var(--voice) calc(0.99 + ((0.2 + min(c * 0.8, 0.1) + min(max(l - 0.7, 0), 0.12) * 1.6) - 0.99) * min(max((l - 0.7) * 100, 0), 1)) calc(min(c, 0.005) + ((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.75) - min(c, 0.005)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --primary-hover: oklch(from var(--voice) calc((min(c * 0.17, 0.03) * 4 + min(max(l - 0.7, 0), 0.12) * 1.2) + (l - 0.05 - (min(c * 0.17, 0.03) * 4 + min(max(l - 0.7, 0), 0.12) * 1.2)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.17, 0.03) + min(max(l - 0.7, 0), 0.12) * 0.2) + (c - (min(c * 0.17, 0.03) + min(max(l - 0.7, 0), 0.12) * 0.2)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --muted: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + min(max(l - 0.7, 0), 0.12) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.6) h / calc(0.62 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --faint: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + min(max(l - 0.7, 0), 0.12) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.6) h / calc(0.56 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --placeholder: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + min(max(l - 0.7, 0), 0.12) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.6) h / calc(0.44 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-46: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + min(max(l - 0.7, 0), 0.12) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.6) h / calc(0.46 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-55: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + min(max(l - 0.7, 0), 0.12) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.6) h / calc(0.55 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-80: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + min(max(l - 0.7, 0), 0.12) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.6) h / calc(0.8 * (1 + min(c * 0.34, 0.06) * 3.6)));
     --phrase: oklch(from var(--voice) 0.9 min(c * 0.25, 0.035) h);
     --phrase-hover: oklch(from var(--voice) 0.84 min(c * 0.35, 0.05) h); /* (clear pale tints of your hue, so the one you're in, your colour, stands out of them) */
-    --wave: oklch(from var(--voice-act) calc(min(l, 0.55) + max(l - 0.7, 0) * 0.5) calc(c * (1 + min(max((l - 0.7) * 100, 0), 1) * 0.6)) h); /* the waveform's played part: your colour, deep and full (a pastel's a clear rose or blue, more of its hue; Mono the ink) */
-    --stem-band: oklch(from var(--voice) calc(0.55 + max(l - 0.7, 0) * 0.5) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h); /* the band's icons and waveforms in the text's tone (a pastel's softer, as its text is) */
+    --wave: oklch(from var(--voice-act) calc(min(l, 0.55) + min(max(l - 0.7, 0), 0.12) * 0.5) calc(max(c, 0.095 * min(max((l - 0.7) * 100, 0), 1)) * (1 + min(max((l - 0.7) * 100, 0), 1) * 0.6)) h); /* the waveform's played part: your colour, deep and full (a pastel's a clear rose or blue, more of its hue; Mono the ink) */
+    --stem-band: oklch(from var(--voice) calc(0.55 + min(max(l - 0.7, 0), 0.12) * 0.5) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * max(c, 0.095) * 0.6) h); /* the band's icons and waveforms in the text's tone (a pastel's softer, as its text is) */
     --bg: oklch(from var(--voice) calc(0.965 + min(c, 0.006) * 0.1) min(c, 0.006) h); --surface-2: oklch(from var(--voice) 0.935 min(c, 0.01) h);
     --hover-2: oklch(from var(--voice) 0.9 min(c, 0.014) h); --tog-down: oklch(from var(--voice) 0.88 min(c, 0.014) h);
     --fg-2: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.02 * (1 + min(c, 0.06) * 3.6)));
@@ -269,7 +269,7 @@
     --voice-orange: oklch(0.75 0.195 58); --voice-amber: oklch(0.77 0.174 82); --voice-green: oklch(0.73 0.266 150); --voice-teal: oklch(0.74 0.162 195);
   }
   :root[data-theme="light"] { /* (its own: the one above is at :root's specificity, under the light block's) */
-    --voice-blue: oklch(0.648 0.192 262); --voice-violet: oklch(0.662 0.208 295); --voice-pink: oklch(0.82 0.095 355); --voice-coral: oklch(0.667 0.265 32);
+    --voice-blue: oklch(0.648 0.192 262); --voice-violet: oklch(0.662 0.208 295); --voice-pink: oklch(0.9 0.055 350); --voice-coral: oklch(0.667 0.265 32);
     --voice-orange: oklch(0.654 0.17 58); --voice-amber: oklch(0.646 0.146 82); --voice-green: oklch(0.62 0.19 150); --voice-teal: oklch(0.631 0.105 195);
   }
 }
