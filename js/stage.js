@@ -70,6 +70,15 @@ function setAccent(k) {
   for (const b of $("#swatches").children) b.setAttribute("aria-pressed", String(b.dataset.k === k));
 }
 paintAccent();
+// Vibrant (Settings, off at first): your colour through the whole app (its greys, ink and text in shades of it:
+// tokens.css), not only where it points. Remembered as "vibrant"; the script in <head> sets it before first paint
+function setVibrant(on) {
+  store.set("vibrant", on);
+  if (on) document.documentElement.dataset.tone = "vibrant"; else delete document.documentElement.dataset.tone;
+  readColors(); // the canvas takes it from here
+}
+$("#vibrantOn").checked = document.documentElement.dataset.tone === "vibrant";
+$("#vibrantOn").onchange = (e) => setVibrant(e.target.checked);
 
 // The theme (Settings): "system" (the system's light or dark, followed as it changes), "light" or "dark", remembered
 // as "theme". The script in <head> sets it on <html> (data-theme) before first paint, as it does the accent; the

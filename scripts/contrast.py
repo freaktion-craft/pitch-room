@@ -262,13 +262,17 @@ def declarations(body):
     return out
 
 
-def theme(css, light, p3, supports=True):
+def theme(css, light, p3, supports=True, vibrant=False):
     """The tokens as <html> has them: :root's (with its P3 accents on a P3 screen), then, for light, the light block's
     over them (it outranks :root wherever it is: its specificity's higher), its own @supports and P3 ones last.
-    supports=False: as a browser without what the @supports blocks ask for has them (their plain values)."""
+    supports=False: as a browser without what the @supports blocks ask for has them (their plain values). vibrant: as
+    Settings' Vibrant has them (data-tone="vibrant": each block's own vibrant one after it)."""
     bl, t = blocks(css), {}
     on = lambda media: not media or (media.startswith("@supports") and supports) or ("p3" in media and p3)
-    for sel_want in ([":root"], [':root[data-theme="light"]']) if light else ([":root"],):
+    want = [":root"] + ([':root[data-tone="vibrant"]'] if vibrant else [])
+    if light:
+        want += [':root[data-theme="light"]'] + ([':root[data-theme="light"][data-tone="vibrant"]'] if vibrant else [])
+    for sel_want in ([w] for w in want):
         for want_media in (False, True):
             for sel, media, decls in bl:
                 if bool(media) == want_media and on(media) and sel_want[0] in [s.strip() for s in sel.split(",")]:
@@ -411,9 +415,9 @@ PASTELS = ("pink", "sky")
 PASTEL_NEED = {4.5: 3, 3: 2.5}
 
 
-def rows(css, light, p3):
+def rows(css, light, p3, vibrant=False):
     """Every pair in this theme with each accent picked: [(accent, pair, contrast or None, at least, why)]."""
-    out, t0 = [], theme(css, light, p3)
+    out, t0 = [], theme(css, light, p3, vibrant=vibrant)
     for k in ACCENTS:
         t = painted(t0, k)
         if light and k in PASTELS:  # data-pastel's block over them (set with the accent: stage.js)
@@ -445,9 +449,9 @@ def mono(css):
     have it (a browser without relative colour), in each theme: the number that don't, each said."""
     names = sorted({n for _, media, decls in blocks(css) if media and media.startswith("@supports") for n in decls})
     bad = 0
-    for light in (False, True):
+    for light, vibrant in ((False, False), (True, False), (False, True), (True, True)):
         for p3 in (False, True):
-            got, was = (painted(theme(css, light, p3, s), "white") for s in (True, False))
+            got, was = (painted(theme(css, light, p3, s, vibrant), "white") for s in (True, False))
             for n in names:
                 a, b = colour(got, n, p3), colour(was, n, p3)
                 if max(abs(x - y) for x, y in zip((*a[0], a[1]), (*b[0], b[1]))) > 1e-6:  # (float rounding)
@@ -463,10 +467,10 @@ def main():
     css = open(TOKENS, encoding="utf-8").read()
     try:
         bad = mono(css)
-        for light in (False, True):
+        for vibrant, light in ((False, False), (False, True), (True, False), (True, True)):
             for p3 in (False, True):
-                name = ("light" if light else "dark") + (" P3" if p3 else "")
-                rs = rows(css, light, p3)
+                name = ("light" if light else "dark") + (" P3" if p3 else "") + (" vibrant" if vibrant else "")
+                rs = rows(css, light, p3, vibrant)
                 fails = [r for r in rs if r[2] is None or r[2] < r[3]]
                 bad += len(fails)
                 low = min((r for r in rs if r[2]), key=lambda r: r[2])
