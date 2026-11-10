@@ -395,7 +395,7 @@ function initTakesStudio() {
   document.addEventListener("keydown", (e) => {
     if (!(view === "stems" && stemsPage === "takes") || ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Space") { e.preventDefault(); if (!e.repeat) tsPlay(); }
-    else if (e.code === "Home") { e.preventDefault(); tsSeek(0); }
+    else if (e.code === "Home" || (e.shiftKey && e.code === "ArrowLeft")) { e.preventDefault(); tsSeek(0); }
   });
   let w = 0; // laid out again for another width (not for its own height, as lanes come and go)
   new ResizeObserver(([e]) => { const now = Math.round(e.contentRect.width); if (now !== w && stemsPage === "takes") { w = now; tsRender(); } }).observe($("#tsTl"));

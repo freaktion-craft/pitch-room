@@ -1045,7 +1045,7 @@ async function singSong(m, btn) {
 }
 // Settings: a page of their own (#settings, route): going out, their lists closed
 function showMicSet(on) {
-  document.documentElement.classList.toggle("set-view", on); pinSetTop(); requestAnimationFrame(() => { pinSetTop(); paintFade(true); paintSetNav(); }); // (again once it's shown)
+  document.documentElement.classList.toggle("set-view", on); pinSetTop(); requestAnimationFrame(() => { pinSetTop(); paintFade(); paintSetNav(); }); // (again once it's shown)
   if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); themePick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
 }
 // Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
@@ -1094,9 +1094,9 @@ function paintSetNav(at) {
   $("#setNav").querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-current", String(i === at)));
 }
 // Settings scroll with the page, as the library does (its scrollbar at the window's edge): the app's bar and the crumbs
-// held where they stand over a band of the page's colour (#libMast, as tall as both), the list of groups beside them
-// where it starts; the groups go under the band, through the library's fades (paintFade). Measured again when the
-// page changes or the window does.
+// held where they stand over a band of the page's colour (#libMast, down to --fade-up short of their foot, the top
+// fade on over the rest), the list of groups beside them where it starts; the groups go under the band, through the
+// library's fades (paintFade). Measured again when the page changes or the window does.
 function pinSetTop() {
   const root = document.documentElement;
   root.classList.remove("set-top");

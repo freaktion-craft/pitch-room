@@ -70,6 +70,46 @@ function resetOnDblClick(input, def) {
   document.addEventListener("focusout", (e) => { if (e.target.matches?.('input[type="range"]') && !held) show(null); }, true);
   addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true, capture: true }); // (a box scrolled too: Settings' list)
 })();
+// Tooltips: a title drawn as the phrase strip's tip is (an ink chip over the thing, a moment after the pointer rests
+// on it; at once while one's just been showing), not the system's. While it's pointed at, its title waits in
+// data-tipped (so the system's doesn't show too) and goes back after, so code that sets or reads titles is as it was.
+// A key in brackets, "(L)", is set apart in the chip, muted.
+(function tooltips() {
+  const DELAY = 500, WARM = 400, GAP = 8, EDGE = 8;
+  const KEY = /\s?\(((?:(?:Ctrl|Shift|Alt|⌘)\+)*(?:[A-Z0-9←→↑↓]|Space|Home|End|Enter|Esc|Tab))\)/;
+  const tip = el("div", "tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true");
+  document.body.append(tip);
+  let on = null, timer = 0, lastShown = 0;
+  const take = (n) => { const t = n.getAttribute("title"); if (t != null) { n.removeAttribute("title"); n.dataset.tipped = t; } return n.dataset.tipped || ""; };
+  const give = (n) => { if (!n.hasAttribute("title") && n.dataset.tipped != null) n.setAttribute("title", n.dataset.tipped); delete n.dataset.tipped; };
+  function show(n) {
+    const t = take(n); if (!t || !n.isConnected) return;
+    const m = t.match(KEY);
+    if (m) tip.replaceChildren(t.slice(0, m.index), el("span", "tip-key", m[1]), t.slice(m.index + m[0].length)); else tip.replaceChildren(t);
+    tip.style.left = tip.style.top = "0"; tip.hidden = false; // (measured at the left, where it has its full width)
+    const r = n.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(EDGE, Math.min(document.documentElement.clientWidth - w - EDGE, r.left + r.width / 2 - w / 2)) + "px"; // (the scrollbar left out)
+    tip.style.top = (r.top - h - GAP >= EDGE ? r.top - h - GAP : r.bottom + GAP) + "px"; // over it, or under it at the window's top
+  }
+  function hide(keep) {
+    clearTimeout(timer);
+    if (!tip.hidden) { tip.hidden = true; lastShown = Date.now(); }
+    if (!keep && on) { give(on); on = null; }
+  }
+  document.addEventListener("pointerover", (e) => {
+    const n = e.pointerType === "touch" ? null : e.target.closest?.("[title], [data-tipped]");
+    if (n === on) return;
+    hide();
+    if (!n) return;
+    on = n; take(n);
+    timer = setTimeout(() => show(n), Date.now() - lastShown < WARM ? 0 : DELAY);
+  }, true);
+  document.addEventListener("pointerout", (e) => { if (on && !on.contains(e.relatedTarget)) hide(); }, true);
+  document.addEventListener("pointermove", () => { if (on && on.hasAttribute("title")) take(on); }, { passive: true, capture: true }); // retitled while pointed at (the mic, pressed)
+  for (const ev of ["pointerdown", "keydown", "wheel"]) document.addEventListener(ev, () => { hide(true); lastShown = 0; }, { passive: true, capture: true }); // (and no tip again until it's left)
+  addEventListener("scroll", () => hide(true), { passive: true, capture: true });
+  addEventListener("blur", () => hide());
+})();
 
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
 // whole name, for its tooltip, side: a note at the row's end (tone: "accent" or "faint" for its colour), prog: how far
