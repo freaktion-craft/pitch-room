@@ -191,7 +191,7 @@ function route() {
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra, was);
   paintCrumbs(); lastHash = location.hash || "#stems";
-  pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
+  pinLibTop(); paintFade(); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   // back in the library: the song (still loaded) starts from the top when it's opened again, in the Studio or Practice
   if (view === "stems" && stemsPage === "lib" && P.song) { P.offset = 0; P.lead = 0; K.cue = null; K.resume = null; }
@@ -210,7 +210,7 @@ function route() {
   // page has loaded, after it's been shown at the top, and the fades follow a frame behind), the fades there with it
   const back = scrolledTo; scrolledTo = null;
   window.scrollTo(0, back && back.hash === (location.hash || "#stems") ? back.y : 0);
-  paintFade(!!back);
+  paintFade();
 }
 let scrolledTo = (() => { try { return JSON.parse(sessionStorage.getItem("stem:scroll")); } catch (e) { return null; } })();
 history.scrollRestoration = "manual";
@@ -289,7 +289,8 @@ function reveal(at, nameThere = false) {
   const items = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums").querySelectorAll(".al-card") : $("#sLib").querySelectorAll(".row, .lib-group, .al-bar");
   [...items].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6)); // (the rows, the Artist view's headings with them, or the Album view's cards)
   const rising = document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity);
-  Promise.all(rising.map((a) => a.finished)).then(pinLibTop, pinLibTop); // measured where it rose to
+  const risen = () => { pinLibTop(); paintFade(); }; // measured where it rose to, and the fades with it (the search's line was read mid-rise)
+  Promise.all(rising.map((a) => a.finished)).then(risen, risen);
 }
 // The welcome (html.welcome, set in the page's head): the name in the middle, and the screen's right half turned over
 // to the left like a book's page, one after another, each showing an accent colour: slow off the thumb, then a rush,

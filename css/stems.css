@@ -384,20 +384,36 @@ html.desktop-mac #jobsPop { --drawer-top: var(--space-6); --head-top: calc(var(-
 #sLib .lib-none { margin: 0; padding: var(--space-6) var(--space-3); color: var(--faint); font-size: var(--text-md); }
 /* A long list: the page's foot fades into the background while there's more below, and clears at the end. Lower down,
    what's under it is hidden more and blurred more: six blurs (0.5 px doubling to 16 px), each in its own band of the
-   fade, overlapping the next, under the background coming in on an eased curve. Each layer fades itself in and out
-   (an opacity on the box would cut the blurs off from what's behind it). */
-#listFade, #listFadeTop { position: fixed; left: 0; right: 0; z-index: 5; height: 0; pointer-events: none; --dir: to bottom; } /* height: paintFade */
+   fade, overlapping the next, under the background coming in on an eased curve. Each layer is shown by itself (an
+   opacity on the box would cut the blurs off from what's behind it), and at once: a blur easing in showed the rows
+   sharp and blurred both for a moment. The background is a fill of the page's colour, its curve in a mask (the colour
+   itself fading to transparent, over the page's colour, left stripes a level or two off it). */
+:root { --fade-up: var(--space-8); } /* how far the top fade reaches on up past its line, and the band behind the pinned top stops short of it */
+/* (--fh: what its bands are measured against, below; --up: how far it reaches on past its line, none at the foot, whose
+   line is the window's edge) */
+#listFade, #listFadeTop { position: fixed; left: 0; right: 0; z-index: 5; height: 0; pointer-events: none; --dir: to bottom; --fh: 100%; --up: 0px; } /* height: paintFade */
 #listFade { bottom: 0; }
 /* and the same under the library's pinned top, the other way up, while rows have gone under it (or Continue practising
    under the search's line, paintFade): over the band and the sections going up (3), under the pinned parts (4, later) */
-#listFadeTop { top: var(--mast, 0px); z-index: 4; --dir: to top; }
-:is(#listFade, #listFadeTop) > * { position: absolute; inset: 0; opacity: 0; transition: opacity var(--duration-base); }
+#listFadeTop { top: calc(var(--mast, 0px) - var(--up)); z-index: 4; --dir: to top; --up: var(--fade-up); --fh: calc(var(--space-16) * 3); } /* (--fh: FADE_H) */
+/* (--up: how far it reaches on up past its line, over where the band behind the pinned top stops short, #libMast: the
+   blur runs on across the line in one piece, not two blurs meeting at an edge; the bands below are of what's under the
+   line. --k: its strength, 0 to 1 over the first --up of what goes under, paintFade: the blurs and the background
+   come in with it, not all at once) */
+:is(#listFade, #listFadeTop) > * { position: absolute; inset: 0; opacity: 0; }
 :is(#listFade, #listFadeTop).on > * { opacity: 1; }
-:is(#listFade, #listFadeTop).now > * { transition: none; }
+/* and the band's colour on up over everything above it (under the pinned parts, which come later): the page scrolls a
+   frame or more ahead of paintFade, and Continue practising, over the band (z-index 3), is cut by it, so on a fast
+   scroll its rows showed up there sharp, a sliver or a whole block, till the script caught up (down to the search's
+   line itself while nothing's gone under it, paintFade) */
+html:is(.lib-top, .set-top) #listFadeTop::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 100vh; background: var(--bg); }
 /* The library's top (the app's bar, the intro, search and Add song, the column heads) stays put while the list scrolls
    under it: each part sticks right where it stands (--top-*, measured by pinLibTop) over a band of the page's colour as
-   tall as all of it (#libMast), so the rows pass under the gaps between them too. The bar's panels stay over the rest. */
-#libMast { display: none; position: fixed; left: 0; right: 0; top: 0; height: var(--mast, 0px); z-index: 3; background: var(--bg); pointer-events: none; }
+   tall as all of it (#libMast), so the rows pass under the gaps between them too. The bar's panels stay over the rest.
+   While the top fade's at the band's foot the band stops short by its reach, up to --fade-up with its strength
+   (--band-k, set by paintFade in the same go as the fade, so no frame has the one without the other: the band can't
+   leave the strip bare while the script catches up with a fast scroll) */
+#libMast { display: none; position: fixed; left: 0; right: 0; top: 0; height: calc(var(--mast, 0px) - var(--fade-up) * var(--band-k, 0)); z-index: 3; background: var(--bg); pointer-events: none; }
 html.lib-top #libMast { display: block; }
 html.lib-top { scroll-padding-top: var(--mast); } /* a row reached with Tab isn't left under it */
 /* the page's scrollbar beside the list, what scrolls, not the top held over it (Chrome styles the page's from body's) */
@@ -405,15 +421,38 @@ html.lib-top body::-webkit-scrollbar-track { margin-top: var(--mast); }
 html.lib-top #app > header { position: sticky; top: var(--top-header); z-index: 6; }
 html.lib-top #sLibPage .lib-head { position: sticky; top: var(--top-head); z-index: 4; transition: z-index 0s linear var(--duration-base); }
 html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 4; }
-:is(#listFade, #listFadeTop) > i:nth-child(1) { backdrop-filter: blur(0.5px); mask: linear-gradient(var(--dir), transparent 0%, #000 16.7%, #000 33.3%, transparent 50%); }
-:is(#listFade, #listFadeTop) > i:nth-child(2) { backdrop-filter: blur(1px); mask: linear-gradient(var(--dir), transparent 16.7%, #000 33.3%, #000 50%, transparent 66.7%); }
-:is(#listFade, #listFadeTop) > i:nth-child(3) { backdrop-filter: blur(2px); mask: linear-gradient(var(--dir), transparent 33.3%, #000 50%, #000 66.7%, transparent 83.3%); }
-:is(#listFade, #listFadeTop) > i:nth-child(4) { backdrop-filter: blur(4px); mask: linear-gradient(var(--dir), transparent 50%, #000 66.7%, #000 83.3%, transparent 100%); }
-:is(#listFade, #listFadeTop) > i:nth-child(5) { backdrop-filter: blur(8px); mask: linear-gradient(var(--dir), transparent 66.7%, #000 83.3%); }
-:is(#listFade, #listFadeTop) > i:nth-child(6) { backdrop-filter: blur(16px); mask: linear-gradient(var(--dir), transparent 83.3%, #000 100%); }
-:is(#listFade, #listFadeTop) > b { background: linear-gradient(var(--dir), color-mix(in oklab, var(--bg) 0%, transparent) 0%, color-mix(in oklab, var(--bg) 3%, transparent) 14%,
-  color-mix(in oklab, var(--bg) 10%, transparent) 27%, color-mix(in oklab, var(--bg) 22%, transparent) 40%, color-mix(in oklab, var(--bg) 38%, transparent) 52%,
-  color-mix(in oklab, var(--bg) 56%, transparent) 64%, color-mix(in oklab, var(--bg) 74%, transparent) 76%, color-mix(in oklab, var(--bg) 89%, transparent) 88%, var(--bg) 100%); }
+/* the bands, each a share of --fh from the fade's line. The top's at set distances under its line (--fh, its full
+   height, FADE_H), not shares of the box: shorter (the list's column heads coming up under Continue practising, or the
+   list's end), it's cut short at its far end, where what goes under it ends, not squeezed into a thin band with the
+   cover going under sharp-edged. The foot's are shares of its box (--fh 100 %): it draws back as the end comes up, and
+   its far end lies on rows still in view, so cut short there it drew a hard edge through one */
+:is(#listFade, #listFadeTop) > i:nth-child(1) { backdrop-filter: blur(calc(var(--k, 1) * 0.5px)); mask: linear-gradient(var(--dir), transparent calc(100% - var(--up) - var(--fh) * 1), #000 calc(100% - var(--up) - var(--fh) * 0.833), #000 calc(100% - var(--up) - var(--fh) * 0.667), transparent calc(100% - var(--up) - var(--fh) * 0.5)); }
+:is(#listFade, #listFadeTop) > i:nth-child(2) { backdrop-filter: blur(calc(var(--k, 1) * 1px)); mask: linear-gradient(var(--dir), transparent calc(100% - var(--up) - var(--fh) * 0.833), #000 calc(100% - var(--up) - var(--fh) * 0.667), #000 calc(100% - var(--up) - var(--fh) * 0.5), transparent calc(100% - var(--up) - var(--fh) * 0.333)); }
+:is(#listFade, #listFadeTop) > i:nth-child(3) { backdrop-filter: blur(calc(var(--k, 1) * 2px)); mask: linear-gradient(var(--dir), transparent calc(100% - var(--up) - var(--fh) * 0.667), #000 calc(100% - var(--up) - var(--fh) * 0.5), #000 calc(100% - var(--up) - var(--fh) * 0.333), transparent calc(100% - var(--up) - var(--fh) * 0.167)); }
+:is(#listFade, #listFadeTop) > i:nth-child(4) { backdrop-filter: blur(calc(var(--k, 1) * 4px)); mask: linear-gradient(var(--dir), transparent calc(100% - var(--up) - var(--fh) * 0.5), #000 calc(100% - var(--up) - var(--fh) * 0.333), #000 calc(100% - var(--up) - var(--fh) * 0.167), transparent calc(100% - var(--up))); }
+:is(#listFade, #listFadeTop) > i:nth-child(5) { backdrop-filter: blur(calc(var(--k, 1) * 8px)); mask: linear-gradient(var(--dir), transparent calc(100% - var(--up) - var(--fh) * 0.333), #000 calc(100% - var(--up) - var(--fh) * 0.167)); }
+:is(#listFade, #listFadeTop) > i:nth-child(6) { backdrop-filter: blur(calc(var(--k, 1) * 16px)); mask: linear-gradient(var(--dir), transparent calc(100% - var(--up) - var(--fh) * 0.167), #000 calc(100% - var(--up))); }
+/* the top's two strongest start higher, 24 and 48 px (--x, about three times their blur) up over the band's colour above
+   it (its ::before, drawn before them), and hidden there by their masks, so only what they blur takes it in: whole at the
+   box's top edge, they blurred rows mirrored at it, not that flat colour. Their bands stay where they were */
+#listFadeTop > i:nth-child(5) { --x: var(--space-6); top: calc(var(--x) * -1); mask: linear-gradient(var(--dir), transparent calc(100% - var(--x) - var(--up) - var(--fh) * 0.333), #000 calc(100% - var(--x) - var(--up) - var(--fh) * 0.167), #000 calc(100% - var(--x)), transparent calc(100% - var(--x))); }
+#listFadeTop > i:nth-child(6) { --x: calc(var(--space-6) * 2); top: calc(var(--x) * -1); mask: linear-gradient(var(--dir), transparent calc(100% - var(--x) - var(--up) - var(--fh) * 0.167), #000 calc(100% - var(--x) - var(--up)), #000 calc(100% - var(--x)), transparent calc(100% - var(--x))); }
+:is(#listFade, #listFadeTop) > b { background: var(--bg); }
+#listFade > b { mask: linear-gradient(var(--dir), transparent calc(100% - var(--fh) * 1), rgb(0 0 0 / 0.03) calc(100% - var(--fh) * 0.86), rgb(0 0 0 / 0.1) calc(100% - var(--fh) * 0.73),
+  rgb(0 0 0 / 0.22) calc(100% - var(--fh) * 0.6), rgb(0 0 0 / 0.38) calc(100% - var(--fh) * 0.48), rgb(0 0 0 / 0.56) calc(100% - var(--fh) * 0.36), rgb(0 0 0 / 0.74) calc(100% - var(--fh) * 0.24),
+  rgb(0 0 0 / 0.89) calc(100% - var(--fh) * 0.12), #000 100%); }
+/* under the pinned top, the background comes in only part way by the line (60 %: the blurred rows reach right up to it,
+   not an empty band under it), then whole over its reach on up past it, into the band, on one curve that ends flat
+   (no corner at the line or where it meets the band). Its strength with --k (the blurs take it in their radii): a
+   second mask, so it follows the scroll with no easing of its own, whole at its top edge whatever --k and easing to --k
+   over 8 px, so the band's edge doesn't show through it while it comes in */
+#listFadeTop > b { mask: linear-gradient(var(--dir), transparent calc(100% - var(--up) - var(--fh) * 1), rgb(0 0 0 / 0.02) calc(100% - var(--up) - var(--fh) * 0.86), rgb(0 0 0 / 0.06) calc(100% - var(--up) - var(--fh) * 0.73),
+  rgb(0 0 0 / 0.13) calc(100% - var(--up) - var(--fh) * 0.6), rgb(0 0 0 / 0.22) calc(100% - var(--up) - var(--fh) * 0.48), rgb(0 0 0 / 0.33) calc(100% - var(--up) - var(--fh) * 0.36),
+  rgb(0 0 0 / 0.44) calc(100% - var(--up) - var(--fh) * 0.24), rgb(0 0 0 / 0.53) calc(100% - var(--up) - var(--fh) * 0.12), rgb(0 0 0 / 0.6) calc(100% - var(--up)),
+  rgb(0 0 0 / 0.635) calc(100% - var(--up) * 0.85), rgb(0 0 0 / 0.7) calc(100% - var(--up) * 0.7), rgb(0 0 0 / 0.81) calc(100% - var(--up) * 0.5), rgb(0 0 0 / 0.87) calc(100% - var(--up) * 0.4),
+  rgb(0 0 0 / 0.92) calc(100% - var(--up) * 0.3), rgb(0 0 0 / 0.978) calc(100% - var(--up) * 0.15), rgb(0 0 0 / 0.997) calc(100% - var(--up) * 0.05), #000 100%),
+  linear-gradient(to bottom, #000, rgb(0 0 0 / var(--k, 1)) var(--space-2));
+  mask-composite: intersect; } /* (after the shorthand, which sets it back) */
 /* New (drawNew): the songs just added, 128 px covers in a row that slides sideways, a page at a time with the arrows.
    Its ends fade out (a mask, --fl and --fr as wide as there's more that way, paintNew), so a cover goes into the fade
    rather than being cut off at the edge. Over the band behind the pinned top while it goes up under the search. */
@@ -494,7 +533,9 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .ln-card b { font-weight: var(--weight-medium); font-size: var(--text-md); line-height: 20px; }
 .ln-card small { color: var(--muted); font-size: var(--text-sm); line-height: 18px; }
 /* Continue practising (paintCont): the three songs last practised, under New and over the list, going up under the
-   search's line as New does (z-index 3, as .lib-new; paintFade cuts it at the search's line). Spaced by what's seen:
+   search's line as New does (z-index 3, as .lib-new; paintFade cuts it at the search's line, or up to --fade-up over it
+   while the top's fade is there over it, and away altogether once the list's gone under the column heads). Spaced by
+   what's seen:
    its heading 8 px over the first row, so the heading's text is as far over the first cover as the column heads' over
    the list's (31 px, 30); no margin under it, its last row's 16 px under the cover and the group's 12 putting what's
    next 28 px down, as under the search's line (.lib-head) */
