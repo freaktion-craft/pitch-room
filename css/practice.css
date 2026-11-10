@@ -51,7 +51,7 @@
 .strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; touch-action: pan-y; }
 .strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--phrase); cursor: pointer; }
 .strip button:hover { background: var(--phrase-hover); }
-.strip button[aria-current="true"] { background: color-mix(in oklab, var(--play) 62%, var(--phrase)); } /* the one you're in, in your colour (Play's: a pastel as it is): fuller while it loops */
+.strip button[aria-current="true"] { background: color-mix(in oklab, var(--play) 85%, var(--phrase)); } /* the one you're in, in your colour (Play's: a pastel as it is), plainly apart from the rest: full while it loops */
 .strip.looping button[aria-current="true"] { background: var(--play); }
 .strip button.inspan { background: var(--phrase-hover); } /* a run of phrases looped together */
 .strip.looping button.inspan:not([aria-current="true"]) { background: color-mix(in oklab, var(--play) 50%, var(--phrase)); } /* the rest of the run, a step under it */
