@@ -74,12 +74,15 @@ function scIdle() {
 function scWords(res) {
   const K = res.notes.length, kn = { k: res.good, n: K };
   // (unread, or not clean for what wasn't read alone: the top, or under 60% read; a close note didn't stop it)
-  if (res.ok === -1 || (res.ok === 0 && res.miss + res.skip + res.short === 0)) return ["Couldn’t read that one", null, "Louder, nearer the mic.", null, ""];
+  if (res.ok === -1 || (res.ok === 0 && res.miss + res.skip + res.short + res.oct === 0)) return ["Couldn’t read that one", null, "Louder, nearer the mic.", null, ""];
   if (res.good === K) return ["All {n} on pitch", { n: K }, null, null, "good"];
   if (res.worst == null) return ["{k} of {n} on pitch", kn, null, null, ""]; // (the rest good, some not read)
   const wn = res.notes[res.worst], nm = { note: absName(wn.tgt) }, t = scTurnT();
   const near = t != null && Math.abs(wn.tgt - t) <= SC.turnNear, at = ["Lighter through your turn, {note}.", nm];
   if (wn.st === "skip") return ["{k} of {n} on pitch · skipped {note}", { ...kn, ...nm }, "Sing every note.", null, "bad"];
+  // (sung an octave off; where the rest was sung an octave from the piano, judged there, the rest's octave is the one)
+  if (wn.st === "oct") return [wn.c > 0 ? "{k} of {n} on pitch · {note} an octave up" : "{k} of {n} on pitch · {note} an octave down", { ...kn, ...nm },
+    res.o ? "Sing {note} in the same octave as the rest." : "Sing {note} in the piano’s octave.", nm, "bad"];
   if (res.drift) return [res.drift.dir < 0 ? "Flat throughout · −{c}¢" : "Sharp throughout · +{c}¢", { c: Math.abs(res.drift.c) }, "Match the first note to the piano.", null, "step"];
   if (wn.st === "miss") return ["{k} of {n} on pitch · missed {note}", { ...kn, ...nm }, ...(near ? at : ["Hear {note} in your head first.", nm]), "bad"];
   if (wn.st === "short") return ["{k} of {n} on pitch · {note} too short", { ...kn, ...nm }, "Give every note its beat.", null, "step"];
@@ -259,12 +262,13 @@ function scMark(g, st, x, y, c) {
     scHalo(g, C.orange, (u) => { g.beginPath(); g.moveTo(x, y + (up ? -hgt / 2 : hgt / 2)); g.lineTo(x + s / 2, y + (up ? hgt / 2 : -hgt / 2)); g.lineTo(x - s / 2, y + (up ? hgt / 2 : -hgt / 2)); g.closePath(); u ? g.stroke() : g.fill(); });
   } else if (st === "miss" || st === "skip") scHalo(g, C.bad, () => { g.beginPath(); g.moveTo(x - 4.5, y - 4.5); g.lineTo(x + 4.5, y + 4.5); g.moveTo(x + 4.5, y - 4.5); g.lineTo(x - 4.5, y + 4.5); g.stroke(); });
   else if (st === "short") scHalo(g, C.orange, () => { g.beginPath(); g.moveTo(x - 4, y); g.lineTo(x + 4, y); g.stroke(); }); // (a dash: too brief)
+  else if (st === "oct") scHalo(g, C.bad, () => { const e = c > 0 ? -5 : 5; g.beginPath(); g.moveTo(x, y - e); g.lineTo(x, y + e); g.moveTo(x - 4, y + 0.2 * e); g.lineTo(x, y + e); g.lineTo(x + 4, y + 0.2 * e); g.stroke(); }); // (an arrow the way it was sung)
   else scHalo(g, C.muted, (u) => { g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); if (!u) { g.lineWidth = 1.5; g.setLineDash([2, 2]); } g.stroke(); g.setLineDash([]); });
 }
 // Scales: a column a note of the key, its target a grey bar (as tall as ±25 c: on pitch inside it), the vowel's turn across
 // (a place, so grey); your trace in your colour, live as you sing, then each note's warped into its column with its mark
-// (good a green dot, close an orange ▲ sharp or ▼ flat, too short an orange dash, a miss or a skip a red ×, unread a
-// dashed ring). The set's keys by Go.
+// (good a green dot, close an orange ▲ sharp or ▼ flat, too short an orange dash, a miss or a skip a red ×, an octave off
+// a red arrow up or down on its target, unread a dashed ring). The set's keys by Go.
 function drawScale(now) {
   const cv = $("#scPad"), r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
   const w = Math.round(r.width * d), h = Math.round(r.height * d);
@@ -358,8 +362,8 @@ function drawScale(now) {
     }
   }
   // the strip: this set's keys (newest at its right), else the pattern's last 8 days. A key: going on, an ink ring; clean
-  // and nothing off, a green dot; clean with a note close, an orange ring; a note missed, skipped or too short, a red ×;
-  // else (not read), a dashed ring
+  // and nothing off, a green dot; clean with a note close, an orange ring; a note missed, skipped, too short or an octave
+  // off, a red ×; else (not read), a dashed ring
   const ks = SV.keys.slice(), now1 = R && R.phase !== "rest";
   if (ks.length || R) {
     const n = Math.floor((x1 - xMin) / 12) + 1, all = ks.length + (now1 ? 1 : 0), from = Math.max(0, all - n);
@@ -369,7 +373,7 @@ function drawScale(now) {
       if (!q) { g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.arc(x, ys, 4, 0, Math.PI * 2); g.stroke(); }
       else if (q.ok === 1 && !q.close) { g.fillStyle = C.good; g.beginPath(); g.arc(x, ys, 4, 0, Math.PI * 2); g.fill(); }
       else if (q.ok === 1) { g.strokeStyle = C.orange; g.beginPath(); g.arc(x, ys, 4, 0, Math.PI * 2); g.stroke(); }
-      else if (q.ok === 0 && q.miss + q.skip + q.short > 0) { g.strokeStyle = C.bad; g.beginPath(); g.moveTo(x - 3.5, ys - 3.5); g.lineTo(x + 3.5, ys + 3.5); g.moveTo(x + 3.5, ys - 3.5); g.lineTo(x - 3.5, ys + 3.5); g.stroke(); }
+      else if (q.ok === 0 && q.miss + q.skip + q.short + q.oct > 0) { g.strokeStyle = C.bad; g.beginPath(); g.moveTo(x - 3.5, ys - 3.5); g.lineTo(x + 3.5, ys + 3.5); g.moveTo(x + 3.5, ys - 3.5); g.lineTo(x - 3.5, ys + 3.5); g.stroke(); }
       else { g.strokeStyle = C.muted; g.lineWidth = 1.5; g.setLineDash([2, 2]); g.beginPath(); g.arc(x, ys, 4, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }
       if (i === SV.flip && i < all - 1) { g.strokeStyle = C.line; g.lineWidth = 1; const tx = Math.round(x + 6) + 0.5; g.beginPath(); g.moveTo(tx, ys - 7); g.lineTo(tx, ys + 7); g.stroke(); }
     }

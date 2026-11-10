@@ -80,13 +80,17 @@ function pitchAt(n, t, opts) {
 }
 // The response as the Lab keeps it: frames at fps (each ±10%), tracked; samples from the mute's end on, w the time since
 // the one before (≤ 100 ms, as voice.js); along: voiced time while the piano sounds; vEnd: the last voiced frame before
-// the mute's end. slip: one frame mid-note k read +12.
+// the mute's end. slip: the tracker's octave slip in note k: k, one frame mid-note read +12; or {k, ms, st}, the line read
+// st off (+12 if none) for ms about its core's middle (55% into the note).
 function sing(pat, root, opts, fps, seed) {
   const R = rng(seed * 7919 + 1), F = rng(seed * 104729 + fps);
   const { notes, muteAt } = plan(pat, root, opts, R);
   const end = Math.max(1000, ...notes.map((n) => n.t1)) + 1500, trk = tracker(), xs = [];
-  let t = muteAt - 200, along = 0, prevT = t, slipAt = null, vEnd = null;
-  if (opts.slip != null) { const n = notes.find((q) => q.k === opts.slip); slipAt = n ? (n.t0 + n.t1) / 2 : null; }
+  let t = muteAt - 200, along = 0, prevT = t, slip = null, vEnd = null;
+  if (opts.slip != null) {
+    const o = typeof opts.slip === "object" ? opts.slip : { k: opts.slip }, n = notes.find((q) => q.k === o.k), c = n && n.t0 + 0.55 * (n.t1 - n.t0);
+    if (n) slip = o.ms ? { a: c - o.ms / 2, b: c + o.ms / 2, st: o.st || 12 } : { a: (n.t0 + n.t1) / 2, b: Infinity, st: 12, once: true };
+  }
   while (t < end) {
     const dt = (1000 / fps) * (1 + 0.1 * (2 * F() - 1));
     t += dt;
@@ -95,7 +99,7 @@ function sing(pat, root, opts, fps, seed) {
     const cur = trk(raw, t), v = raw != null && cur != null;
     let m = v ? cur : null;
     if (t < 0) { if (v && !opts.leak) { along += Math.min(100, t - prevT); vEnd = t; } prevT = t; continue; } // (the piano's sounding: nothing kept)
-    if (m != null && slipAt != null && t >= slipAt) { m += 12; slipAt = null; }
+    if (m != null && slip && t >= slip.a && t < slip.b) { m += slip.st; if (slip.once) slip = null; }
     const p = xs[xs.length - 1];
     xs.push({ t, w: p ? Math.min(100, t - p.t) : 16, m, v });
     prevT = t;
@@ -261,24 +265,71 @@ for (const [c, need] of [[50, 0.97], [100, 0.85]]) {
   check("6. tempo and rubato: as clean (nothing off, ≤0.1% unread)", good + un === n && un <= 0.001 * n && ok === keys, `${pct(good, n)}, unread ${un}, ok ${pct(ok, keys)}`);
 }
 
-// 7. Octave errors
+// 7. Octave errors. A whole response an octave from the piano is judged in its own octave (7a, 7b). A note sung an octave
+// off is said to be (oct, about ±1200 c), the rest good, and the key isn't clean (7c, changed: it was unread, as if the
+// tracker's, so the key climbed on it, or, its top unread, the page told the singer to come nearer the mic). The tracker's
+// own slips never are: a frame (7d), or a few (7g).
 {
-  let a = 0, b = 0, c = 0, d = 0, keys = 0;
+  let a = 0, b = 0, c = 0, c2 = 0, cN = 0, d = 0, keys = 0;
+  // notes ks sung an octave off (sg: 1 up, −1 down): each oct, the rest good, not clean
+  const octAt = (r, ks, sg) => r.ok === 0 && r.notes.every((q) => (ks.includes(q.k) ? q.st === "oct" && Math.abs(q.c - sg * 1200) <= 30 : q.st === "good"));
   each((pat, root, fps, seed) => {
     keys++;
     const lo = run(pat, root, { oct: -12 }, fps, seed).r.res;
     if (lo.good === lo.notes.length && lo.o === -12 && lo.top === root + scSpan(pat) - 12) a++;
     const hi = run(pat, root, { oct: 12 }, fps, seed).r.res;
     if (hi.o === 12 && hi.good === hi.notes.length) b++;
-    const one = run(pat, root, { octNote: 1 }, fps, seed).r.res;
-    if (one.notes.every((q) => (q.k === 1 ? q.st === "unread" : q.st === "good"))) c++;
+    if (octAt(run(pat, root, { octNote: 1 }, fps, seed).r.res, [1], 1)) c++;
+    // (down where that's no neighbour's note: on one, it's 7e's)
+    if (![pat.st[0], pat.st[2]].includes(pat.st[1] - 12)) { cN++; if (octAt(run(pat, root, { wrong: { k: 1, st: -12 } }, fps, seed).r.res, [1], -1)) c2++; }
     const clean = run(pat, root, {}, fps, seed).r.res, slip = run(pat, root, { slip: 2 }, fps, seed).r.res;
     if (slip.notes.every((q, i) => q.st === clean.notes[i].st && Math.abs(q.c - clean.notes[i].c) <= 3)) d++;
   });
   check("7a. the whole pattern −12: all good, o −12, top in the sung octave", a === keys, pct(a, keys));
   check("7b. the whole pattern +12: all good, o +12", b === keys, pct(b, keys));
-  check("7c. one whole note +12: it unread, the rest good", c === keys, pct(c, keys));
+  check("7c. one whole note +12: it an octave up (+1200 ± 30 c), the rest good, ok 0 (was: it unread)", c === keys, pct(c, keys));
+  check("7c. … −12, where that's no neighbour's note: it an octave down, the rest good, ok 0", c2 === cN, pct(c2, cN));
   check("7d. a one-frame +12 slip: no change", d === keys, pct(d, keys));
+  // 7e. An octave leap not taken: a note reached by one sung on the note before it (Octaves' 8 left on its 1, or its 1 on
+  // its 8; the octave leaps' 8 on their 1). Its pitch runs on from the note before, so it's that note held, by pitch: only
+  // time says it was sung (scAlign, as 8d: the run holds both notes' time), and with this singer's ±22% lengths and three
+  // or four notes to measure them by, some read as skipped. Never clean. (Not before the last note, as 8d.)
+  let n = 0, nr = 0, ok1 = 0, oc = 0;
+  each((pat, root, fps, seed) => {
+    const K = pat.st.length;
+    for (let k = 1; k < K - 1; k++) {
+      const st = pat.st[k - 1] - pat.st[k];
+      if (Math.abs(st) !== 12) continue;
+      const r = run(pat, root, { wrong: { k, st } }, fps, seed).r.res;
+      n++; if (r.ok === 1) ok1++;
+      if (k === K - 2) continue;
+      nr++; if (octAt(r, [k], Math.sign(st))) oc++;
+    }
+  });
+  check("7e. an octave leap not taken (sung on the note before): never ok 1", ok1 === 0, `${ok1} of ${n}`);
+  check("7e. … it an octave off, the rest good: ≥80%", oc >= 0.8 * nr, pct(oc, nr));
+  // 7f. The wide patterns: 2 octaves' bottom note sung an octave up (or its bottom two), its top an octave down; 1.5
+  // octaves' last note up; the tops of 9 down, Octave down, Arpeggio down and Arpeggio an octave down
+  const WIDE = { arp2: [[[12], 1], [[11, 12], 1], [[6], -1]], ros: [[[12], 1]], d9: [[[0], -1]], d8: [[[0], -1]], da8: [[[0], -1]], arp: [[[3], -1]] };
+  let w = 0, wN = 0;
+  each((pat, root, fps, seed) => {
+    for (const [ks, sg] of WIDE[pat.id] || []) {
+      wN++; if (octAt(run(pat, root, { cents: (k) => (ks.includes(k) ? sg * 1200 : 0) }, fps, seed).r.res, ks, sg)) w++;
+    }
+  });
+  check("7f. wide: 2 octaves' bottom (or bottom two) up, its top down, the tops of the descents down: each an octave off, the rest good, ok 0", w === wN, pct(w, wN));
+  // 7g. The tracker's slip of a few frames: the line an octave off (up, down) for 100 ms (3 frames at 30 fps) in note 2 of
+  // quick notes (300–350 ms), where it's most of the note's core, so what the core reads: never put on the singer (not an
+  // octave off, missed, skipped nor too short): good or unread, now and then close on its own pitch
+  let s = 0, sN = 0, su = 0, bad = [];
+  each((pat, root, fps, seed) => {
+    for (const st of [12, -12]) {
+      const q = run(pat, root, { slip: { k: 2, ms: 100, st }, len: (k, R) => 300 + 50 * R() }, fps, seed).r.res.notes[2];
+      sN++; if (q.st === "unread") su++;
+      if (q.st === "good" || q.st === "close" || q.st === "unread") s++; else if (bad.length < 3) bad.push(`${pat.id}@${fps}#${seed} ${st > 0 ? "+" : "−"}: ${q.st}`);
+    }
+  });
+  check("7g. a 100 ms octave slip mid-note: good, close or unread, never the singer's", s === sN, `${pct(s, sN)}, unread ${su}` + (bad.length ? "; " + bad.join(", ") : ""));
 }
 
 // 8. A missed note
@@ -300,7 +351,8 @@ for (const [c, need] of [[50, 0.97], [100, 0.85]]) {
     if (both ? st.ok !== 1 && st.skip > 0 : st.notes.every((q) => (q.k >= half ? q.st === "skip" : q.st === "good"))) c++;
   });
   // (a neighbour sung over half as long again as the singer's median note holds the dropped note's time: read as sung
-  // there, on its pitch, a miss. With this singer's ±22% lengths and three or four notes to take a median of, a few do.)
+  // there, on its pitch, a miss, or on Octaves an octave off. With this singer's ±22% lengths and three or four notes to
+  // take a median of, a few do.)
   check("8a. a dropped note: never ok 1", a1 === keys, pct(a1, keys));
   check("8a. … skipped, its neighbours good: ≥97%", a >= 0.97 * keys, pct(a, keys));
   check("8b. a note sung +1 st: a miss of 90–110 c, the rest good", b === keys, `${pct(b, keys)}; c ${Math.min(...cs)}…${Math.max(...cs)}`);
@@ -335,10 +387,11 @@ for (const [c, need] of [[50, 0.97], [100, 0.85]]) {
     if (!al.xs.some((s) => s.m != null) && scOnset(al.xs, 0) == null && al.along >= SC.along) a++;
     const hs = sing(pat, root, { along: true, hold: 1000 }, fps, seed), ho = respond(hs, N);
     // (the held note: the inner notes on another key skipped, or, between two on the held key, given its time and so a
-    // miss on it (an alternation's); where the pattern has its key once, from the top down, one note heard is no response,
-    // as a sound before singing: the page then says "Sang with the piano", along)
+    // miss on it, or an octave off where it's the octave (an alternation's: Fifths', Octaves'); where the pattern has its
+    // key once, from the top down, one note heard is no response, as a sound before singing: the page then says "Sang with
+    // the piano", along)
     const once = N.filter((m) => m === N[K - 1]).length === 1;
-    if (ho ? ho.res.ok === 0 && ho.res.notes.slice(1, K - 1).every((q) => q.st === "skip" || q.tgt === N[K - 1] || (q.st === "miss" && N.slice(0, q.k).includes(N[K - 1]))) : once) b++;
+    if (ho ? ho.res.ok === 0 && ho.res.notes.slice(1, K - 1).every((q) => q.st === "skip" || q.tgt === N[K - 1] || ((q.st === "miss" || q.st === "oct") && N.slice(0, q.k).includes(N[K - 1]))) : once) b++;
     if ((!ho || ho.res.ok !== 1) && (!ho || ho.early) && hs.along >= SC.along) bOk++;
     const lk = sing(pat, root, { leak: true }, fps, seed);
     if (!lk.xs.some((s) => s.m != null) && respond(lk, N) == null) c++;

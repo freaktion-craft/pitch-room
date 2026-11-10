@@ -27,7 +27,19 @@ const SC = {
                                 //   too (midway: nearer both than one); sooner where a sliver of the neighbour was heard
                                 //   near its pitch (some sign it was sung there; 0.25 took 2% of dropped notes for misses)
   squeeze: 0.5,                 // a run under this share of its note's time is a sliver (squeezed)
-  octSlip: 11,                  // st: a core this far from its target is an octave slip (sung or tracked): unread
+  octSlip: 11,                  // st: a core this far from its target is an octave or more off: sung an octave off (oct)
+                                //   within octNear of the octave and held there octHeld, else unread (the tracker's)
+  octNear: 1,                   // st: how near the octave: out to octSlip (12 − 1), so no core between a miss and the octave
+                                //   is left unread; past 13 st it's no note's octave: unread
+  octHeld: 150,                 // ms pitched near that octave in the note's whole run, else the tracker's: stage.js shows
+                                //   an octave error once it's lasted its 50 ms leap hold, for as long as it lasts, a few
+                                //   frames (4 at 30 fps: 133 ms); a note sung an octave off holds it all but that 50 ms
+                                //   (synthetic: 95% of quick 200–250 ms notes named, all from 300 ms)
+  octPen: 1.6,                  // st: in scAlign, a sample an octave from a note costs as if this far off it (plus how far
+                                //   it is from the octave). Under clip: a note sung an octave off keeps its own run, not
+                                //   given to a neighbour or skipped. Over √(skip / minNote) ≈ 1.36: the shortest run an
+                                //   octave from a note still costs more than leaving that note out (346 to 250), so no
+                                //   sliver of a neighbour an octave apart stands in for a note not sung (1.0 did: 8c, 9b)
   octFit: 3,                    // st: in finding the octave sung, a sample's distance to its nearest note counts this far
                                 //   at most (a semitone off still fits better than a fourth; a wrong note can't swing it)
   start: 80, startWin: 120,     // ms pitched within ms: the response has begun
@@ -141,16 +153,17 @@ function scCentre(xs, a, b) {
 
 // The response cut into its notes, in order. P: the pitched samples {t, w, m}; T: the targets. Each note gets a run of
 // samples in a row, or none (not sung); every sample belongs to a note. Cost: each sample's w·min(d², clip²) against its
-// note, SC.skip for each note not sung, and SC.skip too for a note whose run is too short to read (under SC.minNote ms
+// note (an octave off it, as if SC.octPen st off: sung an octave off, a note's run is still nearer its own note than any
+// other), SC.skip for each note not sung, and SC.skip too for a note whose run is too short to read (under SC.minNote ms
 // pitched: it's skipped anyway). Otherwise a frame or two would stand in for a skipped note, and a note sung a semitone
 // towards its neighbour, or an octave off, could be swallowed by that neighbour. The cheapest cut (a segment DP, linear
 // in the samples). Returns, a note each, {i0, i1} (its first and last sample) or null.
 function scAlign(P, T) {
-  const n = P.length, K = T.length, cl = SC.clip * SC.clip, out = T.map(() => null);
+  const n = P.length, K = T.length, cl = SC.clip * SC.clip, op = SC.octPen * SC.octPen, out = T.map(() => null);
   if (!n) return out;
   const S = T.map((tk) => { // S[k][i]: the cost of samples 0…i−1 against note k
     const a = new Float64Array(n + 1);
-    for (let i = 0; i < n; i++) { const d = P[i].m - tk; a[i + 1] = a[i] + P[i].w * Math.min(d * d, cl); }
+    for (let i = 0; i < n; i++) { const d = P[i].m - tk, e = Math.abs(d) - 12; a[i + 1] = a[i] + P[i].w * Math.min(d * d, e * e + op, cl); }
     return a;
   });
   const Wt = new Float64Array(n + 1);
@@ -291,13 +304,15 @@ function scOctave(P, N) {
 // The whole response's octave o first (sung an octave from the piano is judged there); then each note's core (scCentre:
 // its voice's start and end trimmed off) against its target T: good within SC.good cents, close within SC.close, else a
 // miss; skip: not sung (under SC.minHeard ms voiced, or SC.minNote long); short: heard, but voiced under SC.minNote (too
-// brief to read: a fault, not an unknown); unread: voiced long enough but too little pitch in its core, or an octave off
-// (the tracker), or (early) sung before reading began. ok: 1 clean (no miss, skip or short, 60% read, the top note read),
-// 0 not, −1 too little read. top: a clean key's top where that note was good (the highest key sung cleanly), else null.
+// brief to read: a fault, not an unknown); oct: its core an octave off (SC.octNear), held there SC.octHeld ms: sung an
+// octave off, not on pitch (c: ±1200 or so); unread: voiced long enough but too little pitch in its core, or far off and
+// not that (an octave off too briefly: the tracker's), or (early) sung before reading began. ok: 1 clean (no miss, skip,
+// short or octave off, 60% read, the top note read), 0 not, −1 too little read. top: a clean key's top where that note was
+// good (the highest key sung cleanly), else null.
 function scJudge(xs, N, opts = {}) {
   const K = N.length, P = xs.filter((s) => s.m != null);
   const tz = { k: 0, n: 0 }, rs = { k: 0, n: 0 };
-  const res = { ok: -1, o: 0, T: N.slice(), notes: [], good: 0, close: 0, miss: 0, skip: 0, short: 0, unread: 0, judged: 0, heard: 0, clean: false, top: null, worst: null, drift: null, tz, rs };
+  const res = { ok: -1, o: 0, T: N.slice(), notes: [], good: 0, close: 0, miss: 0, skip: 0, short: 0, oct: 0, unread: 0, judged: 0, heard: 0, clean: false, top: null, worst: null, drift: null, tz, rs };
   if (P.reduce((u, s) => u + s.w, 0) < SC.minCore) {
     res.notes = N.map((tgt, k) => ({ k, tgt, a: null, b: null, m: null, c: null, st: "unread" }));
     res.unread = K;
@@ -314,6 +329,8 @@ function scJudge(xs, N, opts = {}) {
     const a = pv ? (P[pv.i1].t + P[g.i0].t) / 2 : P[g.i0].t - P[g.i0].w, b = nx ? (P[g.i1].t + P[nx.i0].t) / 2 : P[g.i1].t;
     bounds[k] = [a, b];
   });
+  // the time in (a, b] pitched within tol st of m (each sample's part of it, as scCentre)
+  const near = (a, b, m, tol) => { let w = 0; for (const s of xs) if (s.m != null && Math.abs(s.m - m) <= tol) w += Math.max(0, Math.min(s.t, b) - Math.max(s.t - s.w, a)); return w; };
   for (let k = 0; k < K; k++) {
     const note = { k, tgt: T[k], a: null, b: null, m: null, c: null, st: "skip" };
     res.notes.push(note);
@@ -329,7 +346,15 @@ function scJudge(xs, N, opts = {}) {
     if (d < SC.minNote) { note.st = "short"; continue; } // (sung too briefly to be read: the singer's, not the tracker's)
     const ca = va + Math.min(SC.onset, SC.onsetShare * d), cb = vb - Math.min(SC.release, SC.releaseShare * d);
     const med = scCentre(xs, ca, cb);
-    if (med.v == null || med.wt < SC.minCore || Math.abs(med.v - T[k]) >= SC.octSlip) { note.st = "unread"; note.m = med.v; continue; }
+    if (med.v == null || med.wt < SC.minCore) { note.st = "unread"; note.m = med.v; continue; }
+    const dv = med.v - T[k];
+    if (Math.abs(dv) >= SC.octSlip) {
+      // an octave off: the singer's where the note's whole run held it (a slip of the tracker's lasts a few frames, though
+      // in the core it can be most of it), else unread
+      note.m = med.v;
+      if (Math.abs(Math.abs(dv) - 12) <= SC.octNear && near(a, b, med.v, SC.clip) >= SC.octHeld) { note.st = "oct"; note.c = Math.round(100 * dv); } else note.st = "unread";
+      continue;
+    }
     note.m = med.v; note.c = Math.round(100 * (med.v - T[k]));
     const ac = Math.abs(note.c);
     note.st = ac <= SC.good ? "good" : ac <= SC.close ? "close" : "miss";
@@ -337,9 +362,12 @@ function scJudge(xs, N, opts = {}) {
   // an unread note whose little core sits on a neighbour's note (as near it as good is, and over half a step from its
   // own) where that neighbour was sung good: a piece of the neighbour's run (cut off it where they're a semitone apart,
   // and too short to read), so not sung: skipped (unread, it would let a key with a note left out be clean). (Not beside
-  // a close one: a key sung sharp throughout gives its notes' runs to the semitone above, and that's for drift to say.)
+  // a close one: a key sung sharp throughout gives its notes' runs to the semitone above, and that's for drift to say.
+  // Nor one read an octave off where its run held its own note SC.minCore ms: sung, and the tracker's slip landed on an
+  // alternation's other note.)
   res.notes.forEach((nt, k) => {
     if (nt.st !== "unread" || nt.m == null || Math.abs(nt.m - nt.tgt) <= 0.5) return;
+    if (Math.abs(nt.m - nt.tgt) >= SC.octSlip && near(nt.a, nt.b, nt.tgt, SC.clip) >= SC.minCore) return;
     const by = [k - 1, k + 1].find((j) => j >= 0 && j < K && res.notes[j].st === "good" && 100 * Math.abs(nt.m - T[j]) <= SC.good);
     if (by != null) { nt.st = "skip"; nt.m = null; }
   });
@@ -348,23 +376,24 @@ function scJudge(xs, N, opts = {}) {
   // falling off: judged only where it's good, else unread (a pattern from its top: its top)
   res.heard = res.notes.filter((nt) => nt.st !== "skip").length;
   if (opts.early) for (const nt of res.notes) {
-    if (nt.st !== "skip" && nt.st !== "short") { if (nt.st === "miss" || nt.st === "close") nt.st = "unread"; break; }
+    if (nt.st !== "skip" && nt.st !== "short") { if (nt.st === "miss" || nt.st === "close" || nt.st === "oct") nt.st = "unread"; break; }
     nt.st = "unread";
   }
   for (const nt of res.notes) res[nt.st]++;
-  res.judged = res.good + res.close + res.miss + res.skip + res.short;
+  res.judged = res.good + res.close + res.miss + res.skip + res.short + res.oct;
   if (res.unread > SC.unread * K) { res.ok = -1; }
   else {
     const top = Math.max(...T), tops = res.notes.filter((nt) => nt.tgt === top);
-    res.clean = res.miss === 0 && res.skip === 0 && res.short === 0 && res.good + res.close >= Math.ceil(SC.readMin * K)
+    res.clean = res.miss === 0 && res.skip === 0 && res.short === 0 && res.oct === 0 && res.good + res.close >= Math.ceil(SC.readMin * K)
       && tops.every((nt) => nt.st === "good" || nt.st === "close");
     res.ok = res.clean ? 1 : 0;
     res.top = res.clean && tops.every((nt) => nt.st === "good") ? top : null;
   }
-  // the worst: the first note skipped, else the miss furthest off, else the first too short, else the close furthest off
+  // the worst: the first note skipped, else the first an octave off (further than any miss), else the miss furthest off,
+  // else the first too short, else the close furthest off
   const far = (st) => { let w = null; for (const nt of res.notes) if (nt.st === st && (w == null || Math.abs(nt.c) > Math.abs(res.notes[w].c))) w = nt.k; return w; };
   const first = (st) => { const nt = res.notes.find((q) => q.st === st); return nt ? nt.k : null; };
-  res.worst = first("skip") ?? far("miss") ?? first("short") ?? far("close");
+  res.worst = first("skip") ?? first("oct") ?? far("miss") ?? first("short") ?? far("close");
   // the whole key off one way: the notes heard (close or missed alike) off by much the same amount the same way, so the
   // key was sung out of tune, not a note got wrong (one note wrong leaves the median near 0; several wrong ones, a
   // spread). Reported where nothing was skipped and not every note was good. (A note read short doesn't stop it: sung

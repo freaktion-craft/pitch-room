@@ -239,6 +239,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Again, a few notes lower.": "다시, 몇 음 낮게.", "Hardest at your turn: try Smooth.": "전환음에서 가장 어려웠어요: 다듬기로 연습해요.",
   "Sang with the piano": "피아노와 같이 불렀어요", "Sing after it, not with it.": "피아노가 끝난 뒤에 불러요.",
   "{k} of {n} on pitch · {note} too short": "{n}음 중 {k}음 정확 · {note} 너무 짧음", "Give every note its beat.": "음마다 한 박씩 채워요.",
+  "{k} of {n} on pitch · {note} an octave up": "{n}음 중 {k}음 정확 · {note} 한 옥타브 위", "{k} of {n} on pitch · {note} an octave down": "{n}음 중 {k}음 정확 · {note} 한 옥타브 아래",
+  "Sing {note} in the piano’s octave.": "{note} 음을 피아노와 같은 옥타브로 불러요.", "Sing {note} in the same octave as the rest.": "{note} 음도 나머지 음과 같은 옥타브로 불러요.",
   "Wait for the piano to finish.": "피아노가 끝날 때까지 기다려요.",
   // library and adding a song
   "Stems": "스템",
