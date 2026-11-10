@@ -151,9 +151,7 @@ header { position: relative; }
 .set-nav button { height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: none; color: var(--muted);
   font: var(--text-md)/20px var(--font); text-align: left; cursor: pointer; transition: background-color var(--duration-fast), color var(--duration-fast); }
 .set-nav button:hover { background: var(--fill); color: var(--ink); }
-.set-nav button[aria-current="true"] { position: relative; background: var(--fill); color: var(--ink); }
-/* the one being read: a short bar at its left in your colour (3 px wide, 7 px in from its top and bottom: drawing) */
-.set-nav button[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: var(--radius-pill); background: var(--voice-mark); }
+.set-nav button[aria-current="true"] { background: var(--fill); color: var(--ink); } /* the one being read (no bar at its left: it wasn't wanted) */
 .set-nav button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 @media (max-width: 720px) { .set-layout { grid-template-columns: minmax(0, 1fr); } .set-nav { display: none; } }
 /* Song tools (paintTools): its buttons side by side; under the row, while it's busy or after a Check, the install's bar
