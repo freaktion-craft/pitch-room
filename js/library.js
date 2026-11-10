@@ -983,7 +983,7 @@ function paintContLine(box, m) {
 // Practice, as the Studio's: it says on itself what it's doing meanwhile (singSong); the song as the list has it then.
 // Shown with its row's hover (CSS); what it says when it couldn't stays in sight a moment (.said), pointed at or not.
 function contSing(id) {
-  const b = el("button", "btn sm lc-sing"), t = el("span", "txt");
+  const b = el("button", "btn sm primary lc-sing"), t = el("span", "txt"); // (the main button, as the list's row's Practice is: shown only on its row's hover, so it can be)
   b.type = "button"; b.append(icon("practice"), t); say(t, "Practice");
   b.setAttribute("aria-label", tr("Practice {title}", { title: libCache.get(id)?.title || "" }));
   b.onclick = async () => {
