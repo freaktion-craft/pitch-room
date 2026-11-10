@@ -121,6 +121,11 @@
     --on-key-w-voice: var(--on-key-down);
     --key-w-hover: oklch(from var(--voice) var(--key-w-tint) min(c * 0.3, (1 - var(--key-w-tint)) * 0.47) h);
     --key-b-hover: oklch(from var(--voice) var(--key-b-tint) calc(c * min(0.45, var(--key-b-tint) / l)) h); }
+  /* a pastel (Pink, Sky: data-pastel, set with the accent) on a white key: bright and clear, --key-w-pastel and a soft
+     chroma (deepened to the others' lightness it read dark and dusty), the C's label dark on it in either theme. By
+     data-pastel, not by how light your colour is: the dark theme's orange, amber, green and teal are lighter than 0.7
+     too, and Mono's lighter still (with no hue: a floor under its chroma made its key pink) */
+  :root[data-pastel] .keys { --key-w-voice: oklch(from var(--voice) min(l, var(--key-w-pastel)) max(c, 0.09) h); --on-key-w-voice: var(--on-voice); }
 }
 .key.guide.w { background: var(--key-w-on); }
 .key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }

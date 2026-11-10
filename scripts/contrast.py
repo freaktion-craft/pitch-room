@@ -486,14 +486,15 @@ def chip_pairs(t, p3):
     return out
 
 
-def keys(stage):
+def keys(stage, pick=".keys"):
     """Your colour on the piano's keys (stage.css's .keys: --key-w-voice, --key-b-voice held, --key-w-hover,
-    --key-b-hover pointed at), as a browser with relative colour has them (its @supports rule over the plain one)."""
+    --key-b-hover pointed at), as a browser with relative colour has them (its @supports rule over the plain one); pick:
+    the rule read (":root[data-pastel] .keys": what a pastel has over the others', KEYS_PASTEL)."""
     out = {}
     for want_media in (False, True):
         for sel, media, decls in blocks(stage):
             if bool(media) == want_media and (not media or media.startswith("@supports")) and \
-                    ".keys" in [s.strip() for s in sel.split(",")]:
+                    pick in [s.strip() for s in sel.split(",")]:
                 out.update(decls)
     return out
 
@@ -503,14 +504,17 @@ def key_pairs(t, k):
     white key and on a black key as .keys works it out (no lighter than --key-w-lit, no darker than --key-b-lit), held
     down: 3:1 on the key; the C's label on it (--on-key-down, with Mono's text on it as stage.js sets it): 4.5:1."""
     w, b = resolve(t, t["--key-w-voice"]), resolve(t, t["--key-b-voice"])
-    return [("key w held", w, resolve(t, t["--key-w"]), 3), ("key b held", b, resolve(t, t["--key-b"]), 3),
-            ("key w label", resolve(t, t["--on-key-down"]), w, 4.5)]
+    # (a pastel's white key is kept bright and clear, --key-w-pastel, the owner's call: it isn't held to 3:1 on the
+    # key, and its label is the dark text, --on-key-w-voice)
+    held = [] if k in PASTELS else [("key w held", w, resolve(t, t["--key-w"]), 3)]
+    return held + [("key b held", b, resolve(t, t["--key-b"]), 3), ("key w label", resolve(t, t["--on-key-w-voice"]), w, 4.5)]
 
 
 # the pastels in the light theme: their ink and text are soft shades of them (tokens.css), kept for their look over
 # contrast (the owner's call), so text there is held to 3:1 and a field's hint and marks to 2.5:1
 PASTELS = ("pink", "sky")
 PASTEL_NEED = {4.5: 3, 3: 2.5}
+KEYS_PASTEL = {}  # what a pastel's keys have over the others' (":root[data-pastel] .keys" in stage.css: read in main)
 
 
 def pastel(t, css, light, vibrant, k):
@@ -530,6 +534,8 @@ def rows(css, ks, light, p3, vibrant=False):
     out, t0 = [], {**theme(css, light, p3, vibrant=vibrant), **ks}
     for k in ACCENTS:
         t = pastel(painted(t0, k), css, light, vibrant, k)
+        if k in PASTELS:  # (data-pastel's keys, in either theme: stage.css)
+            t.update(KEYS_PASTEL)
         base = colour(t, "--surface", p3)
         for fg, bg, need, *only in PAIRS:
             if only and only[0] != k:
@@ -593,6 +599,8 @@ def hues(css, ks, light, p3, vibrant, names, skip=()):
         if k == "white":
             continue
         t = pastel(painted(t0, k), css, light, vibrant, k)
+        if k in PASTELS:  # (data-pastel's keys, in either theme: stage.css)
+            t.update(KEYS_PASTEL)
         h0 = oklch_of(resolve(t, "var(--voice)"))[2]
         for name in names:
             if t[name].strip() in [f"var({x})" for x in skip]:
@@ -631,6 +639,7 @@ def main():
     css, stage = (open(f, encoding="utf-8").read() for f in (TOKENS, STAGE))
     try:
         bad, ks = mono(css), keys(stage)
+        KEYS_PASTEL.update(keys(stage, ":root[data-pastel] .keys"))
         for vibrant, light in ((False, False), (False, True), (True, False), (True, True)):
             for p3 in (False, True):
                 name = ("light" if light else "dark") + (" P3" if p3 else "") + (" vibrant" if vibrant else "")

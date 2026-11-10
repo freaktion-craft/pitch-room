@@ -74,7 +74,7 @@
      lighter than --key-b-lit already); the C's label on it white (--on-key-down). Pointed at, a tint of it, as light for
      every colour (--key-w-tint, --key-b-tint): plainly lighter than held, and on a white key between its face and the
      guide's grey */
-  --key-w-lit: 0.52; --key-b-lit: 0.5; --key-w-tint: 0.8; --key-b-tint: 0.4; --on-key-down: oklch(1 0 0);
+  --key-w-lit: 0.52; --key-w-pastel: 0.84; --key-b-lit: 0.5; /* (--key-w-pastel: Pink and Sky held on a white key stay light and clear: deepened, they read dark and dusty) */ --key-w-tint: 0.8; --key-b-tint: 0.4; --on-key-down: oklch(1 0 0);
   /* a key in the library, in a chip of its Camelot hue (stems.css): its ink's and its chip's lightness and chroma,
      a minor key's dimmer, and how much of the chip shows */
   --chip-major-ink: 0.86 0.09; --chip-major-bg: 0.78 0.13; --chip-minor-ink: 0.76 0.08; --chip-minor-bg: 0.64 0.11; --chip-a: 0.16;
@@ -168,7 +168,7 @@
   --key-w: oklch(1 0 0); --key-b: oklch(0.3 0 0); --key-w-on: oklch(0.86 0 0); --key-b-on: oklch(0.12 0 0);
   /* (the colours are 3:1 on white already: the pastels go deeper on a white key, Mono's near-black lighter on a black one;
      the label as on your colour) */
-  --key-w-lit: 0.66; --key-b-lit: 0.6; --key-w-tint: 0.93; --key-b-tint: 0.44; --on-key-down: var(--on-voice);
+  --key-w-lit: 0.66; --key-w-pastel: 0.84; --key-b-lit: 0.6; --key-w-tint: 0.93; --key-b-tint: 0.44; --on-key-down: var(--on-voice);
   --chip-major-ink: 0.45 0.1; --chip-major-bg: 0.7 0.12; --chip-minor-ink: 0.5 0.06; --chip-minor-bg: 0.6 0.06; --chip-a: 0.14;
   --sung-lo: 0.5; --sung-hi: 0.64; --sung-c: 0.12; /* (Pink and Sky deepened to 0.64 went dusty, near the unsung ink: a clear rose and blue) */ /* Mono (near-black) goes grey, or the sung part's the ink; baby pink deeper, so it reads (3.2:1) */
   --aurora: 0.55;
