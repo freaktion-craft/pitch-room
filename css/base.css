@@ -561,12 +561,12 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(-
    in may set its own --fader-fill (a Studio track that's out of the mix: grey), so that's not set on the input */
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; max-width: 100%; height: var(--control-sm); margin: 0; background: transparent; --p: 0%; }
 input[type="range"]::-webkit-slider-runnable-track { height: var(--fader); border-radius: var(--radius-2xs);
-  background: linear-gradient(to right, var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)) var(--p), var(--fill) var(--p)); }
+  background: linear-gradient(to right, var(--fader-fill, var(--slider-fill)) var(--p), var(--fill) var(--p)); }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: var(--thumb); height: var(--fader); border: 0; border-radius: var(--radius-xs); background: var(--ink);
   transition: background-color var(--duration-fast); }
 input[type="range"].hot::-webkit-slider-thumb { background: var(--knob-hot); }
 input[type="range"]::-moz-range-track { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fill); }
-input[type="range"]::-moz-range-progress { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)); }
+input[type="range"]::-moz-range-progress { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fader-fill, var(--slider-fill)); }
 input[type="range"]::-moz-range-thumb { width: var(--thumb); height: var(--fader); border: 0; border-radius: var(--radius-xs); background: var(--ink); transition: background-color var(--duration-fast); }
 input[type="range"].hot::-moz-range-thumb { background: var(--knob-hot); }
 input[type="range"]:disabled { opacity: 0.4; }

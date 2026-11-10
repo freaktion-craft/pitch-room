@@ -420,9 +420,9 @@ def rows(css, light, p3, vibrant=False):
     out, t0 = [], theme(css, light, p3, vibrant=vibrant)
     for k in ACCENTS:
         t = painted(t0, k)
-        if light and k in PASTELS:  # data-pastel's block over them (set with the accent: stage.js)
+        if light and vibrant and k in PASTELS:  # data-pastel's block over them (set with the accent: stage.js; Vibrant only)
             for sel, media, decls in blocks(css):
-                if not media and ':root[data-theme="light"][data-pastel]' in [s.strip() for s in sel.split(",")]:
+                if not media and ':root[data-theme="light"][data-pastel][data-tone="vibrant"]' in [s.strip() for s in sel.split(",")]:
                     t.update(decls)
         base = colour(t, "--surface", p3)
         for fg, bg, need, *only in PAIRS:
