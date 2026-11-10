@@ -19,6 +19,14 @@
 .seg button { min-width: 48px; height: var(--control-sm); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--text-sm); }
 .seg button:hover { color: var(--ink); }
 .seg button[aria-checked="true"] { background: var(--seg-on); color: var(--ink); box-shadow: var(--shadow-seg); } /* the picked one stands up off the track (was the buttons' grey: in light, darker than the card, so it read as pressed in) */
+/* ...on one surface that slides to each pick (js/helpers.js puts it under the picked button: --seg-x, --seg-w) */
+.seg { position: relative; isolation: isolate; }
+.seg::before { content: ""; position: absolute; z-index: -1; top: var(--space-half); bottom: var(--space-half); left: 0; width: var(--seg-w, 0); transform: translateX(var(--seg-x, 0)); border-radius: var(--radius-sm); background: var(--seg-on); box-shadow: var(--shadow-seg); opacity: 0; transition: transform var(--duration-slow) var(--ease), width var(--duration-slow) var(--ease); }
+.seg.seg-slid::before { opacity: 1; }
+.seg.seg-slid button[aria-checked="true"] { background: transparent; box-shadow: none; }
+.seg button { transition: color var(--duration-fast); }
+.seg.seg-snap::before { transition: none; }
+@media (prefers-reduced-motion: reduce) { .seg::before { transition: none; } }
 /* set to anything but both ears for all (and your voice off): a dot on the button, so a quiet ear isn't a mystery */
 #kEars { position: relative; }
 #kEars.set::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--voice); }
