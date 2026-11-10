@@ -231,6 +231,10 @@
    a main button's fill is (not deepened to a mark's 0.66, which went mauve), its glyph the deep shade a main button's
    text is; pointed at, a step deeper in the same hue */
 :root[data-theme="light"][data-pastel][data-tone="vibrant"] { --play: var(--voice); --on-play: var(--voice-deep); --play-hover: var(--voice-press); }
+/* Vibrant, light: the ink's a shade of your colour, so the sung words go deeper and fuller than it (a pastel a clear,
+   full rose or blue): they part from the unsung by colour as well as lightness, and the line you're on stays the
+   strongest (the unsung part greyed instead read duller than the lines after it) */
+:root[data-theme="light"][data-tone="vibrant"] { --sung-hi: 0.58; --sung-c: 0.15; }
 /* Vibrant: Play and a slider's filled part in your colour (off, they're the ink: above) */
 :root[data-tone="vibrant"], :root[data-tone="vibrant"] .theme-dark {
   --play: var(--voice-mark); --on-play: var(--on-voice); --play-hover: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong));
