@@ -71,9 +71,10 @@ function resetOnDblClick(input, def) {
   addEventListener("scroll", () => { if (!held) { show(null); if (hotOne) hot(hotOne, false); } }, { passive: true, capture: true }); // (a box scrolled too: Settings' list)
 })();
 // Tooltips: a title drawn as the phrase strip's tip is (an ink chip over the thing, a moment after the pointer rests
-// on it; at once while one's just been showing), not the system's. While it's pointed at, its title waits in
-// data-tipped (so the system's doesn't show too) and goes back after, so code that sets or reads titles is as it was.
-// A key in brackets, "(L)", is set apart in the chip, muted.
+// on it; at once while one's just been showing, so sliding along the piano's keys names each as it's reached, with no
+// frame between them without one), not the system's. None while a button's held (a drag, a glissando on the keys).
+// While it's pointed at, its title waits in data-tipped (so the system's doesn't show too) and goes back after, so code
+// that sets or reads titles is as it was. A key in brackets, "(L)", is set apart in the chip, muted.
 (function tooltips() {
   const DELAY = 500, WARM = 400, GAP = 8, EDGE = 8;
   const KEY = /\s?\(((?:(?:Ctrl|Shift|Alt|⌘)\+)*(?:[A-Z0-9←→↑↓]|Space|Home|End|Enter|Esc|Tab))\)/;
@@ -97,12 +98,12 @@ function resetOnDblClick(input, def) {
     if (!keep && on) { give(on); on = null; }
   }
   document.addEventListener("pointerover", (e) => {
-    const n = e.pointerType === "touch" ? null : e.target.closest?.("[title], [data-tipped]");
+    const n = e.pointerType === "touch" || e.buttons ? null : e.target.closest?.("[title], [data-tipped]");
     if (n === on) return;
     hide();
     if (!n) return;
     on = n; take(n);
-    timer = setTimeout(() => show(n), Date.now() - lastShown < WARM ? 0 : DELAY);
+    if (Date.now() - lastShown < WARM) show(n); else timer = setTimeout(() => show(n), DELAY); // (at once, not a task later: slid from one to the next, no frame goes by without a tip)
   }, true);
   document.addEventListener("pointerout", (e) => { if (on && !on.contains(e.relatedTarget)) hide(); }, true);
   document.addEventListener("pointermove", () => { if (on && on.hasAttribute("title")) take(on); }, { passive: true, capture: true }); // retitled while pointed at (the mic, pressed)

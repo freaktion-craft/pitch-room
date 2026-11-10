@@ -210,6 +210,21 @@ def chip_pairs(t, p3):
     return out
 
 
+def key_pairs(t, p3):
+    """The piano's keys (stage.css): your colour on a white key at most --key-w-lit light, on a black key at least
+    --key-b-lit (worked out from it as oklch(from ...) has it there), held down: 3:1 on the key; the C's label on it
+    (--on-key-down, with Mono's text on it as stage.js sets it): 4.5:1."""
+    out = []
+    wl, bl = float(resolve(t, t["--key-w-lit"])), float(resolve(t, t["--key-b-lit"]))
+    for k in ACCENTS:
+        L, c, h = (num(x) for x in re.findall(r"[\d.]+%?", resolve(t, t[f"--voice-{k}"]).split("(", 1)[1])[:3])
+        w, b = f"oklch({min(L, wl)} {c} {h})", f"oklch({max(L, bl)} {c} {h})"
+        painted = dict(t, **({"--on-voice": "var(--on-voice-mono)"} if k == "white" else {}))
+        out += [(f"key w held {k}", w, resolve(t, t["--key-w"]), 3), (f"key b held {k}", b, resolve(t, t["--key-b"]), 3),
+                (f"key w label {k}", resolve(painted, painted["--on-key-down"]), w, 4.5)]
+    return out
+
+
 def main():
     css = open(TOKENS, encoding="utf-8").read()
     bad = 0
@@ -230,6 +245,8 @@ def main():
             for label, ink, bg in chip_pairs(t, p3):
                 b = over(parse_colour(bg, p3), base)
                 rows.append((label, contrast_rgb(parse_colour(ink, p3)[0], b[0]), 4.5, ""))
+            for label, fg, bg, need in key_pairs(t, p3):
+                rows.append((label, contrast_rgb(parse_colour(fg, p3)[0], parse_colour(bg, p3)[0]), need, ""))
             fails = [r for r in rows if r[1] is None or r[1] < r[2]]
             bad += len(fails)
             print(f"{name}: {len(rows) - len(fails)}/{len(rows)} pass; lowest {min(r[1] for r in rows if r[1]):.2f}")
