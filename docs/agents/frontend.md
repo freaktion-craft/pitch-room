@@ -120,9 +120,14 @@ play outside Studio and Practice.
   window.
 - Accents: `ACCENTS` in `stage.js`. `"white"` is the stored key for Mono; keep it, saved settings use it. `paintAccent`
   sets `--voice`, `--voice-act` and `--on-voice` on `<html>` and each `.theme-dark`.
-- `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches on,
-  Loop on), never on what you press but the round Play (`.btn.primary.round`); `tokens.css` works it out from
-  `--voice-act` (no lighter than L 0.66 in the light theme), so no script sets it.
+- `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches
+  on), never on what you press; `tokens.css` works it out from `--voice-act` (no lighter than L 0.66 in the light
+  theme), so no script sets it.
+- On your colour: a control that holds a glyph (Play, Loop on, a take playing) is `--voice-btn` with `--on-fill` on it,
+  a label that holds text (the playhead's time, a version picked, the Lab's tabs) `--voice-fill` with `--on-fill`, and
+  a switch's knob `--on-mark` on the mark; in the light theme that's white on a fill deep enough for it, a pastel's a
+  deep shade on a paler tint (`tokens.css` works them out under `@supports`). Text on the accent as it is (the piano's
+  pressed key, the lyric editor's sung words) stays `--on-voice`.
 - The greys follow `--voice` too: under `@supports` (relative colour) `tokens.css` gives the surfaces (`--bg`,
   `--surface`, `--surface-2`, `--hover-2`, `--tog-down`) and the tints that fill, line and mark (`--fg-2` to `--fg-38`,
   so `--fill`, `--line`, `--ring`, `--track`, `--dim`) a trace of its hue; text and ink stay neutral, and Mono comes out

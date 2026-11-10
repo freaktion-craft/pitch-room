@@ -8,8 +8,9 @@ light ones over them (:root[data-theme="light"]), and each again with its wide-g
 What's set under @supports is read as a browser that has it (the desktop app's does).
 The greys take a trace of your colour (--voice), so each theme is worked out once for each accent, as paintAccent sets
 it on <html> (--voice, --voice-act, --on-voice), and every pair is checked with each; a pair that names an accent, only
-with that one. Relative colour is read in one form, oklch(from <an oklch() colour> L C H [/ A]), each of them a number,
-l, c or h, or min() or calc() of those; anything else stops it with an error. Mono has no chroma, so what's worked out
+with that one (and one that names a theme too, only in that one). Relative colour is read in one form, oklch(from <an
+oklch() colour> L C H [/ A]), each of them a number, l, c or h, or min(), clamp() or calc() of those; anything else
+stops it with an error. Mono has no chroma, so what's worked out
 from it under @supports must come out exactly as the plain values have it (a browser without relative colour): that's
 checked too.
 A colour with alpha is laid over what's under it in sRGB, as the browser does. Contrast is WCAG 2's.
@@ -108,8 +109,8 @@ TOKEN = re.compile(r"\s*(?:(\d+(?:\.\d*)?|\.\d+)|([a-z]+)\(|([a-z]+)|([-+*/(),])
 
 def relative(v):
     """oklch(from <colour> L C H [/ A]) worked out, as (L, C, H, alpha), as the browser does. The colour it's from is an
-    oklch() (relative itself or not); each channel is a number, l, c or h (that colour's), or min() or calc() of them
-    (+ - * / and brackets in calc). A left out is that colour's. L is held to 0–1, C to 0 and up, A to 0–1. Anything
+    oklch() (relative itself or not); each channel is a number, l, c or h (that colour's), or min(), clamp() or calc()
+    of them (+ - * / and brackets in calc). A left out is that colour's. L is held to 0–1, C to 0 and up, A to 0–1. Anything
     else stops it ("can't read"): a channel read wrong would pass silently."""
     def bad(why=""):
         return ValueError(f"can't read {v!r}{': ' + why if why else ''}")
@@ -143,7 +144,7 @@ def relative(v):
         pos += 1
         return toks[pos - 1]
 
-    def atom():  # a channel: a number, a channel's name, min() or calc()
+    def atom():  # a channel: a number, a channel's name, min(), clamp() or calc()
         kind, val = take()
         if kind == "num":
             return val
@@ -162,6 +163,14 @@ def relative(v):
                 xs.append(total())
             take(("op", ")"))
             return min(xs)
+        if (kind, val) == ("fn", "clamp"):  # clamp(lo, x, hi): x held between them (lo wins, as in CSS)
+            lo = total()
+            take(("op", ","))
+            x = total()
+            take(("op", ","))
+            hi = total()
+            take(("op", ")"))
+            return max(lo, min(x, hi))
         raise bad(f"{val!r}")
 
     def factor():
@@ -292,10 +301,12 @@ def resolve(t, v, depth=0):
 def colour(t, name, p3):
     if name.startswith("mix:"):  # an accent as small text: as --voice-ink has it (a color-mix with the ink, or itself)
         return parse_colour(ink_mix(t, name[4:]), p3)
-    if name.startswith("mark:"):  # an accent as a mark: as --voice-mark has it (its lightness held down, or itself);
-        # "mark:<accent>/N%": N % of that, seen through, as "color-mix(in oklab, var(--voice-mark) N%, transparent)" has it
-        accent, _, w = name[5:].partition("/")
-        c, a = parse_colour(voice_mark(t, accent), p3)
+    kind, sep, rest = name.partition(":")
+    if sep and kind in WORKED:  # an accent as a mark, a button's fill or a label's: as --voice-mark, --voice-btn or
+        # --voice-fill has it for that accent (worked out from it, or itself); "<kind>:<accent>/N%": N % of that, seen
+        # through, as "color-mix(in oklab, var(--voice-mark) N%, transparent)" has it
+        accent, _, w = rest.partition("/")
+        c, a = parse_colour(worked(t, WORKED[kind], accent), p3)
         return c, a * (num(w) if w else 1)
     v = resolve(t, t[name]) if name.startswith("--") else name
     c = parse_colour(v, p3)
@@ -321,10 +332,14 @@ def ink_mix(t, accent):
     return f"oklch({L} {math.hypot(x, y)} {math.degrees(math.atan2(y, x)) % 360})"
 
 
-def voice_mark(t, accent):
-    """--voice-mark for this accent, as tokens.css works it out from --voice-act (the accent, or the ink for Mono:
-    paintAccent): var(--voice-act) as it is, or a relative colour from it (relative())."""
-    return resolve({**t, "--voice-act": "var(--ink)" if accent == "--voice-white" else f"var({accent})"}, t["--voice-mark"])
+WORKED = {"mark": "--voice-mark", "btn": "--voice-btn", "fill": "--voice-fill"}  # the names a pair gives them by
+
+
+def worked(t, name, accent):
+    """A token tokens.css works out from your colour (--voice-mark, --voice-btn, --voice-fill) for this accent: with
+    --voice and --voice-act as paintAccent sets them (Mono's --voice-act the ink), as it is or a relative colour from
+    them (relative())."""
+    return resolve(painted(t, accent.removeprefix("--voice-")), t[name])
 
 
 def painted(t, k):
@@ -348,10 +363,10 @@ def backdrop(t, bg, p3):
 
 
 # ---------- the pairs ----------
-# (text, on, at least[, accent]): text on a background, each a token or a colour; a background that's itself
+# (text, on, at least[, accent[, theme]]): text on a background, each a token or a colour; a background that's itself
 # see-through is laid over the next one along (a chip over the card): "a|b", or over the card where there's none.
 # Each is checked with every accent picked (the greys follow it), but one that's an accent's own (the fourth: that
-# accent), only with that one.
+# accent), only with that one, and one that's a theme's own (the fifth: "light" or "dark"), only in that one.
 ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "sky", "blue", "violet", "pink"]
 named = lambda k: "Mono" if k == "white" else k.capitalize()  # as Settings names them ("white" is Mono's key)
 PAIRS = []
@@ -364,6 +379,14 @@ for bg in ["--bg", "--surface"]:
         # as a mark (--voice-mark: the section's line, a switch on): 3:1; the pastels, by choice, are
         # 2.77 (sky) and 2.94 (pink) on the light theme's page, at the others' lightness (3.06, 3.26 on the card)
         PAIRS.append((f"mark:--voice-{k}", bg, 2.7 if bg == "--bg" and k in ("pink", "sky") else 3, k))
+        # a button or a label in your colour, against what it's on: 3:1. Its fill is what's seen (a button's,
+        # --voice-btn: Play, Loop on; a label's, --voice-fill: the playhead's time), but the pastels' in the light theme
+        # is a pale tint of them by the owner's pick (about 1.2-1.3:1 on the card), so there what's on it (--on-fill)
+        # is what's seen; in the dark theme theirs is the accent as it is, seen as the others' are
+        if k in ("pink", "sky"):
+            PAIRS += [(f"btn:--voice-{k}", bg, 3, k, "dark"), (f"fill:--voice-{k}", bg, 3, k, "dark"), ("--on-fill", bg, 3, k, "light")]
+        else:
+            PAIRS += [(f"btn:--voice-{k}", bg, 3, k), (f"fill:--voice-{k}", bg, 3, k)]
 PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--hover-2", 4.5),
           ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
           ("--on-solo", "--solo", 4.5), ("--solo", "--tog-down", 3),
@@ -377,9 +400,10 @@ PAIRS += [("--ink", "--fill|--bg", 4.5), ("--ink", "--fill|--surface", 4.5), ("-
           ("--faint", "--fill|--bg", 4.5), ("--placeholder", "--fill|--bg", 3), ("--placeholder", "--fill|--surface", 3),
           ("--placeholder", "--hover-2", 3), ("--muted", "--hover-2", 4.5)]
 for k in ACCENTS:
-    PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5, k))
-    PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"mark:--voice-{k}", 4.5, k))  # on a mark's fill (a take playing, Loop on)
-    PAIRS.append(("--on-ink", f"mark:--voice-{k}", 2.9 if k in ("pink", "sky") else 3, k))  # a switch's knob, on (sky's 2.97 in the light theme)
+    PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5, k))  # text (4.5:1) on the accent as it is: the piano's key pressed, the name's riffle, a word sung in the lyric editor
+    PAIRS.append(("--on-fill", f"btn:--voice-{k}", 3, k))  # glyph (3:1) on a button's fill: Play and Pause, Loop and the click on, a take playing, Compare
+    PAIRS.append(("--on-fill", f"fill:--voice-{k}", 4.5, k))  # text (4.5:1) on a label's fill: the playhead's time, the version you're in, the Lab's tabs
+    PAIRS.append(("--on-mark", f"mark:--voice-{k}", 3, k))  # glyph (3:1): a switch's knob, on the mark
     PAIRS.append(("--ink", f"mark:--voice-{k}/50%", 3, k))  # a fader's cap on its fill (base.css: half the mark, over the card; Mono's 3.2 in the dark theme, 2.85 at 55 %)
 
 
@@ -401,7 +425,7 @@ def rows(css, light, p3):
         t = painted(t0, k)
         base = colour(t, "--surface", p3)
         for fg, bg, need, *only in PAIRS:
-            if only and only[0] != k:
+            if (only and only[0] != k) or (only[1:] and only[1] != ("light" if light else "dark")):
                 continue
             try:
                 b = backdrop(t, bg, p3)

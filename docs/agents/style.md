@@ -112,10 +112,10 @@ writing; match them.
   drawn in ink stay neutral, so a text role never points at a tinted step (`--placeholder` has its own `rgba`).
 - If text sits on it or it is read as text, add the pair to `PAIRS` in `scripts/contrast.py` (it doesn't find pairs by
   itself), run it, and quote the result. It works each theme out once per accent (as `paintAccent` sets `--voice`) and
-  runs every pair with each (a pair that names an accent, with that one only), and checks Mono comes out under
-  `@supports` exactly as the plain values. It only understands `color-mix()` in the exact form `--voice-ink` uses, and
-  relative colour as `oklch(from <an oklch() colour> L C H [/ A])`, each channel a number, `l`, `c`, `h`, `min()` or
-  `calc()`; anything else stops it with an error.
+  runs every pair with each (a pair that names an accent, with that one only; one that names a theme too, in that one
+  only), and checks Mono comes out under `@supports` exactly as the plain values. It only understands `color-mix()` in
+  the exact form `--voice-ink` uses, and relative colour as `oklch(from <an oklch() colour> L C H [/ A])`, each channel
+  a number, `l`, `c`, `h`, `min()`, `clamp()` or `calc()`; anything else stops it with an error.
 - The accent list must match in `tokens.css`, `stage.js` `ACCENTS` and `contrast.py`.
 - Pink is a pastel by the owner's choice: its contrast minimum is relaxed on purpose. Don't "fix" it.
 - `--on-voice` and `--on-voice-mono` may take `--on-accent`, but `--on-voice-mono` must never refer to `--on-voice`

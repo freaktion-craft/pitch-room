@@ -582,7 +582,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--knob);
   box-shadow: var(--shadow-knob); transition: transform var(--duration-base) var(--ease); }
 .switch:checked { background: var(--voice-mark); } /* on: your colour, its knob dark in the dark theme and white in the light */
-.switch:checked::after { transform: translateX(16px); background: var(--on-ink); }
+.switch:checked::after { transform: translateX(16px); background: var(--on-mark); }
 .hint { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
 .credit { margin: var(--space-3) 0 0; color: var(--faint); font-size: var(--text-xs); }
 #keysWrap { display: flex; align-items: flex-end; gap: var(--space-6); } /* the keys, and the piano's credit in the room beside them */
@@ -618,10 +618,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* in a panel over the page, its main button a step down: the solid ink is for the page's own (Add song) */
 .pop .btn.primary { background: var(--surface-2); color: var(--ink); }
 .pop .btn.primary:hover { background: var(--hover-2); }
-/* round, it's Play and Pause (a song's page, Practice, Takes Studio): your colour, the one button you press that takes
-   it (Mono's the ink), its glyph in the text on it (.pp: currentColor); pointed at, a step towards the strongest ink */
-.btn.primary.round { background: var(--voice-mark); color: var(--on-voice); }
-.btn.primary.round:hover { background: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong)); }
+/* round, it's Play and Pause (a song's page, Practice, Takes Studio): your colour as a button's fill (Mono's the ink),
+   its glyph in what's on it (--on-fill; .pp: currentColor); pointed at, a step towards the strongest ink */
+.btn.primary.round { background: var(--voice-btn); color: var(--on-fill); }
+.btn.primary.round:hover { background: color-mix(in oklab, var(--voice-btn) 85%, var(--ink-strong)); }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
 .btn.quiet:hover { background: var(--fg-8); }
 #app > header .btn.quiet:not(.mic) { color: var(--ink); } /* the header's buttons in ink, the mic's beside them: a grey one there reads as off */

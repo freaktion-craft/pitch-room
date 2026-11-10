@@ -169,7 +169,7 @@
 .tt-line.on { opacity: 0.35; }
 /* the playhead's time while you drag it: a flag at the top of the waveform, the line hanging from it (drawWave) */
 .ph-flag { position: absolute; top: 0; z-index: 3; transform: translateX(-50%); height: 20px; padding: 0 var(--space-2); display: grid; place-items: center;
-  border-radius: var(--radius-xs); background: var(--voice); color: var(--on-voice); font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+  border-radius: var(--radius-xs); background: var(--voice-fill); color: var(--on-fill); font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
 .wave-wrap { position: relative; }
 /* The time under the waveform (paintClock): 0:00 and the song's length under its ends, faint; where it is riding
    under the playhead in its colour. An end the moving one would cover fades out. */
@@ -181,7 +181,7 @@
 :is(.wc-start, .wc-end) { color: var(--faint); transition: opacity var(--duration-fast); }
 .wclock .covered { opacity: 0; }
 .wc-now { position: absolute; top: 0; transform: translateX(-50%); padding: 0 var(--space-2); border-radius: var(--radius-xs);
-  background: var(--voice); color: var(--on-voice); white-space: nowrap; }
+  background: var(--voice-fill); color: var(--on-fill); white-space: nowrap; }
 /* the playhead, over the waveform (its rounded corners would clip it at the ends); thicker while you can grab it, hanging
    from the flag while you drag it */
 .ph-line { position: absolute; left: 0; top: 0; bottom: 0; z-index: 2; width: 2px; margin-left: -1px; border-radius: var(--radius-pill); background: var(--voice); pointer-events: none; }
@@ -276,7 +276,7 @@
 .track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
 #sPlayer .track.off { --fader-fill: var(--dim); } /* and its fader's fill grey (every slider's a fader: base.css) */
 .tog { height: var(--control-sm); min-width: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill); font: var(--weight-medium) var(--text-xs) var(--mono); color: var(--muted); }
-.tog[aria-pressed="true"].m { background: var(--voice-mark); color: var(--on-voice); } /* on (Practice's Loop and click): your colour; a track's M has its own (.ms) */
+.tog[aria-pressed="true"].m { background: var(--voice-btn); color: var(--on-fill); } /* on (Practice's Loop and click): your colour; a track's M has its own (.ms) */
 .tog[aria-pressed="true"].s { background: var(--solo); color: var(--on-solo); }
 .tog:hover { background: var(--fg-8); }
 /* A track's mute and solo: one pair, flat as the buttons beside them (the click's 4/4, Shift accent), a hairline of the
