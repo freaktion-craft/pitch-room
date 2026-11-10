@@ -3,8 +3,10 @@
 // audio), so scripts/reach-check.js can run it in Node. Call and response, as Scales: the piano plays the way's notes,
 // then you sing it back, sliding (or stepping) onto the note and holding it. What's read is pitch alone: did the voice get
 // to each of the way's notes, did the slide break on the way (a jump or a gap), did it arrive on the note, how long it
-// took to settle there, how far off it held, and whether it held. No verdict on register, placement or strain. Every
-// threshold is here, in RC, provisional (a guess, not yet tried with real voices), one for all voices.
+// took to settle there, how far off it held, and whether it held; and beside the pitch, how even the level stayed from
+// the way's first note to the end of the hold (in dB against its own start: the mic isn't calibrated). No verdict on
+// register, placement, pushing or strain. Every threshold is here, in RC, provisional (a guess, not yet tried with real
+// voices), one for all voices.
 
 const RC = {
   near: 1, stay: 0.8,           // arrived: within a semitone of the note, and 80% of the rest of the response sung (pitched)
@@ -36,7 +38,18 @@ const RC = {
                                 //   steady, within near of the note): the release trimmed and a settle still inside it
   endGap: 500, cap: 12000,      // ms: silence that ends it; the longest it's listened to
   beat: 0.5, rest: 1200,        // s a note of the call (the last held two); ms between one response and the next call
-  tries: 3                      // a way sung at most this many times, then on to the next
+  tries: 3,                     // a way sung at most this many times, then on to the next
+  // The level, kept even ("avoidance of a crescendo upon ascent", Bozeman 2010, p. 295; García's slur equalises "the
+  // registers, timbres and power of the voice"). A voice gets louder with pitch at the same effort: "SL increases about 6
+  // dB/octave, all else being equal" (Titze, A Short Tutorial on Sound Level and Loudness for Voice, Journal of Singing
+  // 70/2, 2013, p. 191). So a rise (or fall) of up to rise dB a semitone of the pitch moved is let be, as is the level held
+  // as it was; past that band by lvlTol dB, it got louder (or softer) toward that note.
+  rise: 0.5,                    // dB a semitone (6 dB an octave, Titze's)
+  lvlTol: 4,                    // dB past the band (Smooth's step in loudness, TN.loud)
+  lvlWin: 250,                  // ms: each read of the level, the median over this; the first, from the way's first note on,
+                                //   what the rest is against
+  lvlMin: 0.6                   // of the time from the first note to the hold's end with a level, else it isn't read (the
+                                //   browser filtering the mic: vcLock)
 };
 // (turn.js's weighted median: in the page every script shares one scope)
 const RCS = typeof module !== "undefined" ? require("./turn.js") : { tnMed };
@@ -125,18 +138,41 @@ function rcBreaks(ss, a, b) {
   return out.filter((e) => e.at != null).sort((x, y) => x.t - y.t);
 }
 
-// One response, judged. xs: its samples {t, w, m, v} (m null: not pitched; v: voiced), from where it began; d: the way
+// How even the level stayed, between a and b (ms): its median over RC.lvlWin ms from a (L0, at the pitch m0, both
+// medians), against each RC.lvlWin ms after it (every 50 ms on), less the band a voice's own rise with pitch makes (RC.rise
+// dB a semitone moved, either way, or nothing). The furthest past the band by RC.lvlTol dB: {t, at: the note (its
+// trend's), d: the level then less L0 (dB), side +1 louder, −1 softer}; else {even: true}; null where too little level
+// was read (RC.lvlMin). ss: rcTrend's, with L (dB) on the voiced samples it was read on.
+function rcLevel(ss, a, b) {
+  const L = ss.filter((s) => s.t > a && s.t <= b && s.L != null && s.tr != null);
+  if (b - a < 2 * RC.lvlWin || L.reduce((u, s) => u + s.w, 0) < RC.lvlMin * (b - a)) return null;
+  const at = (t0) => { const w = L.filter((s) => s.t > t0 && s.t <= t0 + RC.lvlWin); return w.length ? { L: RCS.tnMed(w.map((s) => [s.L, s.w])).v, m: RCS.tnMed(w.map((s) => [s.tr, s.w])).v } : null; };
+  const r0 = at(a);
+  if (!r0) return null;
+  let worst = null;
+  for (let t = a + RC.lvlWin; t + RC.lvlWin <= b; t += 50) {
+    const r = at(t);
+    if (!r) continue;
+    const dl = r.L - r0.L, nat = RC.rise * (r.m - r0.m), hi = Math.max(0, nat) + RC.lvlTol, lo = Math.min(0, nat) - RC.lvlTol;
+    const ex = dl > hi ? dl - hi : dl < lo ? dl - lo : 0;
+    if (ex && (!worst || Math.abs(ex) > Math.abs(worst.ex))) worst = { t, at: Math.round(r.m), d: Math.round(dl), side: Math.sign(ex), ex };
+  }
+  return worst ? { t: worst.t, at: worst.at, d: worst.d, side: worst.side } : { even: true };
+}
+
+// One response, judged. xs: its samples {t, w, m, v, L (the level, dB, or null where not read)} (m null: not pitched; v: voiced), from where it began; d: the way
 // (RC_WAYS); T: the note (as the piano plays it). The octave sung first (o); then, in order, each of the way's notes
 // before the last reached (by the trend); the slide read for breaks from the first of them to arriving; arriving (ta:
 // Hutchins & Campbell's); the hold: the run up to the end where the trend stays within RC.steady of where the voice
 // ended up (c: its cents), settled (ts) where it begins. Returns {ok: 1 on it (good or close), 0 not, −1 not read; kind:
 // what's said ("good", "close", "read", "from" (not begun on the first note), "reach" (a note not got to: at, side −1
 // under, +1 over), "break" (at, d, gap), "stay" (got near, didn't stay), "wobble" (stayed near, never steady), "short"
-// (steady, not for RC.hold), "miss" (held off by more than close: c), "past" (went past it: d st), "slow" (settled
-// after settle ms)), o, T (the note sung), at, side, c, d, settle, held, ta, ts, way (when each note before the last was
-// reached), breaks, tEnd}.
+// (steady, not for RC.hold), "miss" (held off by more than close: c), "louder" or "softer" (the level, rcLevel: at, d dB),
+// "past" (went past it: d st), "slow" (settled after settle ms)), o, T (the note sung), at, side, c, d, settle, held, ta,
+// ts, way (when each note before the last was reached), breaks, lvl (rcLevel's, from the first way note to the end, or
+// null), tEnd}.
 function rcJudge(xs, d, T) {
-  const res = { ok: -1, kind: "read", o: 0, T, at: null, side: 0, c: null, d: null, settle: null, held: 0, ta: null, ts: null, way: [], breaks: [], tEnd: null };
+  const res = { ok: -1, kind: "read", o: 0, T, at: null, side: 0, c: null, d: null, settle: null, held: 0, ta: null, ts: null, way: [], breaks: [], lvl: null, tEnd: null };
   const vs = xs.filter((s) => s.v);
   const pitched = xs.reduce((u, s) => u + (s.m != null ? s.w : 0), 0);
   if (!vs.length || pitched < RC.minRead) return res;
@@ -199,6 +235,9 @@ function rcJudge(xs, d, T) {
   if (brk) return res;
   res.at = Tt;
   if (Math.abs(c) > RC.close) { res.ok = 0; res.kind = "miss"; res.side = Math.sign(c); return res; }
+  // the level, from the way's first note to the hold's end
+  const lv = (res.lvl = rcLevel(ss, t1, tEnd));
+  if (lv && !lv.even) { res.ok = 0; res.kind = lv.side > 0 ? "louder" : "softer"; res.at = lv.at; res.d = lv.d; res.side = lv.side; return res; }
   if (over > RC.past) { res.ok = 0; res.kind = "past"; res.d = Math.round(over * 10) / 10; res.side = dir; return res; }
   if (res.settle > RC.settle) { res.ok = 0; res.kind = "slow"; return res; }
   res.ok = 1; res.kind = Math.abs(c) <= RC.good ? "good" : "close"; res.side = Math.sign(c);
@@ -263,4 +302,4 @@ function rcStep(st, ok) {
   return s.tries >= RC.tries ? next("on") : { st: s, say: "again", end: false };
 }
 
-if (typeof module !== "undefined") module.exports = { RC, RC_WAYS, rcCallLen, rcMean, rcTrend, rcHeld, rcOctave, rcBreaks, rcJudge, rcEnd, rcStep };
+if (typeof module !== "undefined") module.exports = { RC, RC_WAYS, rcCallLen, rcMean, rcTrend, rcHeld, rcLevel, rcOctave, rcBreaks, rcJudge, rcEnd, rcStep };

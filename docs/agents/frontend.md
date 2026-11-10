@@ -60,7 +60,7 @@ Each area keeps its state in one short capitalised object.
 | `stage.js` | Practice canvas; `C` (canvas colours); accent and theme; the main `loop()` |
 | `turn.js` | `TN`: the Lab's Turn measures (harmonic levels, the turn, a pass's break or step). Pure, runs in Node |
 | `scale.js` | `SC`, `SC_PATS`: the Lab's Scales judging (`scAlign`, `scJudge`, `scStep`). Pure, runs in Node |
-| `reach.js` | `RC`, `RC_WAYS`: the Lab's Reach judging (`rcJudge`, `rcEnd`, `rcStep`): ways onto one note, read for arriving, settling, holding, breaks. Pure, runs in Node |
+| `reach.js` | `RC`, `RC_WAYS`: the Lab's Reach judging (`rcJudge`, `rcEnd`, `rcStep`): ways onto one note, read for arriving, settling, holding, breaks, and how even the level stayed. Pure, runs in Node |
 | `voice.js` | `VC`: the Lab page, its mic and pitch frames (`VC.fr`), and the Turn view |
 | `voice-scale.js` | `SV`: the Lab's Scales view (call and response at the piano) |
 | `voice-reach.js` | `RV`: the Lab's Reach view; Practice's note menu (a right-click on a bar, or N), sending a note there (`sendToLab`) |

@@ -259,6 +259,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Next: {way}.": "다음: {way}.", "On to {way}.": "{way}로 넘어가요.",
   "All {n} ways on it": "{n}가지 모두 닿았어요", "{k} of {n} ways on it": "{n}가지 중 {k}가지 닿았어요", "Back to your song, or again.": "곡으로 돌아가거나 다시 해요.",
   "Practise {note} in the Lab": "랩에서 {note} 연습하기",
+  "On {note}, the level even": "{note}에 닿았어요, 크기도 고르게", "Louder toward {note} · +{d} dB": "{note} 쪽으로 커졌어요 · +{d} dB",
+  "Softer toward {note} · −{d} dB": "{note} 쪽으로 작아졌어요 · −{d} dB", "Again, the same volume all the way.": "다시, 끝까지 같은 크기로.",
   // library and adding a song
   "Stems": "스템",
   "Library": "라이브러리", "Where you are": "현재 위치","Add song": "곡 추가", "Add your first song": "첫 곡을 추가하세요",

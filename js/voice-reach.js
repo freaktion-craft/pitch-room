@@ -1,7 +1,7 @@
 "use strict";
 // The Lab's Reach view: one note, and four ways onto it, easiest first (js/reach.js's RC_WAYS). The piano plays the way's
-// notes, then you sing it back, sliding (or stepping) onto the note and holding it; each response is read for pitch
-// alone (rcJudge) and said in two lines. On it, the next way; not, the same way again (RC.tries at most). Call and
+// notes, then you sing it back, sliding (or stepping) onto the note and holding it; each response is read for its pitch,
+// and how even its level stayed (rcJudge), and said in two lines. On it, the next way; not, the same way again (RC.tries at most). Call and
 // response, as Scales: nothing's read while the piano sounds (VC.mute). Also here: Practice's note menu, a right-click
 // on a note's bar (or N, on the note at the playhead) sending that note here. The measures are js/reach.js's.
 
@@ -43,7 +43,7 @@ function rvHow(d, T) {
 function rvWords(res) {
   const nm = { note: absName(res.at ?? res.T) };
   switch (res.kind) {
-    case "good": return ["On {note}", nm, null, null, "good"];
+    case "good": return [res.lvl && res.lvl.even ? "On {note}, the level even" : "On {note}", nm, null, null, "good"]; // (no level read: the browser filtering the mic)
     case "close": return [res.side < 0 ? "A little under {note}" : "A little over {note}", nm, null, null, ""];
     case "miss": return [res.side < 0 ? "Under {note} · −{c}¢" : "Over {note} · +{c}¢", { ...nm, c: Math.abs(res.c) },
       res.side < 0 ? "Aim a little higher as you land." : "Aim a little lower as you land.", null, "bad"];
@@ -53,6 +53,8 @@ function rvWords(res) {
     case "stay": return ["Didn’t stay on {note}", nm, "Land, then hold it still.", null, "bad"];
     case "wobble": return ["Didn’t settle on {note}", nm, "Land, then hold it still.", null, "step"];
     case "short": return ["Too short on {note}", nm, "Hold it a full second.", null, "step"];
+    case "louder": return ["Louder toward {note} · +{d} dB", { ...nm, d: Math.abs(res.d) }, "Again, the same volume all the way.", null, "step"];
+    case "softer": return ["Softer toward {note} · −{d} dB", { ...nm, d: Math.abs(res.d) }, "Again, the same volume all the way.", null, "step"];
     case "past": return ["Past {note}, then back", nm, "Slow down as you near it.", null, "step"];
     case "slow": return ["Slow to settle on {note}", nm, "Land right on it.", null, "step"];
     default: return ["Couldn’t read that one", null, "Louder, nearer the mic.", null, ""];
@@ -253,6 +255,15 @@ function drawReach(now) {
     for (const b of res.breaks) {
       const s = src.find((q) => q.t >= b.t && q.m != null), x = X(b.t), y = Y(s ? s.m : b.at);
       scHalo(g, C.bad, () => { g.beginPath(); g.moveTo(x - 4.5, y - 4.5); g.lineTo(x + 4.5, y + 4.5); g.moveTo(x + 4.5, y - 4.5); g.lineTo(x - 4.5, y + 4.5); g.stroke(); });
+    }
+    if ((res.kind === "louder" || res.kind === "softer") && res.lvl) { // (where the level was furthest off: an orange ring on your line, its dB)
+      const t = res.lvl.t + RC.lvlWin / 2, s = src.find((q) => q.t >= t && q.m != null);
+      if (s) {
+        const x = X(s.t), y = Y(s.m), label = (res.d > 0 ? "+" : "−") + Math.abs(res.d) + " dB";
+        scHalo(g, C.orange, () => { g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.stroke(); });
+        g.font = font(11); g.textAlign = "left";
+        scHalo(g, C.orange, (u) => (u ? g.strokeText(label, x + 9, y - 8) : g.fillText(label, x + 9, y - 8)));
+      }
     }
     if (res.kind === "past" && res.ta != null) {
       let pk = null;

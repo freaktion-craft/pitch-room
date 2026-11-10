@@ -45,7 +45,9 @@ const ease = (u) => 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, u)));
 // past ({x st beyond, ms back}), crack ({u: where in the last slide, st: skipped}), gap ({u, ms} silent in the last
 // slide), short (st: the last slide stops this short of the note), start (st: begun this far off the first note, towards
 // the note), bottom (st: the dip's low note this far short), wobble ({c, f} on the hold), creep ({x st short, ms}: arrives
-// short and creeps onto it), hold (ms the note's held), breath (ms between steps), slip (one frame +12 in the last slide).
+// short and creeps onto it), hold (ms the note's held), breath (ms between steps), slip (one frame +12 in the last slide),
+// lvl ({db: the level's change from the first note's end to the hold's start, held after; nat: dB an octave it rises with
+// the pitch sung, as a voice does at the same effort}; the level otherwise even, −20 dB ± 0.8 a frame), noL (no level).
 function plan(d, T, opts, R) {
   const P = [], dir = (a, b) => Math.sign(b - a) || 1;
   let t = opts.lead != null ? opts.lead : 200 + 300 * R();
@@ -60,11 +62,14 @@ function plan(d, T, opts, R) {
       const last = k === notes.length - 1, len = last ? opts.hold ?? 1600 + 600 * R() : 350 + 100 * R();
       const v = last ? fin : m, t0 = t, wb = last && opts.wobble;
       t = piece(t, t + len, wb ? (q) => v + (wb.c / 100) * Math.sin((2 * Math.PI * wb.f * (q - t0)) / 1000) : () => v);
+      if (k === 0) P.tA = t;
+      if (k === notes.length - 2) P.tB = t;
       if (!last) t += opts.breath ?? 30 * R();
     });
-    return { P, Tt, end: t };
+    return { P, Tt, end: t, first: notes[0] };
   }
   t = piece(t, t + hold0, () => notes[0]);
+  P.tA = t;
   for (let k = 1; k < notes.length; k++) {
     const last = k === notes.length - 1, a = notes[k - 1];
     let b = last ? fin : notes[k];
@@ -90,12 +95,13 @@ function plan(d, T, opts, R) {
     if (!last) { const h = 120 + 100 * R(), m = notes[k]; t = piece(t, t + h, () => m); }
   }
   const hold = opts.hold ?? 1600 + 600 * R(), th = t;
+  P.tB = th;
   if (opts.creep) {
     const b = Tt - opts.creep.x * dir(notes[notes.length - 2], Tt), c = opts.creep.ms;
     t = piece(th, th + hold, (q) => (q - th < c ? b + (fin - b) * ((q - th) / c) : fin));
   } else if (opts.wobble) t = piece(th, th + hold, (q) => (opts.short ? Tt - opts.short * dir(notes[notes.length - 2], Tt) : fin) + (opts.wobble.c / 100) * Math.sin((2 * Math.PI * opts.wobble.f * (q - th)) / 1000));
   else { const v = opts.short ? Tt - opts.short * dir(notes[notes.length - 2], Tt) : fin; t = piece(th, th + hold, () => v); }
-  return { P, Tt, end: t };
+  return { P, Tt, end: t, first: notes[0] };
 }
 // The response as the Lab keeps it: frames at fps (each ±10%), tracked; samples from 0 on, w the time since the one
 // before (≤ 100 ms, as voice.js)
@@ -114,10 +120,16 @@ function sing(d, T, opts, fps, seed) {
     }
     const cur = trk(raw, t), v = raw != null && cur != null;
     let m = v ? cur : null;
+    // the level (dB): even, or changing from the first note's end to the hold's start (lvl.db), rising with the pitch (lvl.nat)
+    let L = null;
+    if (v && !opts.noL) {
+      const lv = opts.lvl || {}, u = Math.max(0, Math.min(1, (t - pl.P.tA) / Math.max(1, pl.P.tB - pl.P.tA)));
+      L = -20 + (lv.db || 0) * u + ((lv.nat || 0) * (raw - pl.first)) / 12 + 0.8 * F.n();
+    }
     if (m != null && slip != null && t >= slip) { m += 12; slip = null; }
     if (t < 0) continue;
     const p = xs[xs.length - 1];
-    xs.push({ t, w: p ? Math.min(100, t - p.t) : 16, m, v });
+    xs.push({ t, w: p ? Math.min(100, t - p.t) : 16, m, v, L });
   }
   return { xs, Tt: pl.Tt };
 }
@@ -158,7 +170,7 @@ function tally(name, need, ways, opts, want, seeds) {
 const ok1 = (r) => r.res.ok === 1;
 
 // 1. Clean
-tally("1. clean: on it (good), o 0, ended by the hold", 1, undefined, {}, (r) => r.res.kind === "good" && r.res.o === 0 && r.why === "hold");
+tally("1. clean: on it (good), o 0, ended by the hold, the level even", 1, undefined, {}, (r) => r.res.kind === "good" && r.res.o === 0 && r.why === "hold" && r.res.lvl && r.res.lvl.even);
 // 2. Held off the note
 tally("2a. held −35 c: close and under, still on it (ok 1)", 1, undefined, { cents: -35 }, (r) => r.res.kind === "close" && r.res.side === -1 && ok1(r) && r.res.c <= -25 && r.res.c >= -45);
 tally("2b. held +35 c: close and over", 1, undefined, { cents: 35 }, (r) => r.res.kind === "close" && r.res.side === 1 && r.res.c >= 25 && r.res.c <= 45);
@@ -193,37 +205,49 @@ tally("8a. the whole way an octave down: o −12, on it", 1, undefined, { oct: -
 tally("8b. the whole way an octave up: o +12, on it", 1, undefined, { oct: 12 }, (r) => r.res.o === 12 && ok1(r));
 // 9. Stepped with a breath between the notes: no break read there
 tally("9. Step up with 60–100 ms breaths: on it", 1, (d) => !d.glide, { breath: 80 }, ok1);
-// 10. Frame-rate invariance: the same singers (a mix of the cases above) at 30 and 144 fps
+// 10. The level. A voice's own rise with pitch (Titze's 6 dB an octave) is even; a swell toward the end, or a fade, past
+// that band by RC.lvlTol is louder or softer, said at a note of the way. (db: 9 past the band's own edge for that way)
 {
-  const mix = [{}, { cents: -35 }, { cents: -70 }, { past: { x: 1.2, ms: 300 } }, { crack: { u: 0.45, st: 3 }, rate: 6 }, { gap: { u: 0.5, ms: 150 } }, { short: 2.5 }, { hold: 500 }, { wobble: { c: 70, f: 1.5 }, hold: 2500 }, { vib: { c: 100, f: 5.5 } }];
+  const up = (d) => Math.max(0, -d.st[0]) * RC.rise, down = (d) => Math.max(0, d.st[0]) * RC.rise;
+  tally("10a. the level rising 6 dB an octave with the pitch: on it, even", 1, undefined, { lvl: { nat: 6 } }, (r) => ok1(r) && r.res.lvl && r.res.lvl.even);
+  tally("10b. … falling 6 dB an octave as the pitch falls (the same voice going down): on it", 1, (d) => d.st[0] > 0, { lvl: { nat: 6 } }, ok1);
+  tally("10c. a swell toward the note (9 dB past the band): louder", 0.97, undefined, (d) => ({ lvl: { db: 9 + up(d) } }), (r) => r.res.kind === "louder" && r.res.side === 1 && r.res.d >= 6);
+  tally("10d. a fade toward the note (9 dB past the band): softer", 0.97, undefined, (d) => ({ lvl: { db: -9 - down(d) } }), (r) => r.res.kind === "softer" && r.res.side === -1 && r.res.d <= -6);
+  tally("10e. a swell of 2 dB past the natural rise: on it", 0.98, undefined, (d) => ({ lvl: { nat: 6, db: 2 } }), ok1);
+  tally("10f. no level read (the browser filtering the mic): on it, the level unread", 1, undefined, { noL: true }, (r) => ok1(r) && r.res.lvl == null);
+}
+
+// 11. Frame-rate invariance: the same singers (a mix of the cases above) at 30 and 144 fps
+{
+  const mix = [{}, { lvl: { db: 14 } }, { lvl: { db: -11 } }, { cents: -35 }, { cents: -70 }, { past: { x: 1.2, ms: 300 } }, { crack: { u: 0.45, st: 3 }, rate: 6 }, { gap: { u: 0.5, ms: 150 } }, { short: 2.5 }, { hold: 500 }, { wobble: { c: 70, f: 1.5 }, hold: 2500 }, { vib: { c: 100, f: 5.5 } }];
   let n = 0, same = 0;
   for (const d of RC_WAYS) for (let seed = 1; seed <= 20; seed++) for (const o of mix) {
     if (!d.glide && (o.past || o.crack || o.gap || o.short)) continue;
     const T = 50 + ((seed * 5) % 15), a = run(d, T, o, 30, seed).r, b = run(d, T, o, 144, seed).r;
     n++; if (a && b && a.res.kind === b.res.kind) same++;
   }
-  check("10. 30 vs 144 fps: the same kind (≥97%)", same >= 0.97 * n, pct(same, n));
+  check("11. 30 vs 144 fps: the same kind (≥97%)", same >= 0.97 * n, pct(same, n));
 }
-// 11. Nothing to read: silence; a breath of 200 ms
+// 12. Nothing to read: silence; a breath of 200 ms
 {
   const d = RC_WAYS[0], xs = [];
   for (let t = 16; t < 3000; t += 16) xs.push({ t, w: 16, m: null, v: false });
-  check("11a. silence: no onset", respond(xs, d, 60) == null);
+  check("12a. silence: no onset", respond(xs, d, 60) == null);
   const r = rcJudge(xs.map((s) => (s.t < 200 ? { ...s, m: 60, v: true } : s)), d, 60);
-  check("11b. 200 ms sung: not read (ok −1)", r.ok === -1, r.kind);
+  check("12b. 200 ms sung: not read (ok −1)", r.ok === -1, r.kind);
 }
-// 12. The sequence (rcStep)
+// 13. The sequence (rcStep)
 {
   const seq = (oks) => {
     let st = { i: 0, tries: 0, unread: 0 }, out = [];
     for (const ok of oks) { const r = rcStep(st, ok); st = r.st; out.push(r.end ? "end:" + r.end : r.say); if (r.end) break; }
     return out.join(" ");
   };
-  check("12a. on it each time: next ×3, then done", seq([1, 1, 1, 1]) === "next next next end:done", seq([1, 1, 1, 1]));
-  check("12b. off, then on: again, next", seq([0, 1]) === "again next", seq([0, 1]));
-  check(`12c. off ${RC.tries} times: again, again, on`, seq([0, 0, 0]) === "again again on", seq([0, 0, 0]));
-  check("12d. not read twice: same, end", seq([-1, -1]) === "same end:unread", seq([-1, -1]));
-  check("12e. not read, then on: same, next", seq([-1, 1]) === "same next", seq([-1, 1]));
+  check("13a. on it each time: next ×3, then done", seq([1, 1, 1, 1]) === "next next next end:done", seq([1, 1, 1, 1]));
+  check("13b. off, then on: again, next", seq([0, 1]) === "again next", seq([0, 1]));
+  check(`13c. off ${RC.tries} times: again, again, on`, seq([0, 0, 0]) === "again again on", seq([0, 0, 0]));
+  check("13d. not read twice: same, end", seq([-1, -1]) === "same end:unread", seq([-1, -1]));
+  check("13e. not read, then on: same, next", seq([-1, 1]) === "same next", seq([-1, 1]));
 }
 
 console.log(`${failed ? failed + " FAILED" : "all passed"}  (${((Date.now() - t0Clock) / 1000).toFixed(1)} s)`);
