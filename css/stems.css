@@ -557,7 +557,7 @@ html.lib-top #sLib .lib-cols { position: sticky; top: var(--top-cols); z-index: 
 .lc-sing { min-width: 0; max-width: 100%; white-space: nowrap; opacity: 0; transition: opacity var(--duration-fast), background-color var(--duration-fast), color var(--duration-fast); }
 .lc-sing .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 :is(.lc-item:hover .lc-sing, .lc-sing:focus-visible, .lc-sing.said, .lc-sing[aria-busy="true"]) { opacity: 1; }
-.lc-sing[aria-busy="true"] { color: var(--muted); pointer-events: auto; cursor: progress; }
+.lc-sing[aria-busy="true"] { pointer-events: auto; cursor: progress; } /* (its text as it was: muted would be lost on the ink) */
 .lc-item.pending .lc-sing { visibility: hidden; }
 @media (hover: none) { .lc-sing { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { :is(.lc-item, .lc-sing) { transition: none; } }
