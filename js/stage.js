@@ -11,9 +11,9 @@ function readColors() {
   // the track colours through an element's computed colour, which works out the color-mix() of the backing vocals
   const probe = readColors.probe || (readColors.probe = document.body.appendChild(Object.assign(el("i"), { hidden: true })));
   for (const k of ["vocals","lead","backing","drums","bass","guitar","piano","other","click"]) { probe.style.color = `var(--stem-${k})`; C["stem-" + k] = getComputedStyle(probe).color; }
-  // (and your colour as small text, a color-mix in the light theme; as a label's fill and the text on it, the Lab's
-  // chips; and the greys with a trace of it, relative colours worked out from it: the card, a button's grey, a line)
-  for (const k of ["voice-ink", "voice-fill", "on-fill", "surface", "surface-2", "line"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
+  // (and your colour as small text, a color-mix in the light theme, and text on it; and the greys with a trace of it,
+  // relative colours worked out from it: the card, a button's grey, a line)
+  for (const k of ["voice-ink", "on-voice", "surface", "surface-2", "line", "wave"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
 }
 function resize() {
   const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -70,6 +70,15 @@ function setAccent(k) {
   for (const b of $("#swatches").children) b.setAttribute("aria-pressed", String(b.dataset.k === k));
 }
 paintAccent();
+// Vibrant (Settings, off at first): your colour through the whole app (its greys, ink and text in shades of it:
+// tokens.css), not only where it points. Remembered as "vibrant"; the script in <head> sets it before first paint
+function setVibrant(on) {
+  store.set("vibrant", on);
+  if (on) document.documentElement.dataset.tone = "vibrant"; else delete document.documentElement.dataset.tone;
+  readColors(); // the canvas takes it from here
+}
+$("#vibrantOn").checked = document.documentElement.dataset.tone === "vibrant";
+$("#vibrantOn").onchange = (e) => setVibrant(e.target.checked);
 
 // The theme (Settings): "system" (the system's light or dark, followed as it changes), "light" or "dark", remembered
 // as "theme". The script in <head> sets it on <html> (data-theme) before first paint, as it does the accent; the

@@ -121,22 +121,14 @@ play outside Studio and Practice.
 - Themes: system, light, dark (`setTheme`, `applyTheme` in `stage.js`). `setTheme` persists and tells the desktop
   window.
 - Accents: `ACCENTS` in `stage.js`. `"white"` is the stored key for Mono; keep it, saved settings use it. `paintAccent`
-  sets `--voice`, `--voice-act` and `--on-voice` on `<html>` and each `.theme-dark`, and `data-pastel` on `<html>` for
-  Pink and Sky (the head script in `index.html` too).
-- `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches
-  on), and the round Play's fill; `tokens.css` works it out from `--voice-act` (no lighter than L 0.66 in the light
-  theme), so no script sets it.
-- On your colour: the round Play and the controls in your colour that hold a glyph (Loop and the click on, a take
-  playing, Compare) are `--play` with `--on-play` on it, `--play-hover` pointed at (a deeper step in the same hue); a
-  label that holds text (the playhead's time, a version picked, the Lab's chips) is `--voice-fill` with `--on-fill`;
-  a switch's knob is `--on-mark` on the mark. In the light theme what's on them is white (the label's fill deeper for
-  it), and for Pink and Sky (`data-pastel`) Play and a label are the pastel itself with a main button's deep shade on
-  it (`--on-primary`). A main button (`.btn.primary`) is `--primary`, `--on-primary`, `--primary-hover`. Text on the
-  accent as it is (the piano's pressed key, the lyric editor's sung words) stays `--on-voice`.
+  sets `--voice`, `--voice-act` and `--on-voice` on `<html>` and each `.theme-dark`.
+- `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches on,
+  Loop on), never on what you press but the round Play (`.btn.primary.round`); `tokens.css` works it out from
+  `--voice-act` (no lighter than L 0.66 in the light theme), so no script sets it.
 - The greys follow `--voice` too: under `@supports` (relative colour) `tokens.css` gives the surfaces (`--bg`,
   `--surface`, `--surface-2`, `--hover-2`, `--tog-down`) and the tints that fill, line and mark (`--fg-2` to `--fg-38`,
-  so `--fill`, `--line`, `--ring`, `--track`, `--dim`) a trace of its hue, and the ink and text a shade of it (tone on
-  tone), and Mono comes out as plain grey. Such a token's text (`getPropertyValue`) is then an unworked `oklch(from ...)`: a canvas or script reads
+  so `--fill`, `--line`, `--ring`, `--track`, `--dim`) a trace of its hue; text and ink stay neutral, and Mono comes out
+  as plain grey. Such a token's text (`getPropertyValue`) is then an unworked `oklch(from ...)`: a canvas or script reads
   the colour the browser works out instead (an element's `color` set to `var(--token)`, read with `getComputedStyle`, as
   `readColors()` does through `readColors.probe`).
 - `--on-voice` and `--on-voice-mono` may take `--on-accent`, but `--on-voice-mono` must never refer to `--on-voice`

@@ -145,7 +145,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Microphone": "마이크", "Turn the mic on": "마이크 켜기", "Turn the mic off": "마이크 끄기", "Settings": "설정", "Language": "언어",
   "Input": "입력", "System default": "시스템 기본값", "Microphone {n}": "마이크 {n}",  "Mic sensitivity": "마이크 감도",
   "Mic sensitivity: how loud a sound must be to count as singing": "마이크 감도: 노래로 들을 소리의 크기",
-  "Filter out speaker sound": "스피커 소리 걸러내기", "Note names": "음 이름", "Accent color": "강조 색", "Aurora": "오로라", "The glow behind Practice, as the song plays": "노래가 나오는 동안 연습 화면 뒤에 비치는 빛",
+  "Filter out speaker sound": "스피커 소리 걸러내기", "Note names": "음 이름", "Accent color": "강조 색", "Vibrant": "비비드", "Your color through the whole app, not just its highlights": "강조 색만이 아니라 앱 전체를 내 색으로", "Aurora": "오로라", "The glow behind Practice, as the song plays": "노래가 나오는 동안 연습 화면 뒤에 비치는 빛",
   "General": "일반", "Advanced": "고급", "Settings sections": "설정 항목", "The app’s words": "앱에 쓰이는 말", "On the stage and the keyboard": "무대와 건반에 표시",
   "Your pitch and the highlights": "내 음정과 강조 표시", "What you sing into": "노래할 때 쓰는 마이크",
   "How loud a sound must be to count as singing": "노래로 들을 소리의 크기", "For speakers; leave it off with headphones": "스피커용이에요. 헤드폰을 쓸 땐 꺼 두세요",

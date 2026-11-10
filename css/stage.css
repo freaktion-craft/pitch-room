@@ -105,21 +105,14 @@
   display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.62); padding-bottom: var(--space-1); }
 .key.b { position: absolute; top: 0; width: 16px; height: 52px; background: var(--key-b); border-radius: 0 0 var(--radius-xs) var(--radius-xs); z-index: 1; }
 /* your colour as each key shows it: held to a lightness that stands 3:1 off the key (--key-w-lit, --key-b-lit), and its
-   tint for a key pointed at, as light for every colour (--key-w-tint, --key-b-tint). Each in your colour's hue, with no
-   more chroma than every colour can have at its lightness (one the screen can't show is clipped, which turns its hue):
-   held deeper, all of it, or for orange to teal as much as its shade keeps (c × l′/l: tokens.css's shade switch on the
-   hue); held lighter, as much as is left of it on the way to white; pointed at, 0.3 of it on a white key but no more
-   than 0.47 × the way to white (near white the screen has little chroma, blue least), 0.45 on a black key but no more
-   than its shade's. contrast.py checks them. Where the browser can't work a colour out from another (or can't take a
-   cos() of its hue), your colour as it is and a mix of it */
+   tint for a key pointed at, as light for every colour (--key-w-tint, --key-b-tint). Where the browser can't work a
+   colour out from another, your colour as it is and a mix of it */
 .keys { --key-w-voice: var(--voice); --key-b-voice: var(--voice); --on-key-w-voice: var(--on-voice);
   --key-w-hover: color-mix(in oklab, var(--voice) 30%, var(--key-w)); --key-b-hover: color-mix(in oklab, var(--voice) 45%, var(--key-b)); }
-@supports (color: oklch(from red l calc(c * cos(h * 1deg)) h)) {
-  .keys { --key-w-voice: oklch(from var(--voice) min(l, var(--key-w-lit)) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1) * (1 - min(1, var(--key-w-lit) / l)))) h);
-    --key-b-voice: oklch(from var(--voice) max(l, var(--key-b-lit)) calc(c * min(1, (1 - var(--key-b-lit)) / (1 - l))) h);
+@supports (color: oklch(from red l c h)) {
+  .keys { --key-w-voice: oklch(from var(--voice) min(l, var(--key-w-lit)) c h); --key-b-voice: oklch(from var(--voice) max(l, var(--key-b-lit)) c h);
     --on-key-w-voice: var(--on-key-down);
-    --key-w-hover: oklch(from var(--voice) var(--key-w-tint) min(c * 0.3, (1 - var(--key-w-tint)) * 0.47) h);
-    --key-b-hover: oklch(from var(--voice) var(--key-b-tint) calc(c * min(0.45, var(--key-b-tint) / l)) h); }
+    --key-w-hover: oklch(from var(--voice) var(--key-w-tint) calc(c * 0.3) h); --key-b-hover: oklch(from var(--voice) var(--key-b-tint) calc(c * 0.45) h); }
 }
 .key.guide.w { background: var(--key-w-on); }
 .key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }

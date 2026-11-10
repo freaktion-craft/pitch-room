@@ -736,7 +736,7 @@ function drawEq(now, hearing) {
       const x = xOf(k * f0); g.strokeStyle = k === lead ? C.voice : C.muted; g.fillStyle = k === lead ? C["voice-ink"] : C.muted; g.lineWidth = k === lead ? 2 : 1;
       g.beginPath(); g.moveTo(x, Hp); g.lineTo(x, Hp - 26); g.stroke(); g.fillText("H" + k, x, Hp - 30);
     }
-    if (VC.p2 != null && now - VC.p2At < 300 && VC.p2 >= TN.p2Out) chip(tr("H2 stands out"), xOf(2 * f0), Hp - 44, C["on-fill"], C["voice-fill"]);
+    if (VC.p2 != null && now - VC.p2At < 300 && VC.p2 >= TN.p2Out) chip(tr("H2 stands out"), xOf(2 * f0), Hp - 44, C["on-voice"], C.voice);
   }
   // the envelope, and the formants as dots on it with their Hz on a tab above (only while the vowel can be read)
   const blur = !vcVowelRead();
@@ -748,7 +748,7 @@ function drawEq(now, hearing) {
     chip(`F${i + 1} ${Math.round(f)}`, x, y - 10 - row * 22, C.ink, C["surface-2"]);
   });
   // the note's fundamental, named on the Hz line in the gutter
-  if (f0) chip(absName(sung + 12 * Math.log2(A4 / 440)), xOf(f0), H - 2, C["on-fill"], C["voice-fill"]);
+  if (f0) chip(absName(sung + 12 * Math.log2(A4 / 440)), xOf(f0), H - 2, C["on-voice"], C.voice);
   g.textAlign = "left";
 }
 

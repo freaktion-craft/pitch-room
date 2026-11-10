@@ -561,12 +561,12 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(-
    in may set its own --fader-fill (a Studio track that's out of the mix: grey), so that's not set on the input */
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; max-width: 100%; height: var(--control-sm); margin: 0; background: transparent; --p: 0%; }
 input[type="range"]::-webkit-slider-runnable-track { height: var(--fader); border-radius: var(--radius-2xs);
-  background: linear-gradient(to right, var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)) var(--p), var(--fill) var(--p)); }
+  background: linear-gradient(to right, var(--fader-fill, var(--slider-fill)) var(--p), var(--fill) var(--p)); }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: var(--thumb); height: var(--fader); border: 0; border-radius: var(--radius-xs); background: var(--ink);
   transition: background-color var(--duration-fast); }
 input[type="range"].hot::-webkit-slider-thumb { background: var(--knob-hot); }
 input[type="range"]::-moz-range-track { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fill); }
-input[type="range"]::-moz-range-progress { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)); }
+input[type="range"]::-moz-range-progress { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fader-fill, var(--slider-fill)); }
 input[type="range"]::-moz-range-thumb { width: var(--thumb); height: var(--fader); border: 0; border-radius: var(--radius-xs); background: var(--ink); transition: background-color var(--duration-fast); }
 input[type="range"].hot::-moz-range-thumb { background: var(--knob-hot); }
 input[type="range"]:disabled { opacity: 0.4; }
@@ -582,7 +582,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--knob);
   box-shadow: var(--shadow-knob); transition: transform var(--duration-base) var(--ease); }
 .switch:checked { background: var(--voice-mark); } /* on: your colour, its knob dark in the dark theme and white in the light */
-.switch:checked::after { transform: translateX(16px); background: var(--on-mark); }
+.switch:checked::after { transform: translateX(16px); background: var(--on-ink); }
 .hint { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-sm); }
 .credit { margin: var(--space-3) 0 0; color: var(--faint); font-size: var(--text-xs); }
 #keysWrap { display: flex; align-items: flex-end; gap: var(--space-6); } /* the keys, and the piano's credit in the room beside them */
@@ -619,7 +619,7 @@ input[type="range"]:disabled { opacity: 0.4; }
 .pop .btn.primary { background: var(--surface-2); color: var(--ink); }
 .pop .btn.primary:hover { background: var(--hover-2); }
 /* round, it's Play and Pause (a song's page, Practice, Takes Studio): your colour, the one button you press that takes
-   it (Mono's the ink), its glyph in the text on it (.pp: currentColor); pointed at, a deeper step in its hue */
+   it (Mono's the ink), its glyph in the text on it (.pp: currentColor); pointed at, a step towards the strongest ink */
 .btn.primary.round { background: var(--play); color: var(--on-play); }
 .btn.primary.round:hover { background: var(--play-hover); }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
