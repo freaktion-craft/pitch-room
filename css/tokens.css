@@ -157,7 +157,7 @@
   --voice-white: oklch(0.32 0 0);
   --voice-blue: oklch(0.648 0.178 262); --voice-violet: oklch(0.662 0.192 295); --voice-pink: oklch(0.9 0.055 350); --voice-coral: oklch(0.667 0.21 32);
   --voice-orange: oklch(0.654 0.149 58); --voice-amber: oklch(0.646 0.126 82); --voice-green: oklch(0.62 0.162 150); --voice-teal: oklch(0.631 0.102 195);
-  --voice-sky: oklch(0.8 0.09 236); /* sky blue, a pastel as baby pink is */
+  --voice-sky: oklch(0.9 0.055 236); /* baby sky, a soft blue-white as Pink is (the #b9e4ff asked for, about) */
   --on-voice: var(--on-accent); --on-voice-mono: oklch(1 0 0);
   --voice-ink: color-mix(in oklab, var(--voice) 50%, var(--ink));
   --voice-mark: var(--voice-act); /* deepened where the browser can (below) */
@@ -236,6 +236,10 @@
    a main button's fill is (not deepened to a mark's 0.66, which went mauve), its glyph the deep shade a main button's
    text is; pointed at, a step deeper in the same hue */
 :root[data-theme="light"][data-pastel][data-tone="vibrant"] { --play: var(--voice); --on-play: var(--voice-deep); --play-hover: var(--voice-press); }
+/* Vibrant, light: the ink's a shade of your colour, so the sung words go deeper and fuller than it (a pastel a clear,
+   full rose or blue): they part from the unsung by colour as well as lightness, and the line you're on stays the
+   strongest (the unsung part greyed instead read duller than the lines after it) */
+:root[data-theme="light"][data-tone="vibrant"] { --sung-hi: 0.58; --sung-c: 0.15; }
 /* Vibrant: Play and a slider's filled part in your colour (off, they're the ink: above) */
 :root[data-tone="vibrant"], :root[data-tone="vibrant"] .theme-dark {
   --play: var(--voice-mark); --on-play: var(--on-voice); --play-hover: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong));

@@ -41,15 +41,13 @@
 @supports (color: oklch(from red l c h)) { .lylist, .countin { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) max(c, calc(var(--sung-c) * min(max((l - 0.7) * 100, 0), 1))) h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi); the count-in's dots in it too */
 .lylist p:is(.now, .b1) span:not(.sys) { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
-/* what's not sung yet of the line, well under the ink (six tenths of it: at three quarters it still read as black): the
-   sung part stands out by more than its colour (the brackets' words keep their own grey; a syllable takes its word's) */
-.lylist p:is(.now, .b1) span:not(.bg, .sy) { --un: color-mix(in oklab, var(--ink) 60%, transparent); }
-/* with Vibrant on the ink's a shade of your colour, so the unsung part's near grey (a trace of it): the sung part parts
-   from it by its colour, not only by lightness */
-@supports (color: oklch(from red l c h)) { :root[data-tone="vibrant"] .lylist p:is(.now, .b1) span:not(.bg, .sy) { --un: oklch(from var(--ink) l min(c, 0.015) h / 0.6); } }
+/* what's not sung yet of the line, well under the ink (two thirds of it: at three quarters it still read as black): the
+   sung part stands out by more than its colour (the brackets' words keep their own grey; a syllable takes its word's).
+   Never under the next line's, so the line you're on reads the strongest */
+.lylist p:is(.now, .b1) span:not(.bg, .sy) { --un: color-mix(in oklab, var(--ink) 66%, transparent); }
 .lylist.still, .lylist.still p { transition: none; } /* new lines (renderLyrics): there at once */
 .lylist p.n1 { opacity: 0.55; } /* 5.3:1, read without effort like --muted */
-.lylist p.n1.soon { opacity: 0.8; } /* its turn is coming: time to read it */
+.lylist p.n1.soon { opacity: 0.62; } /* its turn is coming: a step up, still under the line you're on (at 0.8 it outshone it) */
 .lylist p.n2 { opacity: 0.35; }
 .lylist p.b1 { opacity: 0.2; }
 .lylist p.b1.live { opacity: 1; transition: none; }
