@@ -61,6 +61,7 @@ function paintAccent() {
     n.style.setProperty("--voice-act", accent === "white" ? "var(--ink)" : `var(--voice-${accent})`); // a button in it: Mono at full
     if (accent === "white") n.style.setProperty("--on-voice", "var(--on-voice-mono)"); else n.style.removeProperty("--on-voice"); // (text on it)
   }
+  document.documentElement.toggleAttribute("data-pastel", accent === "pink" || accent === "sky"); // (kept soft in the light theme: tokens.css)
 }
 function setAccent(k) {
   accent = k; store.set("accent", k);
