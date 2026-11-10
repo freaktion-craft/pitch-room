@@ -272,7 +272,7 @@ function drawWave() {
   if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(96 * d); }
   const x = c.getContext("2d"), W = r.width, H = 96; x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
   const prog = playheadShown(W);
-  x.fillStyle = C.ink;
+  x.fillStyle = C.wave || C.ink; // (your colour with Vibrant on: tokens.css)
   const rise = matchMedia("(prefers-reduced-motion: reduce)").matches ? Infinity : performance.now() - P.peaksAt;
   if (P.peaks) {
     const soloed = Object.keys(P.tracks).filter((k) => P.tracks[k].solo && P.trackPeaks && P.trackPeaks[k]);
