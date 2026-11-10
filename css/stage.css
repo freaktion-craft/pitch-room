@@ -111,9 +111,12 @@
 .keys { --key-w-voice: var(--voice); --key-b-voice: var(--voice); --on-key-w-voice: var(--on-voice);
   --key-w-hover: color-mix(in oklab, var(--voice) 30%, var(--key-w)); --key-b-hover: color-mix(in oklab, var(--voice) 45%, var(--key-b)); }
 @supports (color: oklch(from red l c h)) {
-  .keys { --key-w-voice: oklch(from var(--voice) min(l, var(--key-w-lit)) c h); --key-b-voice: oklch(from var(--voice) max(l, var(--key-b-lit)) c h);
+  /* (a pastel, L over 0.7, on a white key: bright and clear, --key-w-pastel and a soft chroma; deepened to the others'
+     lightness it read dark and dusty) */
+  .keys { --key-w-voice: oklch(from var(--voice) min(l, calc(var(--key-w-lit) + (var(--key-w-pastel) - var(--key-w-lit)) * min(max((l - 0.7) * 100, 0), 1))) max(c, calc(0.09 * min(max((l - 0.7) * 100, 0), 1))) h); --key-b-voice: oklch(from var(--voice) max(l, var(--key-b-lit)) c h);
     --on-key-w-voice: var(--on-key-down);
     --key-w-hover: oklch(from var(--voice) var(--key-w-tint) calc(c * 0.3) h); --key-b-hover: oklch(from var(--voice) var(--key-b-tint) calc(c * 0.45) h); }
+  :root[data-pastel] .keys { --on-key-w-voice: var(--on-voice); } /* (on a pastel that bright, the C's label dark in either theme) */
 }
 .key.guide.w { background: var(--key-w-on); }
 .key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }
