@@ -49,10 +49,12 @@ function notice(msg) {
   clearTimeout(notice.timer); notice.timer = setTimeout(() => { box.hidden = true; }, 4000);
 }
 
-// keyboards: Practice's, and the one on Chest & head voice
+// keyboards: Practice's, and the one on Chest & head voice. Each key's named (aria-label), and the name shows as you point
+// at it (its title: tooltips), so you know the note before you press it: in the note names you picked, spelt as the
+// song's key has them (again on a change: the names, the key)
 const KEY_LO = 36, KEY_HI = 84, KW = 26;
 const keyEls = new Map(), vcKeyEls = new Map();
-const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
+const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => { const n = absName(m); b.setAttribute("aria-label", n); b.title = n; }); };
 function buildKeys(box, keyEls, onPress = playKey) {
   let wi = 0;
   for (let m = KEY_LO; m <= KEY_HI; m++) {

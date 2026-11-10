@@ -62,6 +62,13 @@
   --glow-mix: 70%; /* a held syllable's glow: how much of your colour's in it */
   --note-bg: oklch(0.27 0.03 75); --note-ink: oklch(0.86 0.09 80); --warn-ink: oklch(0.8 0.13 80);
   --key-w: oklch(0.87 0 0); --key-b: oklch(0.22 0 0); --key-w-on: oklch(0.72 0 0); --key-b-on: oklch(0 0 0);
+  /* your colour on the piano's keys (stage.css: a key held down, the bar of the note you're singing, a key's focus
+     ring): at most --key-w-lit light on a white key and at least --key-b-lit on a black one, so it's 3:1 on the key
+     whatever colour it is (on a white key every colour goes deeper, Mono's white and the pastels most; every colour's
+     lighter than --key-b-lit already); the C's label on it white (--on-key-down). Pointed at, a tint of it, as light for
+     every colour (--key-w-tint, --key-b-tint): plainly lighter than held, and on a white key between its face and the
+     guide's grey */
+  --key-w-lit: 0.52; --key-b-lit: 0.5; --key-w-tint: 0.8; --key-b-tint: 0.4; --on-key-down: oklch(1 0 0);
   /* a key in the library, in a chip of its Camelot hue (stems.css): its ink's and its chip's lightness and chroma,
      a minor key's dimmer, and how much of the chip shows */
   --chip-major-ink: 0.86 0.09; --chip-major-bg: 0.78 0.13; --chip-minor-ink: 0.76 0.08; --chip-minor-bg: 0.64 0.11; --chip-a: 0.16;
@@ -134,6 +141,9 @@
   --glow-mix: 45%;
   --note-bg: oklch(0.95 0.035 85); --note-ink: oklch(0.42 0.07 70); --warn-ink: oklch(0.5 0.1 70);
   --key-w: oklch(1 0 0); --key-b: oklch(0.3 0 0); --key-w-on: oklch(0.86 0 0); --key-b-on: oklch(0.12 0 0);
+  /* (the colours are 3:1 on white already: the pastels go deeper on a white key, Mono's near-black lighter on a black one;
+     the label as on your colour) */
+  --key-w-lit: 0.66; --key-b-lit: 0.6; --key-w-tint: 0.93; --key-b-tint: 0.44; --on-key-down: var(--on-voice);
   --chip-major-ink: 0.45 0.1; --chip-major-bg: 0.7 0.12; --chip-minor-ink: 0.5 0.06; --chip-minor-bg: 0.6 0.06; --chip-a: 0.14;
   --sung-lo: 0.5; --sung-hi: 0.64; /* Mono (near-black) goes grey, or the sung part's the ink; baby pink deeper, so it reads (3.2:1) */
   --aurora: 0.55;
