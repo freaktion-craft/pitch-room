@@ -174,10 +174,10 @@
   --shadow-lift: 0 24px 64px rgba(0, 0, 0, 0.28);
   color-scheme: light;
 }
-/* your colour as a mark in the light theme: no lighter than L 0.66, which leaves the vivid ones about as they are and
-   deepens the pastels, as the sung words are (--sung-hi). Where the browser can't work it out, --voice-act as it is
+/* your colour as a mark in the light theme: no lighter than L 0.66, which leaves the vivid ones about as they are; the
+   pastels (Pink, Sky) as they are, baby pink and sky blue (deepened they went dusty: the owner's call over contrast). Where the browser can't work it out, --voice-act as it is
    (the light block's). At the light block's specificity, after it, so it wins */
-@supports (color: oklch(from red l c h)) { :root[data-theme="light"] { --voice-mark: oklch(from var(--voice-act) min(l, 0.66) c h);
+@supports (color: oklch(from red l c h)) { :root[data-theme="light"] { --voice-mark: oklch(from var(--voice-act) calc(min(l, 0.66) + (l - min(l, 0.66)) * min(max((l - 0.7) * 100, 0), 1)) c h); /* (the pastels, L over 0.7, as they are: deepened they went dusty) */
   /* (and for the pastels' Play, either way: a clean deep shade of them for its glyph, and a step deeper pointed at; the
      others' and Mono's as the plain values have them) */
   --voice-deep: oklch(from var(--voice) calc(0.2 + max(l - 0.7, 0) * 1.6 + min(c * 0.8, 0.1) * min(max((l - 0.7) * 100, 0), 1)) calc(min(max((l - 0.7) * 100, 0), 1) * c * 0.97) h);
