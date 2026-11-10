@@ -51,10 +51,10 @@
 .strip { position: relative; flex: 1 1 240px; height: var(--control-sm); border-radius: var(--radius-sm); background: var(--fill); cursor: pointer; touch-action: pan-y; }
 .strip button { position: absolute; top: 4px; bottom: 4px; min-width: 4px; padding: 0; border: 0; border-radius: var(--radius-xs); background: var(--phrase); cursor: pointer; }
 .strip button:hover { background: var(--phrase-hover); }
-.strip button[aria-current="true"] { background: color-mix(in oklab, var(--voice-mark) 85%, var(--phrase)); } /* the one you're in, in your colour (a pastel as it is), plainly apart from the rest: full while it loops */
-.strip.looping button[aria-current="true"] { background: var(--voice-mark); }
+.strip button[aria-current="true"] { background: color-mix(in oklab, var(--phrase-on) 85%, var(--phrase)); } /* the one you're in, in your colour (a pastel a step fuller), plainly apart from the rest: full while it loops */
+.strip.looping button[aria-current="true"] { background: var(--phrase-on); }
 .strip button.inspan { background: var(--phrase-hover); } /* a run of phrases looped together */
-.strip.looping button.inspan:not([aria-current="true"]) { background: color-mix(in oklab, var(--voice-mark) 50%, var(--phrase)); } /* the rest of the run, a step under it */
+.strip.looping button.inspan:not([aria-current="true"]) { background: color-mix(in oklab, var(--phrase-on) 50%, var(--phrase)); } /* the rest of the run, a step under it */
 /* over the strip, at once: the words of the phrase hovered, or reached by a drag */
 .strip-tip { position: fixed; z-index: var(--z-tooltip); transform: translate(-50%, -100%); max-width: min(360px, calc(100vw - 16px)); padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); line-height: 16px; pointer-events: none; }

@@ -448,11 +448,11 @@ for bg in ["--bg", "--surface"]:
     for fg in ["--ink", "--muted", "--faint", "--bad", "--orange", "--warn-ink", "--good"]:
         PAIRS.append((fg, bg, 4.5))
     for k in ACCENTS:  # your colour as a line, a dot, a fill and large text (a sung word): 3:1; as small text, mixed
-        PAIRS.append((f"--voice-{k}", bg, 1.5 if k in ("pink", "sky") else 3, k))  # with the ink as --voice-ink is: 4.5:1 (pink, sky: pastels, by choice)
-        PAIRS.append((f"mix:--voice-{k}", bg, 3 if k in ("pink", "sky") else 4.5, k))  # (the pastels mixed with their soft ink: kept soft, PASTELS)
+        PAIRS.append((f"--voice-{k}", bg, 1.2 if k in ("pink", "sky") else 3, k))  # with the ink as --voice-ink is: 4.5:1 (pink, sky: pastels, by choice)
+        PAIRS.append((f"mix:--voice-{k}", bg, 2.5 if k in ("pink", "sky") else 4.5, k))  # (the pastels mixed with their soft ink: kept soft, PASTELS)
         # as a mark (--voice-mark: the section's line, a switch on): 3:1; the pastels, by choice, are
         # 2.77 (sky) and 2.94 (pink) on the light theme's page, at the others' lightness (3.06, 3.26 on the card)
-        PAIRS.append((f"mark:--voice-{k}", bg, 1.5 if k in ("pink", "sky") else 3, k))  # (the pastels as they are, the owner's call: baby pink, not deepened to dusty)
+        PAIRS.append((f"mark:--voice-{k}", bg, 1.2 if k in ("pink", "sky") else 3, k))  # (the pastels as they are, the owner's call: baby pink, not deepened to dusty)
 PAIRS += [("--ink", "--surface-2", 4.5), ("--muted", "--surface-2", 4.5), ("--ink", "--seg-on", 4.5), ("--ink", "--hover-2", 4.5),
           ("--on-ink", "--ink", 4.5), ("--on-ink-muted", "--ink", 4.5), ("--on-primary", "--primary", 4.5), ("--on-primary", "--primary-hover", 4.5), ("--on-play", "--play", 3), ("--wave", "--fill|--surface", 3),("--on-ink", "--ink-strong", 4.5), ("--note-ink", "--note-bg", 4.5),
           ("--on-solo", "--solo", 4.5), ("--solo", "--tog-down", 3),
@@ -468,7 +468,7 @@ PAIRS += [("--ink", "--fill|--bg", 4.5), ("--ink", "--fill|--surface", 4.5), ("-
 for k in ACCENTS:
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5, k))
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"mark:--voice-{k}", 4.5, k))  # on a mark's fill (a take playing, Loop on)
-    PAIRS.append(("--on-ink", f"mark:--voice-{k}", 1.5 if k in ("pink", "sky") else 3, k))  # a switch's knob, on (sky's 2.97 in the light theme)
+    PAIRS.append(("--on-ink", f"mark:--voice-{k}", 1.2 if k in ("pink", "sky") else 3, k))  # a switch's knob, on (sky's 2.97 in the light theme)
     PAIRS.append(("--ink", f"mark:--voice-{k}/50%", 3, k))  # a fader's cap on its fill (base.css: half the mark, over the card; Mono's 3.2 in the dark theme, 2.85 at 55 %)
     PAIRS.append(("--on-mark", f"mark:--voice-{k}", 3, k))  # a glyph on your colour as a mark (Loop and the click on, a take playing, Compare): white in the light theme
     PAIRS.append(("--on-fill", f"fill:--voice-{k}", 4.5, k))  # text on your colour as a label (the playhead's time, the version you're in, the Lab's chips)
