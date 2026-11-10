@@ -356,7 +356,7 @@ def backdrop(t, bg, p3):
 # see-through is laid over the next one along (a chip over the card): "a|b", or over the card where there's none.
 # Each is checked with every accent picked (the greys follow it), but one that's an accent's own (the fourth: that
 # accent), only with that one.
-ACCENTS = ["white", "coral", "orange", "amber", "green", "teal", "sky", "blue", "violet", "pink"]
+ACCENTS = ["white", "orange", "amber", "green", "teal", "sky", "blue", "violet", "pink"]
 named = lambda k: "Mono" if k == "white" else k.capitalize()  # as Settings names them ("white" is Mono's key)
 PAIRS = []
 for bg in ["--bg", "--surface"]:
