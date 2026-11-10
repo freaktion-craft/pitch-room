@@ -517,7 +517,7 @@ function initScales() {
     b.onclick = () => { if (k !== SV.on) scSetOn(k); };
     $("#vcVowels").append(b);
   }
-  $("#scHide").append(icon("hide"));
+  $("#scHide").append(icon("view")); // (an eye, pressed or not: its pressed state says it's hidden; the struck-out eye read as hidden already)
   $("#scHide").onclick = () => scSetHide(!SV.hide);
   $("#scSlow").onclick = () => scSetSlow(!SV.slow);
   // in a set: come down from here (an arrow down, ↓) and this key again (again's arrow round, R: app.js's keys)
