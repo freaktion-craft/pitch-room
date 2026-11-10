@@ -51,6 +51,15 @@
 /* a syllable held a long time: a glow that grows as it's held (the letters stay still) */
 .lylist span { transition: filter var(--duration-slow); } /* let go of, it fades */
 .lylist .held { transition: none; filter: drop-shadow(0 0 calc(var(--g, 0) * 7px) color-mix(in oklab, var(--voice) var(--glow-mix), transparent)); }
+/* the word being sung rises a touch as the fill reaches it and stays up while its line's sung, then the line settles
+   (renderLyrics: --r, 0 to 1, eased, on the song's time). By top, which moves a word where it's drawn and nothing else: no
+   row, no word beside it and no line's height changes (a transform doesn't take on a word, and inline-block would change
+   where a long one breaks). A tenth of the lyrics' size (--ly), in whole px: letters are drawn on whole pixels, so every
+   row rises as far, and risen they're as sharp as they were (1 px at 15 px, 2 px from 16 to 25, 3 px above; the
+   brackets' smaller words a tenth of theirs). The count-in stays still: it counts, it isn't sung */
+@media (prefers-reduced-motion: no-preference) {
+  .lylist p:is(.now, .b1) span { position: relative; top: calc(var(--r, 0) * round(-0.1em, 1px)); }
+}
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
    drawn there during an intro or break, while the coming bars arrive from the right */

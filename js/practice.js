@@ -811,6 +811,20 @@ function lineShown(t, free) { // free: whatever's looping or counting in (a take
 // about 70 ms early best (Deezer's study of 53 people, ISMIR 2021).
 const LYRIC_LEAD = 0.07;
 const LYRIC_SOON = 1.2, LYRIC_HOLD = 1; // the next line brightens this long before its turn (s); a syllable held this long glows as it's held
+// A word rises a touch as the fill reaches it (stage.css: top, by --r), eased as --ease, over its own length or LYRIC_RISE,
+// whichever's longer, and stays up while its line's sung; once the line's last word is over (as the line before dims,
+// losing .live) the line settles, over LYRIC_SETTLE. On the song's time, as the fill is: a seek, a loop or a pause puts it
+// where it would be, never on its way there.
+const LYRIC_RISE = 0.6, LYRIC_SETTLE = 0.4; // s as heard
+// --ease (tokens.css) at x, 0 to 1: cubic-bezier(0.16, 1, 0.3, 1), its curve's x found by halving, then its height there.
+function lyEase(x) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const at = (p, q, s) => 3 * s * (1 - s) * ((1 - s) * p + s * q) + s * s * s;
+  let lo = 0, hi = 1;
+  for (let k = 0; k < 16; k++) { const s = (lo + hi) / 2; if (at(0.16, 0.3, s) < x) lo = s; else hi = s; }
+  return at(1, 1, (lo + hi) / 2);
+}
 // A word's syllables along its width, measured once it's laid out: where each one's letters end, as a share of the word.
 function lyMeasure(x) {
   const n = x.s.firstChild, w = x.s.getBoundingClientRect().width;
@@ -822,8 +836,8 @@ function lyMeasure(x) {
   return true;
 }
 // How far along a word the fill is at time t: through each syllable as it's sung, held where it's got to in a rest; a word
-// without syllables (Whisper's), evenly from its start to its end.
-function lyFill(x, t) {
+// without syllables (Whisper's), evenly from its start to its end. And how far it's risen (down: how far its line's settled).
+function lyFill(x, t, down) {
   let f, glow = 0;
   if (t <= x.a) f = 0;
   else if (t >= x.b) f = 1;
@@ -844,6 +858,8 @@ function lyFill(x, t) {
   const v = f <= 0 ? -10 : f >= 1 ? 110 : Math.round(f * 1000) / 10; // past the word's ends: the soft edge of the fill isn't on it
   if (x.v !== v) { x.v = v; x.s.style.setProperty("--p", v + "%"); }
   if (glow || x.glow) { x.glow = glow; x.s.classList.toggle("held", glow > 0); x.s.style.setProperty("--g", glow.toFixed(2)); }
+  const r =Math.round(lyEase((t - x.a) / Math.max(LYRIC_RISE * P.rate, x.b - x.a)) * (1 - down) * 100) / 100;
+  if (x.r !== r) { x.r = r; x.s.style.setProperty("--r", r); } // (only when it changes, as --p)
 }
 const LYRIC_REST = 0.35; // s between two words that's a rest
 // Where a line would rather go to its next row: a rest, a comma, or a change of language (not a lone foreign word), with 30%
@@ -870,7 +886,7 @@ function renderLyrics(now) {
   if (K.lyFor !== K.phrases) {
     K.lyFor = K.phrases; K.lyAt = null; K.lyCountAt = null; K.lyFresh = true; list.classList.add("still"); // (new lines: shown where they are, not faded or slid in)
     K.lyLines = K.phrases.map((ph) => {
-      const p = el("p"), words = ph.words, ws = words.map((w) => ({ a: w[0], b: w[1], parts: w[3] || null, s: el("span", w[4] ? "bg" : null, w[2].trim()) }));
+      const p = el("p"), words = ph.words, ws = words.map((w) => ({ a: w[0], b: w[1], parts: w[3] || null, r: 0, s: el("span", w[4] ? "bg" : null, w[2].trim()) }));
       // backing vocals at the end of a line: a smaller row of their own, as the lines joined in a phrase each have theirs
       let tail = words.length;
       while (tail > 0 && words[tail - 1][4]) tail--;
@@ -927,9 +943,12 @@ function renderLyrics(now) {
   }
   if (!cur) return;
   const t = now + (LYRIC_LEAD + frameDt) * P.rate, before = K.lyLines[i - 1], next = K.lyLines[i + 1];
-  for (const x of cur.ws) lyFill(x, t);
+  const down = (ph) => lyEase((now - ph.t1 - 0.1 * P.rate) / (LYRIC_SETTLE * P.rate)); // a line settling once it's sung, as it stops being .live
+  const dc = down(cur.ph);
+  for (const x of cur.ws) lyFill(x, t, dc);
   if (before) { // the line before stays lit and goes on filling while it's being sung (the list may have moved on already)
-    for (const x of before.ws) lyFill(x, t);
+    const db = down(before.ph);
+    for (const x of before.ws) lyFill(x, t, db);
     before.p.classList.toggle("live", now < before.ph.t1 + 0.1 * P.rate);
   }
   if (next) next.p.classList.toggle("soon", now >= next.ph.t0 - LYRIC_SOON * P.rate && !(K.loop && !(T.play && T.play.srcs) && i >= (K.span ? K.span.b : K.ph))); // (not a line the loop won't reach)
