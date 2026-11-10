@@ -125,8 +125,9 @@ play outside Studio and Practice.
 - `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches
   on), never on what you press; `tokens.css` works it out from `--voice-act` (no lighter than L 0.66 in the light
   theme), so no script sets it.
-- On your colour: a control that holds a glyph (Play, Loop on, a take playing) is `--voice-btn` with `--on-fill` on it,
-  a label that holds text (the playhead's time, a version picked, the Lab's tabs) `--voice-fill` with `--on-fill`, and
+- On your colour: a control that holds a glyph (Play, Loop on, a take playing) is `--voice-btn` with `--on-fill` on it
+  (Play pointed at: `--voice-btn-hot`, a deeper step in the same hue), a label that holds text (the playhead's time, a
+  version picked, the Lab's tabs) `--voice-fill` with `--on-fill`, and
   a switch's knob `--on-mark` on the mark; in the light theme that's white on a fill deep enough for it, a pastel's a
   deep shade on a paler tint (`tokens.css` works them out under `@supports`). Text on the accent as it is (the piano's
   pressed key, the lyric editor's sung words) stays `--on-voice`. The song's waveform played (`--wave`: the overview,
