@@ -49,10 +49,12 @@ function notice(msg) {
   clearTimeout(notice.timer); notice.timer = setTimeout(() => { box.hidden = true; }, 4000);
 }
 
-// keyboards: Practice's, and the one on Chest & head voice
+// keyboards: Practice's, and the one on Chest & head voice. Each key's named (aria-label), and the name shows as you point
+// at it (its title: tooltips), so you know the note before you press it: in the note names you picked, spelt as the
+// song's key has them (again on a change: the names, the key)
 const KEY_LO = 36, KEY_HI = 84, KW = 26;
 const keyEls = new Map(), vcKeyEls = new Map();
-const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
+const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => { const n = absName(m); b.setAttribute("aria-label", n); b.title = n; }); };
 function buildKeys(box, keyEls, onPress = playKey) {
   let wi = 0;
   for (let m = KEY_LO; m <= KEY_HI; m++) {
@@ -467,7 +469,7 @@ document.addEventListener("keydown", (e) => {
     if (e.repeat && /^(Space|KeyL|KeyR|KeyM)$/.test(e.code)) { e.preventDefault(); return; }
     const act = { Space: songToggle, ArrowLeft: e.shiftKey ? songStart : () => phraseStep(-1), ArrowRight: e.shiftKey ? songEnd : () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
       Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: S.dev && !e.repeat ? () => dropNote(e) : null,
-      BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
+      KeyN: !e.repeat ? noteMenuKey : null, BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }
   }
   if (view === "voice" && VC.view === "scale" && SV.run && !e.shiftKey) {

@@ -418,6 +418,17 @@ def chip_pairs(t, p3):
     return out
 
 
+def key_pairs(t, k):
+    """The piano's keys (stage.css) with accent k picked: your colour on a white key at most --key-w-lit light, on a
+    black key at least --key-b-lit (worked out from it as oklch(from ...) has it there), held down: 3:1 on the key; the
+    C's label on it (--on-key-down, with Mono's text on it as stage.js sets it): 4.5:1."""
+    wl, bl = float(resolve(t, t["--key-w-lit"])), float(resolve(t, t["--key-b-lit"]))
+    L, c, h = (num(x) for x in re.findall(r"[\d.]+%?", resolve(t, t[f"--voice-{k}"]).split("(", 1)[1])[:3])
+    w, b = f"oklch({min(L, wl)} {c} {h})", f"oklch({max(L, bl)} {c} {h})"
+    return [("key w held", w, resolve(t, t["--key-w"]), 3), ("key b held", b, resolve(t, t["--key-b"]), 3),
+            ("key w label", resolve(t, t["--on-key-down"]), w, 4.5)]
+
+
 def rows(css, light, p3):
     """Every pair in this theme with each accent picked: [(accent, pair, contrast or None, at least, why)]."""
     out, t0 = [], theme(css, light, p3)
@@ -436,6 +447,8 @@ def rows(css, light, p3):
         for label, ink, bg in chip_pairs(t, p3):
             b = over(parse_colour(bg, p3), base)
             out.append((k, label, contrast_rgb(parse_colour(ink, p3)[0], b[0]), 4.5, ""))
+        for label, fg, bg, need in key_pairs(t, k):
+            out.append((k, label, contrast_rgb(parse_colour(fg, p3)[0], parse_colour(bg, p3)[0]), need, ""))
     return out
 
 
