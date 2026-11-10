@@ -111,6 +111,7 @@
     --fg-46: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.46 * (1 + min(c, 0.05) * 4.4)));
     --fg-55: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.55 * (1 + min(c, 0.05) * 4.4)));
     --fg-80: oklch(from var(--voice) calc(1 - min(c, 0.05) * 2.4) min(c, 0.05) h / calc(0.8 * (1 + min(c, 0.05) * 4.4)));
+    --stem-band: oklch(from var(--voice) 0.74 min(c, 0.05) h); /* the band's icons and waveforms, tone on tone with the names beside them (a plain grey stood out) */
     --bg: oklch(from var(--voice) 0.165 min(c, 0.008) h); --surface: oklch(from var(--voice) 0.2 min(c, 0.01) h);
     --surface-2: oklch(from var(--voice) 0.275 min(c, 0.014) h); --hover-2: oklch(from var(--voice) 0.315 min(c, 0.016) h);
     --tog-down: oklch(from var(--voice) 0.21 min(c, 0.01) h);
@@ -196,6 +197,7 @@
     --fg-46: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.46 * (1 + min(c * 0.34, 0.06) * 3.6)));
     --fg-55: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.55 * (1 + min(c * 0.34, 0.06) * 3.6)));
     --fg-80: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.8 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --stem-band: oklch(from var(--voice) calc(0.55 + max(l - 0.7, 0) * 0.5) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h); /* the band's icons and waveforms in the text's tone (a pastel's softer, as its text is) */
     --bg: oklch(from var(--voice) calc(0.965 + min(c, 0.006) * 0.1) min(c, 0.006) h); --surface-2: oklch(from var(--voice) 0.935 min(c, 0.01) h);
     --hover-2: oklch(from var(--voice) 0.9 min(c, 0.014) h); --tog-down: oklch(from var(--voice) 0.88 min(c, 0.014) h);
     --fg-2: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.02 * (1 + min(c, 0.06) * 3.6)));
