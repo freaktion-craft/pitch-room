@@ -7,12 +7,13 @@ const cv = $("#cv"), g = cv.getContext("2d");
 let W = 0, H = 0, dpr = 1, C = {};
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ["surface","surface-2","ink","muted","line","voice","good","warn","orange","bad"]) C[k] = cs.getPropertyValue("--" + k).trim();
+  for (const k of ["ink","muted","voice","good","warn","orange","bad"]) C[k] = cs.getPropertyValue("--" + k).trim();
   // the track colours through an element's computed colour, which works out the color-mix() of the backing vocals
   const probe = readColors.probe || (readColors.probe = document.body.appendChild(Object.assign(el("i"), { hidden: true })));
   for (const k of ["vocals","lead","backing","drums","bass","guitar","piano","other","click"]) { probe.style.color = `var(--stem-${k})`; C["stem-" + k] = getComputedStyle(probe).color; }
-  // (and your colour as small text, a color-mix in the light theme, and text on it)
-  for (const k of ["voice-ink", "on-voice"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
+  // (and your colour as small text, a color-mix in the light theme, and text on it; and the greys with a trace of it,
+  // relative colours worked out from it: the card, a button's grey, a line)
+  for (const k of ["voice-ink", "on-voice", "surface", "surface-2", "line"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
 }
 function resize() {
   const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);

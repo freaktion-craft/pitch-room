@@ -622,8 +622,9 @@ function paintCover(tile, m) {
 const TILT = 16, NEAR = 1.2, CV_DEPTH = 900; // px: the eye's distance for the tilt (about twice the cover's size)
 const CV = { tile: null, x: 0, y: 0, tx: 0, ty: 0, raf: 0, closing: false };
 const stillMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-// its shadow, none, its edge as it is (the theme's: --fg-6, .cv-card): as it leaves and lands on the tile
-const cvFlat = () => `0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 1px ${getComputedStyle(document.documentElement).getPropertyValue("--fg-6").trim()}`;
+// its shadow, none, its edge as it is (the theme's: --fg-6, .cv-card): as it leaves and lands on the tile. The edge's
+// colour as the browser works it out (its text is a relative colour), through stage.js's hidden element (readColors)
+const cvFlat = () => { const p = readColors.probe; p.style.color = "var(--fg-6)"; return `0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 1px ${getComputedStyle(p).color}`; };
 // the transform that puts the big cover over the tile: the step between them, as a FLIP animation's first frame
 function overTile(tile, fly) {
   const a = tile.getBoundingClientRect(), b = fly.getBoundingClientRect(), s = a.width / b.width;
