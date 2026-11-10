@@ -199,16 +199,17 @@ label.set-row { cursor: pointer; }
 .gate-acts { display: flex; gap: var(--space-2); }
 /* the mic: the header's own button's look (.btn.quiet.mic), on and off, the same in both places */
 .gate { position: relative; height: 20px; }
-.gate-meter { position: absolute; left: 0; right: 0; top: 6px; height: 8px; border-radius: var(--radius-pill); background: var(--fg-8); overflow: hidden; }
+/* the bar as a fader's (as tall, as round), across the middle of the gate's 20 px */
+.gate-meter { position: absolute; left: 0; right: 0; top: calc(50% - var(--fader) / 2); height: var(--fader); border-radius: var(--radius-2xs); background: var(--fg-8); overflow: hidden; }
 .gate-meter i { display: block; height: 100%; width: 0; background: var(--fg-30); }
 .gate-meter i.on { background: var(--voice); }
-.gate input[type="range"] { position: absolute; top: 0; left: -6px; width: calc(100% + 12px); height: 20px; margin: 0; }
-/* the track as tall as the handle, so the handle's line stands over the bar, its middle on the bar's */
+.gate input[type="range"] { position: absolute; top: 0; left: calc(var(--thumb) / -2); width: calc(100% + var(--thumb)); max-width: none; height: 20px; margin: 0; } /* (wider than its box by the cap, which a slider's max-width would stop: the cap's middle reaches both ends of the bar) */
+/* the handle a fader's cap, but the gate's whole 20 px tall, so it stands 4 px past the bar above and below, a line
+   across it; its track as tall and clear, so the cap's middle is on the bar's */
 #gate::-webkit-slider-runnable-track { height: 20px; background: transparent; }
 #gate::-moz-range-track, #gate::-moz-range-progress { height: 20px; background: transparent; }
-#gate::-webkit-slider-thumb { width: 12px; height: 20px; margin-top: 0; border-radius: var(--radius-xs); background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
-#gate::-moz-range-thumb { width: 12px; height: 20px; border-radius: var(--radius-xs); background: linear-gradient(90deg, transparent 4px, var(--ink) 4px 8px, transparent 8px); }
-#gate.hot::-webkit-slider-thumb { background: linear-gradient(90deg, transparent 4px, var(--knob-hot) 4px 8px, transparent 8px); transform: none; }
+#gate::-webkit-slider-thumb { height: 20px; }
+#gate::-moz-range-thumb { height: 20px; }
 /* the accent colour: a row of swatches in the settings, at the right of its row */
 .swatches { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); margin-right: calc(var(--space-1) * -1); } /* the last dot, not its ring, at the rows' right edge */
 .swatch { width: 32px; height: 32px; padding: var(--space-1); border: 0; border-radius: 50%; background: content-box var(--c); flex: none; transition: box-shadow var(--duration-fast); }
@@ -552,32 +553,23 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(-
 @keyframes ring-spin { to { transform: rotate(270deg); } }
 @media (prefers-reduced-motion: reduce) { .ring.spin { animation: none; } }
 .pick-list [aria-selected="true"] .ico { visibility: visible; color: var(--voice-mark); } /* the tick, in your colour */
-/* Sliders: a thin line, filled in your colour up to the handle (--p, which sliderTips keeps in step: Chrome has no style
-   for that part), and a small round handle in ink that turns a muted grey under the pointer or while it's held */
-input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; max-width: 100%; height: 20px; margin: 0; background: transparent; --p: 0%; }
-input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: var(--radius-pill); background: linear-gradient(to right, var(--voice-mark) var(--p), var(--track) var(--p)); }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: calc(var(--space-1) * -1); border: 0; border-radius: 50%; background: var(--ink);
-  transition: background-color var(--duration-fast), transform var(--duration-fast) var(--ease); }
-input[type="range"].hot::-webkit-slider-thumb { background: var(--knob-hot); transform: scale(1.17); }
-input[type="range"]::-moz-range-track { height: 4px; border-radius: var(--radius-pill); background: var(--track); }
-input[type="range"]::-moz-range-progress { height: 4px; border-radius: var(--radius-pill); background: var(--voice-mark); }
-input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--ink); }
+/* Sliders, every one a fader: a slim bar (--fader tall) filled up to a thin ink cap you drag (--thumb wide: the level's
+   tip goes by it, sliderTips), the cap a muted grey under the pointer or while it's held. The input stays as tall as a
+   small button, so it's as easy to grab. The fill reaches the cap (--p, which sliderTips keeps in step: Chrome has no
+   style for that part) in your colour, quieter than a mark (half of it: Practice's timeline fill is about that) so the
+   ink cap shows on it, even where the mark's as light as the ink (Mono, a pastel in the dark theme); what a slider sits
+   in may set its own --fader-fill (a Studio track that's out of the mix: grey), so that's not set on the input */
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; max-width: 100%; height: var(--control-sm); margin: 0; background: transparent; --p: 0%; }
+input[type="range"]::-webkit-slider-runnable-track { height: var(--fader); border-radius: var(--radius-2xs);
+  background: linear-gradient(to right, var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)) var(--p), var(--fill) var(--p)); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: var(--thumb); height: var(--fader); border: 0; border-radius: var(--radius-xs); background: var(--ink);
+  transition: background-color var(--duration-fast); }
+input[type="range"].hot::-webkit-slider-thumb { background: var(--knob-hot); }
+input[type="range"]::-moz-range-track { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fill); }
+input[type="range"]::-moz-range-progress { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)); }
+input[type="range"]::-moz-range-thumb { width: var(--thumb); height: var(--fader); border: 0; border-radius: var(--radius-xs); background: var(--ink); transition: background-color var(--duration-fast); }
 input[type="range"].hot::-moz-range-thumb { background: var(--knob-hot); }
 input[type="range"]:disabled { opacity: 0.4; }
-/* Faders (class="fader"): the volumes' slider, on a song's page (the song's and each track's) and in Practice (the guide
-   vocal's, the band's, the click's and the takes' mix). A slim block filled up to a thin cap you drag (the input stays as
-   tall as a small button, so it is as easy to grab). The fill is your colour, quieter than a mark (half of it: Practice's
-   timeline fill is about that) so the ink cap shows on it, even where the mark's as light as the ink (Mono, a pastel in
-   the dark theme); what it sits in may set its own --fader-fill (a Studio track that's out of the mix: grey), so that's
-   not set on the input. --thumb is the cap's width, which the level's tip goes by (sliderTips) */
-input[type="range"].fader { height: var(--control-sm); --fader: var(--space-3); --thumb: 4px; }
-input[type="range"].fader::-webkit-slider-runnable-track { height: var(--fader); border-radius: var(--radius-2xs);
-  background: linear-gradient(to right, var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)) var(--p), var(--fill) var(--p)); }
-input[type="range"].fader::-webkit-slider-thumb { width: var(--thumb); height: var(--fader); margin-top: 0; border-radius: var(--radius-xs); background: var(--ink); }
-input[type="range"].fader.hot::-webkit-slider-thumb { background: var(--knob-hot); transform: none; }
-input[type="range"].fader::-moz-range-track { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fill); }
-input[type="range"].fader::-moz-range-progress { height: var(--fader); border-radius: var(--radius-2xs); background: var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)); }
-input[type="range"].fader::-moz-range-thumb { width: var(--thumb); height: var(--fader); border-radius: var(--radius-xs); background: var(--ink); }
 /* a slider's level over its handle while you move it (sliderTips) */
 .slider-tip { position: fixed; z-index: var(--z-tooltip); transform: translate(-50%, -100%); height: 20px; padding: 0 var(--space-2); display: grid; place-items: center;
   border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; pointer-events: none; }

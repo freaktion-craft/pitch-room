@@ -274,7 +274,7 @@
 .track .name small { display: block; color: var(--faint); font-size: var(--text-xs); }
 .track.off .ico { opacity: 0.35; }
 .track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
-#sPlayer .track.off { --fader-fill: var(--dim); } /* and its fader's fill grey (the song's volume and each track's are faders: input.fader, base.css) */
+#sPlayer .track.off { --fader-fill: var(--dim); } /* and its fader's fill grey (every slider's a fader: base.css) */
 .tog { height: var(--control-sm); min-width: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--fill); font: var(--weight-medium) var(--text-xs) var(--mono); color: var(--muted); }
 .tog[aria-pressed="true"].m { background: var(--voice-mark); color: var(--on-voice); } /* on (Practice's Loop and click): your colour; a track's M has its own (.ms) */
 .tog[aria-pressed="true"].s { background: var(--solo); color: var(--on-solo); }

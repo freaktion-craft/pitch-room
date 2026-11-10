@@ -109,15 +109,15 @@
 .ts-bar { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; padding: var(--pad-card); border-radius: var(--radius-card); background: var(--surface);
   font-size: var(--text-sm); }
 .ts-bar output { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
-/* Sync, a slider filled from 0 (--z along it) to the handle, left earlier, right later, with a mark across it where the
+/* Sync, a fader filled from 0 (--z along it) to the cap, left earlier, right later, with a mark across it where the
    delay the browser reports puts the takes (--a); then its ms, grey there and in your colour when moved from it, as
    wide as its widest so nothing beside it moves */
-.ts-sync input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--track) min(var(--z), var(--p)), var(--voice-mark) min(var(--z), var(--p)) max(var(--z), var(--p)), var(--track) max(var(--z), var(--p))); }
-.ts-sync input[type="range"]::-moz-range-track { background: linear-gradient(to right, var(--track) min(var(--z), var(--p)), var(--voice-mark) min(var(--z), var(--p)) max(var(--z), var(--p)), var(--track) max(var(--z), var(--p))); }
+.ts-sync input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--fill) min(var(--z), var(--p)), var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)) min(var(--z), var(--p)) max(var(--z), var(--p)), var(--fill) max(var(--z), var(--p))); }
+.ts-sync input[type="range"]::-moz-range-track { background: linear-gradient(to right, var(--fill) min(var(--z), var(--p)), var(--fader-fill, color-mix(in oklab, var(--voice-mark) 50%, transparent)) min(var(--z), var(--p)) max(var(--z), var(--p)), var(--fill) max(var(--z), var(--p))); }
 .ts-sync-at { position: relative; display: inline-flex; }
-.ts-sync-at input { position: relative; } /* over the mark, which shows above and below its track */
-.ts-sync-auto { position: absolute; top: 3px; bottom: 3px; left: calc(6px + var(--a, 0) * (100% - 12px)); width: 2px; margin-left: -1px; border-radius: var(--radius-pill);
-  background: var(--muted); pointer-events: none; } /* 6px: half the handle, whose middle is at the value */
+.ts-sync-at input { position: relative; } /* over the mark, which shows above and below its bar */
+.ts-sync-auto { position: absolute; top: 3px; bottom: 3px; left: calc(var(--thumb) / 2 + var(--a, 0) * (100% - var(--thumb))); width: 2px; margin-left: -1px; border-radius: var(--radius-pill);
+  background: var(--muted); pointer-events: none; } /* where the cap's middle is at that amount; 3 px in from the input's top and bottom, 5 px past the bar */
 .ts-sync input[type="range"]::-moz-range-progress { background: transparent; }
 .ts-sync input[type="range"] { width: 80px; } /* narrower than the volumes', so the bar stays on one line */
 .ts-sync-val { min-width: 7ch; font: var(--text-sm) var(--mono); font-variant-numeric: tabular-nums; }

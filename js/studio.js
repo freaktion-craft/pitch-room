@@ -450,7 +450,7 @@ function trackRow(name, members, sub, open) {
   const all = (k) => ts.every((x) => x[k]);
   const m = el("button", "tog m", "M"); m.type = "button"; m.title = tr(name === "click" ? "Click on/off" : "Mute"); m.setAttribute("aria-pressed", String(all("mute")));
   const s = el("button", "tog s", "S"); s.type = "button"; s.title = tr("Solo"); s.setAttribute("aria-pressed", String(all("solo")));
-  const v = document.createElement("input"); v.type = "range"; v.className = "fader"; v.min = 0; v.max = 1.5; v.step = 0.01; v.setAttribute("aria-label", tr("{name} volume", { name: tr(group ? "vocals" : name) }));
+  const v = document.createElement("input"); v.type = "range"; v.min = 0; v.max = 1.5; v.step = 0.01; v.setAttribute("aria-label", tr("{name} volume", { name: tr(group ? "vocals" : name) }));
   v.value = ts.reduce((a, x) => a + x.vol, 0) / ts.length;
   m.onclick = () => { const to = !all("mute"); ts.forEach((x) => (x.mute = to)); applyGains(); renderTracks(); };
   s.onclick = () => { const to = !all("solo"); ts.forEach((x) => (x.solo = to)); applyGains(); renderTracks(); };
