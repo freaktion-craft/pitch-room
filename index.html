@@ -89,6 +89,8 @@ const EMPTY_LIBRARY = false;
   <div id="listFadeTop" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
 
   <main id="vPractice" aria-label="Practice" hidden>
+    <!-- a right-click on a note's bar in Practice (or N): that note to the Lab's Reach (js/voice-reach.js noteMenu) -->
+    <div class="menu" id="noteMenu" role="menu" aria-label="Note in the song" hidden><button type="button" role="menuitem" id="nmLab"><span></span></button></div>
     <div class="backbar"><nav class="crumbs" id="kCrumbs" aria-label="Where you are"></nav>
       <div class="bb-acts"><button class="btn sm lyr" id="kLyr" type="button" hidden>Find lyrics</button><span class="ears-at"><button class="btn sm icon" id="kEars" type="button" aria-label="Headphones" title="Headphones: which ear each part plays in" aria-expanded="false" aria-controls="earsPop"></button><div class="pop" id="earsPop" role="dialog" aria-label="Headphones" hidden><b class="pop-title">Headphones</b><div id="earRows"></div></div></span><div class="rec-split" role="group" aria-label="Record takes"><button class="btn sm icon rec" id="kRec" type="button" aria-pressed="false" aria-label="Record takes"></button><button class="pick rec-mode" id="kRecMode" type="button"></button></div></div></div>
     <div class="pr-cols" id="prCols">
@@ -171,7 +173,9 @@ const EMPTY_LIBRARY = false;
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
     <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
-    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Turn</button><button type="button" role="radio" data-v="scale" aria-checked="false">Scales</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div></div>
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Turn</button><button type="button" role="radio" data-v="scale" aria-checked="false">Scales</button><button type="button" role="radio" data-v="reach" aria-checked="false">Reach</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div>
+      <!-- Reach, sent a note from Practice: back to the song there, where it was (js/voice-reach.js) -->
+      <div class="bb-acts"><button class="btn sm" id="rvBack" type="button" hidden>Back to Practice</button></div></div>
     <div class="vc">
       <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span></section>
       <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false">Freeze</button></section>
@@ -190,6 +194,13 @@ const EMPTY_LIBRARY = false;
         <button class="btn sm vc-mode sc-pat" id="scPat" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="scPats"><span id="scPatName">3 notes</span></button>
         <button class="btn sm primary vc-go" id="scGo" type="button">Start</button>
         <div class="vc-say"><p id="scSay" aria-live="polite"></p><p id="scDo"></p></div>
+      </section>
+      <!-- Reach: one note, four ways onto it, easiest first, each played then sung back (js/voice-reach.js) -->
+      <section class="vc-reach" aria-label="Reach" hidden>
+        <canvas id="rvPad" aria-hidden="true"></canvas>
+        <div class="seg vc-mode" id="rvWays" role="radiogroup" aria-label="Way"></div>
+        <button class="btn sm primary vc-go" id="rvGo" type="button">Start</button>
+        <div class="vc-say"><p id="rvSay" aria-live="polite"></p><p id="rvDo"></p></div>
       </section>
       <!-- the patterns (js/voice-scale.js scMenu): Up, Down and Leaps side by side, each pattern its name and degrees -->
       <div class="menu sc-pats" id="scPats" role="menu" aria-label="Pattern" hidden></div>
@@ -483,8 +494,10 @@ const EMPTY_LIBRARY = false;
 <script src="js/stage.js"></script>
 <script src="js/turn.js"></script>
 <script src="js/scale.js"></script>
+<script src="js/reach.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/voice-scale.js"></script>
+<script src="js/voice-reach.js"></script>
 <script src="js/onboard.js"></script>
 <script src="js/app.js"></script>
 </body>

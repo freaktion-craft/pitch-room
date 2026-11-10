@@ -119,6 +119,9 @@ const GUT = 48; // the note names' column; they start 16 px in, under the stage'
 const HIT = 0.24; // where the playhead line is, as a share of the width right of the note names
 // with lyrics, more of it for the words: a third, at least 360 px, at most 60% (the bars still show 4.4 s)
 const hitShare = () => (K.lyrics ? Math.min(0.6, Math.max(0.33, 360 / (W - GUT))) : HIT);
+// What the stage last drew, for finding a bar under the pointer (stageNoteAt, js/voice-reach.js): its time and pitch
+// scales (X, Y: px in its box), the bars' height, the playhead
+let stageAt = null;
 // now: song time at the hit line; cur: your pitch; hist: your recent pitch; evs: the bars; guide: the original singer's
 // pitch line ({pts, shift})
 function draw(now, cur, hist, evs, guide) {
@@ -150,6 +153,7 @@ function draw(now, cur, hist, evs, guide) {
   // bars
   g.save(); g.beginPath(); g.rect(GUT + 1, 0, W - GUT - 1, H); g.clip();
   const bh = Math.max(8, Math.min(ppS * 0.78, 24));
+  stageAt = { now, hitX, W, X, Y, bh, evs };
   for (const e of evs) {
     const x0 = X(e.t0), x1 = X(e.t1);
     if (x1 < GUT || x0 > W + 4) continue;
@@ -293,8 +297,9 @@ function loop() {
   let m = null;
   if (ac && (micOn || testOsc)) {
     if (testOsc) {
-      // (in the Lab, its note; in Scales, the pattern's note now; while a Smooth pass runs, left where it is, for a glide set by hand)
-      const tgt = view === "voice" ? (VC.view === "scale" ? { midi: scNow(now) } : VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
+      // (in the Lab, its note; in Scales, the pattern's note now; in Reach, along the way's shape; while a Smooth pass runs,
+      // left where it is, for a glide set by hand)
+      const tgt = view === "voice" ? (VC.view === "scale" ? { midi: scNow(now) } : VC.view === "reach" ? { midi: rvNow(now) } : VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
       if (testGain) testGain.gain.setTargetAtTime(tgt && tgt.midi == null ? 0 : 0.3, ac.currentTime, 0.01); // (no note: quiet)
       if (tgt && tgt.midi != null) testOsc.frequency.setTargetAtTime(mf(tgt.midi + testOffset / 100), ac.currentTime, 0.03);
     }

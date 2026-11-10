@@ -4,9 +4,9 @@
 
 ## Boot order and shared globals
 
-- `index.html` loads 17 classic `<script>`s in a fixed order: core, ko, audio, live, helpers, library, info, adding,
-  studio, practice, lyedit, takes, takes-studio, stage, voice, onboard, app. `icons.local.js` loads just before
-  `core.js` (optional; a missing file is answered with an empty 200).
+- `index.html` loads 22 classic `<script>`s in a fixed order: core, ko, audio, live, helpers, library, info, adding,
+  studio, practice, lyedit, takes, takes-studio, stage, turn, scale, reach, voice, voice-scale, voice-reach, onboard, app.
+  `icons.local.js` loads just before `core.js` (optional; a missing file is answered with an empty 200).
 - They are plain scripts, not modules: every top-level `const`, `let` and `function` is visible to the files after it.
   Each file starts with `"use strict"` and a short `//` header (usually 1-3 lines) saying what it holds.
 - `app.js` is the only entry point. At its end it runs `renderMic()`, `initStems()`, `initSing()`, `initVoice()`,
@@ -60,8 +60,10 @@ Each area keeps its state in one short capitalised object.
 | `stage.js` | Practice canvas; `C` (canvas colours); accent and theme; the main `loop()` |
 | `turn.js` | `TN`: the Lab's Turn measures (harmonic levels, the turn, a pass's break or step). Pure, runs in Node |
 | `scale.js` | `SC`, `SC_PATS`: the Lab's Scales judging (`scAlign`, `scJudge`, `scStep`). Pure, runs in Node |
+| `reach.js` | `RC`, `RC_WAYS`: the Lab's Reach judging (`rcJudge`, `rcEnd`, `rcStep`): ways onto one note, read for arriving, settling, holding, breaks. Pure, runs in Node |
 | `voice.js` | `VC`: the Lab page, its mic and pitch frames (`VC.fr`), and the Turn view |
 | `voice-scale.js` | `SV`: the Lab's Scales view (call and response at the piano) |
+| `voice-reach.js` | `RV`: the Lab's Reach view; Practice's note menu (a right-click on a bar, or N), sending a note there (`sendToLab`) |
 | `onboard.js` | `OB`: first-run steps |
 | `app.js` | Routing, header, keyboards, language switch, startup |
 
