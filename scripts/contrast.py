@@ -157,8 +157,11 @@ def resolve(t, v, depth=0):
 def colour(t, name, p3):
     if name.startswith("mix:"):  # an accent as small text: as --voice-ink has it (a color-mix with the ink, or itself)
         return parse_colour(ink_mix(t, name[4:]), p3)
-    if name.startswith("mark:"):  # an accent as a mark: as --voice-mark has it (its lightness held down, or itself)
-        return parse_colour(voice_mark(t, name[5:]), p3)
+    if name.startswith("mark:"):  # an accent as a mark: as --voice-mark has it (its lightness held down, or itself);
+        # "mark:<accent>/N%": N % of that, seen through, as "color-mix(in oklab, var(--voice-mark) N%, transparent)" has it
+        accent, _, w = name[5:].partition("/")
+        c, a = parse_colour(voice_mark(t, accent), p3)
+        return c, a * (num(w) if w else 1)
     v = resolve(t, t[name]) if name.startswith("--") else name
     c = parse_colour(v, p3)
     if c is None:
@@ -220,6 +223,7 @@ for k in ACCENTS:
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"--voice-{k}", 4.5))
     PAIRS.append(("--on-voice-mono" if k == "white" else "--on-voice", f"mark:--voice-{k}", 4.5))  # on a mark's fill (a take playing, Loop on)
     PAIRS.append(("--on-ink", f"mark:--voice-{k}", 2.9 if k in ("pink", "sky") else 3))  # a switch's knob, on (sky's 2.97 in the light theme)
+    PAIRS.append(("--ink", f"mark:--voice-{k}/50%", 3))  # a fader's cap on its fill (stems.css: half the mark, over the card; Mono's 3.2 in the dark theme, 2.85 at 55 %)
 
 
 def chip_pairs(t, p3):
