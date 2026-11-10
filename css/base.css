@@ -585,8 +585,9 @@ input[type="range"]:disabled { opacity: 0.4; }
 
 /* Buttons: one component, .btn, set on three axes.
    size:  40 px by default, .sm 32, .xs 24 (--btn-h); padding, text and icon follow it
-   tone:  surface-2 by default; .primary, the ink, for the one strong action in a group; .quiet, a faint fill (the
-          header's chips); .ghost, nothing until pointed at (an icon action in a row or a list)
+   tone:  surface-2 by default; .primary, the ink, for the one strong action in a group (round, Play and Pause, in
+          your colour); .quiet, a faint fill (the header's chips); .ghost, nothing until pointed at (an icon action in
+          a row or a list)
    shape: .icon, a square, and .round, a circle: an icon alone
    An icon before a label gets less padding on its side, so icon and label read as centred together, and 6 px between
    them (the icon's own margin adds a little), so they read as one. Disabled, it fades and takes no clicks. */
@@ -611,6 +612,10 @@ input[type="range"]:disabled { opacity: 0.4; }
 /* in a panel over the page, its main button a step down: the solid ink is for the page's own (Add song) */
 .pop .btn.primary { background: var(--surface-2); color: var(--ink); }
 .pop .btn.primary:hover { background: var(--hover-2); }
+/* round, it's Play and Pause (a song's page, Practice, Takes Studio): your colour, the one button you press that takes
+   it (Mono's the ink), its glyph in the text on it (.pp: currentColor); pointed at, a step towards the strongest ink */
+.btn.primary.round { background: var(--voice-mark); color: var(--on-voice); }
+.btn.primary.round:hover { background: color-mix(in oklab, var(--voice-mark) 85%, var(--ink-strong)); }
 .btn.quiet { background: var(--fill); color: var(--muted); white-space: nowrap; }
 .btn.quiet:hover { background: var(--fg-8); }
 #app > header .btn.quiet:not(.mic) { color: var(--ink); } /* the header's buttons in ink, the mic's beside them: a grey one there reads as off */

@@ -44,8 +44,8 @@
      full strength, the toning down being for what isn't one (set with --voice, by setAccent) */
   --voice-act: var(--ink);
   /* --voice-mark: your colour as a mark that has to be seen (a line, a fill, a bar: 3:1), for where you are and what's
-     on; nothing you press to do something takes it. --voice-act as it is here (Mono the ink), deepened in the light
-     theme (below); worked out from it here, not set by paintAccent */
+     on; nothing you press to do something takes it but the round Play (base.css). --voice-act as it is here (Mono the
+     ink), deepened in the light theme (below); worked out from it here, not set by paintAccent */
   --voice-mark: var(--voice-act);
   /* text on an accent (--on-accent: on any of the colours, in either theme), on yours (--on-voice), and on Mono's
      (--on-voice-mono), which Mono puts in --on-voice (stage.js): each its own value, never one another's (a loop of
