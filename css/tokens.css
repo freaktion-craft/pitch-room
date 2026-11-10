@@ -180,7 +180,7 @@
    0.3 left faint text under 4.5:1). Mono comes out as it was */
 @supports (color: oklch(from red l c h)) {
   :root[data-theme="light"] {
-    --ink: oklch(from var(--voice) 0.2 min(c * 0.22, 0.04) h); --ink-strong: oklch(from var(--voice) calc(min(c * 0.17, 0.03) * 4) min(c * 0.17, 0.03) h);
+    --ink: oklch(from var(--voice) calc(0.2 + min(c * 0.8, 0.1)) min(c * 0.22, 0.04) h); /* (a step up off black with your colour, so its hue shows: L 0.27–0.3) */ --ink-strong: oklch(from var(--voice) calc(min(c * 0.17, 0.03) * 4) min(c * 0.17, 0.03) h);
     --on-ink: oklch(from var(--voice) 0.99 min(c, 0.005) h);
     --muted: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3) min(c * 0.34, 0.06) h / calc(0.62 * (1 + min(c * 0.34, 0.06) * 3.6)));
     --faint: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3) min(c * 0.34, 0.06) h / calc(0.56 * (1 + min(c * 0.34, 0.06) * 3.6)));
