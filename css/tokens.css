@@ -86,6 +86,7 @@
   /* depth, in colour */
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2); /* a switch's knob */
   --shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.25); /* a control over a waveform */
+  --primary: var(--ink); --on-primary: var(--on-ink); --primary-hover: var(--ink-strong); /* a main button's fill, its text, pointed at: the ink (the light theme's pastels: below) */
   --seg-on: var(--hover-2); /* the picked part of a segmented control: raised off its track, lighter than the card's buttons */
   --shadow-seg: 0 1px 1px rgba(0, 0, 0, 0.12); /* its hairline lift (a knob's shadow was too much) */
   /* a panel, menu or list over the page: set off by its tone, not drawn round (a card's hairline, a faint light along
@@ -182,15 +183,18 @@
    them, the text lighter and more of their hue, by how pale they are (max(l - 0.7, 0)). Mono comes out as it was */
 @supports (color: oklch(from red l c h)) {
   :root[data-theme="light"] {
-    --ink: oklch(from var(--voice) calc(0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) calc(min(c * 0.22, 0.04) + max(l - 0.7, 0) * 0.25) h);
+    --ink: oklch(from var(--voice) calc(0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) calc(min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) h);
     --ink-strong: oklch(from var(--voice) calc(min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2) calc(min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2) h);
     --on-ink: oklch(from var(--voice) 0.99 min(c, 0.005) h);
-    --muted: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + max(l - 0.7, 0) * 0.3) h / calc(0.62 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --faint: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + max(l - 0.7, 0) * 0.3) h / calc(0.56 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --placeholder: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + max(l - 0.7, 0) * 0.3) h / calc(0.44 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --fg-46: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + max(l - 0.7, 0) * 0.3) h / calc(0.46 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --fg-55: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + max(l - 0.7, 0) * 0.3) h / calc(0.55 * (1 + min(c * 0.34, 0.06) * 3.6)));
-    --fg-80: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + max(l - 0.7, 0) * 0.3) h / calc(0.8 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --primary: oklch(from var(--voice) calc((0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) + (l - (0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) + (c - (min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --on-primary: oklch(from var(--voice) calc(0.99 + ((0.2 + min(c * 0.8, 0.1) + max(l - 0.7, 0) * 1.6) - 0.99) * min(max((l - 0.7) * 100, 0), 1)) calc(min(c, 0.005) + ((min(c * 0.22, 0.04) + min(max((l - 0.7) * 100, 0), 1) * c * 0.75) - min(c, 0.005)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --primary-hover: oklch(from var(--voice) calc((min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2) + (l - 0.05 - (min(c * 0.17, 0.03) * 4 + max(l - 0.7, 0) * 1.2)) * min(max((l - 0.7) * 100, 0), 1)) calc((min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2) + (c - (min(c * 0.17, 0.03) + max(l - 0.7, 0) * 0.2)) * min(max((l - 0.7) * 100, 0), 1)) h);
+    --muted: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.62 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --faint: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.56 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --placeholder: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 3 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.44 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-46: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.46 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-55: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.55 * (1 + min(c * 0.34, 0.06) * 3.6)));
+    --fg-80: oklch(from var(--voice) calc(min(c * 0.34, 0.06) * 5 + max(l - 0.7, 0) * 2) calc(min(c * 0.34, 0.06) + min(max((l - 0.7) * 100, 0), 1) * c * 0.6) h / calc(0.8 * (1 + min(c * 0.34, 0.06) * 3.6)));
     --bg: oklch(from var(--voice) calc(0.965 + min(c, 0.006) * 0.1) min(c, 0.006) h); --surface-2: oklch(from var(--voice) 0.935 min(c, 0.01) h);
     --hover-2: oklch(from var(--voice) 0.9 min(c, 0.014) h); --tog-down: oklch(from var(--voice) 0.88 min(c, 0.014) h);
     --fg-2: oklch(from var(--voice) calc(min(c, 0.06) * 5) min(c, 0.06) h / calc(0.02 * (1 + min(c, 0.06) * 3.6)));

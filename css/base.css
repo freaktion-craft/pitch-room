@@ -613,8 +613,8 @@ input[type="range"]:disabled { opacity: 0.4; }
 .btn.icon .ico { width: var(--icon-md); height: var(--icon-md); }
 .btn.xs > .ico { width: var(--icon-xs); height: var(--icon-xs); }
 .btn.round { border-radius: 50%; }
-.btn.primary { background: var(--ink); color: var(--on-ink); }
-.btn.primary:hover { background: var(--ink-strong); }
+.btn.primary { background: var(--primary); color: var(--on-primary); }
+.btn.primary:hover { background: var(--primary-hover); }
 /* in a panel over the page, its main button a step down: the solid ink is for the page's own (Add song) */
 .pop .btn.primary { background: var(--surface-2); color: var(--ink); }
 .pop .btn.primary:hover { background: var(--hover-2); }
