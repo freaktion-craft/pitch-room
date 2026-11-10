@@ -37,7 +37,7 @@
 /* filled as it's sung, a soft edge running through the word (renderLyrics: --p, past either end of it when it's not on
    it); the line before keeps its fill, so it doesn't flash back to plain as it leaves, and stays lit while it's still
    being sung */
-@supports (color: oklch(from red l c h)) { .lylist { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) c h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi) */
+@supports (color: oklch(from red l c h)) { .lylist, .countin { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) c h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi); the count-in's dots in it too */
 .lylist p:is(.now, .b1) span { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
 .lylist.still, .lylist.still p { transition: none; } /* new lines (renderLyrics): there at once */
@@ -79,7 +79,7 @@
 .lylist .countin .lbl:empty { display: block; height: 20px; } /* its row kept: a label coming or going mustn't move the line under it */
 .countin span { font-size: var(--text-sm); line-height: 20px; color: var(--muted); white-space: nowrap; }
 .countin .dots { display: flex; gap: calc(var(--dot) * 0.6); height: var(--dot); }
-.countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--ink); transition: opacity var(--duration-fast); }
+.countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--sung, var(--voice)); transition: opacity var(--duration-fast); } /* your colour, as the words are once sung (was the ink) */
 .countin .dots i.gone { opacity: 0.25; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(380px, calc(100% - 32px));
