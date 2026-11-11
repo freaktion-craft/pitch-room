@@ -38,7 +38,7 @@
    it); the line before keeps its fill, so it doesn't flash back to plain as it leaves, and stays lit while it's still
    being sung. A word in syllable boxes (.sys, below) isn't filled itself: each syllable is, the edge at its place in it
    (in px), so it runs on through the word as one */
-@supports (color: oklch(from red l c h)) { .lylist, .countin { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) max(c, calc(var(--sung-c) * min(max((l - 0.7) * 100, 0), 1))) h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi); the count-in's dots in it too */
+@supports (color: oklch(from red l c h)) { .lylist, .countin { --sung: oklch(from var(--voice-act) calc(clamp(var(--sung-lo), l, var(--sung-hi)) + (l - clamp(var(--sung-lo), l, var(--sung-hi))) * clamp(0, (0.03 - c) * 1000, 1)) max(c, calc(var(--sung-c) * min(max((l - 0.7) * 100, 0), 1))) h); } } /* the edge you follow: your colour within --sung-lo and --sung-hi; Mono (no hue, --voice-act the ink) the ink itself, the sung part the strongest (kept grey, it was the unsung's lightness: no fill seen); the count-in's dots in it too */
 .lylist p:is(.now, .b1) span:not(.sys) { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
 /* what's not sung yet of the line, well under the ink (two thirds of it: at three quarters it still read as black): the
