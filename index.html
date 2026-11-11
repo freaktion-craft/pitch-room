@@ -175,7 +175,7 @@ const EMPTY_LIBRARY = false;
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
     <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
-    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Turn</button><button type="button" role="radio" data-v="scale" aria-checked="false">Scales</button><button type="button" role="radio" data-v="reach" aria-checked="false">Reach</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div>
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="pad" aria-checked="false">Turn</button><button type="button" role="radio" data-v="scale" aria-checked="false">Scales</button><button type="button" role="radio" data-v="reach" aria-checked="false">Reach</button><button type="button" role="radio" data-v="match" aria-checked="false">Match</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div>
       <!-- Reach, sent a note from Practice: back to the song there, where it was (js/voice-reach.js) -->
       <div class="bb-acts"><button class="btn sm" id="rvBack" type="button" hidden>Back to Practice</button></div></div>
     <div class="vc">
@@ -206,6 +206,14 @@ const EMPTY_LIBRARY = false;
         <div class="seg vc-mode" id="rvWays" role="radiogroup" aria-label="Way"></div>
         <button class="btn sm primary vc-go" id="rvGo" type="button">Start</button>
         <div class="vc-say"><p id="rvSay" aria-live="polite"></p><p id="rvDo"></p></div>
+      </section>
+      <!-- Match: one piano note, sung back; how far off you landed; the next note chosen to make the notes familiar
+           (js/voice-match.js) -->
+      <section class="vc-match" aria-label="Match" hidden>
+        <canvas id="mvPad" aria-hidden="true"></canvas>
+        <button class="btn sm icon vc-mode" id="mvAgain" type="button" aria-label="Hear the note again" title="Hear the note again (R)"></button>
+        <button class="btn sm primary vc-go" id="mvGo" type="button">Start</button>
+        <div class="vc-say"><p id="mvSay" aria-live="polite"></p><p id="mvDo"></p></div>
       </section>
       <!-- the patterns (js/voice-scale.js scMenu): Up, Down and Leaps side by side, each pattern its name and degrees -->
       <div class="menu sc-pats" id="scPats" role="menu" aria-label="Pattern" hidden></div>
@@ -501,9 +509,11 @@ const EMPTY_LIBRARY = false;
 <script src="js/turn.js"></script>
 <script src="js/scale.js"></script>
 <script src="js/reach.js"></script>
+<script src="js/match.js"></script>
 <script src="js/voice.js"></script>
 <script src="js/voice-scale.js"></script>
 <script src="js/voice-reach.js"></script>
+<script src="js/voice-match.js"></script>
 <script src="js/onboard.js"></script>
 <script src="js/app.js"></script>
 </body>

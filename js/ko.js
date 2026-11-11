@@ -247,6 +247,16 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "{k} of {n} on pitch · {note} an octave up": "{n}음 중 {k}음 정확 · {note} 한 옥타브 위", "{k} of {n} on pitch · {note} an octave down": "{n}음 중 {k}음 정확 · {note} 한 옥타브 아래",
   "Sing {note} in the piano’s octave.": "{note} 음을 피아노와 같은 옥타브로 불러요.", "Sing {note} in the same octave as the rest.": "{note} 음도 나머지 음과 같은 옥타브로 불러요.",
   "Wait for the piano to finish.": "피아노가 끝날 때까지 기다려요.",
+  // the Lab's Match (js/voice-match.js)
+  "Hear the note again": "음 다시 듣기", "Hear the note again (R)": "음 다시 듣기 (R)",
+  "{k} of {n} notes familiar": "{n}음 중 {k}음 익숙해요", "Start, then sing back each note.": "시작하면 들리는 음마다 따라 불러요.",
+  "{note}": "{note}", "New: {note}": "새 음: {note}", "{note} again": "{note} 다시",
+  "By ear: your line shows after.": "귀로만: 내 선은 부른 뒤에 보여요.",
+  "On {note} · {c}": "{note}에 맞았어요 · {c}", "A little under {note} · {c}": "{note}보다 조금 낮아요 · {c}", "A little over {note} · {c}": "{note}보다 조금 높아요 · {c}",
+  "Landed under {note} · {c}": "{note}보다 낮게 시작했어요 · {c}", "Landed over {note} · {c}": "{note}보다 높게 시작했어요 · {c}",
+  "Under {note} · {c}": "{note}보다 낮아요 · {c}", "Over {note} · {c}": "{note}보다 높아요 · {c}",
+  "Found it after. Back after the next note.": "부르다가 찾았어요. 다음 음 뒤에 다시 나와요.", "Back after the next note.": "다음 음 뒤에 다시 나와요.",
+  "{k} of {n} matched": "{n}음 중 {k}음 맞았어요", "{f} of {p} notes familiar": "{p}음 중 {f}음 익숙해요", "{f} of {p} notes familiar · {a} new": "{p}음 중 {f}음 익숙해요 · 새 음 {a}개",
   // the Lab's Reach (js/voice-reach.js), and Practice's note menu
   "Reach": "목표음", "Way": "방법", "Target": "목표음", "Back to Practice": "연습으로 돌아가기", "Note in the song": "곡의 음",
   "Slide up": "미끄러져 오르기", "From above": "위에서 내려오기", "Down and back": "내렸다 돌아오기", "Steps up": "한 음씩 오르기",
