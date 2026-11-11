@@ -320,6 +320,16 @@
 #rvWays { max-width: calc(100% - 2 * var(--space-3) - 80px); overflow-x: auto; scrollbar-width: none; } /* 80: Go and a gap */
 #rvWays button { flex: none; white-space: nowrap; }
 @media (max-width: 760px) { .vc-reach { height: 52vh; } }
+/* Match (js/voice-match.js): as Reach, the note heard again in the ways' place; the notes in play drawn along its foot */
+.vc-match { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; }
+#mvPad { position: absolute; inset: 0; width: 100%; height: 100%; }
+#mvSay { color: var(--ink); font-weight: var(--weight-medium); }
+#mvSay[data-tone="good"] { color: var(--good); }
+#mvSay[data-tone="bad"] { color: var(--bad); }
+#mvSay[data-tone="step"] { color: var(--orange); }
+#mvDo { color: var(--muted); }
+.vc[data-view="match"] .vc-bars { visibility: hidden; }
+@media (max-width: 760px) { .vc-match { height: 52vh; } }
 /* the note to sing (Find's first, Smooth's centre) between a semitone down and up, in the keyboard's card beside the keys
    at the right; held on pitch in Find, its button fills from the left */
 .vc-keys { display: flex; align-items: center; gap: var(--space-8); }

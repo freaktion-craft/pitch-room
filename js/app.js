@@ -476,6 +476,7 @@ document.addEventListener("keydown", (e) => {
     const k = { ArrowDown: scCanDown() ? "down" : null, KeyR: "stay" }[e.code];
     if (k) { e.preventDefault(); if (!e.repeat) scAsk(k); }
   }
+  if (view === "voice" && VC.view === "match" && MV.run && e.code === "KeyR" && !e.shiftKey) { e.preventDefault(); if (!e.repeat) mvAgain(); } // (the note again)
 });
 
 // ---------- language switch ----------
