@@ -575,12 +575,14 @@ input[type="range"]:disabled { opacity: 0.4; }
 .tip { position: fixed; z-index: var(--z-tooltip); width: max-content; max-width: min(360px, calc(100vw - 16px)); padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs); background: var(--ink); color: var(--on-ink); font-size: var(--text-xs); line-height: 16px; pointer-events: none; }
 .tip-key { margin-left: var(--space-1); color: var(--on-ink-muted); }
-/* from the last one to this, along the keys (helpers.js): the edge it's going towards first, the other a moment after,
-   so it stretches, moves and draws in; its words centred meanwhile. Quick, so it settles at its words' width (with the
-   trailing edge a beat late and slow, a key's short name sat in a box half again too wide for a tenth of a second) */
-.tip.tip-slide { width: auto; text-align: center; white-space: nowrap; overflow: hidden;
-  transition: left var(--duration-base) var(--ease) calc(var(--duration-fast) / 6), right var(--duration-fast) var(--ease), top var(--duration-fast) var(--ease); }
-.tip.tip-slide.tip-left { transition: left var(--duration-fast) var(--ease), right var(--duration-base) var(--ease) calc(var(--duration-fast) / 6), top var(--duration-fast) var(--ease); }
+/* from the last one to this, along the keys (helpers.js): the edge that widens it goes first (--tip-l, --tip-r fast),
+   the edge that narrows it a moment after, so it stretches, moves and draws in, and is never narrower than its words
+   on the way; its words centred meanwhile. Quick, so it settles at their width */
+.tip.tip-slide { --tip-l: var(--duration-base) var(--ease) calc(var(--duration-fast) / 6); --tip-r: var(--tip-l);
+  width: auto; text-align: center; white-space: nowrap; overflow: hidden;
+  transition: left var(--tip-l), right var(--tip-r), top var(--duration-fast) var(--ease); }
+.tip.tip-l-fast { --tip-l: var(--duration-fast) var(--ease); }
+.tip.tip-r-fast { --tip-r: var(--duration-fast) var(--ease); }
 @media (prefers-reduced-motion: reduce) { .tip.tip-slide { transition: none; } }
 .switch { appearance: none; -webkit-appearance: none; width: 36px; height: 20px; border-radius: var(--radius-pill); background: var(--ring); position: relative;
   margin: 0; cursor: pointer; transition: background-color var(--duration-base) var(--ease); flex: none; }
