@@ -78,8 +78,9 @@
   /* a key in the library, in a chip of its Camelot hue (stems.css): its ink's and its chip's lightness and chroma,
      a minor key's dimmer, and how much of the chip shows */
   --chip-major-ink: 0.86 0.09; --chip-major-bg: 0.78 0.13; --chip-minor-ink: 0.76 0.08; --chip-minor-bg: 0.64 0.11; --chip-a: 0.16;
-  /* a lyric's sung part, your colour kept within these lightnesses: a pale one deeper, or it hardly shows against the ink */
-  --sung-lo: 0; --sung-hi: 0.72; --sung-c: 0; /* (--sung-c: a pastel's sung part at least this vivid, so it parts from the unsung) */
+  /* a lyric's sung part, your colour kept within these lightnesses (dark: as it is, the unsung being two thirds of the ink;
+     at 0.72 Pink and Sky went dusty, near the unsung) */
+  --sung-lo: 0; --sung-hi: 0.86; --sung-c: 0; /* (--sung-c: a pastel's sung part at least this vivid, so it parts from the unsung) */
   --aurora: 0.4; /* Practice's glow, how much of it: there, not looked at */
   /* tracks: the voices in your accent colour (the lead as it is, the backing vocals a quieter shade of it), the band
      all in one muted white; each track is named beside its icon and waveform, so colour isn't what tells them apart */
@@ -170,7 +171,7 @@
      the label as on your colour) */
   --key-w-lit: 0.66; --key-w-pastel: 0.84; --key-b-lit: 0.6; --key-w-tint: 0.93; --key-b-tint: 0.44; --on-key-down: var(--on-voice);
   --chip-major-ink: 0.45 0.1; --chip-major-bg: 0.7 0.12; --chip-minor-ink: 0.5 0.06; --chip-minor-bg: 0.6 0.06; --chip-a: 0.14;
-  --sung-lo: 0.5; --sung-hi: 0.64; --sung-c: 0.12; /* (Pink and Sky deepened to 0.64 went dusty, near the unsung ink: a clear rose and blue) */ /* Mono (near-black) goes grey, or the sung part's the ink; baby pink deeper, so it reads (3.2:1) */
+  --sung-lo: 0.5; --sung-hi: 0.64; --sung-c: 0.12; /* (Pink and Sky deepened to 0.64 went dusty, near the unsung ink: a clear rose and blue) */ /* baby pink deeper, so it reads (3.2:1); Mono isn't held to these: its sung part is the ink (stage.css) */
   --aurora: 0.55;
   --stem-backing: color-mix(in oklab, var(--voice) 55%, oklch(0.75 0 0)); --stem-band: oklch(0.55 0 0);
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-opacity='.6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");

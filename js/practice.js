@@ -812,7 +812,7 @@ function lineShown(t, free) { // free: whatever's looping or counting in (a take
 const LYRIC_LEAD = 0.07;
 const LYRIC_SOON = 1.2, LYRIC_HOLD = 1; // the next line brightens this long before its turn (s); a syllable held this long glows as it's held
 // Each syllable rises a touch as the fill reaches it (stage.css: .sy, by a transform; a word without syllables, Whisper's,
-// as one), eased as --ease, over its own length or LYRIC_RISE, whichever's longer, and stays up while its line's sung;
+// as one), eased in and out (lyGlide), over its own length or LYRIC_RISE, whichever's longer, and stays up while its line's sung;
 // once the line's last word is over (as the line before dims, losing .live) the line settles, over LYRIC_SETTLE. On the
 // song's time, as the fill is: a seek, a loop or a pause puts it where it would be, never on its way there.
 const LYRIC_RISE = 0.6, LYRIC_SETTLE = 0.4; // s as heard
@@ -826,6 +826,9 @@ function lyEase(x) {
   for (let k = 0; k < 16; k++) { const s = (lo + hi) / 2; if (at(0.16, 0.3, s) < x) lo = s; else hi = s; }
   return at(1, 1, (lo + hi) / 2);
 }
+// A syllable's rise, 0 to 1: eased in and out alike (a sine), so it lifts as evenly as the fill runs (on --ease it was
+// five sixths up in its first 100 ms: a tick)
+const lyGlide = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : (1 - Math.cos(Math.PI * x)) / 2);
 // A word's syllables along its width, measured once it's laid out: where each one's letters end, as a share of the word.
 function lyMeasure(x) {
   const n = x.s.firstChild, w = x.s.getBoundingClientRect().width;
@@ -882,7 +885,7 @@ function lyFillSy(x, t, down) {
     if (y.v !== v) { y.v = v; y.s.style.setProperty("--p", v); }
     const glow = y.t && s1 - s0 >= LYRIC_HOLD && t > s0 && t < s1 ? (t - s0) / (s1 - s0) : 0;
     if (glow || y.glow) { y.glow = glow; y.s.classList.toggle("held", glow > 0); y.s.style.setProperty("--g", glow.toFixed(2)); }
-    let h = Math.round(lyEase((t - s0) / Math.max(LYRIC_RISE * P.rate, s1 - s0)) * (1 - down) * y.lift * 100) / 100; // px, to a hundredth
+    let h = Math.round(lyGlide((t - s0) / Math.max(LYRIC_RISE * P.rate, s1 - s0)) * (1 - down) * y.lift * 100) / 100; // px, to a hundredth
     if (y.fresh) { y.fresh = false; h = Math.round(h * y.dpr) / y.dpr; } // its first frame on a whole pixel: its layer's drawn there, and stays as sharp moved from it (a seek mid-rise)
     const tf = `translate(${y.fx}px, ${-h}px)`;
     if (y.tf !== tf) { y.tf = tf; y.s.style.transform = tf; }
