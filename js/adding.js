@@ -51,7 +51,7 @@ function ringOut(btn) {
   const a = btn.animate([{ opacity: 1, filter: "blur(0)", translate: "0 0", width: w + "px", marginLeft: "0px" },
     { opacity: 0, filter: "blur(6px)", translate: "12px 0", offset: 0.6 },
     { opacity: 0, filter: "blur(6px)", translate: "12px 0", width: "0px", marginLeft: -gap + "px" }], { duration: RING_OUT_MS, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" });
-  a.finished.then(() => { if (!btn.dataset.leaving) return; delete btn.dataset.leaving; paintJobs(); a.cancel(); }, () => {});
+  a.finished.then(() => { if (!btn.dataset.leaving) return; delete btn.dataset.leaving; btn.classList.add("idle"); paintJobs(); a.cancel(); }, () => {}); // (idle before the paint: else it saw the ring still there and sent it out again, over and over, the mic sliding with it)
 }
 // The drawer's songs in sections, each shown only while it has any: Processing, then Pending under it (waiting their
 // turn, or stopped wanting their lyrics pasted: orange, the next going on meanwhile), Stopped (failed); in each, in the
