@@ -10,8 +10,9 @@ Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
 - Picks the installer for the visitor's system from the newest **published** release of the public
   `freaktion-craft/pitchroom-releases` repo that has one, through the GitHub API (the last 30 releases): a release may be
   Windows' only, so Mac can be a few versions behind.
-- Under the button, that file's version (from its name, else the tag) and the day it came out, e.g. `v1.0.28 · Nov 11,
-  2026` (`2026년 11월 11일` in Korean). Not shown on a phone, an unknown OS, or when the API fails.
+- Under the button, that file's version (from its name, else the tag) and how long ago it came out, e.g. `v1.0.28 · 18
+  hours ago` (`18시간 전` in Korean; `ago()`). Not shown on a phone, an unknown OS, or when the API fails (it allows 60
+  calls an hour per address).
 - `FILES` holds the file regexes: macOS arm64 and x64 `.dmg`, Windows `pitchroom_install.exe` (or the older
   `-win-x64.exe` name).
 - `detectOS` and `detectMacArch` (userAgentData, else the WebGL renderer, else arm64) choose the file.
