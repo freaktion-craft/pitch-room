@@ -176,7 +176,8 @@ let newIds = new Set();
 function drawNew(lib) {
   const since = Date.now() / 1000 - NEW_DAYS * 86400;
   const fresh = lib.filter((m) => m.created >= since).sort((a, b) => b.created - a.created).slice(0, NEW_MAX);
-  if (newSeen && fresh.some((m) => !newSeen.has(m.id)) && !newOpen) newWaiting = true; // a song just ready: New opens for it
+  // a song just ready: New opens for it, out of nothing, folded or with none to show till now (open but hidden, empty)
+  if (newSeen && fresh.some((m) => !newSeen.has(m.id)) && (!newOpen || !newIds.size)) { newWaiting = true; newOpen = false; }
   newSeen = new Set(lib.map((m) => m.id));
   newIds = new Set(fresh.map((m) => m.id));
   $("#sNewCount").textContent = fresh.length || "";

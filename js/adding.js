@@ -41,6 +41,17 @@ function paintPix(bar, p, going, paused) { // (paused: stopped till it's told so
   }
   bar.setAttribute("aria-valuenow", Math.round(p * 100));
 }
+// The ring once the last song's in: full and white, it blurs out going right as its room closes, so the mic beside it
+// slides back to its place (not gone at once, the mic jumping); then not there (idle)
+const RING_OUT_MS = 520;
+function ringOut(btn) {
+  btn.dataset.leaving = "1";
+  const w = btn.offsetWidth, gap = parseFloat(getComputedStyle(btn.parentElement).columnGap) || 0;
+  const a = btn.animate([{ opacity: 1, filter: "blur(0)", translate: "0 0", width: w + "px", marginLeft: "0px" },
+    { opacity: 0, filter: "blur(6px)", translate: "12px 0", offset: 0.6 },
+    { opacity: 0, filter: "blur(6px)", translate: "12px 0", width: "0px", marginLeft: -gap + "px" }], { duration: RING_OUT_MS, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" });
+  a.finished.then(() => { if (!btn.dataset.leaving) return; delete btn.dataset.leaving; paintJobs(); a.cancel(); }, () => {});
+}
 // The drawer's songs in sections, each shown only while it has any: Processing, then Pending under it (waiting their
 // turn, or stopped wanting their lyrics pasted: orange, the next going on meanwhile), Stopped (failed); in each, in the
 // order they were sent. The sections always in that order, however they came. One that's in leaves the drawer for the
@@ -57,15 +68,6 @@ function jobSection(key, name) {
     sec.append(h, el("div", "jobs-rows")); list.append(sec);
   }
   return sec;
-}
-// How long a song has still to go, in s, from how fast it's been going since it started (or was sent its lyrics):
-// its progress over that time; null till there's enough to tell (ETA_WAIT s, ETA_GOT of the way)
-const ETA_WAIT = 8, ETA_GOT = 0.01;
-function etaLeft(j) {
-  const a = j.etaAt;
-  if (!a || j.status !== "running") return null;
-  const dt = (performance.now() - a.t) / 1000, dp = (j.progress || 0) - a.p;
-  return dt < ETA_WAIT || dp < ETA_GOT ? null : (1 - (j.progress || 0)) * (dt / dp);
 }
 function paintJobs() {
   const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !j.needLyrics && !j.needPick && j.status !== "error"), ready = jobs.filter((j) => j.done);
@@ -84,7 +86,10 @@ function paintJobs() {
   arc.style.visibility = jobs.length ? "" : "hidden"; // empty: just the track, no dot of a round end
   if (!btn.querySelector(":scope > .ico")) btn.append(icon("plus"));
   const wasIdle = btn.classList.contains("idle");
-  btn.classList.toggle("idle", !jobs.length); // nothing added: not there (CSS); one sent, it comes in
+  if (!jobs.length && !wasIdle && !btn.dataset.leaving && !stillMotion() && btn.getClientRects().length) ringOut(btn); // the last one in: out, not gone at once
+  else if (jobs.length && btn.dataset.leaving) { delete btn.dataset.leaving; btn.getAnimations().forEach((a) => a.cancel()); } // another sent while it went: back
+  if (btn.dataset.leaving) { btn.classList.add("ready"); arc.style.strokeDasharray = "100 100"; arc.style.visibility = ""; } // (full and white as it goes)
+  btn.classList.toggle("idle", !jobs.length && !btn.dataset.leaving); // nothing added: not there (CSS); one sent, it comes in
   if (wasIdle && jobs.length && !stillMotion()) btn.animate([{ transform: "scale(0.5)", opacity: 0 }, { transform: "scale(1.12)", opacity: 1, offset: 0.55 }, { transform: "none", opacity: 1 }], { duration: 380, easing: "ease-out" });
   const pct = Math.round(p * 100);
   say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : need.length ? (need.some((j) => j.needLyrics) ? "Lyrics needed" : "Which song is it?") : ready.length > 1 ? "{n} songs added"
@@ -127,7 +132,7 @@ function paintJobs() {
     else if (stopping) say(state, "Cancelling…");
     else if (j.status === "queued" && secOf.get(id) === "processing") say(state, "Starting…"); // (the first: none before it)
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
-    else { const left = etaLeft(j); say(state, left == null ? "{stage}" : left < 60 ? "{stage} · under a minute left" : "{stage} · about {n} min left", { stage: () => tr(j.stage || ""), n: Math.round(left / 60) }); }
+    else say(state, "{stage}", { stage: () => tr(j.stage || "") }); // (how far it's got: the pixels under it say)
     paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, j.status === "running" && !j.waiting && !j.done && !need && !ask && !err && !stopping && !stillMotion(), (need || ask) && !stopping); // (queued, or waiting for its lyrics' turn: still; wanting its lyrics, or which song it is: paused)
     row.querySelector(".lyr-open").hidden = !need; // (not "open": that's the drawer's, read above, for one in that's seen)
     if (!need && !row.querySelector(".lyr-form").hidden) lyricsBox(row, false); // (pasted, or settled elsewhere)
@@ -391,10 +396,13 @@ async function songArrived(songId) {
   await renderLibrary();
   paintJobs(); // the panel names it as the library does
   if (!(view === "stems" && stemsPage === "lib") || stillMotion()) return;
+  // New not there till now: it comes in and opens first (openNew, from renderLibrary), and the card blurs in once it's
+  // open; New there already: the card blurs in at once. The list's row a beat after the card.
   const card = $("#sNewTrack").querySelector(`[data-id="${songId}"]`), node = had ? libRows.get(songId) : box;
-  if (card?.getClientRects().length) card.animate([{ opacity: 0, filter: "blur(10px)", transform: "scale(0.92)" }, { opacity: 1, filter: "blur(0)", transform: "none" }],
-    { duration: 600, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "backwards" });
-  if (node?.isConnected) unfold(node, had ? 0 : from, card ? 260 : 0);
+  const shown = card?.getClientRects().length, after = shown && newMove === "open" ? NEW_OPEN_MS - 60 : 0;
+  if (shown) card.animate([{ opacity: 0, filter: "blur(10px)", transform: "scale(0.92)" }, { opacity: 1, filter: "blur(0)", transform: "none" }],
+    { duration: 600, delay: after, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "backwards" });
+  if (node?.isConnected) unfold(node, had ? 0 : from, shown ? after + 260 : 0);
   if (searchHidden && !$("#sSearchBox").hidden) $("#sSearchBox").animate([{ opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0)" }], { duration: 480, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
 }
 function unfold(node, from = 0, delay = 0) {
@@ -436,10 +444,8 @@ function watchJob(id, kind, forSong) {
       const had = adding.get(id); // (a playlist's song: sent by its name, its link known once it's found; its candidates asked then)
       if (had && link && YT_LINK.test(link) && !had.early && !had.findAsked) { had.findAsked = true; findEarly(id, link); }
       skip = status === "queued" && ahead > 1 ? 4 : 0;
-      const was = adding.get(id), now = performance.now(); // (its time left: timed from when it started going, again from where it is if it went back or waited)
-      const etaAt = status !== "running" || waiting ? null : !was?.etaAt || progress < was.etaAt.p ? { t: now, p: progress } : was.etaAt;
       const arrive = status === "done" && !needLyrics && !needPick && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
-      addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), etaAt, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError, waiting: !!waiting, needPick: !!needPick,
+      addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError, waiting: !!waiting, needPick: !!needPick,
         done: status === "done" && !needLyrics && !needPick, ...(arrive ? { arrived: true } : {}) });
       if (arrive) leaveDrawer(id).then(() => songArrived(songId));
     }
