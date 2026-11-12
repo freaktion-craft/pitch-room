@@ -36,21 +36,38 @@
 .lylist p.now { opacity: 1; }
 /* filled as it's sung, a soft edge running through the word (renderLyrics: --p, past either end of it when it's not on
    it); the line before keeps its fill, so it doesn't flash back to plain as it leaves, and stays lit while it's still
-   being sung */
-@supports (color: oklch(from red l c h)) { .lylist { --sung: oklch(from var(--voice) clamp(var(--sung-lo), l, var(--sung-hi)) c h); } } /* the edge you follow: against the ink, never too near it (--sung-lo, --sung-hi) */
-.lylist p:is(.now, .b1) span { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
+   being sung. A word in syllable boxes (.sys, below) isn't filled itself: each syllable is, the edge at its place in it
+   (in px), so it runs on through the word as one */
+@supports (color: oklch(from red l c h)) { .lylist, .countin { --sung: oklch(from var(--voice-act) calc(clamp(var(--sung-lo), l, var(--sung-hi)) + (l - clamp(var(--sung-lo), l, var(--sung-hi))) * clamp(0, (0.03 - c) * 1000, 1)) max(c, calc(var(--sung-c) * min(max((l - 0.7) * 100, 0), 1))) h); } } /* the edge you follow: your colour within --sung-lo and --sung-hi; Mono (no hue, --voice-act the ink) the ink itself, the sung part the strongest (kept grey, it was the unsung's lightness: no fill seen); the count-in's dots in it too */
+.lylist p:is(.now, .b1) span:not(.sys) { background: linear-gradient(90deg, var(--sung, var(--voice)) calc(var(--p, -10%) - 2px), var(--un, var(--ink)) calc(var(--p, -10%) + 2px)); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
+/* what's not sung yet of the line, well under the ink (two thirds of it: at three quarters it still read as black): the
+   sung part stands out by more than its colour (the brackets' words keep their own grey; a syllable takes its word's).
+   Never under the next line's, so the line you're on reads the strongest */
+.lylist p:is(.now, .b1) span:not(.bg, .sy) { --un: color-mix(in oklab, var(--ink) 66%, transparent); }
 .lylist.still, .lylist.still p { transition: none; } /* new lines (renderLyrics): there at once */
 .lylist p.n1 { opacity: 0.55; } /* 5.3:1, read without effort like --muted */
-.lylist p.n1.soon { opacity: 0.8; } /* its turn is coming: time to read it */
+.lylist p.n1.soon { opacity: 0.62; } /* its turn is coming: a step up, still under the line you're on (at 0.8 it outshone it) */
 .lylist p.n2 { opacity: 0.35; }
 .lylist p.b1 { opacity: 0.2; }
 .lylist p.b1.live { opacity: 1; transition: none; }
 /* backing vocals, in brackets in the lyrics: smaller, quieter, still filled as they're heard */
 .lylist .bg { --un: var(--muted); font-size: 0.85em; font-weight: var(--weight-medium); color: var(--muted); }
-/* a syllable held a long time: a glow that grows as it's held (the letters stay still) */
+/* a syllable held a long time: a glow that grows as it's held (the letters stay still); in boxes, on the syllable held */
 .lylist span { transition: filter var(--duration-slow); } /* let go of, it fades */
 .lylist .held { transition: none; filter: drop-shadow(0 0 calc(var(--g, 0) * 7px) color-mix(in oklab, var(--voice) var(--glow-mix), transparent)); }
+/* each syllable rises a touch as the fill reaches it and stays up while its line's sung, then the line settles
+   (renderLyrics: a transform each, on the song's time). A transform takes on a box, not on letters in a row, so while its
+   line's sung (and the one before) a word's syllables are boxes of their own (lyBox), in a word that doesn't break. Laid
+   out as the plain words were: each box's right margin ends it where the next syllable's letters start in the plain text
+   (kerning and all), and the line's measured again; one that would lay out differently stays plain words, and doesn't
+   rise. Padding past the letters, the margin taking it back, so a letter reaching past its box is still filled. The
+   count-in stays still: it counts, it isn't sung */
+.lylist .sys { white-space: nowrap; }
+/* each a layer of its own, so it moves by fractions of a pixel (drawn in with the rest, letters land on whole pixels: it
+   would go up in steps); only the two lines' syllables, and from where it rests (renderLyrics), so it's drawn there as
+   sharp as the plain word, and as sharp risen a whole number of pixels */
+.lylist .sy { display: inline-block; padding: 0 var(--space-1); margin-left: calc(-1 * var(--space-1)); will-change: transform; }
 /* Practice: the count-in before the voice comes back after an intro or a break */
 /* midway across the stretch between the note names and the playhead line (resize() sets left and --dot): nothing is
    drawn there during an intro or break, while the coming bars arrive from the right */
@@ -70,7 +87,7 @@
 .lylist .countin .lbl:empty { display: block; height: 20px; } /* its row kept: a label coming or going mustn't move the line under it */
 .countin span { font-size: var(--text-sm); line-height: 20px; color: var(--muted); white-space: nowrap; }
 .countin .dots { display: flex; gap: calc(var(--dot) * 0.6); height: var(--dot); }
-.countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--ink); transition: opacity var(--duration-fast); }
+.countin .dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--sung, var(--voice)); transition: opacity var(--duration-fast); } /* your colour, as the words are once sung (was the ink) */
 .countin .dots i.gone { opacity: 0.25; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(380px, calc(100% - 32px));
@@ -88,17 +105,44 @@
 .key.w { width: 26px; height: 84px; background: var(--key-w); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); border-radius: 0 0 var(--radius-xs) var(--radius-xs); margin-right: -1px;
   display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.62); padding-bottom: var(--space-1); }
 .key.b { position: absolute; top: 0; width: 16px; height: 52px; background: var(--key-b); border-radius: 0 0 var(--radius-xs) var(--radius-xs); z-index: 1; }
+/* your colour as each key shows it: held to a lightness that stands 3:1 off the key (--key-w-lit, --key-b-lit), and its
+   tint for a key pointed at, as light for every colour (--key-w-tint, --key-b-tint). Each in your colour's hue, with no
+   more chroma than every colour can have at its lightness (one the screen can't show is clipped, which turns its hue):
+   held deeper, all of it, or for orange to teal as much as its shade keeps (c × l′/l: tokens.css's shade switch on the
+   hue); held lighter, as much as is left of it on the way to white; pointed at, 0.3 of it on a white key but no more
+   than 0.47 × the way to white (near white the screen has little chroma, blue least), 0.45 on a black key but no more
+   than its shade's. contrast.py checks them. Where the browser can't work a colour out from another (or can't take a
+   cos() of its hue), your colour as it is and a mix of it */
+.keys { --key-w-voice: var(--voice); --key-b-voice: var(--voice); --on-key-w-voice: var(--on-voice);
+  --key-w-hover: color-mix(in oklab, var(--voice) 30%, var(--key-w)); --key-b-hover: color-mix(in oklab, var(--voice) 45%, var(--key-b)); }
+@supports (color: oklch(from red l calc(c * cos(h * 1deg)) h)) {
+  .keys { --key-w-voice: oklch(from var(--voice) min(l, var(--key-w-lit)) calc(c * (1 - clamp(0, (cos((h - 126) * 1deg) - 0.15) * 8, 1) * (1 - min(1, var(--key-w-lit) / l)))) h);
+    --key-b-voice: oklch(from var(--voice) max(l, var(--key-b-lit)) calc(c * min(1, (1 - var(--key-b-lit)) / (1 - l))) h);
+    --on-key-w-voice: var(--on-key-down);
+    --key-w-hover: oklch(from var(--voice) var(--key-w-tint) min(c * 0.3, (1 - var(--key-w-tint)) * 0.47) h);
+    --key-b-hover: oklch(from var(--voice) var(--key-b-tint) calc(c * min(0.45, var(--key-b-tint) / l)) h); }
+  /* a pastel (Pink, Sky: data-pastel, set with the accent) on a white key: bright and clear, --key-w-pastel and a soft
+     chroma (deepened to the others' lightness it read dark and dusty), the C's label dark on it in either theme. By
+     data-pastel, not by how light your colour is: the dark theme's orange, amber, green and teal are lighter than 0.7
+     too, and Mono's lighter still (with no hue: a floor under its chroma made its key pink) */
+  :root[data-pastel] .keys { --key-w-voice: oklch(from var(--voice) min(l, var(--key-w-pastel)) max(c, 0.09) h); --on-key-w-voice: var(--on-voice); }
+}
 .key.guide.w { background: var(--key-w-on); }
 .key.guide.b { background: var(--key-b-on); box-shadow: inset 0 -4px 0 oklch(0.57 0 0); }
-.key.live { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 -5px 0 var(--voice); }
-.key.b.live { box-shadow: inset 0 -5px 0 var(--voice); }
-/* keys you point at and play: a tint of your colour, then the colour itself while held (the label goes dark on it) */
+.key.live { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), inset 0 -5px 0 var(--key-w-voice); }
+.key.b.live { box-shadow: inset 0 -5px 0 var(--key-b-voice); }
+/* keys you point at and play: a tint of your colour, then the colour itself while held (the label white or dark on it,
+   --on-key-down). The note to sing keeps its grey under the pointer (its name's in the tip) */
 @media (hover: hover) {
-  .key.w:hover { background: color-mix(in oklab, var(--voice) 30%, var(--key-w)); }
-  .key.b:hover { background: color-mix(in oklab, var(--voice) 45%, var(--key-b)); }
+  .key.w:hover:not(.guide, .down) { background: var(--key-w-hover); }
+  .key.b:hover:not(.guide, .down) { background: var(--key-b-hover); }
 }
-.key.w.down, .key.b.down { background: var(--voice); }
-.key.w.down { color: var(--on-voice); }
+.key.w.down { background: var(--key-w-voice); color: var(--on-key-w-voice); }
+.key.b.down { background: var(--key-b-voice); }
+/* a key reached with Tab: its ring inside it, in your colour as it shows on that key (outside, it ran under the keys
+   beside it and was lost on the white ones) */
+.key.w:focus-visible { outline-color: var(--key-w-voice); outline-offset: -4px; }
+.key.b:focus-visible { outline-color: var(--key-b-voice); outline-offset: -4px; }
 
 @media (max-width: 760px) {
   header { margin-bottom: var(--space-10); }

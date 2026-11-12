@@ -4,9 +4,10 @@
 
 ## Boot order and shared globals
 
-- `index.html` loads 17 classic `<script>`s in a fixed order: core, ko, audio, live, helpers, library, info, adding,
-  studio, practice, lyedit, takes, takes-studio, stage, voice, onboard, app. `icons.local.js` loads just before
-  `core.js` (optional; a missing file is answered with an empty 200).
+- `index.html` loads 24 classic `<script>`s in a fixed order: core, ko, audio, live, helpers, library, info, adding,
+  studio, practice, lyedit, takes, takes-studio, stage, turn, scale, reach, match, voice, voice-scale, voice-reach, voice-match,
+  onboard, app.
+  `icons.local.js` loads just before `core.js` (optional; a missing file is answered with an empty 200).
 - They are plain scripts, not modules: every top-level `const`, `let` and `function` is visible to the files after it.
   Each file starts with `"use strict"` and a short `//` header (usually 1-3 lines) saying what it holds.
 - `app.js` is the only entry point. At its end it runs `renderMic()`, `initStems()`, `initSing()`, `initVoice()`,
@@ -60,8 +61,12 @@ Each area keeps its state in one short capitalised object.
 | `stage.js` | Practice canvas; `C` (canvas colours); accent and theme; the main `loop()` |
 | `turn.js` | `TN`: the Lab's Turn measures (harmonic levels, the turn, a pass's break or step). Pure, runs in Node |
 | `scale.js` | `SC`, `SC_PATS`: the Lab's Scales judging (`scAlign`, `scJudge`, `scStep`). Pure, runs in Node |
+| `reach.js` | `RC`, `RC_WAYS`: the Lab's Reach judging (`rcJudge`, `rcEnd`, `rcStep`): ways onto one note, read for arriving, settling, holding, breaks, and how even the level stayed. Pure, runs in Node |
+| `match.js` | `MT`: the Lab's Match judging (`mtJudge`, `mtEnd`: where one sung note landed, in cents) and choosing (`mtPick`, `mtGrade`: Leitner boxes per note; a miss back after one other; a new note once all in play are got twice running). Pure, runs in Node |
 | `voice.js` | `VC`: the Lab page, its mic and pitch frames (`VC.fr`), and the Turn view |
 | `voice-scale.js` | `SV`: the Lab's Scales view (call and response at the piano) |
+| `voice-reach.js` | `RV`: the Lab's Reach view; Practice's note menu (a right-click on a bar, or N), sending a note there (`sendToLab`) |
+| `voice-match.js` | `MV`: the Lab's Match view (one piano note, sung back; the notes in play and how familiar each is, kept in `voiceMatch`) |
 | `onboard.js` | `OB`: first-run steps |
 | `app.js` | Routing, header, keyboards, language switch, startup |
 
@@ -120,6 +125,19 @@ play outside Studio and Practice.
   window.
 - Accents: `ACCENTS` in `stage.js`. `"white"` is the stored key for Mono; keep it, saved settings use it. `paintAccent`
   sets `--voice`, `--voice-act` and `--on-voice` on `<html>` and each `.theme-dark`.
+- `--voice-mark` is your colour as a mark of where you are and what's on (the tab line, slider fills at half, switches on,
+  Loop on), never on what you press but the round Play (`.btn.primary.round`); `tokens.css` works it out from
+  `--voice-act` (no lighter than L 0.66 in the light theme), so no script sets it.
+- What's on your colour: a glyph on it as a mark (Loop and the click on, a take playing, Compare) is `--on-mark`; a
+  label in it that holds text (the playhead's time, the version you're in, the Lab's chips) is `--voice-fill` with
+  `--on-fill` (the canvas reads both through `readColors.probe`). Both are white in the light theme, the label's fill
+  deeper for it (no lighter than L 0.545), but for Pink and Sky (`data-pastel`), dark on the pastel as before.
+- The greys follow `--voice` too: under `@supports` (relative colour) `tokens.css` gives the surfaces (`--bg`,
+  `--surface`, `--surface-2`, `--hover-2`, `--tog-down`) and the tints that fill, line and mark (`--fg-2` to `--fg-38`,
+  so `--fill`, `--line`, `--ring`, `--track`, `--dim`) a trace of its hue; text and ink stay neutral, and Mono comes out
+  as plain grey. Such a token's text (`getPropertyValue`) is then an unworked `oklch(from ...)`: a canvas or script reads
+  the colour the browser works out instead (an element's `color` set to `var(--token)`, read with `getComputedStyle`, as
+  `readColors()` does through `readColors.probe`).
 - `--on-voice` and `--on-voice-mono` may take `--on-accent`, but `--on-voice-mono` must never refer to `--on-voice`
   (or anything that leads back to it). Mono sets `--on-voice: var(--on-voice-mono)`, so a cycle leaves no colour at
   all. (The comment in `tokens.css` overstates this as "never one another's".)
@@ -134,6 +152,10 @@ play outside Studio and Practice.
   phrases, Record, takes, Takes Studio).
 - Shared controls: `.btn` (size `.sm`/`.xs`, tone `.primary`/`.quiet`/`.ghost`, shape `.icon`/`.round`), `.tog`, `.pick`
   (`makePick`), `.switch`, `.seg`, `.pop`, `.menu`, `.set-row`. Show and hide with the `hidden` attribute.
+- Sliders: every `input[type="range"]` is a fader (`base.css`, no class): a bar `--fader` tall filled in your colour up
+  to an ink cap `--thumb` wide (both in `tokens.css`; `sliderTips` reads `--thumb` to put the level's tip over the cap).
+  A place greys its faders by setting `--fader-fill` on what holds them (a Studio track out of the mix). The mic's gate
+  and Takes Studio's Sync restyle theirs in place (a threshold over a meter; a fill from zero).
 - Page-wide states are classes on `<html>` (`desktop-mac`, `desktop-win`, `welcome`, `asking`, `theming`, ...).
 - Respect `prefers-reduced-motion` (`stillMotion()` in `library.js`, the CSS media blocks).
 - CSS transitions use the token durations (`--duration-*`) and `--ease`. `el.animate` calls carry their own literal

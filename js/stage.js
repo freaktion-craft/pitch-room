@@ -7,12 +7,13 @@ const cv = $("#cv"), g = cv.getContext("2d");
 let W = 0, H = 0, dpr = 1, C = {};
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ["surface","surface-2","ink","muted","line","voice","good","warn","orange","bad"]) C[k] = cs.getPropertyValue("--" + k).trim();
+  for (const k of ["ink","muted","voice","good","warn","orange","bad"]) C[k] = cs.getPropertyValue("--" + k).trim();
   // the track colours through an element's computed colour, which works out the color-mix() of the backing vocals
   const probe = readColors.probe || (readColors.probe = document.body.appendChild(Object.assign(el("i"), { hidden: true })));
   for (const k of ["vocals","lead","backing","drums","bass","guitar","piano","other","click"]) { probe.style.color = `var(--stem-${k})`; C["stem-" + k] = getComputedStyle(probe).color; }
-  // (and your colour as small text, a color-mix in the light theme, and text on it)
-  for (const k of ["voice-ink", "on-voice"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
+  // (and your colour as small text, a color-mix in the light theme, and as a label with the text on it, the Lab's
+  // chips; and the greys with a trace of it, relative colours worked out from it: the card, a button's grey, a line)
+  for (const k of ["voice-ink", "voice-fill", "on-fill", "surface", "surface-2", "line", "wave"]) { probe.style.color = `var(--${k})`; C[k] = getComputedStyle(probe).color; }
 }
 function resize() {
   const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -48,10 +49,12 @@ readColors();
 
 // accent colour (--voice), remembered as "accent"; the script in <head> applies it before first paint. Picked from the
 // swatches in the settings.
-// in the order of their hues round the wheel (coral's 32° to pink's 353°), white before them
+// in the order of their hues round the wheel (orange's 58° to pink's 350°), white before them (Coral's gone: a saved
+// Coral is Orange)
 // ("white" is Mono: white in the dark theme, near-black in the light; its key kept, as settings have it)
-const ACCENTS = { white: "Mono", coral: "Coral", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal", blue: "Blue", violet: "Violet", pink: "Pink" };
+const ACCENTS = { white: "Mono", orange: "Orange", amber: "Amber", green: "Green", teal: "Teal", sky: "Sky", blue: "Blue", violet: "Violet", pink: "Pink" };
 let accent = store.get("accent", "white");
+if (accent === "coral") accent = "orange";
 if (!(accent in ACCENTS)) accent = "white";
 // on <html>, and on each part that stays dark (.theme-dark), so it's that theme's shade of it there
 function paintAccent() {
@@ -60,6 +63,7 @@ function paintAccent() {
     n.style.setProperty("--voice-act", accent === "white" ? "var(--ink)" : `var(--voice-${accent})`); // a button in it: Mono at full
     if (accent === "white") n.style.setProperty("--on-voice", "var(--on-voice-mono)"); else n.style.removeProperty("--on-voice"); // (text on it)
   }
+  document.documentElement.toggleAttribute("data-pastel", accent === "pink" || accent === "sky"); // (kept soft in the light theme: tokens.css)
 }
 function setAccent(k) {
   accent = k; store.set("accent", k);
@@ -68,6 +72,15 @@ function setAccent(k) {
   for (const b of $("#swatches").children) b.setAttribute("aria-pressed", String(b.dataset.k === k));
 }
 paintAccent();
+// Vibrant (Settings, off at first): your colour through the whole app (its greys, ink and text in shades of it:
+// tokens.css), not only where it points. Remembered as "vibrant"; the script in <head> sets it before first paint
+function setVibrant(on) {
+  store.set("vibrant", on);
+  if (on) document.documentElement.dataset.tone = "vibrant"; else delete document.documentElement.dataset.tone;
+  readColors(); // the canvas takes it from here
+}
+$("#vibrantOn").checked = document.documentElement.dataset.tone === "vibrant";
+$("#vibrantOn").onchange = (e) => setVibrant(e.target.checked);
 
 // The theme (Settings): "system" (the system's light or dark, followed as it changes), "light" or "dark", remembered
 // as "theme". The script in <head> sets it on <html> (data-theme) before first paint, as it does the accent; the
@@ -119,6 +132,9 @@ const GUT = 48; // the note names' column; they start 16 px in, under the stage'
 const HIT = 0.24; // where the playhead line is, as a share of the width right of the note names
 // with lyrics, more of it for the words: a third, at least 360 px, at most 60% (the bars still show 4.4 s)
 const hitShare = () => (K.lyrics ? Math.min(0.6, Math.max(0.33, 360 / (W - GUT))) : HIT);
+// What the stage last drew, for finding a bar under the pointer (stageNoteAt, js/voice-reach.js): its time and pitch
+// scales (X, Y: px in its box), the bars' height, the playhead
+let stageAt = null;
 // now: song time at the hit line; cur: your pitch; hist: your recent pitch; evs: the bars; guide: the original singer's
 // pitch line ({pts, shift})
 function draw(now, cur, hist, evs, guide) {
@@ -150,6 +166,7 @@ function draw(now, cur, hist, evs, guide) {
   // bars
   g.save(); g.beginPath(); g.rect(GUT + 1, 0, W - GUT - 1, H); g.clip();
   const bh = Math.max(8, Math.min(ppS * 0.78, 24));
+  stageAt = { now, hitX, W, X, Y, bh, evs };
   for (const e of evs) {
     const x0 = X(e.t0), x1 = X(e.t1);
     if (x1 < GUT || x0 > W + 4) continue;
@@ -293,8 +310,9 @@ function loop() {
   let m = null;
   if (ac && (micOn || testOsc)) {
     if (testOsc) {
-      // (in the Lab, its note; in Scales, the pattern's note now; while a Smooth pass runs, left where it is, for a glide set by hand)
-      const tgt = view === "voice" ? (VC.view === "scale" ? { midi: scNow(now) } : VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
+      // (in the Lab, its note; in Scales, the pattern's note now; in Reach, along the way's shape; in Match, the note; while a Smooth pass runs,
+      // left where it is, for a glide set by hand)
+      const tgt = view === "voice" ? (VC.view === "scale" ? { midi: scNow(now) } : VC.view === "reach" ? { midi: rvNow(now) } : VC.view === "match" ? { midi: mvNow() } : VC.run && VC.run.mode === "smooth" ? null : { midi: VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target }) : activeNote(songPos()) || lastTarget;
       if (testGain) testGain.gain.setTargetAtTime(tgt && tgt.midi == null ? 0 : 0.3, ac.currentTime, 0.01); // (no note: quiet)
       if (tgt && tgt.midi != null) testOsc.frequency.setTargetAtTime(mf(tgt.midi + testOffset / 100), ac.currentTime, 0.03);
     }

@@ -114,14 +114,18 @@ function voiceFrame() {
   if (VC.run && !hearing) { vcAbort(); paintTurn(); } // (the mic turned off: the run's stopped, not left waiting)
   if (VC.run) (VC.run.mode === "find" ? vcFindTick : vcPassTick)(now);
   if (SV.run) { if (!hearing) scAbort(); else scTick(now, voiced, dt); } // (Scales' set: js/voice-scale.js)
+  if (RV.run) { if (!hearing) rvAbort(); else rvTick(now, voiced, dt); } // (Reach's: js/voice-reach.js)
+  if (MV.run) { if (!hearing) mvAbort(); else mvTick(now, voiced, dt); } // (Match's: js/voice-match.js)
   const off = !micOn && !testOsc;
   if ($("#vcOff").hidden !== !off) $("#vcOff").hidden = !off;
-  drawTurn(now); drawScale(now); drawSpec(now, hearing); drawEq(now, hearing);
+  drawTurn(now); drawScale(now); drawReach(now); drawMatch(now); drawSpec(now, hearing); drawEq(now, hearing);
   if (now - VC.painted > 100) { VC.painted = now; paintVoiceRead(); }
-  vcKeys(vcCur());
+  vcKeys(vcHidden() ? null : vcCur()); // (none while your line's hidden: vcHidden)
 }
 // The note read now, as the Lab reads it: the line, an octave down where it read a yell an octave high (VC.hold)
 const vcCur = () => (cur != null && VC.hold.down ? cur - 12 : cur);
+// your own line hidden while you sing: in a Scales set, if you chose (scHidden); in Match, on a familiar note (mvHidden)
+const vcHidden = () => scHidden() || mvHidden();
 
 // The input lock. While the Lab's shown the mic runs with nothing of the browser's own on its sound: openMic has noise
 // suppression, gain control and voice isolation off, and the echo filter's off here too (micEcho), so a mic opened with
@@ -161,8 +165,8 @@ function vcSay(st, sv, d, dv, keep = true, tone = "") {
   VC.msg = keep;
   vcTitles();
 }
-// a cut-off line has its whole text as its title (and only then)
-function vcTitles() { for (const el of [$("#vcSay"), $("#vcDo"), $("#scSay"), $("#scDo")]) { const t = el.scrollWidth > el.clientWidth ? el.textContent : ""; if (el.title !== t) el.title = t; } }
+// a cut-off line has its whole text as its title (and only then); Scales' pattern's name too (a phone, in a set)
+function vcTitles() { for (const el of [$("#vcSay"), $("#vcDo"), $("#scSay"), $("#scDo"), $("#scPatName")]) { const t = el.scrollWidth > el.clientWidth ? el.textContent : ""; if (el.title !== t) el.title = t; } }
 const vcV = (v = VC.vowel) => { const l = (VOWELS.find(([k]) => k === v) || VOWELS[0])[1]; return () => tr(l); }; // (said again in the language now)
 const vcSlide = (T) => ["Slide “{v}” {lo}–{hi} and back, slowly.", { v: vcV(), lo: absName(T - 4), hi: absName(T + 4) }];
 // a vowel's runs that found a turn, newest last; a turn's name (a span where H2 rode a wide F1)
@@ -321,8 +325,8 @@ function vcPassDone(res, xs) {
 // a pass's tone (vcSay), and the colour it's marked in: even, a break, a step (loudness or tone); not read: none
 const vcTone = (res) => (res.ok === 1 ? "good" : res.ok === 0 ? (res.kind === "break" ? "bad" : "step") : "");
 const vcToneC = (t) => ({ good: C.good, bad: C.bad, step: C.orange })[t] || C.muted;
-// your notes and passes: in your colour, unless it's as good as one of those (Green, Coral, Orange): then in ink
-const vcMine = () => (["green", "coral", "orange"].includes(accent) ? C.ink : C.voice);
+// your notes and passes: in your colour, unless it's as good as one of those (Green, Orange): then in ink
+const vcMine = () => (["green", "orange"].includes(accent) ? C.ink : C.voice);
 function vcPassWords(res, T) {
   const at = res.at != null ? { note: absName(res.at) } : null;
   if (res.ok === 1) return ["Even", null, "Again.", null];
@@ -361,7 +365,7 @@ function vcDayRow() {
 function vcDay(even) { const row = vcDayRow(); row[1]++; if (even) row[2]++; store.set("voiceSmooth", VC.days); }
 
 // ---------- controls ----------
-const vcShown = () => (VC.view === "scale" ? (SV.run ? SV.run.step.root : SV.start) : VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target); // the note beside the keys (in Scales, its start, or the key it's on)
+const vcShown = () => (VC.view === "scale" ? (SV.run ? SV.run.step.root : SV.start) : VC.view === "reach" ? (RV.run ? RV.run.T : RV.note) : VC.view === "match" ? (MV.run && MV.run.T != null ? MV.run.T : MV.home) : VC.mode === "smooth" && VC.centre != null ? VC.centre : VC.target); // the note beside the keys (in Scales, its start, or the key it's on)
 const vcStored = () => { const v = store.get("voiceFloor", 48); return Number.isFinite(v) ? v : 48; }; // (Find's floor)
 // Find's notes: the keys whose harmonics can be read
 const vcLo = () => Math.max(KEY_LO, tnRange(A4)[0]), vcHi = () => Math.min(KEY_HI, tnRange(A4)[1]);
@@ -405,12 +409,14 @@ function vcGuide() {
   setText("vcTgt", absName(m));
 }
 // A note played (and nothing read while it sounds, in a run)
-function vcPlay(m) { playKey(m); if (VC.run || SV.run) VC.mute = Math.max(VC.mute, performance.now() + TN.keyMute); }
+function vcPlay(m) { playKey(m); if (VC.run || SV.run || RV.run || MV.run) VC.mute = Math.max(VC.mute, performance.now() + TN.keyMute); }
 // a key tapped, or an arrow (arrow: kept as Find's floor): in a run, only heard; else Find's first note (and Find's ready
 // to run again) or Smooth's centre. (Nothing else is cleared.)
 function vcStart(m, arrow = false) {
   m = Math.max(KEY_LO, Math.min(KEY_HI, m));
   if (VC.view === "scale") { if (!SV.run) scSetStart(m); vcPlay(arrow && !SV.run ? SV.start : m); return; } // (Scales' start note; a key tapped is the one heard)
+  if (VC.view === "reach") { if (!RV.run) rvSetNote(m); vcPlay(RV.run ? m : RV.note); return; } // (Reach's note)
+  if (VC.view === "match") { if (!MV.run) mvSetHome(m); vcPlay(MV.run ? m : MV.home); return; } // (Match's centre)
   if (!VC.run) {
     if (VC.mode === "find") { vcSetTarget(m, arrow); m = VC.target; VC.done = null; VC.msg = false; }
     else { VC.centre = m; VC.mine = true; vcGuide(); }
@@ -424,14 +430,15 @@ function vcStart(m, arrow = false) {
 function paintTurn() {
   for (const b of $("#vcMode").children) b.setAttribute("aria-checked", String(b.dataset.m === VC.mode));
   say($("#vcGo"), VC.run ? "Stop" : VC.mode === "find" && VC.done && VC.done.state === "found" ? "Smooth" : VC.mode === "smooth" && vcBlind() ? "Find" : "Start");
-  say($("#vcStepLbl"), VC.view === "scale" ? (SV.run ? "Key" : "Start note") : VC.mode === "find" ? "Start note" : "Centre");
+  say($("#vcStepLbl"), VC.view === "scale" ? (SV.run ? "Key" : "Start note") : VC.view === "reach" ? "Target" : VC.view === "match" ? (MV.run ? "Target" : "Centre") : VC.mode === "find" ? "Start note" : "Centre");
   vcGuide();
   // (loudness and tone aren't read while the browser filters the mic: their lanes aren't shown, vcLock)
   $("#vcAxH2").hidden = VC.mode !== "find"; $("#vcAxT").hidden = $("#vcAxL").hidden = VC.mode !== "smooth" || VC.filt.length > 0;
   if (!VC.run) $("#vcTgt").style.setProperty("--p", "0%");
   for (const b of $("#vcVowels").children) { // each vowel: its newest turn, and its last 8 days' even passes
+    if (!b.dataset.v) continue; // (Scales' trills: paintScale)
     const v = b.dataset.v, t = vcTurns(v).pop(), days = vcDays(v).slice(-8), bars = b.children[2].children;
-    b.setAttribute("aria-checked", String(v === VC.vowel));
+    b.setAttribute("aria-checked", String(v === VC.vowel && !(VC.view === "scale" && SV.on)));
     b.children[1].textContent = t ? vcTurnName(t) : "–";
     for (let i = 0; i < 8; i++) {
       const r = days[i - (8 - days.length)];
@@ -733,7 +740,7 @@ function drawEq(now, hearing) {
       const x = xOf(k * f0); g.strokeStyle = k === lead ? C.voice : C.muted; g.fillStyle = k === lead ? C["voice-ink"] : C.muted; g.lineWidth = k === lead ? 2 : 1;
       g.beginPath(); g.moveTo(x, Hp); g.lineTo(x, Hp - 26); g.stroke(); g.fillText("H" + k, x, Hp - 30);
     }
-    if (VC.p2 != null && now - VC.p2At < 300 && VC.p2 >= TN.p2Out) chip(tr("H2 stands out"), xOf(2 * f0), Hp - 44, C["on-voice"], C.voice);
+    if (VC.p2 != null && now - VC.p2At < 300 && VC.p2 >= TN.p2Out) chip(tr("H2 stands out"), xOf(2 * f0), Hp - 44, C["on-fill"], C["voice-fill"]);
   }
   // the envelope, and the formants as dots on it with their Hz on a tab above (only while the vowel can be read)
   const blur = !vcVowelRead();
@@ -745,7 +752,7 @@ function drawEq(now, hearing) {
     chip(`F${i + 1} ${Math.round(f)}`, x, y - 10 - row * 22, C.ink, C["surface-2"]);
   });
   // the note's fundamental, named on the Hz line in the gutter
-  if (f0) chip(absName(sung + 12 * Math.log2(A4 / 440)), xOf(f0), H - 2, C["on-voice"], C.voice);
+  if (f0) chip(absName(sung + 12 * Math.log2(A4 / 440)), xOf(f0), H - 2, C["on-fill"], C["voice-fill"]);
   g.textAlign = "left";
 }
 
@@ -757,10 +764,10 @@ function vcVowelRead() {
   const t = vcTurns(VC.vowel).pop(), own = t ? 2 * mf(t.t) : F1_PRIOR[VC.vowel] || F1_PRIOR.a, f0 = mf(VC.fmAt);
   return f0 <= TN.f1Read && 3 * f0 <= Math.min(VC.fm[0], own);
 }
-// Beside the view: the note and how far off it is (in cents, against A440), H1−H2, the level, and F1 · F2 ("~" where the
-// vowel can't be read: vcVowelRead)
+// Beside the view: the note and how far off it is (in cents, against A440; neither while your line's hidden:
+// vcHidden), H1−H2, the level, and F1 · F2 ("~" where the vowel can't be read: vcVowelRead)
 function paintVoiceRead() {
-  const sung = vcCur(), m = sung == null ? null : sung + 12 * Math.log2(A4 / 440);
+  const sung = vcHidden() ? null : vcCur(), m = sung == null ? null : sung + 12 * Math.log2(A4 / 440);
   setText("vcNote", m == null ? "–" : absName(m)); setText("vcTgt", absName(vcShown())); // (the names as set now)
   const c = m == null ? null : Math.round((m - Math.round(m)) * 100);
   setText("vcCents", c == null ? "" : (c > 0 ? "+" : c < 0 ? "−" : "±") + Math.abs(c) + "¢");
@@ -793,31 +800,35 @@ function voiceShow() {
   micKeep(performance.now(), true); vcLock(); VC.hold = { down: false, at: null };
   if (VC.run) { vcAbort(); paintTurn(); }
   if (SV.run) scAbort();
+  if (RV.run) rvAbort();
+  if (MV.run) mvAbort();
   const wrap = $("#vcKeys").parentElement, k = vcKeyEls.get(60);
   if (k) wrap.scrollLeft = k.offsetLeft - wrap.clientWidth / 2;
   $("#vcOff").hidden = micOn || !!testOsc;
 }
 // Left (route): Scales' set stopped, its call hushed (a pattern queued on the piano would play on over the next page); the
 // mic with the echo filter again, if it's set
-function voiceHide() { if (SV.run) scAbort(); if (micOn && micAsked !== micEcho()) restartMic(); }
+function voiceHide() { if (SV.run) scAbort(); if (RV.run) rvAbort(); if (MV.run) mvAbort(); if (micOn && micAsked !== micEcho()) restartMic(); }
+// The view: Turn, Scales, Reach, the spectrogram or the EQ in its place (the spectrogram's to begin with); the mic's ask
+// (#vcOff) over whichever's shown. Leaving Turn, Scales or Reach stops its run.
+function vcShowView(v) {
+  if (v !== "pad" && VC.run) { vcAbort(); paintTurn(); }
+  if (v !== "scale" && SV.run) scAbort();
+  if (v !== "reach" && RV.run) rvAbort();
+  if (v !== "match" && MV.run) mvAbort();
+  VC.view = v; $(".vc").dataset.view = v;
+  $(".vc-pad").hidden = v !== "pad"; $(".vc-scale").hidden = v !== "scale"; $(".vc-reach").hidden = v !== "reach"; $(".vc-match").hidden = v !== "match"; $(".vc-spec").hidden = v !== "spec"; $(".vc-eq").hidden = v !== "eq";
+  $(".vc-" + v).append($("#vcOff"));
+  for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
+  paintTurn(); paintScale(); paintReach(); paintMatch();
+}
 function initVoice() {
   // the header's Lab tab: in, and the mic on with it (this click lets it start)
   $("#tabLab").onclick = () => { if (view !== "voice") startMic(); };
   $("#vcMic").onclick = () => startMic();
-  // the view: Turn, Scales, the spectrogram or the EQ in its place (the spectrogram's to begin with); the mic's ask (#vcOff)
-  // over whichever's shown. Leaving Turn or Scales stops its run.
-  const showView = (v) => {
-    if (v !== "pad" && VC.run) { vcAbort(); paintTurn(); }
-    if (v !== "scale" && SV.run) scAbort();
-    VC.view = v; $(".vc").dataset.view = v;
-    $(".vc-pad").hidden = v !== "pad"; $(".vc-scale").hidden = v !== "scale"; $(".vc-spec").hidden = v !== "spec"; $(".vc-eq").hidden = v !== "eq";
-    $(".vc-" + v).append($("#vcOff"));
-    for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
-    paintTurn(); paintScale();
-  };
-  initScales();
-  for (const b of $("#vcView").children) b.onclick = () => { showView(b.dataset.v); store.set("voiceView", b.dataset.v); };
-  showView(["pad", "scale", "spec", "eq"].includes(store.get("voiceView", "spec")) ? store.get("voiceView", "spec") : "spec"); // (the spectrogram, till another's picked)
+  initScales(); initReach(); initMatch();
+  for (const b of $("#vcView").children) b.onclick = () => { vcShowView(b.dataset.v); store.set("voiceView", b.dataset.v); };
+  vcShowView(["pad", "scale", "reach", "match", "spec", "eq"].includes(store.get("voiceView", "spec")) ? store.get("voiceView", "spec") : "spec"); // (the spectrogram, till another's picked)
   // Freeze: this moment kept faintly behind the EQ's spectrum, envelope and formants, or let go
   $("#vcFreeze").onclick = () => {
     VC.ghost = VC.ghost ? null : VC.eqNow ? { ...VC.eqNow, cols: Float32Array.from(VC.eqNow.cols) } : null;
@@ -832,8 +843,8 @@ function initVoice() {
     say(name, label); t.className = "vt"; bars.className = "vc-bars"; bars.setAttribute("aria-hidden", "true");
     for (let i = 0; i < 8; i++) bars.append(document.createElement("i"));
     b.append(name, t, bars);
-    b.onclick = () => { if (v !== VC.vowel) vcSetVowel(v); };
-    $("#vcVowels").append(b);
+    b.onclick = () => { if (VC.view === "scale" && SV.on) scSetOn(""); if (v !== VC.vowel) vcSetVowel(v); }; // (in Scales, off a trill)
+    $("#vcVowels").insertBefore(b, $("#vcVowels [data-on]")); // (Scales' trills below the vowels: initScales)
   }
   $("#vcDown").append(icon("prev")); $("#vcUp").append(icon("next"));
   $("#vcDown").onclick = () => vcStart(vcShown() - 1, true);

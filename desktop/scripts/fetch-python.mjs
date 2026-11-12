@@ -36,7 +36,7 @@ const tgz = await get(`${base}/${name}`);
 const got = createHash("sha256").update(tgz).digest("hex");
 if (got !== want) throw new Error(`${name}: SHA-256 ${got}, expected ${want}`);
 
-const tmp = fs.mkdtempSync(path.join(desktop, ".python-")); // beside runtime/, not in the temp folder: on another drive (Windows CI) it can't be moved
+const tmp = fs.mkdtempSync(path.join(desktop, ".python-")); // beside runtime/, not in the temp folder: on another drive it can't be moved
 fs.writeFileSync(path.join(tmp, name), tgz);
 execFileSync("tar", ["-xzf", name], { cwd: tmp, stdio: "inherit" }); // the archive holds python/
 fs.rmSync(out, { recursive: true, force: true });

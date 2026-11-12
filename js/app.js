@@ -49,10 +49,12 @@ function notice(msg) {
   clearTimeout(notice.timer); notice.timer = setTimeout(() => { box.hidden = true; }, 4000);
 }
 
-// keyboards: Practice's, and the one on Chest & head voice
+// keyboards: Practice's, and the one on Chest & head voice. Each key's named (aria-label), and the name shows as you point
+// at it (its title: tooltips), so you know the note before you press it: in the note names you picked, spelt as the
+// song's key has them (again on a change: the names, the key)
 const KEY_LO = 36, KEY_HI = 84, KW = 26;
 const keyEls = new Map(), vcKeyEls = new Map();
-const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => b.setAttribute("aria-label", absName(m))); };
+const labelKeys = () => { for (const ks of [keyEls, vcKeyEls]) ks.forEach((b, m) => { const n = absName(m); b.setAttribute("aria-label", n); b.title = n; }); };
 function buildKeys(box, keyEls, onPress = playKey) {
   let wi = 0;
   for (let m = KEY_LO; m <= KEY_HI; m++) {
@@ -191,7 +193,7 @@ function route() {
   if (view !== "practice") { recOff(); listenStop(); } else tsStop(true); // takes are recorded and played in Practice only; the Takes Studio's playing stays on its page
   if (view === "stems") stemsRoute(sub, extra, was);
   paintCrumbs(); lastHash = location.hash || "#stems";
-  pinLibTop(); paintFade(true); // with the page: the list as last drawn is there already (drawn again once the server answers)
+  pinLibTop(); paintFade(); // with the page: the list as last drawn is there already (drawn again once the server answers)
   if (P.playing && !(view === "stems" && stemsPage === "song") && view !== "practice") pauseSong();
   // back in the library: the song (still loaded) starts from the top when it's opened again, in the Studio or Practice
   if (view === "stems" && stemsPage === "lib" && P.song) { P.offset = 0; P.lead = 0; K.cue = null; K.resume = null; }
@@ -210,7 +212,7 @@ function route() {
   // page has loaded, after it's been shown at the top, and the fades follow a frame behind), the fades there with it
   const back = scrolledTo; scrolledTo = null;
   window.scrollTo(0, back && back.hash === (location.hash || "#stems") ? back.y : 0);
-  paintFade(!!back);
+  paintFade();
 }
 let scrolledTo = (() => { try { return JSON.parse(sessionStorage.getItem("stem:scroll")); } catch (e) { return null; } })();
 history.scrollRestoration = "manual";
@@ -289,7 +291,8 @@ function reveal(at, nameThere = false) {
   const items = $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums").querySelectorAll(".al-card") : $("#sLib").querySelectorAll(".row, .lib-group, .al-bar");
   [...items].forEach((r, i) => rise(r, t + 120 + Math.min(i, 10) * 50, 6, 6)); // (the rows, the Artist view's headings with them, or the Album view's cards)
   const rising = document.getAnimations().filter((a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity);
-  Promise.all(rising.map((a) => a.finished)).then(pinLibTop, pinLibTop); // measured where it rose to
+  const risen = () => { pinLibTop(); paintFade(); }; // measured where it rose to, and the fades with it (the search's line was read mid-rise)
+  Promise.all(rising.map((a) => a.finished)).then(risen, risen);
 }
 // The welcome (html.welcome, set in the page's head): the name in the middle, and the screen's right half turned over
 // to the left like a book's page, one after another, each showing an accent colour: slow off the thumb, then a rush,
@@ -443,10 +446,11 @@ async function riffleName(brand) {
 }
 $("#startBtn").onclick = songToggle;
 $("#micBtn").onclick = $("#micBtn2").onclick = () => (micOn ? stopMic() : startMic());
-// Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest
-// still play, seek and step (Record clicked, then Space, plays rather than ending the take). One reached with Tab
-// keeps its own keys, so a button presses with Space and a slider goes to its ends with Home and End. Text fields and
-// an open list or menu always keep theirs.
+// Keys and focus. A control you clicked keeps the focus but not the player's keys: Space, Home, End and the rest still
+// play, seek and step (Shift+← and Shift+→, or Home and End, to the start and the end; Record clicked, then Space, plays
+// rather than ending the take). One reached with Tab keeps its own keys, so a button presses with Space and a slider goes
+// to its ends with Home and End. Text fields and an open list or menu always keep theirs. In the Lab's Scales, in a set,
+// ↓ comes down after the key being sung, and R sings it again (scAsk).
 let tabbed = false;
 addEventListener("pointerdown", () => { tabbed = false; }, true);
 addEventListener("keydown", (e) => { if (e.key === "Tab") tabbed = true; }, true);
@@ -457,16 +461,22 @@ document.addEventListener("keydown", (e) => {
   if (ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (view === "stems" && stemsPage === "song" && P.song) {
     if (e.code === "Space") { e.preventDefault(); if (!e.repeat) P.playing ? pauseSong() : playSong(); }
-    else if (e.code === "Home" || e.code === "End") { e.preventDefault(); if (e.code === "Home") seekSong(0); else seekEnd(); }
+    else if (e.code === "Home" || (e.shiftKey && e.code === "ArrowLeft")) { e.preventDefault(); seekSong(0); }
+    else if (e.code === "End" || (e.shiftKey && e.code === "ArrowRight")) { e.preventDefault(); seekEnd(); }
     return;
   }
   if (view === "practice" && K.on) {
     if (e.repeat && /^(Space|KeyL|KeyR|KeyM)$/.test(e.code)) { e.preventDefault(); return; }
-    const act = { Space: songToggle, ArrowLeft: () => phraseStep(-1), ArrowRight: () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
+    const act = { Space: songToggle, ArrowLeft: e.shiftKey ? songStart : () => phraseStep(-1), ArrowRight: e.shiftKey ? songEnd : () => phraseStep(1), KeyL: () => setLoop(!K.loop), KeyR: recPress,
       Home: songStart, End: songEnd, KeyM: S.dev ? () => markPhrase(songPos()) : null, KeyT: S.dev && !e.repeat ? () => dropNote(e) : null,
-      BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
+      KeyN: !e.repeat ? noteMenuKey : null, BracketLeft: () => nudgeLyrics(-NUDGE, true), BracketRight: () => nudgeLyrics(NUDGE, true), Comma: () => (e.shiftKey ? !e.repeat && jumpLine(-1) : nudgeLyrics(-NUDGE)), Period: () => (e.shiftKey ? !e.repeat && jumpLine(1) : nudgeLyrics(NUDGE)) }[e.code];
     if (act) { e.preventDefault(); act(); }
   }
+  if (view === "voice" && VC.view === "scale" && SV.run && !e.shiftKey) {
+    const k = { ArrowDown: scCanDown() ? "down" : null, KeyR: "stay" }[e.code];
+    if (k) { e.preventDefault(); if (!e.repeat) scAsk(k); }
+  }
+  if (view === "voice" && VC.view === "match" && MV.run && e.code === "KeyR" && !e.shiftKey) { e.preventDefault(); if (!e.repeat) mvAgain(); } // (the note again)
 });
 
 // ---------- language switch ----------

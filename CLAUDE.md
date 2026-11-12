@@ -21,7 +21,7 @@ Platforms are **Windows and macOS only**. Linux was dropped (PR 48): don't add L
 | Path | What it holds |
 |---|---|
 | `index.html` | The page: markup, server placeholders, dev flags, the script load order |
-| `js/` | 20 plain scripts sharing one global scope, loaded in a fixed order (`core.js` first, `app.js` last) |
+| `js/` | 24 plain scripts sharing one global scope, loaded in a fixed order (`core.js` first, `app.js` last) |
 | `css/` | `tokens.css` (design tokens, both themes) then `base`, `stage`, `stems`, `practice` |
 | `img/` | Page images (onboarding) |
 | `favicon.svg` | The icon |
@@ -38,10 +38,9 @@ Platforms are **Windows and macOS only**. Linux was dropped (PR 48): don't add L
 | `requirements.txt` | Base packages (installed at first run; a new one also needs `NEEDED` in `launch.py`, see `server.md`) |
 | `requirements-stems.txt` | Heavy song tools (installed from the page) |
 | `scripts/contrast.py` | WCAG contrast check of the colour tokens |
-| `scripts/turn-check.js`, `scripts/scale-check.js` | Offline checks of the Lab's measures (`js/turn.js`, `js/scale.js`) on synthetic voices |
+| `scripts/turn-check.js`, `scripts/scale-check.js`, `scripts/reach-check.js`, `scripts/match-check.js` | Offline checks of the Lab's measures (`js/turn.js`, `js/scale.js`, `js/reach.js`, `js/match.js`) on synthetic voices |
 | `desktop/` | Electron app: `main.js`, `preload.js`, splash, build scripts in `desktop/scripts/` |
 | `site/` | pitchroom.dev download page |
-| `.github/workflows/` | `release.yml` (version bump and release), `desktop.yml` (builds) |
 | `README.md` | User-facing readme |
 
 Gitignored data that may sit in a checkout: `library/`, `models/`, `settings.json`, `.venv/`, `.tools/` (uv's
@@ -76,8 +75,8 @@ There is no test suite and no linter (only the Lab's two check scripts). Verific
 3. Look at the page in an **offscreen, muted** Electron window against a server with scratch data.
 4. Korean: every new English UI string has its entry in `js/ko.js`.
 5. Dev flags in `index.html` at release values.
-6. After a change to `js/turn.js` or `js/scale.js`: `node scripts/turn-check.js` or `node scripts/scale-check.js`
-   (seconds; ends "all passed").
+6. After a change to `js/turn.js`, `js/scale.js`, `js/reach.js` or `js/match.js`: `node scripts/turn-check.js`,
+   `node scripts/scale-check.js`, `node scripts/reach-check.js` or `node scripts/match-check.js` (seconds; ends "all passed").
 
 Details and recipes: `docs/agents/verifying.md`.
 
@@ -107,8 +106,8 @@ Details and recipes: `docs/agents/verifying.md`.
 - **Pro icons never committed.** `icons.local.js` (Hugeicons Pro, gitignored) overrides the free set by name. Never commit
   it or paste Pro paths into `js/helpers.js`.
 - **No secrets or private data** in commits, release notes or docs. Release notes are public.
-- **The Lab's thresholds are guesses.** The Lab (`#voice`: Turn and Scales) keeps every threshold in `TN`
-  (`js/turn.js`) and `SC` (`js/scale.js`), one for all voices, not yet tried with real voices. Change them there, never
+- **The Lab's thresholds are guesses.** The Lab (`#voice`: Turn, Scales and Reach) keeps every threshold in `TN`
+  (`js/turn.js`), `SC` (`js/scale.js`), `RC` (`js/reach.js`) and `MT` (`js/match.js`), one for all voices, not yet tried with real voices. Change them there, never
   as a special case in the page code, and keep the check scripts passing.
 
 ## Git, PRs and releases
@@ -124,8 +123,8 @@ Details and recipes: `docs/agents/verifying.md`.
 - PRs merge into `main` with merge commits ("Merge pull request #N"). To catch up, merge `main` into the branch; don't
   rebase shared branches.
 - **Merges, releases and site deploys happen only on the owner's explicit yes.**
-- Release: `gh workflow run release.yml --ref main -f bump=patch`, then watch it and pull `main`. See
-  `docs/agents/desktop-and-release.md` for the local Windows build used while GitHub Actions is unavailable.
+- Releases are built locally (no GitHub Actions: it needs paid minutes): Windows on the owner's PC, macOS on their
+  Mac. Steps: `docs/agents/desktop-and-release.md`.
 - Don't commit `.wrangler/`, scratch scripts or screenshots.
 - Style details (comments, naming, line endings, CSS, copy): `docs/agents/style.md`.
 

@@ -136,7 +136,7 @@ async function drawLibrary() {
   if (!lib.length) { // the column heads are new: pinned where they stand (no albums' grid over the first-song row)
     libAlbum = null; $("#sLibPage").classList.remove("album-grid"); $("#sAlbums").replaceChildren(); albumBarNode?.remove();
     paintCont(); // (Continue practising gone with them)
-    drawNew(lib); pinLibTop(); paintFade(true); return;
+    drawNew(lib); pinLibTop(); paintFade(); return;
   }
   const log = cpLog(); // every song's takes asked about (when each was last recorded to: Continue practising), its songs first
   lib.map((m) => m.id).sort((a, b) => cpWhen(log[b]) - cpWhen(log[a])).forEach((id) => askTakes(id));
@@ -166,7 +166,7 @@ async function drawLibrary() {
   });
   arrangeRows();
   drawNew(lib); // with the list back in (where the page is scrolled to is read there)
-  pinLibTop(); paintFade(true); // the column heads are new: pinned where they stand; the fades there with the list, not after it
+  pinLibTop(); paintFade(); // the column heads are new: pinned where they stand; the fades there with the list, not after it
   awaitLookups(lib);
 }
 // New: the songs added in the last NEW_DAYS days (NEW_MAX at most, newest first), bigger covers in a row above the
@@ -492,9 +492,9 @@ function albumBar(g, songs) {
   return albumBarNode;
 }
 let albumScroll = 0; // where the grid was when an album was opened: back there after
-function openAlbum(key) { albumScroll = scrollY; libAlbum = key; arrangeRows(); pinLibTop(); scrollTo(0, 0); paintFade(true); }
+function openAlbum(key) { albumScroll = scrollY; libAlbum = key; arrangeRows(); pinLibTop(); scrollTo(0, 0); paintFade(); }
 function closeAlbum() {
-  const was = libAlbum; libAlbum = null; arrangeRows(); pinLibTop(); scrollTo(0, albumScroll); paintFade(true);
+  const was = libAlbum; libAlbum = null; arrangeRows(); pinLibTop(); scrollTo(0, albumScroll); paintFade();
   albumCards.get(was)?.focus({ preventScroll: true }); // (where you were in the grid, in sight again)
 }
 function paintLibView() {
@@ -623,8 +623,9 @@ function paintCover(tile, m) {
 const TILT = 16, NEAR = 1.2, CV_DEPTH = 900; // px: the eye's distance for the tilt (about twice the cover's size)
 const CV = { tile: null, x: 0, y: 0, tx: 0, ty: 0, raf: 0, closing: false };
 const stillMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-// its shadow, none, its edge as it is (the theme's: --fg-6, .cv-card): as it leaves and lands on the tile
-const cvFlat = () => `0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 1px ${getComputedStyle(document.documentElement).getPropertyValue("--fg-6").trim()}`;
+// its shadow, none, its edge as it is (the theme's: --fg-6, .cv-card): as it leaves and lands on the tile. The edge's
+// colour as the browser works it out (its text is a relative colour), through stage.js's hidden element (readColors)
+const cvFlat = () => { const p = readColors.probe; p.style.color = "var(--fg-6)"; return `0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 1px ${getComputedStyle(p).color}`; };
 // the transform that puts the big cover over the tile: the step between them, as a FLIP animation's first frame
 function overTile(tile, fly) {
   const a = tile.getBoundingClientRect(), b = fly.getBoundingClientRect(), s = a.width / b.width;
@@ -681,7 +682,7 @@ function initLibSearch() {
   const pickView = (v) => {
     if (v === libView && !(v === "album" && libAlbum != null)) return; // (Album again, an album open: back to the grid)
     if (!LIB_VIEWS.includes(v)) return;
-    libView = v; libAlbum = null; store.set("libView", v); paintLibView(); arrangeRows(); pinLibTop(); paintFade(true); // (the fades where they are at once: no blink of them across the switch)
+    libView = v; libAlbum = null; store.set("libView", v); paintLibView(); arrangeRows(); pinLibTop(); paintFade(); // (the fades where they are at once: no blink of them across the switch)
   };
   // an album open: Escape back to the grid (not while typing, nor over a cover up close, a menu or a panel, whose own
   // Escape closes them: looked at before they do, in the capture)
@@ -738,10 +739,15 @@ function pinLibTop() {
   root.classList.add("lib-top");
 }
 addEventListener("resize", pinLibTop);
-// The fades on the library, each as tall as there's list beyond it, up to FADE_H: under its pinned top it grows in
-// with the scroll as rows go under, and at its foot it draws back as the end comes up. now: a change of page or the
-// list drawn (a reload, scrolled down it), where they're there (or gone) at once with it, not fading in after.
+// The fades on the library, each as tall as there's list beyond it, up to FADE_H (the top's --fh, stems.css). Under its
+// pinned top it's there at its full height once anything has reached the line, its strength (the blurs and the
+// background, --k) coming in over the first --up of it going under: grown with the scroll instead, its bands were
+// squeezed into a thin hard band and the first heading looked sliced. At its foot it draws back as the end comes up.
+// Both there or gone at once, with the page or the scroll: nothing eases.
 const FADE_H = 192;
+// how far the top's fade reaches on up past its line (its --up, stems.css), read once
+let FADE_UP = null;
+const fadeUp = () => FADE_UP ??= parseFloat(getComputedStyle($("#listFadeTop")).getPropertyValue("--up")) || 0;
 // the room the New row takes above the list (none while it's hidden): hidden, the list starts where it does
 const newRoom = () => { // (down to the list, or to the albums' grid in its place; or to Continue practising, under it)
   const n = $("#sNew"), next = !$("#sCont").hidden ? $("#sCont") : $("#sLibPage").classList.contains("album-grid") ? $("#sAlbums") : $("#sLib");
@@ -755,16 +761,58 @@ const topRoom = () => {
 };
 // The foot's fade on a song's page too (the Studio), as its tracks go on below the window; the top's the library's and
 // Settings' (under their pinned tops), the foot's theirs too
-function paintFade(now) {
-  const set = view === "settings", lib = view === "stems" && stemsPage === "lib", song = view === "stems" && stemsPage === "song";
-  const below = document.documentElement.scrollHeight - (scrollY + innerHeight);
-  // the New row and Continue practising, over the band behind the pinned top while they go up: cut off where they reach the search's line
-  for (const nw of [$("#sNew"), $("#sCont")]) if (!nw.hidden) { const cut = $("#sLibPage .lib-head").getBoundingClientRect().bottom - nw.getBoundingClientRect().top; nw.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : ""; }
-  for (const [f, px, here] of [[$("#listFade"), below, lib || song || set], [$("#listFadeTop"), set ? scrollY : scrollY - topRoom(), lib || set]]) {
-    if (now) { f.classList.add("now"); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove("now"))); }
-    f.style.height = Math.max(0, Math.min(FADE_H, px)) + "px";
-    f.classList.toggle("on", here && px > 0);
+function paintFade() {
+  const root = document.documentElement, set = view === "settings", lib = view === "stems" && stemsPage === "lib", song = view === "stems" && stemsPage === "song";
+  const below = root.scrollHeight - (scrollY + innerHeight);
+  // the top's fade, at one of three lines: Continue practising (a part of the list) going under the search's line; then
+  // the rows under the column heads (the search's line, with none: the albums' grid); Settings' groups under the crumbs.
+  // under: how far what's going under has gone past the line (the grid's: its first cards'); left: how far below the line
+  // it can reach (Continue's: down to where the list starts, so its last cover's blur thins out over the gap before the
+  // fade ends, not cut off with it, and at least to the column heads' foot, so rows a fast scroll brings there before
+  // this has caught up are blurred, not sharp). It reaches --up on past its line too, where the band behind the pinned
+  // top stops short (#libMast), the blur running on across the line.
+  // (all of it read before anything's written: a read after a write waits on the page's style being worked out again)
+  const up = fadeUp(), nw = $("#sNew"), cont = $("#sCont"), head = $("#sLibPage .lib-head").getBoundingClientRect().bottom;
+  const grid = !set && $("#sLibPage").classList.contains("album-grid"), list = set ? $("#micSet") : grid ? $("#sAlbums") : $("#sLib");
+  const room = lib ? topRoom() : 0, past = lib && !cont.hidden && scrollY - room > 0; // (Continue gone on up past the search's line: the list under the column heads)
+  const line = parseFloat(root.style.getPropertyValue("--mast")) || 0; // (the column heads' foot, or the crumbs': as pinLibTop or pinSetTop set it on the page)
+  const nwTop = nw.hidden ? 0 : nw.getBoundingClientRect().top, contTop = cont.hidden ? 0 : cont.getBoundingClientRect().top;
+  let under = 0, left = 0, at = "", reach = 0;
+  if (lib && !cont.hidden && !past) {
+    under = head - contTop; left = Math.max(list.getBoundingClientRect().top, line) - head;
+    // the box --up over the line once Continue's going under it; till then at the line, so the band's colour over what's
+    // above it (its ::before) reaches the line itself: the page scrolls a frame or more ahead of this, and on a flick
+    // down from the top Continue's rows showed up sharp over the line for a frame
+    at = (under > 0 ? head - up : head) + "px";
+    // how far over the line Continue's let on: the whole --up while the fade's over it, drawn down to the line over the
+    // last --up before the list reaches the column heads, so nothing of it is left to go at the hand-off
+    if (under > 0) reach = up * Math.min(1, Math.max(0, (room - scrollY) / up));
+  } else if (lib || set) {
+    const r = list.getBoundingClientRect();
+    if (grid) { // (from where its first cards stand in the page, by layout: a rising card's lift isn't counted)
+      let y = 0; for (let e = list.firstElementChild || list; e; e = e.offsetParent) y += e.offsetTop;
+      under = line - (y - scrollY);
+    } else under = set ? line - r.top : scrollY - room;
+    left = r.bottom - line;
+    // the New row over the list with no Continue under it: the band's colour over what's above the fade (its ::before)
+    // stops at New's top, not 8 px into it, while nothing's gone under yet (and no higher than over the search's line)
+    if (lib && !nw.hidden && under <= 0) at = Math.max(head - up, Math.min(line - up, nwTop)) + "px";
   }
+  // the New row and Continue practising, over the band behind the pinned top while they go up: cut off where they reach
+  // the search's line; Continue higher while the fade's there over it (reach), so it's blurred on across the line, and
+  // all of it once it's gone past (only its last row's foot is left by then, which shows sharp under the search's line
+  // when it's pointed at)
+  const cuts = [[nw, head - nwTop], [cont, past ? cont.offsetHeight : head - reach - contTop]];
+  for (const [n, cut] of cuts) if (!n.hidden) n.style.clipPath = cut > 0 ? `inset(${cut}px -24px 0)` : "";
+  const top = $("#listFadeTop"), k = String(Math.max(0, Math.min(1, up ? under / up : 1)));
+  top.style.top = at; top.style.setProperty("--k", k);
+  for (const [f, px, here] of [[$("#listFade"), below, lib || song || set], [top, under > 0 ? left : 0, lib || set]]) {
+    const h = Math.max(0, Math.min(FADE_H, px));
+    f.style.height = (h && f === top ? h + up : h) + "px"; // (the top's on up past its line too)
+    f.classList.toggle("on", here && h > 0);
+  }
+  // the band stops short of its foot while the fade's there at it (not at Continue's line), with the fade's strength
+  $("#libMast").style.setProperty("--band-k", top.classList.contains("on") && !at ? k : "0");
 }
 // the page growing or shrinking under a still window (a song's tracks in): the foot's fade with it
 new ResizeObserver(() => paintFade()).observe(document.body);
@@ -936,7 +984,7 @@ function paintContLine(box, m) {
 // Practice, as the Studio's: it says on itself what it's doing meanwhile (singSong); the song as the list has it then.
 // Shown with its row's hover (CSS); what it says when it couldn't stays in sight a moment (.said), pointed at or not.
 function contSing(id) {
-  const b = el("button", "btn sm lc-sing"), t = el("span", "txt");
+  const b = el("button", "btn sm primary lc-sing"), t = el("span", "txt"); // (the main button, as the list's row's Practice is: shown only on its row's hover, so it can be)
   b.type = "button"; b.append(icon("practice"), t); say(t, "Practice");
   b.setAttribute("aria-label", tr("Practice {title}", { title: libCache.get(id)?.title || "" }));
   b.onclick = async () => {

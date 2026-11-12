@@ -31,7 +31,8 @@ function paintPix(bar, p, going, paused) { // (paused: stopped till it's told so
   bar.dataset.n = n; bar.classList.toggle("going", !!going); bar.classList.toggle("paused", !!paused); // (going: being worked on; waiting its turn, it's still: no wave, no blink)
   [...cells].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", (going || paused) && k === n); });
   if (turning) {
-    const cs = getComputedStyle(bar), gray = cs.getPropertyValue("--fill").trim(), lit = cs.getPropertyValue("--voice").trim(); // (the tokens, not a cell's colour: that may be mid-blink or mid-wave)
+    const cs = getComputedStyle(bar), lit = cs.getPropertyValue("--voice").trim(); // (the tokens, not a cell's colour: that may be mid-blink or mid-wave)
+    const probe = readColors.probe; probe.style.color = "var(--fill)"; const gray = getComputedStyle(probe).color; // (--fill as the browser works it out, through stage.js's hidden element: its text is a relative colour)
     const step = Math.min(PX_STEP, PX_GROW / (n - was));
     for (let k = was; k < n; k++) {
       const c = cells[k]; c.style.transition = "none"; // (the CSS fade would show the accent at once, over the wait)

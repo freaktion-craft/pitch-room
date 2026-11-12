@@ -811,6 +811,24 @@ function lineShown(t, free) { // free: whatever's looping or counting in (a take
 // about 70 ms early best (Deezer's study of 53 people, ISMIR 2021).
 const LYRIC_LEAD = 0.07;
 const LYRIC_SOON = 1.2, LYRIC_HOLD = 1; // the next line brightens this long before its turn (s); a syllable held this long glows as it's held
+// Each syllable rises a touch as the fill reaches it (stage.css: .sy, by a transform; a word without syllables, Whisper's,
+// as one), eased in and out (lyGlide), over its own length or LYRIC_RISE, whichever's longer, and stays up while its line's sung;
+// once the line's last word is over (as the line before dims, losing .live) the line settles, over LYRIC_SETTLE. On the
+// song's time, as the fill is: a seek, a loop or a pause puts it where it would be, never on its way there.
+const LYRIC_RISE = 0.6, LYRIC_SETTLE = 0.4; // s as heard
+const LYRIC_LIFT = 0.1; // how far, in the lyrics' size (the brackets' smaller words, in theirs): in whole device pixels, so risen it's as sharp as at rest
+// --ease (tokens.css) at x, 0 to 1: cubic-bezier(0.16, 1, 0.3, 1), its curve's x found by halving, then its height there.
+function lyEase(x) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const at = (p, q, s) => 3 * s * (1 - s) * ((1 - s) * p + s * q) + s * s * s;
+  let lo = 0, hi = 1;
+  for (let k = 0; k < 16; k++) { const s = (lo + hi) / 2; if (at(0.16, 0.3, s) < x) lo = s; else hi = s; }
+  return at(1, 1, (lo + hi) / 2);
+}
+// A syllable's rise, 0 to 1: eased in and out alike (a sine), so it lifts as evenly as the fill runs (on --ease it was
+// five sixths up in its first 100 ms: a tick)
+const lyGlide = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : (1 - Math.cos(Math.PI * x)) / 2);
 // A word's syllables along its width, measured once it's laid out: where each one's letters end, as a share of the word.
 function lyMeasure(x) {
   const n = x.s.firstChild, w = x.s.getBoundingClientRect().width;
@@ -822,8 +840,10 @@ function lyMeasure(x) {
   return true;
 }
 // How far along a word the fill is at time t: through each syllable as it's sung, held where it's got to in a rest; a word
-// without syllables (Whisper's), evenly from its start to its end.
-function lyFill(x, t) {
+// without syllables (Whisper's), evenly from its start to its end. In syllable boxes (lyBox), each syllable's part of it,
+// and how far each has risen (down: how far its line's settled).
+function lyFill(x, t, down) {
+  if (x.sy) return lyFillSy(x, t, down);
   let f, glow = 0;
   if (t <= x.a) f = 0;
   else if (t >= x.b) f = 1;
@@ -845,6 +865,85 @@ function lyFill(x, t) {
   if (x.v !== v) { x.v = v; x.s.style.setProperty("--p", v + "%"); }
   if (glow || x.glow) { x.glow = glow; x.s.classList.toggle("held", glow > 0); x.s.style.setProperty("--g", glow.toFixed(2)); }
 }
+// The same in syllable boxes: the fill's edge at its place in the word, px from its start, each syllable's --p that edge
+// in its own box (past its letters, the edge isn't on it); the glow on the syllable held; and each one's rise, written
+// only when it changes. Each is a layer of its own (stage.css), which starts on a whole pixel: fx moves it back to where
+// its letters were. Risen all the way, it's up a whole number of device pixels (lift).
+function lyFillSy(x, t, down) {
+  let e = t <= x.a ? -Infinity : t >= x.b ? Infinity : null;
+  if (e === null) {
+    e = x.w;
+    for (const y of x.sy) {
+      const [s0, s1] = y.t || [x.a, x.b];
+      if (t < s0) { e = y.o; break; }
+      if (t < s1) { e = y.o + y.w * (t - s0) / Math.max(y.t ? 0.02 : 0.05, s1 - s0); break; }
+    }
+  }
+  for (const y of x.sy) {
+    const [s0, s1] = y.t || [x.a, x.b], q = e - y.o;
+    const v = q < -2 ? "-10%" : q > y.cw + 2 ? "110%" : Math.round((q + y.pad) * 10) / 10 + "px";
+    if (y.v !== v) { y.v = v; y.s.style.setProperty("--p", v); }
+    const glow = y.t && s1 - s0 >= LYRIC_HOLD && t > s0 && t < s1 ? (t - s0) / (s1 - s0) : 0;
+    if (glow || y.glow) { y.glow = glow; y.s.classList.toggle("held", glow > 0); y.s.style.setProperty("--g", glow.toFixed(2)); }
+    let h = Math.round(lyGlide((t - s0) / Math.max(LYRIC_RISE * P.rate, s1 - s0)) * (1 - down) * y.lift * 100) / 100; // px, to a hundredth
+    if (y.fresh) { y.fresh = false; h = Math.round(h * y.dpr) / y.dpr; } // its first frame on a whole pixel: its layer's drawn there, and stays as sharp moved from it (a seek mid-rise)
+    const tf = `translate(${y.fx}px, ${-h}px)`;
+    if (y.tf !== tf) { y.tf = tf; y.s.style.transform = tf; }
+  }
+}
+// A line's words in syllable boxes (stage.css: .sy), so each syllable can rise on its own, laid out exactly as the plain
+// words were or not at all. The plain words measured first: each word's box, and where each syllable's letters start in
+// it. Then the boxes, each with a right margin ending it where the next one's letters start (so the word's as wide as it
+// was, kerning and all: a box on its own is rounded up to the layout's unit, a 64th of a device pixel), and the line
+// measured again, its height and every word's place and row, to that unit. If anything's moved, it's plain words again
+// (filled as before, not rising). A word over two rows stays plain (a box can't break), as does one whose text isn't its
+// syllables' (edited since they were timed). renderLyrics: once per line as it comes on, again after a resize or a font
+// coming in.
+function lyBox(L) {
+  const p = L.p, o = p.getBoundingClientRect(), d = devicePixelRatio, rg = document.createRange();
+  const shape = () => JSON.stringify([p.getBoundingClientRect().height, L.ws.map((x) => [...x.s.getClientRects()].map((q) => [q.x - o.x, q.y - o.y, q.width, q.height]))]);
+  const was = shape(), ws = [];
+  for (const x of L.ws) {
+    const n = x.s.firstChild, rs = x.s.getClientRects(), parts = x.parts || [[x.a, x.b, x.text]];
+    if (!n || n.nodeType !== 3 || x.s.childNodes.length !== 1 || rs.length !== 1 || parts.map((q) => q[2]).join("") !== n.data) continue;
+    let c = 0;
+    const at = parts.map((q) => { rg.setStart(n, c); rg.setEnd(n, (c += q[2].length)); return rg.getBoundingClientRect().x - rs[0].x; });
+    if (x.parts) x.cuts = [...at.map((a) => a / rs[0].width), 1]; // (lyMeasure's, while we're here)
+    ws.push({ x, at, w: rs[0].width, left: rs[0].x, sy: parts.map((q) => el("span", "sy", q[2])) });
+  }
+  if (!ws.length) return false;
+  for (const q of ws) { const s = q.x.s; s.classList.add("sys"); s.classList.remove("held"); s.style.removeProperty("--p"); s.replaceChildren(...q.sy); }
+  const pad = parseFloat(getComputedStyle(ws[0].sy[0]).paddingLeft) || 0, bw = ws.map((q) => q.sy.map((s) => s.getBoundingClientRect().width));
+  // (in 64ths of a device pixel, the unit it's laid out in, and a quarter of one more away from 0: a length's cut or
+  // rounded to that unit, and at a scaled screen's 1.5 a 96th of a px isn't a number a string holds exactly)
+  const unit = (v) => { const n = Math.round(v * d * 64); return (n + Math.sign(n) / 4) / (64 * d); };
+  ws.forEach((q, i) => q.sy.forEach((s, k) => { s.style.marginRight = unit((k + 1 < q.sy.length ? q.at[k + 1] : q.w) - q.at[k] - bw[i][k] + pad) + "px"; }));
+  if (shape() !== was) { for (const q of ws) lyPlain(q.x); return false; }
+  const lift = {}; // by size: the lyrics', the brackets'
+  ws.forEach((q, i) => {
+    const x = q.x, fs = getComputedStyle(x.s).fontSize, px = (lift[fs] ??= Math.round(parseFloat(fs) * LYRIC_LIFT * d) / d);
+    x.w = q.w; x.glow = 0;
+    x.sy = q.sy.map((s, k) => {
+      const bx = q.left + q.at[k] - pad; // where its box starts: its layer starts at the whole pixel nearest
+      const fx = Math.round((bx - Math.round(bx * d) / d) * 1e4) / 1e4, tf = `translate(${fx}px, 0px)`;
+      s.style.transform = tf; // (at rest from the first frame, in its layer: drawn as the plain word was)
+      return { s, t: x.parts ? x.parts[k] : null, o: q.at[k], w: (k + 1 < q.sy.length ? q.at[k + 1] : q.w) - q.at[k], cw: bw[i][k] - 2 * pad, pad, lift: px, fx, dpr: d, v: null, tf, glow: 0, fresh: true };
+    });
+  });
+  return true;
+}
+// A word back to plain text, filled as a whole again; a line's words.
+function lyPlain(x) {
+  x.s.classList.remove("sys", "held");
+  x.s.textContent = x.text;
+  x.sy = null; x.v = null; x.glow = 0;
+}
+function lyUnbox(L) {
+  for (const x of L.ws) if (x.sy) lyPlain(x);
+  L.on = false;
+}
+const LY_STILL = matchMedia("(prefers-reduced-motion: reduce)"); // (nothing rises)
+document.fonts.addEventListener("loadingdone", () => { K.lyFonts = (K.lyFonts || 0) + 1; K.lyAt = null; }); // a font come in: the lyrics laid out anew (lyBox)
 const LYRIC_REST = 0.35; // s between two words that's a rest
 // Where a line would rather go to its next row: a rest, a comma, or a change of language (not a lone foreign word), with 30%
 // of the line either side (in letters, a syllable as two), or it leaves a stub. By word; cut: those that start a row anyway.
@@ -870,7 +969,7 @@ function renderLyrics(now) {
   if (K.lyFor !== K.phrases) {
     K.lyFor = K.phrases; K.lyAt = null; K.lyCountAt = null; K.lyFresh = true; list.classList.add("still"); // (new lines: shown where they are, not faded or slid in)
     K.lyLines = K.phrases.map((ph) => {
-      const p = el("p"), words = ph.words, ws = words.map((w) => ({ a: w[0], b: w[1], parts: w[3] || null, s: el("span", w[4] ? "bg" : null, w[2].trim()) }));
+      const p = el("p"), words = ph.words, ws = words.map((w) => ({ a: w[0], b: w[1], parts: w[3] || null, text: w[2].trim(), s: el("span", w[4] ? "bg" : null, w[2].trim()) }));
       // backing vocals at the end of a line: a smaller row of their own, as the lines joined in a phrase each have theirs
       let tail = words.length;
       while (tail > 0 && words[tail - 1][4]) tail--;
@@ -892,7 +991,7 @@ function renderLyrics(now) {
   // the line on now: the one the count-in is over while it's the count-in's turn (renderCountIn: K.lyRow)
   const row = K.lyRow, now_ = row && row.state === "now", i = now_ ? row.at : K.ln ?? lineShown(now);
   const cur = K.lyLines[i], cnt = lyCount(), at = row ? row.at : null;
-  const key = `${i}|${at}|${row && row.state}|${!cnt.querySelector(".lbl").textContent}`; // (not the stage's height: read here it lays out mid-frame, and resize() clears K.lyAt)
+  const key = `${i}|${at}|${row && row.state}|${!cnt.querySelector(".lbl").textContent}|${LY_STILL.matches}`; // (not the stage's height: read here it lays out mid-frame, and resize() clears K.lyAt)
   if (K.lyAt !== key && cur) {
     if (!col.offsetHeight) return; // not on screen yet: placed once it is
     K.lyAt = key;
@@ -920,6 +1019,15 @@ function renderLyrics(now) {
       x.p.className = k === i ? "now" : k === i + 1 ? "n1" : k === i + 2 ? "n2" : k === i - 1 ? "b1" : "";
       if (k !== i && k !== i - 1) for (const y of x.ws) if (y.glow) { y.glow = 0; y.s.classList.remove("held"); } // left in the middle of a hold
     });
+    // the line on now and the one before in syllable boxes, to rise (lyBox), the rest plain words; measured again once
+    // they're laid out anew (a resize, a font come in), and none with motion reduced
+    const bk = LY_STILL.matches ? null : `${col.style.width}|${col.style.getPropertyValue("--ly")}|${devicePixelRatio}|${K.lyFonts}`;
+    K.lyLines.forEach((L, k) => {
+      const want = bk && (k === i || k === i - 1);
+      if (L.bk !== bk) { if (L.on) lyUnbox(L); L.bk = bk; L.ok = null; }
+      if (L.on && !want) lyUnbox(L);
+      else if (want && !L.on && L.ok !== false) L.ok = L.on = lyBox(L);
+    });
     const mid = col.offsetHeight * 0.42, centre = cur.p; // the line, the count-in over it: nothing moves as its first word comes
     K.lyY = Math.round(mid - centre.offsetTop - parseFloat(getComputedStyle(centre).lineHeight) / 2); // its first row: one height for every line, the eye goes back there
     list.style.transform = `translateY(${K.lyY}px)`;
@@ -927,9 +1035,12 @@ function renderLyrics(now) {
   }
   if (!cur) return;
   const t = now + (LYRIC_LEAD + frameDt) * P.rate, before = K.lyLines[i - 1], next = K.lyLines[i + 1];
-  for (const x of cur.ws) lyFill(x, t);
+  const down = (ph) => lyEase((now - ph.t1 - 0.1 * P.rate) / (LYRIC_SETTLE * P.rate)); // a line settling once it's sung, as it stops being .live
+  const dc = down(cur.ph);
+  for (const x of cur.ws) lyFill(x, t, dc);
   if (before) { // the line before stays lit and goes on filling while it's being sung (the list may have moved on already)
-    for (const x of before.ws) lyFill(x, t);
+    const db = down(before.ph);
+    for (const x of before.ws) lyFill(x, t, db);
     before.p.classList.toggle("live", now < before.ph.t1 + 0.1 * P.rate);
   }
   if (next) next.p.classList.toggle("soon", now >= next.ph.t0 - LYRIC_SOON * P.rate && !(K.loop && !(T.play && T.play.srcs) && i >= (K.span ? K.span.b : K.ph))); // (not a line the loop won't reach)
@@ -1045,7 +1156,7 @@ async function singSong(m, btn) {
 }
 // Settings: a page of their own (#settings, route): going out, their lists closed
 function showMicSet(on) {
-  document.documentElement.classList.toggle("set-view", on); pinSetTop(); requestAnimationFrame(() => { pinSetTop(); paintFade(true); paintSetNav(); }); // (again once it's shown)
+  document.documentElement.classList.toggle("set-view", on); pinSetTop(); requestAnimationFrame(() => { pinSetTop(); paintFade(); paintSetNav(); }); // (again once it's shown)
   if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); themePick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
 }
 // Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
@@ -1094,9 +1205,9 @@ function paintSetNav(at) {
   $("#setNav").querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-current", String(i === at)));
 }
 // Settings scroll with the page, as the library does (its scrollbar at the window's edge): the app's bar and the crumbs
-// held where they stand over a band of the page's colour (#libMast, as tall as both), the list of groups beside them
-// where it starts; the groups go under the band, through the library's fades (paintFade). Measured again when the
-// page changes or the window does.
+// held where they stand over a band of the page's colour (#libMast, down to --fade-up short of their foot, the top
+// fade on over the rest), the list of groups beside them where it starts; the groups go under the band, through the
+// library's fades (paintFade). Measured again when the page changes or the window does.
 function pinSetTop() {
   const root = document.documentElement;
   root.classList.remove("set-top");

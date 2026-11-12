@@ -1,7 +1,6 @@
-// A release's Mac files, built on a Mac and added to that release in freaktion-craft/pitchroom-releases: for while
-// GitHub's Mac runners can't be had (desktop.yml builds them otherwise), as after a Windows-only release built on the
-// developer's PC. The release's tag is built as it was tagged, in a worktree of its own (its own `npm ci`; never this
-// checkout's node_modules), for Apple silicon and Intel in turn (the app's Python is per processor: fetch-python.mjs
+// A release's Mac files, built on a Mac and added to that release in freaktion-craft/pitchroom-releases (there are no
+// GitHub Actions builds), as after a Windows-only release built on the developer's PC. The release's tag is built as it
+// was tagged, in a worktree of its own (its own `npm ci`; never this checkout's node_modules), for Apple silicon and Intel in turn (the app's Python is per processor: fetch-python.mjs
 // --arch), and the two builds' update files are made one latest-mac.yml, as electron-builder makes it when it builds
 // both at once. Then the dmg, zip and blockmap of each, and latest-mac.yml, are uploaded into the release (by its id: two
 // drafts can share a tag), replacing ones of the same name; whether it's the latest is left as it is.
