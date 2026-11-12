@@ -7,8 +7,12 @@ Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
 
 ## What it does
 
-- Picks the installer for the visitor's system from the latest **published** release of the public
-  `freaktion-craft/pitchroom-releases` repo, through the GitHub API.
+- Picks the installer for the visitor's system from the newest **published** release of the public
+  `freaktion-craft/pitchroom-releases` repo that has one, through the GitHub API (the last 30 releases): a release may be
+  Windows' only, so Mac can be a few versions behind.
+- Under the button, that file's version (from its name, else the tag) and how long ago it came out, e.g. `v1.0.28 · 18
+  hours ago` (`18시간 전` in Korean; `ago()`). Not shown on a phone, an unknown OS, or when the API fails (it allows 60
+  calls an hour per address).
 - `FILES` holds the file regexes: macOS arm64 and x64 `.dmg`, Windows `pitchroom_install.exe` (or the older
   `-win-x64.exe` name).
 - `detectOS` and `detectMacArch` (userAgentData, else the WebGL renderer, else arm64) choose the file.
@@ -18,9 +22,9 @@ Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
 - A "Downloading…" tip and a flying animation aim at the browser's downloads icon with fixed offsets per browser.
 - Dark only. A few app tokens are copied inline and must be kept in step with `css/tokens.css` by hand.
 
-Because it reads the latest published release, a release needs no site change. Renaming the installer does: update
-`FILES` too. A Windows-only latest release has no `.dmg`, so Mac visitors land on a releases page without a Mac file
-(`desktop-and-release.md`).
+Because it reads the published releases, a release needs no site change. Renaming the installer does: update `FILES`
+too. After a Windows-only release, Mac visitors get the last `.dmg` (`desktop-and-release.md`); with none in the last 30
+releases, the button stays on the releases page.
 
 ## Deploy
 

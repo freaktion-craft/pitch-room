@@ -65,7 +65,12 @@ a { -webkit-user-drag: none; }
 .tip img { width: 28px; height: 28px; flex: none; display: block; } /* the installer's own icon (desktop/build/installer-icon.png, cut to its folder, 96 px for a sharp 28 at 3x) */
 /* the name, as the app's welcome has it (Geist Serif, 44 px), where the button was, once it's gone up to the download */
 @font-face { font-family: "Geist Serif"; src: url("https://cdn.jsdelivr.net/npm/geist@1.9.0/dist/fonts/geist-serif/GeistSerif-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-.get, .word { grid-area: 1 / 1; } /* one over the other, in the middle */
+.get, .word, .ver { grid-area: 1 / 1; } /* one over the other, in the middle */
+/* under the button: the version it downloads and how long ago that file came out, once they're known; gone with the button */
+.ver { align-self: center; transform: translateY(40px); color: rgba(255, 255, 255, 0.55); font: 400 12px/1 var(--font); font-variant-numeric: tabular-nums;
+  opacity: 0; transition: opacity 0.4s var(--ease); }
+.ver.on { opacity: 1; }
+.ver.gone { opacity: 0; transition-duration: 0.15s; }
 .word { color: var(--ink); font: 400 44px/1 "Geist Serif", var(--font); letter-spacing: -0.01em; visibility: hidden; }
 /* coming in, wiped on from the left: a mask, ink to clear across a soft band, drawn over it from left to right (its band
    off to the left of the name at the start, past its right at the end), the blur going as it does */
@@ -83,7 +88,7 @@ a { -webkit-user-drag: none; }
 /* on a phone: that one line in the middle, nothing else */
 .desktop { display: none; grid-area: 1 / 1; margin: 0; padding: 0 24px; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 15px/1.5 var(--font); }
 .phone .desktop { display: block; }
-.phone .get, .phone .note, .phone .word, .phone .tip { display: none; }
+.phone .get, .phone .note, .phone .word, .phone .tip, .phone .ver { display: none; }
 </style>
 </head>
 <body>
@@ -91,13 +96,15 @@ a { -webkit-user-drag: none; }
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12"/></svg>
   <span id="getLabel">Download</span>
 </a>
+<span class="ver" id="ver"></span>
 <span class="word" id="word" aria-hidden="true">Pitchroom</span>
 <p class="desktop" id="desktop">Please visit from a desktop</p>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
 <div class="tip" id="tip" role="status"><img src="img/installer-icon.png" alt="" width="28" height="28"><span id="tipText"></span></div>
 
 <script>
-const API = "https://api.github.com/repos/freaktion-craft/pitchroom-releases/releases/latest";
+// the published releases, newest first: each system's file from the newest that has one (a release may be Windows' only)
+const API = "https://api.github.com/repos/freaktion-craft/pitchroom-releases/releases?per_page=30";
 const ko = /^ko/i.test(navigator.language);
 const NAMES = { mac: "macOS", win: "Windows" };
 const FILES = { "mac-arm64": /mac-arm64\.dmg$/, "mac-x64": /mac-x64\.dmg$/, win: /(pitchroom_install|win-x64)\.exe$/ }; // (Windows': pitchroom_install.exe from 1.0.5, -win-x64.exe before)
@@ -135,6 +142,12 @@ async function detectMacArch() {
   return "arm64";
 }
 
+function ago(when) {
+  const min = Math.max(1, Math.round((Date.now() - when) / 60000)), fmt = new Intl.RelativeTimeFormat(ko ? "ko" : "en", { numeric: "always" });
+  const [n, unit] = min < 60 ? [min, "minute"] : min < 1440 ? [min / 60, "hour"] : min < 43200 ? [min / 1440, "day"] : min < 525600 ? [min / 43200, "month"] : [min / 525600, "year"];
+  return fmt.format(-Math.floor(n), unit);
+}
+
 (async () => {
   if (ko) document.getElementById("note").textContent = "노래 연습을 하고 싶은 사람들을 위한 취미 프로젝트예요.";
   if (ko) document.getElementById("desktop").textContent = "데스크톱에서 방문해 주세요";
@@ -147,9 +160,17 @@ async function detectMacArch() {
   try {
     const r = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });
     if (!r.ok) return;
-    const file = (await r.json()).assets.find((a) => FILES[key].test(a.name));
-    if (file) document.getElementById("get").href = file.browser_download_url;
-  } catch {} // offline or rate-limited: the releases page
+    let rel, file;
+    for (rel of await r.json()) if (!rel.draft && !rel.prerelease && (file = rel.assets.find((a) => FILES[key].test(a.name)))) break;
+    if (!file) return;
+    document.getElementById("get").href = file.browser_download_url;
+    // its version (the file's own, where its name has one: an old release can carry an older Mac file) and how long ago it
+    // came out, in its largest whole unit (minutes, hours, days, months, years)
+    const v = (file.name.match(/\d+\.\d+\.\d+/) || [rel.tag_name.replace(/^v/, "")])[0];
+    const ver = document.getElementById("ver");
+    ver.textContent = `v${v} · ${ago(new Date(file.updated_at))}`;
+    ver.classList.add("on");
+  } catch {} // offline or rate-limited: the releases page, no version
 })();
 
 // the tip, only when the button downloads the file itself (not when it opens the releases page)
@@ -189,6 +210,7 @@ async function fly(get) {
   Object.assign(label.style, { position: "absolute", left: `${t.left - r.left}px`, top: `${t.top - r.top}px`, whiteSpace: "nowrap" });
   document.body.append(ghost);
   get.style.visibility = "hidden";
+  document.getElementById("ver").classList.add("gone");
   const shrink = { duration: FLY.shrink, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" };
   label.animate([{ opacity: 1 }, { opacity: 0 }], { ...shrink, duration: FLY.shrink * 0.6 });
   svg.animate([{ left: `${s.left - r.left}px` }, { left: `${(D - s.width) / 2}px` }], shrink);

@@ -125,8 +125,8 @@ scripts/release-mac.mjs [vX.Y.Z]`; the latest published release by default) adds
   the worktree.
 - Like the Windows build made here, it includes `icons.local.js` when this checkout has it.
 
-**macOS and a Windows-only release:** it becomes "latest" with no `.dmg` (until `release-mac` adds the Mac files). The site then finds no Mac file and sends
-Mac visitors to a releases page without one, and the macOS app's update check offers a version it can't get.
+**macOS and a Windows-only release:** it becomes "latest" with no `.dmg` (until `release-mac` adds the Mac files). The site then offers Mac
+visitors the newest `.dmg` from an earlier release, and the macOS app's update check offers a version it can't get.
 1.0.12-1.0.14 carried the previous release's Mac files over; 1.0.15 on did not. Which practice to keep is the owner's
 call: ask.
 
