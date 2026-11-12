@@ -68,9 +68,12 @@ a { -webkit-user-drag: none; }
 .get, .word, .ver { grid-area: 1 / 1; } /* one over the other, in the middle */
 /* under the button: the version it downloads and how long ago that file came out, once they're known; gone with the button */
 .ver { align-self: center; transform: translateY(40px); color: rgba(255, 255, 255, 0.55); font: 400 12px/1 var(--font); font-variant-numeric: tabular-nums;
-  opacity: 0; transition: opacity 0.4s var(--ease); }
-.ver.on { opacity: 1; }
-.ver.gone { opacity: 0; transition-duration: 0.15s; }
+  opacity: 0; }
+/* it comes in as the button does, up out of a blur, a beat after it (or on its own, when it's known later: the delay set
+   as it's shown) */
+.ver.on { opacity: 1; animation: reveal 0.7s cubic-bezier(0.2, 0, 0, 1) both; }
+/* its characters, once they've let go of it (fall()): each on its own over the page, as it was set there */
+.bit { position: fixed; z-index: 1000; color: rgba(255, 255, 255, 0.55); font: 400 12px/1 var(--font); font-variant-numeric: tabular-nums; white-space: pre; pointer-events: none; }
 .word { color: var(--ink); font: 400 44px/1 "Geist Serif", var(--font); letter-spacing: -0.01em; visibility: hidden; }
 /* coming in, wiped on from the left: a mask, ink to clear across a soft band, drawn over it from left to right (its band
    off to the left of the name at the start, past its right at the end), the blur going as it does */
@@ -84,7 +87,7 @@ a { -webkit-user-drag: none; }
 @keyframes rise { from { opacity: 0; } }
 .get { animation: reveal 0.7s cubic-bezier(0.2, 0, 0, 1) 0.15s both; }
 .note { animation: rise 0.6s var(--ease) 0.45s both; }
-@media (prefers-reduced-motion: reduce) { .get, .note { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .get, .note, .ver.on { animation: none; } }
 /* on a phone: that one line in the middle, nothing else */
 .desktop { display: none; grid-area: 1 / 1; margin: 0; padding: 0 24px; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 15px/1.5 var(--font); }
 .phone .desktop { display: block; }
@@ -169,6 +172,8 @@ function ago(when) {
     const v = (file.name.match(/\d+\.\d+\.\d+/) || [rel.tag_name.replace(/^v/, "")])[0];
     const ver = document.getElementById("ver");
     ver.textContent = `v${v} · ${ago(new Date(file.updated_at))}`;
+    // in a beat after the button (its own starts 0.15 s in), as part of its coming in; straight away if it's later than that
+    ver.style.animationDelay = `${Math.max(0, 250 - performance.now())}ms`;
     ver.classList.add("on");
   } catch {} // offline or rate-limited: the releases page, no version
 })();
@@ -210,7 +215,6 @@ async function fly(get) {
   Object.assign(label.style, { position: "absolute", left: `${t.left - r.left}px`, top: `${t.top - r.top}px`, whiteSpace: "nowrap" });
   document.body.append(ghost);
   get.style.visibility = "hidden";
-  document.getElementById("ver").classList.add("gone");
   const shrink = { duration: FLY.shrink, easing: "cubic-bezier(0.4, 0, 0.2, 1)", fill: "forwards" };
   label.animate([{ opacity: 1 }, { opacity: 0 }], { ...shrink, duration: FLY.shrink * 0.6 });
   svg.animate([{ left: `${s.left - r.left}px` }, { left: `${(D - s.width) / 2}px` }], shrink);
@@ -224,6 +228,9 @@ async function fly(get) {
   // along an arc: out to the right first, then sweeping up into the toolbar (a curve bent toward a point level with where
   // it starts, under the icon: its control), not straight across; eased along it, smaller as it goes, gone as it gets there
   const dx = tx - cx, dy = ty - cy - 8, c = { x: dx * FLY.bend[0], y: dy * FLY.bend[1] }, ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+  // where the dot is along that arc, ms after it sets off (its middle, in the page's px)
+  const dotAt = (ms) => { const e = ease(Math.min(1, Math.max(0, ms) / FLY.fly)), u = 1 - e; return { x: cx + 2 * u * e * c.x + e * e * dx, y: cy + 2 * u * e * c.y + e * e * dy }; };
+  fall(document.getElementById("ver"), dotAt); // the line under it trying to go after it, as it sets off
   const path = Array.from({ length: 25 }, (_, i) => {
     const t = i / 24, e = ease(t), u = 1 - e, x = 2 * u * e * c.x + e * e * dx, y = 2 * u * e * c.y + e * e * dy; // a quadratic curve from here to there
     return { offset: t, transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${(1 - 0.8 * e).toFixed(3)})`, opacity: t < 0.85 ? 1 : (1 - t) / 0.15 };
@@ -233,6 +240,104 @@ async function fly(get) {
   showTip();
   // the button gone for good (its download's begun), the name in its place, wiped on from the left out of a blur
   document.getElementById("word").classList.add("in");
+}
+// the line under the button (its version, how long ago) trying to follow it, and failing: as the button sets off to the
+// right, the line holds on and is dragged after it, its right end first (pulled taut), then lets go a character at a
+// time from its left end, the right end holding on longest. Each flies on the way it was going, to the right and a
+// little up, then drops: onto the line at the page's foot (on its letters, where it's over them) or past it to the
+// window's foot (off its right edge, if it gets that far); lands, bounces, slides (off the end of the line, and on
+// down, if it slides that far) to a stop and lies there, tipped. Each one's path worked out ahead (dragged, then thrown,
+// under gravity), played as keyframes
+const FALL = { lag: 8, hold: 150, holdEach: 14, follow: [0.15, 0.5], elastic: [160, 16], drag: 3, g: 2600, bounce: 0.2, friction: 1500, tilt: 24, lean: 10, spring: [120, 14] };
+// lag: ms between each character starting to be dragged, right to left; hold, holdEach: ms the leftmost holds on for, and
+// how much longer each next one does; follow: how much of the dot's way each tries to go, the leftmost to the rightmost
+// (held to it by an elastic: stiffness /s², damping /s, so it lags, then is yanked as the dot speeds off); drag: how fast
+// the air takes its speed across once it's let go (/s: small and light, it doesn't carry far); g: px/s²; bounce: kept of its speed
+// down; friction: px/s² it slows by on the ground; tilt: deg it may come to rest at, either way; lean: deg it leans
+// toward the button as it's dragged (at 300 px/s); spring: how its turn follows (stiffness, damping), knocked on each
+// landing; each let go a little faster or slower than the next (up to 10%), so they don't land in step
+function fall(ver, dotAt) {
+  const text = ver.textContent;
+  const chars = window.Intl && Intl.Segmenter ? Array.from(new Intl.Segmenter().segment(text), (s) => s.segment) : Array.from(text);
+  // each where it's set in the line now (spaces stay as text: they've nothing to show)
+  ver.textContent = "";
+  const spans = chars.map((ch) => {
+    if (/^\s+$/.test(ch)) return ver.append(ch), null;
+    const s = document.createElement("span"); s.textContent = ch; ver.append(s); return s;
+  }).filter(Boolean);
+  const placed = spans.map((s) => s.getBoundingClientRect()), n = spans.length;
+  ver.style.visibility = "hidden";
+  // the line at the page's foot as something to land on, letter by letter: where each of its letters is along it and how
+  // high its top is (from its type's own measures: its baseline in its line, less how far that letter reaches up; along
+  // it, the canvas's widths, fitted to the line's own)
+  const note = document.getElementById("note"), nr = note.getBoundingClientRect(), ns = getComputedStyle(note);
+  const ctx = document.createElement("canvas").getContext("2d");
+  ctx.font = `${ns.fontWeight} ${ns.fontSize} ${ns.fontFamily}`;
+  const nm = ctx.measureText(note.textContent), base = nr.top + (parseFloat(ns.lineHeight) - nm.fontBoundingBoxAscent - nm.fontBoundingBoxDescent) / 2 + nm.fontBoundingBoxAscent;
+  const fit = nr.width / nm.width, tops = [];
+  let along = "";
+  for (const c of note.textContent) {
+    const x0 = ctx.measureText(along).width; along += c;
+    tops.push([nr.left + x0 * fit, nr.left + ctx.measureText(along).width * fit, base - Math.max(0, ctx.measureText(c).actualBoundingBoxAscent)]);
+  }
+  // the highest letter top under a stretch of it (none: not over the line)
+  const topOver = (x0, x1) => tops.reduce((top, [l, r, y]) => (l < x1 && r > x0 ? Math.min(top, y) : top), Infinity);
+  ctx.font = `400 12px ${ns.fontFamily}`; // (the characters' own type, .bit)
+  spans.forEach((s, i) => {
+    const r = placed[i], ch = s.textContent, bit = document.createElement("span");
+    bit.className = "bit"; bit.textContent = ch; bit.setAttribute("aria-hidden", "true");
+    // its line box the same height as its place in the line, so its letter sits on the same baseline
+    Object.assign(bit.style, { left: `${r.left}px`, top: `${r.top}px`, lineHeight: `${r.height}px` });
+    document.body.append(bit);
+    // where it comes to rest: its box on the window's foot, or its letter (its lowest point) on the line's letters
+    const m = ctx.measureText(ch), low = r.top + (r.height - m.fontBoundingBoxAscent - m.fontBoundingBoxDescent) / 2 + m.fontBoundingBoxAscent + m.actualBoundingBoxDescent;
+    const foot = innerHeight - r.bottom, wall = innerWidth - r.right, mid = r.left + r.width / 2;
+    const line = (x) => topOver(mid + x - r.width / 4, mid + x + r.width / 4) - low; // where it'd sit on the line's letters here (by its middle half)
+    const held = (FALL.hold + i * FALL.holdEach) / 1000, kick = 0.9 + Math.random() * 0.2, dt = 1 / 120, [K, C] = FALL.spring;
+    const delay = (n - 1 - i) * FALL.lag, f = FALL.follow[0] + (FALL.follow[1] - FALL.follow[0]) * (n > 1 ? i / (n - 1) : 1), [Ke, De] = FALL.elastic, d0 = dotAt(0);
+    let rest = (Math.random() * 2 - 1) * FALL.tilt, x = 0, y = 0, vx = 0, vy = 0, t = 0, a = 0, av = 0, air = false, ground = null;
+    const steps = [];
+    for (let k = 0; t < 6; k++) {
+      if (k % 2 === 0) steps.push([t, x, y, a]);
+      if (t < held) { // dragged: pulled on an elastic toward its share of where the dot has got to
+        const d = dotAt(t * 1000 + delay), tx = (d.x - d0.x) * f, ty = (d.y - d0.y) * f;
+        vx += (Ke * (tx - x) - De * vx) * dt; vy += (Ke * (ty - y) - De * vy) * dt;
+      }
+      else if (ground === null) { if (!air) { air = true; vx *= kick; vy *= kick; } vy += FALL.g * dt; vx -= vx * FALL.drag * dt; } // let go: falling
+      else vx = Math.max(0, Math.abs(vx) - FALL.friction * dt) * Math.sign(vx); // sliding
+      // its turn: toward a lean while dragged, then toward where it'll lie
+      av += (-K * (a - (t < held ? Math.min(1, vx / 300) * FALL.lean : rest)) - C * av) * dt; a += av * dt;
+      const was = y, from = x;
+      t += dt; x += vx * dt; if (ground === null) y += vy * dt;
+      if (x > wall) { x = wall; vx *= -0.3; } // off the window's right edge
+      if (ground !== null) {
+        if (ground === "line") {
+          const on = line(x);
+          if (on === Infinity) { ground = null; vy = 0; rest += Math.sign(vx || 1) * 20; continue; } // off the end of the line: on down
+          if (on > y + 0.5) { ground = null; vy = 0; continue; } // over a lower letter: down onto it
+          if (on < y - 4) { x = from; vx *= -0.3; } else y = on; // against a taller one's side, or up onto it (a few px)
+        }
+        if (!vx && Math.abs(a - rest) < 0.2 && Math.abs(av) < 3) break; // still
+        continue;
+      }
+      if (!air || vy <= 0) continue;
+      let on = line(x);
+      if (on !== Infinity && was > on + 4 && line(from) !== Infinity) { x = from; vx *= -0.3; on = line(x); } // in among its letters: against a taller one's side
+      const g = on !== Infinity && was <= on + 4 ? on : foot; // onto the line from above it (or up a few px onto a letter)
+      if (y < g) continue;
+      y = g; av += Math.sign(rest || 1) * vy * 0.12; // the crash: knocked round
+      if (vy > 120) { vy *= -FALL.bounce; vx *= 0.6; } else { vy = 0; vx *= 0.6; ground = g === foot ? "foot" : "line"; } // a small bounce, then down for good
+    }
+    steps.push([t, x, y, a]);
+    const end = t;
+    const anim = bit.animate(steps.map(([t2, x2, y2, a2]) => ({ offset: t2 / end, transform: `translate(${x2.toFixed(1)}px, ${y2.toFixed(1)}px) rotate(${a2.toFixed(1)}deg)` })),
+      { duration: end * 1000, delay: (n - 1 - i) * FALL.lag, easing: "linear", fill: "forwards" });
+    // then held there, as far up from the window's foot as it came to rest (still there if the window's resized)
+    anim.finished.then(() => {
+      Object.assign(bit.style, { top: "auto", bottom: `${innerHeight - r.bottom - y}px`, left: `${r.left + x}px`, transform: `rotate(${a.toFixed(1)}deg)` });
+      anim.cancel();
+    });
+  });
 }
 document.getElementById("get").addEventListener("click", (e) => {
   if (!/\/releases\/download\//.test(e.currentTarget.href)) return;

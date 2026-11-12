@@ -20,6 +20,9 @@ Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
   rate-limited, the link stays on the releases page.
 - Phones and tablets see "Please visit from a desktop". Korean copy when the browser language starts with `ko`.
 - A "Downloading…" tip and a flying animation aim at the browser's downloads icon with fixed offsets per browser.
+- The version line under the button tries to follow it (`fall()`, its numbers in `FALL`): each letter is pulled on an
+  elastic after the flying dot, lets go from the left, falls and lands on the foot line's letters or the window's bottom
+  edge, and lies there tipped. On load it blurs in with the button. Reduced motion skips both.
 - Dark only. A few app tokens are copied inline and must be kept in step with `css/tokens.css` by hand.
 
 Because it reads the published releases, a release needs no site change. Renaming the installer does: update `FILES`
