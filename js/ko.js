@@ -311,7 +311,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Import from YouTube": "YouTube에서 가져오기", "Import {n} from YouTube": "YouTube에서 {n}곡 가져오기", "Another link or a file…": "다른 링크나 파일…", "Adding {n} songs · {pct}%": "{n}곡 추가 중 · {pct}%",
   "Adding a song · {pct}%": "곡 추가 중 · {pct}%", "Couldn’t add a song": "곡을 추가하지 못했어요", "Added": "추가됨", "A song": "곡",
   "{n} songs added": "{n}곡 추가됨", "Song added": "곡 추가됨", "Open song": "곡 열기", "Songs added": "추가된 곡",
-  "{stage} · {pct}%": "{stage} · {pct}%", "{stage} · under a minute left": "{stage} · 1분 안에 끝나요", "{stage} · about {n} min left": "{stage} · 약 {n}분 남음", "Your first song is on its way. How it’s going shows beside the mic.": "첫 곡을 추가하고 있어요. 진행 상황은 마이크 옆에 보여요.",
+  "{stage} · {pct}%": "{stage} · {pct}%", "Your first song is on its way. How it’s going shows beside the mic.": "첫 곡을 추가하고 있어요. 진행 상황은 마이크 옆에 보여요.",
   "Starting…": "시작하는 중…", "Progress": "진행률", "Cancel": "취소", "Clear": "지우기", "Cancelling…": "취소하는 중…",
   "The server didn’t answer properly.": "서버가 제대로 답하지 않았어요.", "That didn’t work.": "잘 안 됐어요.", "Couldn’t reach the server.": "서버에 연결하지 못했어요.",
   "Couldn’t reach the server. Is the app still running?": "서버에 연결하지 못했어요. 앱이 아직 실행 중인가요?",
