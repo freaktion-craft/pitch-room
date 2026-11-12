@@ -93,8 +93,12 @@ function resetOnDblClick(input, def) {
     const m = t.match(KEY);
     if (m) tip.replaceChildren(t.slice(0, m.index), el("span", "tip-key", m[1]), t.slice(m.index + m[0].length)); else tip.replaceChildren(t);
     tip.classList.remove("tip-slide", "tip-l-fast", "tip-r-fast");
-    tip.style.right = "auto"; tip.style.left = tip.style.top = "0"; tip.hidden = false; // (measured at the left, where it has its full width)
-    const r = n.getBoundingClientRect(), w = tip.getBoundingClientRect().width, h = tip.offsetHeight, vw = document.documentElement.clientWidth;
+    tip.style.left = "auto"; tip.style.right = tip.style.top = "0"; tip.hidden = false; // (measured at the right, where it has its full width)
+    // cb: where right: 0 is (not the window's clientWidth: with the scrollbar's gutter kept, they differ, and a right
+    // edge set from that left the chip a dozen px narrower than its words after a slide, its words cut)
+    const t0 = tip.getBoundingClientRect(), w = t0.width, cb = t0.right, h = tip.offsetHeight, vw = document.documentElement.clientWidth;
+    const r = n.getBoundingClientRect();
+    tip.style.right = "auto";
     const x = Math.max(EDGE, Math.min(vw - w - EDGE, r.left + r.width / 2 - w / 2)); // (the scrollbar left out)
     const y = r.top - h - GAP >= EDGE ? r.top - h - GAP : r.bottom + GAP; // over it, or under it at the window's top
     if (slide && lastAt && h === lastAt.h && h < 2 * ONE_LINE && Math.hypot(x - lastAt.x, y - lastAt.y) < SLIDE) {
@@ -102,9 +106,9 @@ function resetOnDblClick(input, def) {
       // key's: from the narrower box it showed clipped), and the edge that widens it goes first, the other after, so
       // it's never narrower on the way either
       const mid = lastAt.x + lastAt.w / 2, l0 = Math.min(lastAt.x, mid - w / 2), r0 = Math.max(lastAt.x + lastAt.w, mid + w / 2);
-      tip.style.left = l0 + "px"; tip.style.right = vw - r0 + "px"; tip.style.top = lastAt.y + "px";
+      tip.style.left = l0 + "px"; tip.style.right = cb - r0 + "px"; tip.style.top = lastAt.y + "px";
       void tip.offsetWidth; tip.classList.add("tip-slide"); tip.classList.toggle("tip-l-fast", x < l0); tip.classList.toggle("tip-r-fast", x + w > r0);
-      tip.style.right = vw - x - w + "px";
+      tip.style.right = cb - x - w + "px";
     }
     tip.style.left = x + "px"; tip.style.top = y + "px"; lastAt = { x, y, w, h };
   }
