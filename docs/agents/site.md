@@ -5,6 +5,13 @@
 named in the `og:` tags; 2:1, as KakaoTalk crops anything else itself; bump its `?v=` when it changes). No build step.
 Fonts (Pretendard, Geist Serif) load from cdn.jsdelivr.net.
 
+For search engines and AI assistants (none of it drawn): the description (the same words in `description` and
+`og:description`, the chat preview's line too), `rel="canonical"`, a schema.org `SoftwareApplication` record in the
+head, `site/robots.txt` and `site/sitemap.xml`. The title stays the bare name (the owner's pick). There is no
+`404.html` on purpose: without one Pages serves the page at every path (`/download` works), and the canonical says
+they're all one page. `www` and `pitchroom.pages.dev` also serve it; a real redirect for those is a Cloudflare
+dashboard rule, not a file here.
+
 ## What it does
 
 - Picks the installer for the visitor's system from the newest **published** release of the public
