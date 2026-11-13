@@ -2,6 +2,10 @@
 
 Read this first. Topic docs are in `docs/agents/` (listed at the end).
 
+Before changing an area, read its part of `docs/agents/solved.md` (bugs already fixed there, as rules, so they don't
+come back). Before building UI, look in `docs/agents/reuse.md` for the control, popup, motion or helper that already
+exists. A mechanism bug you fix gets a line in `solved.md`; a shared piece you add gets a line in `reuse.md`.
+
 ## What it is
 
 Pitchroom is a local singing-practice app. You add a song (a YouTube link, a playlist or a file). The app splits it into
@@ -130,6 +134,8 @@ Details and recipes: `docs/agents/verifying.md`.
 
 ## Topic docs
 
+- `docs/agents/solved.md`: problems already found and fixed, as rules per area; the owner's decisions not to undo.
+- `docs/agents/reuse.md`: what to reuse for a control, popup, motion, colour or helper; copies not yet folded together.
 - `docs/agents/frontend.md`: the page. Boot order, globals, routing, `store`, i18n, theming, icons, pitfalls.
 - `docs/agents/server.md`: the Python side. API, data folder, song folder, jobs, the add-a-song pipeline, models,
   versions and upgrades.

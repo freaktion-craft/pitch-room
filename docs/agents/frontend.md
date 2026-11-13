@@ -2,6 +2,8 @@
 
 `index.html`, `js/*.js`, `css/*.css`. No modules, no bundler, nothing to install: edit and reload.
 
+The shared helpers and controls to reuse are in `reuse.md`; bugs already fixed on the page, in `solved.md`.
+
 ## Boot order and shared globals
 
 - `index.html` loads 24 classic `<script>`s in a fixed order: core, ko, audio, live, helpers, library, info, adding,
