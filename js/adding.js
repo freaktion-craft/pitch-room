@@ -299,9 +299,10 @@ async function choosePick(id, c, b) {
   form.querySelectorAll(".cand").forEach((p) => { p.classList.toggle("on", p === b); p.setAttribute("aria-checked", String(p === b)); });
   const done = () => { foldBox(form, open, false); open.focus({ preventScroll: true }); }; // (focus back where the list was opened from)
   if (j.demo) { addingJob(id, { picked: { key: c.key, title: c.title, artist: c.artist, art: c.art, at: Date.now() }, pickError: null }); done(); return; } // (?demo=picker)
+  let body; // (read after the try: declared in it, the pick went through but the page threw, the row left asking)
   try {
     const r = await fetch(`/api/jobs/${id}/pick`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c.own ? { own: true } : { record: c.record }) });
-    const body = await r.json().catch(() => ({}));
+    body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.error || "That didn’t work.");
   } catch (e) {
     if (adding.has(id)) addingJob(id, { pickError: e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message }); // (the list as it was, and why)
