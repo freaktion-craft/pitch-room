@@ -52,10 +52,14 @@ SR = 44100
 MODELS = {"htdemucs": "4 stems", "htdemucs_6s": "6 stems (+ guitar, piano)"}
 HEAVY = ["torch", "demucs", "librosa", "whisper", "stable_whisper"]  # (yt-dlp: a base package, for finding a song before these are in)
 # Lead-vocal separation (audio-separator) is optional: without it the bars come from the whole vocal stem.
-# BS-Roformer karaoke by frazer & becruily (195 MB, ~60 s for a 4-minute song on an RTX 4070 Ti). On a song with
+# BS-Roformer karaoke by frazer & becruily (195 MB, ~45 s for a 4-minute song on an RTX 4070 Ti). On a song with
 # vocal chops, the bars it took out were the stretches a search for exact bar-to-bar loops had flagged. Two other
 # karaoke models (Mel-Roformer by becruily, 1.6 GB; by aufr33 & viperx, 871 MB) put backing in the same places.
 LEAD_MODEL = "bs_roformer_karaoke_frazer_becruily.ckpt"
+# How many of the model's overlapping windows read each moment. Its own config says 4, which was 324 s of a 9-minute
+# add on an M2 Pro; 2 takes half the time (83 s to 42 s on the 4070 Ti). On the one song tried the two leads were
+# 40 dB apart and the bars the same but for 2 more in 500.
+LEAD_OVERLAP = 2
 MODEL_DIR = os.path.join(DATA, "models")
 
 _jobs: dict[str, dict] = {}
@@ -2615,13 +2619,14 @@ def _lead_vocal(vocals: np.ndarray, job=None, share: tuple[float, float] = (0.0,
         first = not os.path.isfile(os.path.join(MODEL_DIR, LEAD_MODEL))
         _stage(job, "Downloading the lead-vocal model (first time only, ≈200 MB)" if first else "Taking out backing vocals and chops",
                share[0])
-    expected = vocals.shape[1] / SR * (0.3 if device() == "cuda" else 3.0)
+    expected = vocals.shape[1] / SR * (0.2 if device() == "cuda" else 1.5)
     _in_thread.job = job
     try:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp, _creep(job, share, expected):
             src = os.path.join(tmp, "vocals.wav")
             sf.write(src, vocals.T, SR)
-            sep = Separator(log_level=logging.WARNING, model_file_dir=MODEL_DIR, output_dir=tmp, output_format="WAV")
+            sep = Separator(log_level=logging.WARNING, model_file_dir=MODEL_DIR, output_dir=tmp, output_format="WAV",
+                            mdxc_params={"overlap": LEAD_OVERLAP})
             sep.load_model(model_filename=LEAD_MODEL)
             if job:
                 _check(job)
