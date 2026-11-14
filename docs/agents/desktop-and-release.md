@@ -17,6 +17,8 @@ Windows and macOS only.
     `html.desktop-win`). Navigation is locked to the server; other links open in the browser.
   - `permissions()`: an allowlist of web permissions for the page's origin. A new permission must be added there.
   - Asks before quitting while jobs or an install are running.
+  - Windows, installed (not WIP): `app.setAppUserModelId(APP_ID)` (package.json's `appId`; change both together), and
+    `mendShortcut` at start puts the Start-menu shortcut back if it's gone or wrong. Never the Desktop's.
   - Self-update (Windows, packaged, not WIP): `updateFirst` runs in the splash before the server starts and downloads
     the whole installer, then `standIn` shows a PowerShell stand-in splash (`update-splash.ps1`) while the installer
     runs.

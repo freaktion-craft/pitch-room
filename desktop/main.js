@@ -28,6 +28,12 @@ const TITLEBAR = 32; // Windows: the window's buttons' strip over the page, px (
 // "wip" (put in as it's made): which commit it was made from.
 const WIP = app.isPackaged ? require("./package.json").wip || "" : "";
 
+// Windows knows the installed app by this id (package.json's appId: the installer writes it on the shortcuts it makes).
+// Said by the app too, so its window is that app's on the taskbar whether or not Windows finds a shortcut to tell it by.
+// (Not WIP: its shortcuts, wip.ps1's, carry none.)
+const APP_ID = "com.freaktion.pitchroom";
+if (win32 && app.isPackaged && !WIP) app.setAppUserModelId(APP_ID);
+
 const DATA = app.getPath("userData");
 // the Theme setting, as the page keeps it (settings.json, beside the library: stems.get_settings): "system" (the default),
 // "light" or "dark". As the system's own theme for the window (nativeTheme.themeSource), so the title bar, the page's
@@ -54,6 +60,23 @@ const LOGS = path.join(DATA, "logs"), LOG = path.join(LOGS, "server.log");
 const STATE = path.join(DATA, "window.json");
 
 let win = null, splash = null, server = null, port = 0, quitting = false;
+
+// ---------- the Start menu's shortcut (Windows, the installed app) ----------
+// Put back if it's gone, and set right if it points elsewhere or lacks the app's id. Windows' search finds Pitchroom
+// by it, and the taskbar pins by it. The installer makes it once and leaves the shortcuts as they are on every update
+// after, so one that's lost stayed lost. (Not the Desktop's: that one's yours to delete.)
+function mendShortcut() {
+  try {
+    const link = path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", "Pitchroom.lnk");
+    const exe = process.execPath;
+    let has = null;
+    try { has = shell.readShortcutLink(link); } catch (e) { /* none there */ }
+    if (has && path.resolve(has.target || "").toLowerCase() === exe.toLowerCase() && has.appUserModelId === APP_ID) return;
+    shell.writeShortcutLink(link, has ? "update" : "create", { // as the installer makes it
+      target: exe, cwd: path.dirname(exe), icon: exe, iconIndex: 0, appUserModelId: APP_ID, description: require("./package.json").description || "",
+    });
+  } catch (e) { console.error("the Start menu's shortcut:", e.message); }
+}
 
 // ---------- the splash: the name, a bar and a line, while an update comes in and the engine starts ----------
 let shown = { text: "Starting…" };
@@ -406,6 +429,7 @@ else {
     showSplash();
     if (SELF_UPDATES && (await updateFirst())) return;
     if (MAC_UPDATES && (await updateMac())) return;
+    if (SELF_UPDATES) mendShortcut(); // (the installed Windows app: the same test)
     status("Starting…");
     try { await startServer(); } catch (e) {
       closeSplash();

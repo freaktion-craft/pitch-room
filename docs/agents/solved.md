@@ -218,6 +218,11 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
 - **Windows 11: set `accentColor` on every window** (a pale line round it in light; dfd26a2). With the custom title
   bar, fixed overlays start under `--titlebar` (a line across the drawer; 36b34bb). Windows has its own full-size icon
   (2c01442). WPF text drawn see-through comes out lighter: blend the grey yourself in `update-splash.ps1` (e0cf29d).
+- **Windows: the app says its own id and mends its Start-menu shortcut at start** (`APP_ID`, `mendShortcut`). The
+  installer makes the shortcuts once and keeps them as they are on every update after, so a lost one stayed lost. Was:
+  on one PC Pitchroom couldn't be found in Windows' search and its taskbar icon went when it closed. An update itself
+  keeps a taskbar pin (tried with a real installer and the installed app); it is lost when the app's exe is missing
+  as the installer starts, or on uninstall.
 - **The window's minimum size comes from the page's** (1440 × 880 plus the frame), inside the screen; a smaller saved
   size is raised to it (d806a73).
 - **iPad says it's a Mac**: tell it by `navigator.maxTouchPoints > 1` (b7f0a03).
