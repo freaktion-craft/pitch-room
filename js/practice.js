@@ -1157,7 +1157,7 @@ async function singSong(m, btn) {
 // Settings: a page of their own (#settings, route): going out, their lists closed
 function showMicSet(on) {
   document.documentElement.classList.toggle("set-view", on); pinSetTop(); requestAnimationFrame(() => { pinSetTop(); paintFade(); paintSetNav(); }); // (again once it's shown)
-  if (!on) { micPick?.close(); namesPick?.close(); langPick?.close(); themePick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
+  if (!on) { micPick?.close(); micChPick?.close(); outPick?.close(); outChPick?.close(); namesPick?.close(); langPick?.close(); themePick?.close(); } else { showJobs(false); paintSetNav(); openSync(); paintImport(); }
 }
 // Import beta library, in the desktop app only (it picks the folder): a copy run from its files has its songs, settings
 // and models beside them, copied in by the server (stems.start_import). Its line says how it's going, then how it went;
@@ -1397,7 +1397,10 @@ function initSing() {
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
   micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); syncErr = ""; paintSync(); }); // Sync's is the new input's
   micPick.set([{ v: "", t: "System default" }], "");
-  if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", listMics); listMics(); }
+  micChPick = makePick($("#micCh"), "Input channel", (v) => { S.micCh = v; save(); restartMic(); });
+  outPick = makePick($("#outDev"), "Output", (v) => { S.out = v; save(); setOut(); });
+  outChPick = makePick($("#outCh"), "Output channels", (v) => { S.outCh = v; save(); if (ac) routeOut(); });
+  if (navigator.mediaDevices) { navigator.mediaDevices.addEventListener("devicechange", () => { listMics(); listOuts(); }); listMics(); listOuts(); }
   themePick = makePick($("#theme"), "Theme", setTheme);
   themePick.set(themeItems(), theme);
   namesPick = makePick($("#names"), "Note names", (v) => { S.names = v; save(); labelKeys(); });

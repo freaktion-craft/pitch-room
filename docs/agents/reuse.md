@@ -57,8 +57,10 @@ one at run time, but not by code that runs while the earlier file loads.
 
 ## Audio and the mic
 
-- `ensureCtx()` (`audio.js`) before touching `ac`: it makes the context, `master` (into the limiter), `analyser`,
-  `micBus` and `bandTap`.
+- `ensureCtx()` (`audio.js`) before touching `ac`: it makes the context, `master` (into the limiter, then `outBus`,
+  the chosen output and pair: `setOut`, `routeOut`), `analyser`, `micBus` and `bandTap`. Play into `master`, never
+  `ac.destination`.
+- A mic stream into a node: `micPlug(stream, dest)` (the chosen input channel); disconnect every node it returns.
 - Piano: `playKey(m, dur, delay)` plays at the user's volume and returns the gain (to hush a queued note); `piano(...)`
   for a custom destination. In the Lab, `vcPlay(m)`, which also mutes the mic reading for a moment.
 - The mic is one stream for the whole app: `startMic()` (single-flight, says why it failed through `notice`),

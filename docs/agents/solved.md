@@ -145,7 +145,10 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
 - **A new stream goes under the analyser before the old one stops**; a saved device that's gone falls back to the
   default with no error (`restartMic`; 3391d22).
 - **Device names are hidden until the mic is allowed**: number them, and list again after permission and on
-  `devicechange` (`listMics`).
+  `devicechange` (`listMics`, `listOuts`).
+- **The output pair is fed stereo**: `outBus` is forced to 2 channels, or a mono sound (the piano before the limiter
+  loads) reached only the pair's first channel (`routeOut`). A saved output or pair that's gone plays on the default /
+  1–2, no error. Sync is kept per input and output (`syncKey`).
 - **Find VB-CABLE by its device name, never through Windows' `default`/`communications` aliases**; names can be in
   Korean (`liveCable`; 51aa3c6). Never offer CABLE Output as a mic: the app would hear itself (`cableOut`; e60996f).
 - **The browser reports only its own latency**: a DAW's or loopback's has to be measured, clicks out and in with the

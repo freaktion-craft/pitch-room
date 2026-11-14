@@ -214,7 +214,7 @@ async function busy() { // a song being added, or the tools being installed
 // system's own question first, once (NSMicrophoneUsageDescription says why).
 function permissions() {
   const ours = (origin) => { try { const u = new URL(origin); return u.hostname === "localhost" && +u.port === port; } catch { return false; } };
-  const allowed = new Set(["media", "clipboard-read", "clipboard-sanitized-write", "fullscreen", "speaker-selection"]); // (speaker-selection: Live's output, live.js)
+  const allowed = new Set(["media", "clipboard-read", "clipboard-sanitized-write", "fullscreen", "speaker-selection"]); // (speaker-selection: the page's output, audio.js, and Live's, live.js)
   session.defaultSession.setPermissionCheckHandler((wc, perm, origin) => allowed.has(perm) && ours(origin));
   session.defaultSession.setPermissionRequestHandler(async (wc, perm, done, details) => {
     if (!allowed.has(perm) || !ours(details.requestingUrl || wc.getURL())) return done(false);

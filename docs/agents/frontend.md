@@ -49,7 +49,7 @@ Each area keeps its state in one short capitalised object.
 |---|---|
 | `core.js` | `$`, note names, `store`, `S` (settings) and `save()`, `tr()`, `say()`, `view` |
 | `ko.js` | Korean: `KO_SERVER` (server messages) and `KO_TEXT` (page strings) |
-| `audio.js` | AudioContext (`ensureCtx`), piano samples, mic start/stop, `listMics`, the YIN pitch detector, `__autoSing` |
+| `audio.js` | AudioContext (`ensureCtx`), piano samples, mic start/stop, `listMics`, the output (`listOuts`, `setOut`, `routeOut`), the YIN pitch detector, `__autoSing` |
 | `live.js` | `LIVE`: Live mic through VB-CABLE (Windows) |
 | `helpers.js` | `el`, `mkBtn`, slider value tips, `makePick` (dropdowns), `progRing`, `ICONS` and `icon()`, `fmtTime` |
 | `library.js` | Song list, sort, search, views, New strip, Continue practising (`CP`), cover zoom (`CV`), song menu, tool status |
