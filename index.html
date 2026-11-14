@@ -241,7 +241,7 @@ const EMPTY_LIBRARY = false;
     <!-- left from the onboarding's color step for here (welcome()): in the crumbs' place, the steps again from there -->
     <div class="backbar"><nav class="crumbs" id="setCrumbs" aria-label="Where you are"></nav><section class="panel-card ob-back" id="obBack" hidden><div class="setup-line"><p class="muted">You have a few steps left.</p><button class="btn sm primary" id="obBackBtn" type="button">Back to onboarding</button></div></section></div>
     <div class="set-layout">
-      <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Microphone</button><button type="button" data-to="setRec">Recording</button><button type="button" data-to="setLive">Live</button><button type="button" data-to="setMore">Advanced</button></nav>
+      <nav class="set-nav" id="setNav" aria-label="Settings sections"><button type="button" data-to="setGeneral">General</button><button type="button" data-to="setMic">Audio</button><button type="button" data-to="setRec">Recording</button><button type="button" data-to="setLive">Live</button><button type="button" data-to="setMore">Advanced</button></nav>
       <div class="settings" id="micSet">
         <section class="set-group" aria-labelledby="setGeneral">
           <h2 class="group-label" id="setGeneral">General</h2>
@@ -257,14 +257,18 @@ const EMPTY_LIBRARY = false;
           </div>
         </section>
         <section class="set-group" aria-labelledby="setMic">
-          <h2 class="group-label" id="setMic">Microphone</h2>
+          <h2 class="group-label" id="setMic">Audio</h2>
           <div class="set-list">
             <div class="set-row"><div class="set-what"><b>Input</b><small>What you sing into</small></div><button class="pick" id="micDev" type="button"></button></div>
+            <!-- a stereo input's channel (audio.js, paintMicCh); the output and, on one with more than two, its pair (listOuts, paintOutCh) -->
+            <div class="set-row" id="micChRow" hidden><div class="set-what"><b>Input channel</b><small>Which of its inputs your mic is in</small></div><button class="pick" id="micCh" type="button"></button></div>
             <div class="set-row gate-sec">
               <div class="gate-head"><div class="set-what"><b>Mic sensitivity</b><small>How loud a sound must be to count as singing</small></div><div class="gate-acts"><button class="btn sm icon quiet mic" id="micBtn2" type="button" aria-pressed="false" aria-label="Microphone"><span class="mic-ico"></span></button></div></div>
               <div class="gate"><div class="gate-meter" aria-hidden="true"><i id="gateLvl"></i></div><input type="range" id="gate" min="-70" max="-20" step="1" data-tip="db" aria-label="Mic sensitivity: how loud a sound must be to count as singing"></div>
             </div>
             <label class="set-row"><span class="set-what"><b>Filter out speaker sound</b><small>For speakers; leave it off with headphones</small></span><input type="checkbox" class="switch" id="echo"></label>
+            <div class="set-row" id="outRow" hidden><div class="set-what"><b>Output</b><small>Where you hear the app</small></div><button class="pick" id="outDev" type="button"></button></div>
+            <div class="set-row" id="outChRow" hidden><div class="set-what"><b>Output channels</b><small>Which pair of its outputs</small></div><button class="pick" id="outCh" type="button"></button></div>
           </div>
         </section>
         <section class="set-group" aria-labelledby="setRec">

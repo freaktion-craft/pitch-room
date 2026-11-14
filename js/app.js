@@ -522,7 +522,7 @@ function setLang(v) {
   langPick.set(LANGS, lang);
   resay(); closeMenu();
   for (const p of picks) p.relabel();
-  countPick.set(countItems(), S.countIn); themePick.set(themeItems(), theme); paintKey(); listMics();
+  countPick.set(countItems(), S.countIn); themePick.set(themeItems(), theme); paintKey(); listMics(); listOuts();
   if (K.song) recPick.set(recItems(), recMode);
   renderMic(); paintRec(); paintPlay($("#pPlay"), P.playing); renderStart();
   if (P.song) renderTracks();

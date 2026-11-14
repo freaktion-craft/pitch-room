@@ -146,12 +146,13 @@ function recTick(sn) {
 // recLatency knows only the delays the browser reports. Whatever else lies between the band and a take (a DAW's
 // buffers, a loopback driver, the air from headphones to the mic) is measured here: CLICKS played as the band is (into
 // master, so through the limiter too), heard by the mic and recorded as a take is. How late they come back, less the
-// browser's part, is the rest: kept for the input they came in on (syncExtra: {input: {s, label, at}}, in the settings)
-// and added to every take recorded from it after. Takes already made keep the delay they were made with.
+// browser's part, is the rest: kept for the input they came in on and the output they went out of, when it's not the
+// default (syncExtra: {"input" or "input>output": {s, label, at}}, in the settings) and added to every take recorded
+// that way after. Takes already made keep the delay they were made with.
 const CLICKS = [0, 0.43, 0.79, 1.31, 1.62, 2.17, 2.51, 3.08]; // s: unevenly apart, so only the true lag lines them all up
 const CLICK_WAIT = 1; // s: the longest a click may take to come back (as recLatency's)
 let syncExtras = store.get("syncExtra", {}) || {}, syncBusy = false;
-const syncKey = () => S.mic || "default";
+const syncKey = () => (S.mic || "default") + (ac && typeof ac.sinkId === "string" && ac.sinkId ? ">" + ac.sinkId : "");
 const syncExtra = () => +(syncExtras[syncKey()]?.s) || 0;
 // A click: 3 ms of 2 and 5 kHz together, at full from its first sample (which it's timed from), dying away
 function clickBuf() {
@@ -171,10 +172,10 @@ async function measureDelay() {
     throw new Error(e && e.name === "NotAllowedError" ? "Microphone access is blocked. Allow it from the mic icon in the address bar, then try again."
       : "No microphone found. Check it’s connected, then try again.");
   }
-  const tk = stream.getAudioTracks()[0], src = ac.createMediaStreamSource(stream), rec = new AudioWorkletNode(ac, "stem-rec", { numberOfOutputs: 0 });
+  const tk = stream.getAudioTracks()[0], rec = new AudioWorkletNode(ac, "stem-rec", { numberOfOutputs: 0 }), src = micPlug(stream, rec); // (the input's channel, as takes hear it)
   const chunks = [], out = ac.createGain(), click = clickBuf(), t0 = ac.currentTime + 0.4; // a moment of the room first
   rec.port.onmessage = (e) => chunks.push(e.data);
-  src.connect(rec); rec.port.postMessage(true);
+  rec.port.postMessage(true);
   out.gain.value = 0.8; out.connect(master);
   for (const c of CLICKS) { const b = ac.createBufferSource(); b.buffer = click; b.connect(out); b.start(t0 + c); }
   try {
@@ -182,7 +183,7 @@ async function measureDelay() {
     rec.port.postMessage(false);
     await new Promise((r) => setTimeout(r, 150)); // its last block, on its way
     return { s: findClicks(chunks, Math.round(t0 * ac.sampleRate), ac.sampleRate, click.getChannelData(0)), browser: browserLatency(tk), label: splitInput(tk.label || "")[0] };
-  } finally { src.disconnect(); out.disconnect(); rec.port.onmessage = null; stream.getTracks().forEach((t) => t.stop()); }
+  } finally { src.forEach((x) => x.disconnect()); out.disconnect(); rec.port.onmessage = null; stream.getTracks().forEach((t) => t.stop()); }
 }
 // How late the clicks came back, s, from the recording (chunks of {at: its first frame, x}; from: the frame the first
 // click was played at; click: its samples). The recording matched against the click (how much each moment sounds like

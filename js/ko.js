@@ -144,6 +144,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   // header and settings
   "Microphone": "마이크", "Turn the mic on": "마이크 켜기", "Turn the mic off": "마이크 끄기", "Settings": "설정", "Language": "언어",
   "Input": "입력", "System default": "시스템 기본값", "Microphone {n}": "마이크 {n}",  "Mic sensitivity": "마이크 감도",
+  "Audio": "오디오", "Output": "출력", "Output {n}": "출력 {n}", "Where you hear the app": "앱 소리를 들을 곳",
+  "Output channels": "출력 채널", "Which pair of its outputs": "장치의 어느 출력 쌍으로 낼지",
+  "Input channel": "입력 채널", "Which of its inputs your mic is in": "마이크가 꽂힌 입력 번호",
   "Mic sensitivity: how loud a sound must be to count as singing": "마이크 감도: 노래로 들을 소리의 크기",
   "Filter out speaker sound": "스피커 소리 걸러내기", "Note names": "음 이름", "Accent color": "강조 색", "Vibrant": "비비드", "Your color through the whole app, not just its highlights": "강조 색만이 아니라 앱 전체를 내 색으로", "Aurora": "오로라", "The glow behind Practice, as the song plays": "노래가 나오는 동안 연습 화면 뒤에 비치는 빛",
   "General": "일반", "Advanced": "고급", "Settings sections": "설정 항목", "The app’s words": "앱에 쓰이는 말", "On the stage and the keyboard": "무대와 건반에 표시",

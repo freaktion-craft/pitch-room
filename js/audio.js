@@ -4,7 +4,7 @@
 
 // ---------- audio ----------
 let ac = null, analyser = null, tbuf = null, master = null, noiseBuf = null, bandTap = null;
-let micStream = null, micNode = null, micBus = null, micOn = false, testOsc = null, testOffset = 0;
+let micStream = null, micNodes = null, micBus = null, micOn = false, testOsc = null, testOffset = 0;
 // Everything the page plays meets in master, then goes through a limiter on its way out: tracks summed loud (or turned
 // up past 100, or moved to another key) peak over full scale, which the sound system would clip. The limiter turns
 // down just those peaks and leaves the rest as it is: it reads LIMIT.look samples ahead, so each peak is eased into
@@ -45,13 +45,15 @@ async function limitInit() {
   const url = URL.createObjectURL(new Blob([LIMIT_WORKLET], { type: "text/javascript" }));
   try { await ac.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
   const lim = new AudioWorkletNode(ac, "stem-limit", { outputChannelCount: [2], processorOptions: LIMIT });
-  master.disconnect(); master.connect(lim); lim.connect(ac.destination);
+  master.disconnect(); master.connect(lim); lim.connect(outBus);
   limitDelay = (LIMIT.look - 1) / ac.sampleRate;
 }
 function ensureCtx() {
   if (!ac) {
-    ac = new (window.AudioContext || window.webkitAudioContext)();
-    master = ac.createGain(); master.gain.value = 1; master.connect(ac.destination);
+    const AC = window.AudioContext || window.webkitAudioContext;
+    try { ac = S.out && canPickOut() ? new AC({ sinkId: S.out }) : new AC(); } catch (e) { ac = new AC(); } // (one that's gone: setOut)
+    outBus = ac.createGain(); routeOut(); listOuts(); // (its pair, once it's known how many it has)
+    master = ac.createGain(); master.gain.value = 1; master.connect(outBus);
     if (ac.audioWorklet) limitInit().catch(() => {});
     analyser = ac.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
     // the mic goes in here, so the pitch tracker and the take recorder hear the same input, whichever one is plugged in
@@ -65,6 +67,72 @@ function ensureCtx() {
   }
   if (ac.state === "suspended") ac.resume();
   return ac;
+}
+
+// ---------- output ----------
+// Where everything the page plays goes out (outBus, after the limiter): the output chosen (S.out, "" = the system
+// default; one that's gone plays on the default, no error) and on it, where it has more than two channels (an
+// interface's 3–4 for its headphones), the pair chosen (S.outCh: its first channel). Live's cable is never offered:
+// what played into it would go out as Pitchroom's mic. Where the browser can't choose (no setSinkId), the rows are hidden.
+let outBus = null, outPair = null, outIds = null; // outIds: the outputs there now, once listed
+const canPickOut = () => !!(window.AudioContext && "setSinkId" in AudioContext.prototype);
+const outChannels = () => (ac ? Math.min(32, ac.destination.maxChannelCount || 2) : 2);
+function routeOut() {
+  const d = ac.destination, n = outChannels(), at = S.outCh > 0 && S.outCh + 2 <= n ? S.outCh : 0;
+  outBus.channelCount = 2; outBus.channelCountMode = "explicit"; // (a mono sound in both of the pair, not just its first)
+  outBus.disconnect();
+  if (outPair) { outPair.forEach((x) => x.disconnect()); outPair = null; }
+  if (at) {
+    try {
+      d.channelCount = n; d.channelInterpretation = "discrete";
+      const split = ac.createChannelSplitter(2), merge = ac.createChannelMerger(n);
+      outBus.connect(split); split.connect(merge, 0, at); split.connect(merge, 1, at + 1); merge.connect(d);
+      outPair = [split, merge];
+      return;
+    } catch (e) { outBus.disconnect(); } // (a device that won't take its channels one by one: 1–2)
+  }
+  try { d.channelCount = Math.min(2, n); d.channelInterpretation = "speakers"; } catch (e) {}
+  outBus.connect(d);
+}
+// The output as chosen, if it's there (else the default), then the pair on it
+let outSetting = null;
+function setOut() {
+  if (!ac || !canPickOut()) return Promise.resolve();
+  return (outSetting = (outSetting || Promise.resolve()).then(async () => {
+    const want = S.out && outIds && outIds.includes(S.out) ? S.out : "";
+    if (ac.sinkId !== want) {
+      try { await ac.setSinkId(want); } catch (e) { try { await ac.setSinkId(""); } catch (e2) {} }
+    }
+    routeOut(); paintOutCh(); paintSync();
+  }));
+}
+// The settings' Output menu, as listMics' Input: numbered till the mic's allowed, under their device. Then the output
+// as chosen (it may have come or gone).
+async function listOuts() {
+  const row = $("#outRow");
+  if (!row) return;
+  row.hidden = !canPickOut();
+  if (row.hidden) { $("#outChRow").hidden = true; return; }
+  let outs = [];
+  try { outs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audiooutput"); } catch (e) {}
+  const real = outs.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications" && !cableIn(d));
+  outIds = real.map((d) => d.deviceId);
+  const by = (a, b) => (a.g || "").localeCompare(b.g || "", undefined, { numeric: true }) || a.t.localeCompare(b.t, undefined, { numeric: true });
+  const items = real.map((d, i) => {
+    const [t, g] = d.label ? splitInput(d.label) : [tr("Output {n}", { n: i + 1 }), ""];
+    return { v: d.deviceId, t, g, full: d.label || t };
+  }).sort(by);
+  outPick?.set([{ v: "", t: tr("System default") }, ...items], outIds.includes(S.out) ? S.out : "");
+  await setOut();
+}
+// Output channels: shown where the output has more than two (or a pair's chosen that it no longer has)
+function paintOutCh() {
+  const row = $("#outChRow");
+  if (!row || !outChPick) return;
+  const n = outChannels(), items = [];
+  for (let i = 0; i + 2 <= n; i += 2) items.push({ v: i, t: `${i + 1}–${i + 2}` });
+  row.hidden = !canPickOut() || items.length < 2;
+  outChPick.set(items, items.some((x) => x.v === S.outCh) ? S.outCh : 0);
 }
 
 // Sampled piano: Salamander Grand Piano (Alexander Holm, CC-BY 3.0), recorded every minor third.
@@ -166,7 +234,7 @@ async function micStart() {
     return false;
   }
   stopTest();
-  micNode = ac.createMediaStreamSource(micStream); micNode.connect(micBus); onMicEnd(micStream);
+  micNodes = micPlug(micStream, micBus); onMicEnd(micStream);
   micOn = true; renderMic(); listMics(); liveCable(); // (Live's cable too: the devices' names come with the mic's permission)
   if (micAsked !== micEcho()) restartMic(); // (into or out of the Lab while it opened: as the page now has it)
   return true;
@@ -177,6 +245,7 @@ async function micStart() {
 async function openMic(echo = micEcho()) {
   const audio = { echoCancellation: echo, noiseSuppression: false, autoGainControl: false };
   if (navigator.mediaDevices.getSupportedConstraints?.().voiceIsolation) audio.voiceIsolation = false;
+  if (S.micCh === 0 || S.micCh === 1) audio.channelCount = { ideal: 2 }; // (both of a stereo input, to hear one of them)
   if (S.mic) {
     try { return await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: S.mic } } }); }
     catch (e) { if (e && e.name === "NotAllowedError") throw e; }
@@ -209,9 +278,9 @@ async function micReopen() {
   if (micEcho() !== echo) micAgain = true; // (into or out of the Lab while it opened: opened once more, as the page now has it)
   if (!s) return; // (not to be had: tried again, micKeep)
   if (!micOn) { s.getTracks().forEach((t) => t.stop()); return; } // turned off meanwhile
-  const oldStream = micStream, oldNode = micNode;
-  micStream = s; micAsked = echo; micNode = ac.createMediaStreamSource(s); micNode.connect(micBus); onMicEnd(s);
-  oldNode.disconnect(); oldStream.getTracks().forEach((t) => t.stop());
+  const oldStream = micStream, oldNodes = micNodes;
+  micStream = s; micAsked = echo; micNodes = micPlug(s, micBus); onMicEnd(s);
+  oldNodes.forEach((x) => x.disconnect()); oldStream.getTracks().forEach((t) => t.stop());
   listMics();
 }
 // What the browser does to the mic's sound that the Lab needs off (getSettings: the track's own word; one it doesn't
@@ -221,9 +290,33 @@ function micFilters(stream = micStream) {
   const s = stream?.getAudioTracks()[0]?.getSettings?.() || {};
   return Object.keys(MIC_FILTERS).filter((k) => s[k] === true);
 }
+// The mic's sound into dest: the channel chosen of a stereo input (an interface's "Mic | Line 1/2" with the mic in 1),
+// or all of it, mixed (a mono one, or none chosen). Its nodes, to disconnect.
+function micPlug(stream, dest) {
+  const src = ac.createMediaStreamSource(stream), ch = micStereo(stream) >= 2 && (S.micCh === 0 || S.micCh === 1) ? S.micCh : -1;
+  if (ch < 0) { src.connect(dest); return [src]; }
+  const split = ac.createChannelSplitter(2);
+  src.connect(split); split.connect(dest, ch);
+  return [src, split];
+}
+// How many channels the input has: as it's open, or (opened in mono) as it could be
+function micStereo(stream = micStream) {
+  const tk = stream && stream.getAudioTracks()[0];
+  if (!tk) return 0;
+  const now = +tk.getSettings?.().channelCount || 1, can = +tk.getCapabilities?.().channelCount?.max || 0;
+  return Math.max(now, can);
+}
+// Input channel: shown for a stereo input (or a channel chosen, to go back to both)
+function paintMicCh() {
+  const row = $("#micChRow");
+  if (!row || !micChPick) return;
+  const on = micStereo() >= 2 || S.micCh === 0 || S.micCh === 1;
+  row.hidden = !on;
+  micChPick.set([{ v: -1, t: "1 + 2" }, { v: 0, t: "1" }, { v: 1, t: "2" }], S.micCh === 0 || S.micCh === 1 ? S.micCh : -1);
+}
 // An input unplugged while in use ends its track (stopping it ourselves doesn't): carry on with the default.
 function onMicEnd(stream) { stream.getAudioTracks().forEach((t) => { t.onended = () => { if (stream === micStream) restartMic(); }; }); }
-let micPick = null, namesPick = null, langPick = null, countPick = null, themePick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
+let micPick = null, micChPick = null, outPick = null, outChPick = null, namesPick = null, langPick = null, countPick = null, themePick = null; // the settings' and Practice's dropdowns (makePick), made in initSing
 // The click's beats per bar, in the Studio's click row. One dropdown, made once and moved into each new row (every
 // makePick adds its own list and listeners for good).
 let bpbPick = null;
@@ -246,6 +339,7 @@ async function listMics() {
     return { v: d.deviceId, t, g, full: d.label || t };
   }).sort(by);
   micPick.set([{ v: "", t: tr("System default") }, ...items], real.some((d) => d.deviceId === S.mic) ? S.mic : "");
+  paintMicCh();
 }
 // An input's name and its device's: Windows writes "Mic | Line 1/2(Audient EVO4)", the device in the last brackets
 // (which can hold brackets of their own: "Line(Yamaha SYNCROOM Driver (WDM))").
@@ -260,9 +354,9 @@ function splitInput(label) {
 }
 function stopMic() {
   recOff(); // no recording without the mic
-  if (micNode) micNode.disconnect();
+  if (micNodes) micNodes.forEach((x) => x.disconnect());
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
-  micNode = null; micStream = null; micOn = false; renderMic();
+  micNodes = null; micStream = null; micOn = false; renderMic();
 }
 function stopTest() { if (testOsc) { try { testOsc.stop(); } catch (e) {} testOsc = null; testGain = null; } }
 // Test hook: a sawtooth "voice" that follows the current target, offset by N cents (testGain: quiet where there's no
