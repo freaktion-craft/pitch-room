@@ -121,6 +121,9 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
 - **In click handlers test `e.composedPath()`, not `e.target`.** Was: a button that swapped its icon detached the
   target and the row under it opened (8d8b771).
 - **Find a control by its class, not its place among siblings** (the wrong button disabled; 18280ca).
+- **`classList.toggle(name, force)` takes a boolean: `undefined` flips the class.** Was: the first steps' song bar,
+  painted with no `paused`, had every block blinking on every other paint while it waited, and for good once done
+  (`paintPix`).
 - **Never set `textContent` on a button holding an icon**: changing text goes in its own span (27d70ee).
 - **A dropdown is made once and moved into re-drawn rows** (each redraw added another list; f1d0a52; `makePick` in
   `reuse.md`).

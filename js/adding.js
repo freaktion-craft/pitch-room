@@ -29,7 +29,8 @@ function paintPix(bar, p, going, paused) { // (paused: stopped till it's told so
   const n = Math.round(Math.max(0, Math.min(1, p)) * PX_COLS * PX_ROWS), was = +(bar.dataset.n || 0), cells = bar.children;
   const turning = n > was && !stillMotion() && bar.isConnected;
   bar.dataset.n = n; bar.classList.toggle("going", !!going); bar.classList.toggle("paused", !!paused); // (going: being worked on; waiting its turn, it's still: no wave, no blink)
-  [...cells].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", (going || paused) && k === n); });
+  const blink = !!(going || paused); // (a boolean: toggle() with undefined flips the class, so a bar neither going nor paused had every block blinking on every other paint)
+  [...cells].forEach((c, k) => { c.classList.toggle("on", k < n); c.classList.toggle("next", blink && k === n); });
   if (turning) {
     const cs = getComputedStyle(bar), lit = cs.getPropertyValue("--voice").trim(); // (the tokens, not a cell's colour: that may be mid-blink or mid-wave)
     const probe = readColors.probe; probe.style.color = "var(--fill)"; const gray = getComputedStyle(probe).color; // (--fill as the browser works it out, through stage.js's hidden element: its text is a relative colour)
