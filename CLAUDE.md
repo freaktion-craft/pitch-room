@@ -105,6 +105,10 @@ Details and recipes: `docs/agents/verifying.md`.
   (`truth.json`) are a held-out check. Bump `syllables.VERSION`, `melody.VERSION` or `stems.LYRICS_VERSION` when
   output changes; the page then offers to re-time songs. Bench scripts and truth sets aren't in the repo: ask the owner
   for them and for the numbers to beat before a model change.
+- **Our own models stay ours.** A release uses only models users fetch from servers we don't host (the pinned Hugging
+  Face repos in `syllables.MODEL_FILES`). Weights trained or blended here are never shipped, hosted or fetched: on the
+  owner's PC they sit in `models/own` as a pack, which an update leaves alone (`docs/agents/server.md`, Models). Bench
+  an engine change with the stock models, and release the constants that suit those.
 - **No monitoring or effects engines.** Users sing through their own DAW and loop it into the mic. Monitoring and
   effects stay in the DAW.
 - **Pro icons never committed.** `icons.local.js` (Hugeicons Pro, gitignored) overrides the free set by name. Never commit

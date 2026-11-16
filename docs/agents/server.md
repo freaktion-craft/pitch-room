@@ -131,6 +131,14 @@ Lyrics: LRCLIB candidates, Whisper (large-v3-turbo via stable-ts) to screen and 
   pinned revisions, sizes and sha256 in `syllables.MODEL_FILES`; only for the languages needed).
 - `_fetch_file` writes `.part`, checks size and sha256, then renames. Models go to `DATA/models`, never into the code
   folder of a desktop install.
+- **The owner's pack, `DATA/models/own`** (`syllables._use_pack`, read at import; no release ships, hosts or fetches
+  one). `pack.json`: `{"v", "models": {"ko", "en", "hg": folder}, "respell": table, "set": {constant: number}}`. Its
+  folders go ahead of the stock ones in `syllables.PATHS`, its numbers replace the module's (the ones tuned with those
+  weights), and `hg` with its table adds a second pass for English words (`respell_ready`, `_respell_mix`).
+  `syllables.VERSION` becomes `VERSION * 1000 + v`, so songs are timed again when the pack or the release's version
+  changes. All of it or none: a pack with a piece missing is skipped with one printed line. It is data beside the
+  models, so keep everything that depends on those weights in the pack, not in the code. Without a pack the engine's
+  output must not change: check both ways.
 
 ## Conventions
 
