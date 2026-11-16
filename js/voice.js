@@ -171,7 +171,6 @@ function vcStart(m, arrow = false) {
 // none), and the vowel picked (none while Scales is on a trill: paintScale)
 function paintLab() {
   const m = vcShown();
-  $("#vkBtn").disabled = !!(SV.run || RV.run || MV.run); // (typing the piano: between runs)
   $(".vc-step").hidden = m == null;
   if (m != null) say($("#vcStepLbl"), VC.view === "scale" ? (SV.run ? "Key" : "Start note") : VC.view === "reach" || MV.run ? "Target" : "Centre");
   vcGuide();
@@ -387,7 +386,7 @@ function voiceShow() {
 // Left (route): Scales' set stopped, its call hushed (a pattern queued on the piano would play on over the next page); the
 // mic with the echo filter again, if it's set
 function voiceHide() { vkOff(); if (SV.run) scAbort(); if (RV.run) rvAbort(); if (MV.run) mvAbort(); if (micOn && micAsked !== micEcho()) restartMic(); }
-// The view: Scales, Reach, Match, the spectrogram or the EQ (the spectrogram's to begin with); the mic's ask (#vcOff) over
+// The view: Scales, Reach, Match, Piano, the spectrogram or the EQ (the spectrogram's to begin with); the mic's ask (#vcOff) over
 // whichever's shown. Leaving Scales, Reach or Match stops its run.
 function vcShowView(v) {
   if (v !== "scale" && SV.run) scAbort();
@@ -395,6 +394,7 @@ function vcShowView(v) {
   if (v !== "match" && MV.run) mvAbort();
   VC.view = v; $(".vc").dataset.view = v;
   $(".vc-scale").hidden = v !== "scale"; $(".vc-reach").hidden = v !== "reach"; $(".vc-match").hidden = v !== "match"; $(".vc-spec").hidden = v !== "spec"; $(".vc-eq").hidden = v !== "eq";
+  $(".vc-piano").hidden = v !== "piano"; vkSet(v === "piano"); // (the computer's keys play only there)
   $(".vc-" + v).append($("#vcOff"));
   for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
   paintLab(); paintScale(); paintReach(); paintMatch();
@@ -402,7 +402,7 @@ function vcShowView(v) {
 // ---------- typing the piano ----------
 // The computer's keys as the piano, laid out as a DAW's: the home row is the white keys up from VK.base (a C or an F), the row
 // above it the black keys between them. By where a key is (e.code), not its letter, so it's the same while typing Korean.
-// Z and X move it an octave, with Shift half of one (C to F to the next C). On by its button, and only between runs: a run has
+// Z and X move it an octave, with Shift half of one (C to F to the next C). On while Piano is the view, and only there: a run has
 // its own keys, and in Match the answer could be played. A key sounds while it's held. The mic goes on being read (vcPlay hushes
 // it only in a run), so the note you sing shows beside the one you play; on speakers the piano can be read as you.
 const VK_HOME = ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote"];
@@ -422,19 +422,17 @@ function vkLayout() {
 }
 // The letters on the keys they play, the range in words, and the note being played (the last key still held)
 function vkPaint() {
-  $("#vkBtn").setAttribute("aria-pressed", String(VK.on));
-  $("#vkRange").hidden = $("#vkRead").hidden = !VK.on;
   vcKeyEls.forEach((b) => { delete b.dataset.k; });
   if (!VK.on) return;
   for (const [code, m] of VK.map) { const b = vcKeyEls.get(m); if (b) b.dataset.k = VK_CAP[code] || code.slice(3); }
   const ms = [...VK.map.values()], lo = Math.min(...ms), hi = Math.max(...ms);
-  say($("#vkRange"), "{a}–{b} · Z and X move it an octave, with Shift half", { a: () => absName(lo), b: () => absName(hi) });
+  say($("#vkSay"), "The home row plays {a}–{b}, the row above it the black keys", { a: () => absName(lo), b: () => absName(hi) });
   const wrap = $("#vcKeys").parentElement, a = vcKeyEls.get(lo), b = vcKeyEls.get(hi); // all of the range in view
   if (a && b && (a.offsetLeft < wrap.scrollLeft || b.offsetLeft + b.offsetWidth > wrap.scrollLeft + wrap.clientWidth)) wrap.scrollTo({ left: (a.offsetLeft + b.offsetLeft) / 2 - wrap.clientWidth / 2, behavior: "smooth" });
   vkRead();
 }
 function vkRead() { const last = [...VK.held.values()].pop(); setText("vkPlay", last ? absName(last.m) : "–"); }
-function vkSet(on) { VK.on = on; store.set("vcType", on); if (!on) vkOff(); vkPaint(); }
+function vkSet(on) { VK.on = on; if (!on) vkOff(); vkPaint(); }
 function vkMove(up, half) {
   const i = VK_BASES.indexOf(VK.base) + (up ? 1 : -1) * (half ? 1 : 2);
   if (i < 0 || i >= VK_BASES.length) return; // (as far as it goes)
@@ -461,10 +459,8 @@ function vkUp(code) {
 }
 function vkOff() { for (const code of [...VK.held.keys()]) vkUp(code); } // every key let go: the window left, the range moved, typing turned off
 function initType() {
-  VK.on = store.get("vcType", false) === true;
   VK.base = VK_BASES.includes(store.get("vcTypeBase", 60)) ? store.get("vcTypeBase", 60) : 60;
-  vkLayout(); vkPaint();
-  $("#vkBtn").onclick = () => vkSet(!VK.on);
+  vkLayout(); // (painted when its view is shown: vcShowView)
   document.addEventListener("keydown", vkDown, true);
   document.addEventListener("keyup", (e) => vkUp(e.code), true);
   addEventListener("blur", vkOff);
@@ -478,7 +474,7 @@ function initVoice() {
   $("#vcMic").onclick = () => startMic();
   initScales(); initReach(); initMatch();
   for (const b of $("#vcView").children) b.onclick = () => { vcShowView(b.dataset.v); store.set("voiceView", b.dataset.v); };
-  vcShowView(["scale", "reach", "match", "spec", "eq"].includes(store.get("voiceView", "spec")) ? store.get("voiceView", "spec") : "spec"); // (the spectrogram, till another's picked)
+  vcShowView(["scale", "reach", "match", "piano", "spec", "eq"].includes(store.get("voiceView", "spec")) ? store.get("voiceView", "spec") : "spec"); // (the spectrogram, till another's picked)
   // Freeze: this moment kept faintly behind the EQ's spectrum, envelope and formants, or let go
   $("#vcFreeze").onclick = () => {
     VC.ghost = VC.ghost ? null : VC.eqNow ? { ...VC.eqNow, cols: Float32Array.from(VC.eqNow.cols) } : null;

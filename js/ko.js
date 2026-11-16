@@ -170,7 +170,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Update": "업데이트",
 
   "Update your songs?": "곡을 업데이트할까요?", "Later": "나중에", "Update now": "지금 업데이트",
-  "Type to play": "키보드로 연주", "Keys": "건반", "{a}–{b} · Z and X move it an octave, with Shift half": "{a}–{b} · Z, X로 한 옥타브, Shift와 함께 반 옥타브",
+  "Keys": "건반", "The home row plays {a}–{b}, the row above it the black keys": "가운데 줄이 {a}–{b}, 윗줄이 검은 건반이에요", "Z and X move it an octave, with Shift half": "Z, X로 한 옥타브, Shift와 함께 반 옥타브 옮겨요",
   "Lyric timing update": "가사 타이밍 업데이트", "Apply to all songs": "모든 곡에 적용", "{n} songs · about {m} min": "{n}곡 · 약 {m}분", "Update all": "모두 업데이트",
   "Timing got better. This song takes about 1 min.": "타이밍이 좋아졌어요. 이 곡은 약 1분 걸려요.",
   "Timing got better. All songs update in the background.": "타이밍이 좋아졌어요. 모든 곡을 백그라운드에서 맞춰요.",

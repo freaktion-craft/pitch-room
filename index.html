@@ -175,7 +175,7 @@ const EMPTY_LIBRARY = false;
   </main>
   <main id="vVoice" aria-label="Lab" hidden>
     <!-- the Lab's view, at its left (the header's tabs take you out of it) -->
-    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="scale" aria-checked="false">Scales</button><button type="button" role="radio" data-v="reach" aria-checked="false">Reach</button><button type="button" role="radio" data-v="match" aria-checked="false">Match</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div>
+    <div class="backbar"><div class="seg" id="vcView" role="radiogroup" aria-label="View"><button type="button" role="radio" data-v="scale" aria-checked="false">Scales</button><button type="button" role="radio" data-v="reach" aria-checked="false">Reach</button><button type="button" role="radio" data-v="match" aria-checked="false">Match</button><button type="button" role="radio" data-v="piano" aria-checked="false">Piano</button><button type="button" role="radio" data-v="spec" aria-checked="true">Spectrogram</button><button type="button" role="radio" data-v="eq" aria-checked="false">EQ</button></div>
       <!-- Reach, sent a note from Practice: back to the song there, where it was (js/voice-reach.js) -->
       <div class="bb-acts"><button class="btn sm" id="rvBack" type="button" hidden>Back to Practice</button></div></div>
     <div class="vc">
@@ -208,6 +208,12 @@ const EMPTY_LIBRARY = false;
         <button class="btn sm primary vc-go" id="mvGo" type="button">Start</button>
         <div class="vc-say"><p id="mvSay" aria-live="polite"></p><p id="mvDo"></p></div>
       </section>
+      <!-- the piano played on the computer's keys (voice.js VK, on while this is the view): what the keys cover and how to move them, and large the note the keys play
+           beside the one you sing -->
+      <section class="vc-piano" aria-label="Piano" hidden>
+        <div class="vc-say"><p id="vkSay"></p><p id="vkDo">Z and X move it an octave, with Shift half</p></div>
+        <div class="vp-notes"><div class="vp-note"><span>Keys</span><b id="vkPlay">–</b></div><div class="vp-note"><span>You</span><b id="vkYou">–</b><i id="vkCents"></i></div></div>
+      </section>
       <!-- the patterns (js/voice-scale.js scMenu): Up, Down and Leaps side by side, each pattern its name and degrees -->
       <div class="menu sc-pats" id="scPats" role="menu" aria-label="Pattern" hidden></div>
       <aside class="vc-side">
@@ -225,9 +231,7 @@ const EMPTY_LIBRARY = false;
     </div>
     <!-- the keyboard, and beside it the view's note: Scales' start, Reach's note, Match's centre (lit on it; a key tapped or
          the arrows set it, between runs); none in the Spectrogram and the EQ (paintLab) -->
-    <div class="keys-wrap vc-keys"><!-- typing the piano (voice.js vkPaint): its button; on, the range the letters cover and how to move it, then the note the keys play and the one you sing -->
-      <div class="vc-type"><button class="btn sm" id="vkBtn" type="button" aria-pressed="false">Type to play</button><span class="vk-range" id="vkRange" hidden></span><span class="vk-read" id="vkRead" hidden><span>Keys</span><b id="vkPlay">–</b><span>You</span><b id="vkYou">–</b><i id="vkCents"></i></span></div>
-      <div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div>
+    <div class="keys-wrap vc-keys"><div class="keys" id="vcKeys" aria-label="Piano keyboard (tap to hear a note)"></div>
       <div class="vc-step">
         <div class="vc-step-head"><b id="vcStepLbl">Start note</b><span class="vc-step-row"><button class="btn sm icon" id="vcDown" type="button" aria-label="Down a semitone" title="Down a semitone"></button><button class="btn sm vc-tgt" id="vcTgt" type="button">C3</button><button class="btn sm icon" id="vcUp" type="button" aria-label="Up a semitone" title="Up a semitone"></button></span></div>
       </div></div>

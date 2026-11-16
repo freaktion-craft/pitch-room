@@ -308,6 +308,16 @@
 @media (max-width: 760px) { .vc-reach { height: 52vh; } }
 /* Match (js/voice-match.js): as Reach, the note heard again in the ways' place; the notes in play drawn along its foot */
 .vc-match { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; }
+/* Piano (the computer's keys play the keyboard below: voice.js VK): a card as the others, its two lines at the top left, and in its middle the note the keys play beside the
+   one you sing, each under its name, large; your note's cents under it */
+.vc-piano { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; display: grid; place-items: center; }
+.vc-piano .vc-say { top: var(--space-4); }
+#vkDo { color: var(--muted); }
+.vp-notes { display: grid; grid-template-columns: repeat(2, minmax(4ch, 1fr)); gap: var(--space-8); font-variant-numeric: tabular-nums; }
+.vp-note { display: grid; justify-items: center; align-content: start; gap: var(--space-2); }
+.vp-note span { font-size: var(--text-sm); color: var(--muted); }
+.vp-note b { font-size: clamp(56px, 9vw, 112px); line-height: 1; font-weight: var(--weight-medium); }
+.vp-note i { min-height: 20px; font: var(--text-md) var(--mono); font-style: normal; color: var(--muted); }
 #mvPad { position: absolute; inset: 0; width: 100%; height: 100%; }
 #mvSay { color: var(--ink); font-weight: var(--weight-medium); }
 #mvSay[data-tone="good"] { color: var(--good); }
@@ -317,16 +327,7 @@
 @media (max-width: 760px) { .vc-match { height: 52vh; } }
 /* the view's note (Scales' start, Reach's note, Match's centre) between a semitone down and up, in the keyboard's card beside the keys
    at the right; held on pitch in Find, its button fills from the left */
-.vc-keys { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-8); }
-/* above the keys, all the card's width: typing the piano. Its button (lit in your colour while it's on), the range in words, and at the right the note the keys play and the one you sing */
-.vc-type { flex: 0 0 100%; display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-md); font-size: var(--text-sm); }
-#vkBtn[aria-pressed="true"] { background: var(--voice-fill); color: var(--on-fill); }
-.vk-range { color: var(--muted); font-variant-numeric: tabular-nums; }
-.vk-read { margin-left: auto; display: flex; align-items: baseline; gap: var(--space-2); font-variant-numeric: tabular-nums; }
-.vk-read span { color: var(--muted); }
-.vk-read b { min-width: 4ch; font-size: var(--text-xl); font-weight: var(--weight-medium); line-height: 1; }
-.vk-read b + span { margin-left: var(--space-4); }
-.vk-read i { min-width: 5ch; font: var(--text-sm) var(--mono); font-style: normal; color: var(--muted); }
+.vc-keys { display: flex; align-items: center; gap: var(--space-8); }
 .vc-step { display: grid; flex: none; width: 240px; margin-left: auto; gap: var(--space-2); font-size: var(--text-sm); }
 .vc-step b { font-weight: var(--weight-medium); }
 .vc-step p { margin: 0; }
@@ -341,7 +342,7 @@
 /* the Lab's keyboard as Practice's: from its card's left, as far under what's above it (.keys-wrap, stage.css) */
 @media (max-width: 760px) {
   .vc { grid-template-columns: minmax(0, 1fr); }
-  .vc-scale, .vc-spec, .vc-eq { height: 52vh; }
+  .vc-scale, .vc-spec, .vc-eq, .vc-piano { height: 52vh; }
 }
 
 /* Practice's timeline, under the song's bar: the whole song, the part played filled, a head where it's heard; click or
