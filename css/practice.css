@@ -309,14 +309,15 @@
 /* Match (js/voice-match.js): as Reach, the note heard again in the ways' place; the notes in play drawn along its foot */
 .vc-match { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; }
 /* Piano (the computer's keys play the keyboard below: voice.js VK): a card as the others, its two lines at the top left, and in its middle the note the keys play beside the
-   one you sing, each under its name, large; your note's cents under it */
+   one you sing, each under its name, large; your note's cents under it. Each note has a cell of its own width, the widest name's (Sol♯2), so neither moves
+   as the other changes or goes */
 .vc-piano { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; display: grid; place-items: center; }
 .vc-piano .vc-say { top: var(--space-4); }
 #vkDo { color: var(--muted); }
-.vp-notes { display: grid; grid-template-columns: repeat(2, minmax(4ch, 1fr)); gap: var(--space-8); font-variant-numeric: tabular-nums; }
+.vp-notes { display: grid; grid-template-columns: repeat(2, auto); gap: var(--space-8); font-variant-numeric: tabular-nums; }
 .vp-note { display: grid; justify-items: center; align-content: start; gap: var(--space-2); }
 .vp-note span { font-size: var(--text-sm); color: var(--muted); }
-.vp-note b { font-size: clamp(56px, 9vw, 112px); line-height: 1; font-weight: var(--weight-medium); }
+.vp-note b { display: block; width: 3.2em; text-align: center; white-space: nowrap; font-size: clamp(56px, 9vw, 112px); line-height: 1; font-weight: var(--weight-medium); }
 .vp-note i { min-height: 20px; font: var(--text-md) var(--mono); font-style: normal; color: var(--muted); }
 #mvPad { position: absolute; inset: 0; width: 100%; height: 100%; }
 #mvSay { color: var(--ink); font-weight: var(--weight-medium); }
