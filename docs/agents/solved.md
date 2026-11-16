@@ -202,6 +202,14 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
 - **Lyrics lookup: screen candidates cheaply first, honour `Retry-After`, stop once LRCLIB is unreachable**
   (`lyrics.Unreachable`) but try the next query after a single 400. Was: 78 s to say there were no lyrics, holding the
   GPU queue (97db631, 17cade9).
+- **Lyric timing: Whisper's line times pull a line only so far (`FAR_MOST`, 3 s), and a line Whisper laid on no voice
+  is dropped only if the chain can't hear it either (`UNSUNG_HEARD`).** Was: a run of lines Whisper put a chorus early
+  stayed there, and lines it spread over an instrumental break were dropped though sung (20 real songs: words over 1 s
+  off 4.4% → 2.3%; `syllables.py`). A lower cap costs songs with backing vocals when the stock models hear them.
+- **Lyric timing: letters said one by one (A,L,L) are timed as their names, rests between them free; a number is read
+  as the words around it say (12시엔 열두, 150 백오십, 2 am two); a note's start pays only a syllable come from a blank.**
+  Was: the letters packed together (4 of 12 placed), a number in a Hangul line had no token, and two syllables shared
+  one note's bonus (`SPELLED`, `_ko_number`, `from_blank` in `syllables.py`).
 - **Song naming:** a record by an artist the title, hint and channel don't name must be within 2 s of the song; an
   artist in Hangul or kana is looked up as the stores spell them (`covers.py`, `online`, `search_records`; PR 75).
 - **A song's range comes from filtered notes**, not raw min and max (one blip set it; `_extremes`; 0405fbd).
@@ -257,3 +265,5 @@ Each was asked for. A change that undoes one needs the owner's word.
 - The song picker asks at 40% sure or less, with nothing ticked until you pick.
 - Scales' hide-my-line is a plain eye, not a struck-out one.
 - Releases are built on the owner's computers, not GitHub Actions.
+- Models trained or blended here aren't released or hosted: a release works with the models users fetch from
+  Hugging Face, and the owner's PC has the rest as a pack in `models/own`.

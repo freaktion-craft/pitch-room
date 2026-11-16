@@ -41,13 +41,14 @@ import numpy as np
 from lyrics import STAMP_MIN
 
 SR = 44100
-VERSION = 7  # bump when the onsets or the lines as sung change (syllables.json keeps both): it's worked out again for every song (stems.start_upgrades)
+VERSION = 8  # bump when the onsets or the lines as sung change (syllables.json keeps both): it's worked out again for every song (stems.start_upgrades)
 FRAME = 0.02  # wav2vec2 frame hop (320 samples at 16 kHz)
 FRAME_CENTER = 0.0125  # frame k covers samples [320k, 320k + 400): centre 12.5 ms after k * 20 ms
 _HERE = os.environ.get("PITCHROOM_DATA") or os.path.dirname(os.path.abspath(__file__))  # where models/ is (stems.DATA)
 PATHS = {
     "ko": [p for p in (os.environ.get("STEM_W2V_KO"), os.path.join(_HERE, "models", "w2v_ko")) if p],
     "en": [p for p in (os.environ.get("STEM_W2V_EN"), os.path.join(_HERE, "models", "w2v_en")) if p],
+    "hg": [p for p in (os.environ.get("STEM_W2V_HG"),) if p],  # a pack's second model for English words (see RESPELL_NEAR): none is fetched
 }
 # where to get them: {lang: (folder name, Hugging Face repo, revision, {file: (bytes, sha256)})}
 MODEL_FILES = {
@@ -204,6 +205,26 @@ def _num_words(s: str) -> str:
     return " ".join(_ONES[int(c)] for c in s)
 
 
+# A number as Korean says it: Sino-Korean (150: 백오십), or the native numerals before a native counter (12시: 열두, 3개: 세), up to 99.
+KO_COUNTERS = ("시", "살", "개", "명", "번", "마리", "잔", "병", "권", "장", "대", "벌", "켤레", "그루", "송이", "가지", "군데", "사람", "달", "곳", "배", "줄", "쌍", "채", "통", "판", "곡")
+_KO_SINO, _KO_UNITS = "영일이삼사오육칠팔구", ("", "십", "백", "천")
+_KO_NATIVE = ("", "한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉")
+_KO_TENS = ("", "열", "스물", "서른", "마흔", "쉰", "예순", "일흔", "여든", "아흔")
+
+
+def _ko_number(s: str, native: bool) -> str:
+    n = int(s)
+    if native and 1 <= n <= 99:
+        return "스무" if n == 20 else _KO_TENS[n // 10] + _KO_NATIVE[n % 10]
+    if n == 0 or len(s) > 8 or s[0] == "0":
+        return "".join("공" if c == "0" and len(s) > 1 else _KO_SINO[int(c)] for c in s)  # (a code or a phone number: digit by digit)
+
+    def four(m):  # under 10,000: 일 isn't said before 십, 백 or 천
+        return "".join(("" if d == "1" and u else _KO_SINO[int(d)]) + _KO_UNITS[u] for u, d in zip(range(len(str(m)) - 1, -1, -1), str(m)) if d != "0")
+    hi, lo = divmod(n, 10000)
+    return (("" if hi == 1 else four(hi)) + "만" if hi else "") + four(lo)
+
+
 def _bracketed(text: str) -> list[int]:
     """Per character of a line, whether it's in brackets (one never closed is just a character)."""
     out = [0] * len(text)
@@ -215,6 +236,13 @@ def _bracketed(text: str) -> list[int]:
 def _folded(line: str) -> str:
     """A line as word_spans reads it: NFC, typed apostrophes as the one it takes. One for one: spans still fit the NFC text."""
     return re.sub("[`´‘ʼ′]", "'", unicodedata.normalize("NFC", line))
+
+
+# Letters said one by one ("A,L,L", "T.O.P"): each is sung as its name, which is what the English model hears and spells. Their characters stay
+# the letter's own (as a number's digits do), so the page shows what's written.
+SPELLED = re.compile(r"[A-Za-z](?:[,.][A-Za-z])+[,.!?]*")
+LETTER_NAMES = dict(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", ["ay", "bee", "see", "dee", "ee", "ef", "gee", "aitch", "eye", "jay", "kay", "el", "em", "en", "oh", "pee", "cue", "ar", "es",
+                                                     "tee", "you", "vee", "double you", "ex", "why", "zee"]))
 
 
 def word_spans(line: str) -> list[tuple]:
@@ -233,15 +261,34 @@ def word_spans(line: str) -> list[tuple]:
                 continue
             at += len(run) - len(run.lstrip("'’"))
             run = run.strip("'’").replace("’", "'")
+            spelled = bool(SPELLED.fullmatch(raw.group())) and any(c.lower() not in "aio" for c in raw.group() if c.isalpha())  # (not "I, I, I": those are words)
             for q in re.finditer(r"[A-Za-z']+|[0-9]+", run):
                 part, a = q.group(), at + q.start()
-                if not part.isdigit():
+                if spelled and len(part) == 1:
+                    out += [(w, "en", a, a + 1, bool(bg[a]), True) for w in LETTER_NAMES[part.upper()].split()]
+                elif not part.isdigit():
                     out.append((part, "en", a, a + len(part), bool(bg[a]), False))
-                elif hangul:
-                    out.append((part, "ko", a, a + len(part), bool(bg[a]), False))
+                elif hangul:  # read below, once the words either side are known
+                    out.append((part, "num", a, a + len(part), bool(bg[a]), line[a + len(part): a + len(part) + 2]))
                 else:
                     out += [(w, "en", a, a + len(part), bool(bg[a]), True) for w in _num_words(part).split()]
-    return out
+    if not hangul:
+        return out
+    res = []  # a number in a line with Hangul: Korean if Hangul is glued to it (12시엔, 100일) or Korean is all around it (150 밟으며), English before an English word (2 am)
+    for k, x in enumerate(out):
+        if x[1] != "num":
+            res.append(x)
+            continue
+        part, _, a, b, g, after = x
+        nxt = next((y[1] for y in out[k + 1:] if y[1] != "num"), None)
+        prv = next((y[1] for y in reversed(out[:k]) if y[1] != "num"), None)
+        if after[:1] and HANGUL.match(after[:1]):
+            res.append((_ko_number(part, any(after.startswith(c) for c in KO_COUNTERS)), "ko", a, b, g, True))
+        elif nxt == "en" or (nxt is None and prv == "en"):
+            res += [(w, "en", a, b, g, True) for w in _num_words(part).split()]
+        else:
+            res.append((_ko_number(part, False), "ko", a, b, g, True))
+    return res
 
 
 def _unheard_before(line: str, spans: list) -> list:
@@ -421,7 +468,7 @@ NEG = -1e18
 
 
 def viterbi(E: dict, blanks: dict, labels: list, optional: list, lo: np.ndarray, hi: np.ndarray, far: np.ndarray, opens: np.ndarray | None = None,
-            enter: np.ndarray | None = None, inside: np.ndarray | None = None, gap: np.ndarray | None = None, early: np.ndarray | None = None):
+            enter: np.ndarray | None = None, inside: np.ndarray | None = None, gap: np.ndarray | None = None, early: np.ndarray | None = None, note: np.ndarray | None = None):
     """CTC forced alignment of one chain of labels over the song, each label on the frames of its own model. E: {lang: (T,
     C) regrets}, a frame's log-posteriors under its best class, so that Korean and English tokens compare. labels: (lang,
     class id, or STAR: a wildcard paying STAR_PEN per frame, for any number of frames); optional[j]: label j may be skipped.
@@ -462,6 +509,9 @@ def viterbi(E: dict, blanks: dict, labels: list, optional: list, lo: np.ndarray,
     pidx_c = np.where(valid, pidx, 0)
     rows = np.arange(S)
     on_rows = 2 * np.flatnonzero(opens) + 1 if opens is not None and enter is not None else None
+    from_blank = (valid[on_rows] & (pidx[on_rows] % 2 == 0)) if on_rows is not None else None  # a note's start pays a syllable come from a blank: not one glued onto the syllable before
+    if from_blank is not None:
+        from_blank[:, 0] = False
     early_at = np.flatnonzero(early >= 0) if early is not None else np.zeros(0, np.int64)
 
     def emit(t):
@@ -496,6 +546,8 @@ def viterbi(E: dict, blanks: dict, labels: list, optional: list, lo: np.ndarray,
         cand = np.where(valid, dp[pidx_c], NEG)
         if on_rows is not None:
             cand[on_rows, 1:] += enter[t]
+            if note is not None:
+                cand[on_rows] += note[t] * from_blank
         k = np.argmax(cand, 1)
         dp = cand[rows, k] + emit(t)
         back[t] = k
@@ -552,7 +604,8 @@ FIRST_EARLY, UNHEARD, NOTE_REST, REST_BACK, REST_PAST, RUN_ON, STAMP_LATE = 0.7,
 # where the chain can be: a voiced stretch it hears nothing in, then the line's words a word late (heard: up to 1.5 s).
 WORD_NEAR, WORD_FAR = 0.6, 0.02
 FENCE_FAR = 0.2  # what a line pays per frame across a line beside it that no model can time, and no chain will hold it from
-FAR_MOST = 250  # frames: further than this pays no more (5 s; a place Whisper's wrong about can be far off)
+FAR_MOST = 150  # frames: further than this pays no more (3 s; a place Whisper's wrong about can be far off). At 5 s a run of lines Whisper laid a chorus early stayed there
+#                  (16 lines, 16 s); at 1 s the children's songs with backing vocals lose a little (syllables over 500 ms off 6.1 -> 6.9%; at 3 s, 6.2%).
 # A line nothing else holds (no stamp agrees) can run past its end, over a rest with someone else's voice in it. Its last token pays LAST_FAR a frame past LAST_NEAR s after Whisper's end,
 # one way only, if Whisper gave the line at least LAST_RATE s a syllable (under that its time is a pile-up, not a line). FAR_MOST stops a wrong Whisper line pulling from far off.
 LAST_NEAR, LAST_FAR, LAST_RATE = 0.7, 0.1, 0.2
@@ -593,6 +646,10 @@ WHISPER_EARLY = 0.12
 # one word of every 3rd line out of the chain, 3.7 syllables raised a line, helped 0 of 11; most of the song out, 1.1 a line, helped 42 of 48.
 PIECE_LIFT = (2.0, 3)
 UNSUNG = (0.5, 0.1)  # (a Whisper line at least this long, s; with under this share of it voiced: _unsung)
+# Such a line is sung after all (Whisper spread the lines over an instrumental break) when, chained with the rest, its tokens fit as well as this percentile of the other
+# lines' and those fit no worse than this on average (nats). Of 20 real English songs, 11 lines of 2 were dropped and all were sung; with FAR_MOST at 3 s, their words
+# over 1 s off 4.2 -> 2.3%, the mean error 730 -> 161 ms.
+UNSUNG_HEARD = (25, 0.25)
 WHOLE_HOLD, WHOLE_RUN = 0.15, 0.25  # the whole vocal stem is heard where the lead's quiet this long around (s) and it isn't, for this long at least
 
 
@@ -693,7 +750,54 @@ def _line_windows(L, dur, agreed):
     return [(max(0.0, a), min(dur, b)) for a, b, _ in win], [w[2] for w in win]
 
 
-def _labels(ln: dict, vocab: dict, delim: dict, en_ok: bool, base: str):
+# With a pack that has one (see OWN; nothing here runs without), English words are also heard by a second model, "hg": a Korean model taught English written in
+# Hangul as loanwords are (watermelon 워터멜론, A,L,L 에이 엘 엘), each English syllable timed by the Hangul syllable that holds its vowel. That times the vowel,
+# where the English model's letters time a word's first sound: better for vowel-first words (held-out songs within 100 ms 87% -> 96%) and a word's later
+# syllables (93% -> 97%), worse for consonant-first starts (97% -> 92%), and it hears nothing in some produced passages. So the usual chain stands: the lines are
+# chained once more with their English words respelled, and such a syllable takes that chain's time only within RESPELL_NEAR s of its own.
+RESPELL_NEAR = 0.25
+_NAME_LETTER = {v: k for k, v in LETTER_NAMES.items() if " " not in v}
+_respell = {"path": None, "table": None}  # the pack's table: {"words": {word: [Hangul syllables, [which holds each English syllable's vowel]]}, "letters": {A: ...}}
+
+
+def respell_ready() -> bool:
+    return bool(_respell["path"]) and os.path.isfile(_respell["path"]) and any(os.path.isfile(os.path.join(p, "model.safetensors")) for p in PATHS["hg"])
+
+
+def _respell_vocab(dev: str):
+    return load("hg", dev)[1:4]
+
+
+def _respelled(w: str, num: bool):
+    """An English word as ([Hangul syllables], [which of them holds each English syllable's vowel]), or None for a word the table lacks; a letter said by name
+    (A,L,L) as its Korean name."""
+    if _respell["table"] is None:
+        with open(_respell["path"], encoding="utf-8") as f:
+            _respell["table"] = json.load(f)
+    t = _respell["table"]
+    got = t["letters"].get(_NAME_LETTER[w.lower()]) if num and w.lower() in _NAME_LETTER else t["words"].get(w.lower().strip("'")) or t["words"].get(w.lower())
+    return (list(got[0]), list(got[1])) if got else None
+
+
+def _respell_mix(syl: list, other: list) -> list:
+    """syl (the usual chain's), with the respelled chain's syllable (other) where the rule above says so."""
+    def keyed(xs):
+        n, out = {}, {}
+        for x in xs:
+            k = n.get((x["line"], x["word"]), 0)
+            n[x["line"], x["word"]] = k + 1
+            out[x["line"], x["word"], k] = x
+        return out
+    at, out = keyed(other), []
+    for key, x in keyed(syl).items():
+        o = at.get(key)
+        if x["lang"] == "en" and o is not None and (key[2] or x["text"][:1].lower() in "aeiou") and abs(o["t"] - x["t"]) <= RESPELL_NEAR:
+            x = {**o, "line_logp": x["line_logp"]}
+        out.append(x)
+    return out
+
+
+def _labels(ln: dict, vocab: dict, delim: dict, en_ok: bool, base: str, respell: bool = False):
     """A line's labels: (lang, class id or STAR), whether each may be skipped (word delimiters; words in brackets, which are
     backing vocals the lead may not sing), and what each is: ("tok", word index, char index), ("delim", ...) or ("run",
     [word indices], ...). A run of Latin words that aren't English is one wildcard, and so is text no model hears before a word."""
@@ -724,6 +828,24 @@ def _labels(ln: dict, vocab: dict, delim: dict, en_ok: bool, base: str):
                 labels.append(("ko", STAR if tok is None else tok))
                 optional.append(ln["bg"][k])
                 meta.append(("tok", k, ci))
+        elif respell:  # written in Hangul for the hg model
+            sp, parts = _respelled(w, ln["num"][k]), _parts(w, "en")
+            if sp is None:  # a word the table lacks: anything fits it
+                labels.append(("hg", STAR))
+                optional.append(ln["bg"][k])
+                meta.append(("tok", k, parts[0][0]))
+            else:
+                for i, b in enumerate(sp[0]):
+                    tok = ko_tokens(b, vocab["hg"])[0]
+                    if tok is None and (ord(b) - 0xAC00) % 28:  # a syllable the model has no class for: without what closes it
+                        tok = ko_tokens(chr(ord(b) - (ord(b) - 0xAC00) % 28), vocab["hg"])[0]
+                    j = sp[1].index(i) if i in sp[1] else None
+                    ci = parts[j][0] if j is not None and j < len(parts) else -1 - i  # (below 0: no syllable of the lyric is timed by it)
+                    labels.append(("hg", STAR if tok is None else tok))
+                    optional.append(ln["bg"][k])
+                    meta.append(("tok", k, ci))
+                    if ci >= 0:
+                        ln.setdefault("hg", {})[(k, ci)] = b
         else:
             for ci, ch in enumerate(w.upper()):
                 if ch in vocab["en"]:
@@ -742,7 +864,10 @@ def _parts(w: str, lg: str) -> list:
     return list(zip(st, st[1:] + [len(w)]))
 
 
-def _align(L: list, raw: dict, vocab: dict, blanks: dict, delim: dict, en_ok: bool, cues: dict | None, lrc: dict | None = None) -> tuple[list, list] | None:
+PAUSE_MARK = re.compile(r"[,.;:!?…]")  # between letters said one by one (A,L,L): a rest between them costs nothing
+
+
+def _align(L: list, raw: dict, vocab: dict, blanks: dict, delim: dict, en_ok: bool, cues: dict | None, lrc: dict | None = None, respell: bool = False) -> tuple[list, list] | None:
     """All the lines in one Viterbi over the song, on raw {lang: log-posteriors}. Returns (their syllables {t, tok, tok_logp,
     line_logp, text, lang, line, word, a, b (its characters in the line), bg, vowel_initial}, per line {logp, regret}: how
     well its tokens fit)."""
@@ -754,12 +879,14 @@ def _align(L: list, raw: dict, vocab: dict, blanks: dict, delim: dict, en_ok: bo
     base = next(iter(E))
     labels, optional, meta, owner, lo, hi, far, opens = [(base, STAR)], [True], [("edge", None, None)], [-1], [0], [T - 1], [0.0], [False]
     early = [-1]
+    rest_free = [False]
+    lines_text = [ln.get("text") or "" for ln in L]
     ns = np.array([n[:2] for n in cues["notes"]], float).reshape(-1, 2) if cues is not None else np.zeros((0, 2))
     begin = np.r_[True, ns[1:, 0] - ns[:-1, 1] >= NOTE_REST][: len(ns)]
     rested = np.round((ns[begin, 0] - FRAME_CENTER) / FRAME)  # (by the notes: voiced has the whole stem's loud frames)
     rest_from = np.r_[-np.inf, ns[:-1, 1]][: len(ns)][begin]  # where the voice stopped before each
     for k, ln in enumerate(L):
-        lab, opt, met = _labels(ln, vocab, delim, en_ok, base)
+        lab, opt, met = _labels(ln, vocab, delim, en_ok, base, respell)
         a = min(T - 1, max(0, int(win[k][0] * 50)))
         b = max(a, min(T - 1, int(np.ceil(win[k][1] * 50))))
         fence = ln.get("fence") or (None, None)
@@ -777,6 +904,15 @@ def _align(L: list, raw: dict, vocab: dict, blanks: dict, delim: dict, en_ok: bo
         hi += [b] * len(lab) + [T - 1]
         far += [FENCE_FAR if fence != (None, None) else FAR_AGREED if agreed[k] else FAR_COST] * len(lab) + [0.0]
         early += [-1] * (len(lab) + 1)
+        text_k = _folded(lines_text[k]) if lines_text else ""
+        said = [wi > 0 and ln["num"][wi] and ln["num"][wi - 1] and ln["spans"][wi][1] - ln["spans"][wi][0] == 1 and text_k[ln["spans"][wi][0]].isalpha() and bool(PAUSE_MARK.search(text_k[ln["spans"][wi - 1][1]: ln["spans"][wi][0]])) for wi in range(len(ln["words"]))]  # a letter said by itself after another: they come one at a time, rests between
+        fr = [False] * len(met)
+        for q, m in enumerate(met):
+            if m[0] == "tok" and m[1] < len(said) and said[m[1]] and all(x[0] != "tok" or x[1] != m[1] for x in met[:q]):
+                fr[q] = True
+                if q and met[q - 1][0] == "delim":
+                    fr[q - 1] = True
+        rest_free += fr + [False]
         first = next((len(labels) - 1 - len(lab) + j for j, m in enumerate(met) if m[0] == "tok" and not ln["bg"][m[1]]), None)
         if first is not None and (agreed[k] or trusted[k]) and not any(ln["unheard"][: meta[first][1] + 1]):  # its first syllable, held harder than the rest (see FIRST_NEAR), unless text no model hears starts the line
             m_f = FIRST_NEAR_AGREED if agreed[k] else FIRST_NEAR
@@ -815,24 +951,25 @@ def _align(L: list, raw: dict, vocab: dict, blanks: dict, delim: dict, en_ok: bo
         opens += [m[0] == "tok" and m[2] in st.get(m[1], ()) for m in met] + [False]
     if len(labels) < 3:
         return None
-    enter, inside, gap = None, None, None
+    enter, inside, gap, note = None, None, None, None
     if cues is not None:
         c = _cue_frames(cues, T)
         voiced = cues["voiced"]
         sum_v = np.r_[0, np.cumsum(voiced)]
         ahead = sum_v[np.minimum(c + int(round(VOICED_AHEAD / cues["step"])), len(voiced))] - sum_v[c]
         enter = REONSET_PRIOR * cues["p_re"][c] - SILENT_COST * (ahead == 0)
+        note = np.zeros(T)
         for n in cues["notes"]:
             f = int(round((n[0] - FRAME_CENTER) / FRAME))
             for d in range(-2, 3):
                 if 0 <= f + d < T:
-                    enter[f + d] += NOTE_PRIOR * (1 - abs(d) / 3)
+                    note[f + d] = max(note[f + d], NOTE_PRIOR * (1 - abs(d) / 3))  # (two notes close together pay once)
         own = np.array(owner)
-        inside = np.flatnonzero(np.r_[False, (own[1:] == own[:-1]) & (own[1:] >= 0), False])
+        inside = np.flatnonzero(np.r_[False, (own[1:] == own[:-1]) & (own[1:] >= 0) & ~np.array(rest_free[1:]), False])  # (not where the lyric itself pauses)
         v = voiced[c]
         run = np.arange(T) - np.maximum.accumulate(np.where(v, np.arange(T), 0))  # frames since the voice stopped
         gap = np.where(v, GAP_VOICED, np.where(run <= GAP_REST, GAP_SILENT, 0.0))
-    res = viterbi(E, blanks, labels, optional, np.array(lo), np.array(hi), np.array(far), np.array(opens), enter, inside, gap, np.array(early))
+    res = viterbi(E, blanks, labels, optional, np.array(lo), np.array(hi), np.array(far), np.array(opens), enter, inside, gap, np.array(early), note)
     if res is None:
         return None
     per = [{} for _ in L]
@@ -852,12 +989,13 @@ def _align(L: list, raw: dict, vocab: dict, blanks: dict, delim: dict, en_ok: bo
                 if not got:
                     continue
                 real = [x for x in got if x[3] != STAR]
-                vi = _vowel_initial(lg, w[c0:c1])
-                out.append({"t": round(got[0][0] * FRAME + FRAME_CENTER + SHIFT[lg] + (VOWEL_INITIAL[lg][0] if vi else 0.0), 3),
+                heard, hb = ("ko" if got[0][2] == "hg" else got[0][2], ln.get("hg", {}).get((wi, c0))) if respell else (lg, None)  # (Hangul, as the Korean model's are; its Hangul syllable)
+                vi = _vowel_initial("ko", hb) if hb else _vowel_initial(lg, w[c0:c1])
+                out.append({"t": round(got[0][0] * FRAME + FRAME_CENTER + SHIFT[heard] + (VOWEL_INITIAL[heard][0] if vi else 0.0), 3),
                             "tok": round(max(regret(x) for x in real), 2) if real else None,
                             "tok_logp": round(max(logp(x) for x in real), 2) if real else None,
                             "line_logp": None if fit[-1]["logp"] is None else round(fit[-1]["logp"], 3),
-                            "text": w[c0:c1], "lang": lg, "line": ln["i"], "word": wi, "vowel_initial": vi, "bg": bool(ln["bg"][wi]),
+                            "text": w[c0:c1], "lang": heard, "line": ln["i"], "word": wi, "vowel_initial": vi, "bg": bool(ln["bg"][wi]),
                             "a": a if ln["num"][wi] else a + c0, "b": b if ln["num"][wi] else a + c1})  # a number spelled out: its digits, as one
     return out, fit
 
@@ -1178,7 +1316,7 @@ def align_lyrics(vocals: np.ndarray, lines: list, sr: int = SR, dev: str | None 
         sp = word_spans(ln.get("text") or "")
         if sp:
             L.append({"i": li, "t0": float(ln["t0"]), "t1": float(ln["t1"]), "words": [(x[0], x[1]) for x in sp],
-                      "spans": [(x[2], x[3]) for x in sp], "bg": [x[4] for x in sp], "num": [x[5] for x in sp], "unheard": _unheard_before(ln.get("text") or "", sp), "ww": ln.get("words") or []})
+                      "spans": [(x[2], x[3]) for x in sp], "bg": [x[4] for x in sp], "num": [x[5] for x in sp], "unheard": _unheard_before(ln.get("text") or "", sp), "ww": ln.get("words") or [], "text": ln.get("text") or ""})
     info = [{"i": ln["i"], "t0": ln["t0"], "t1": ln["t1"], "n_aligned": 0, "n_syl": sum(len(_parts(w, lg)) for w, lg in ln["words"])} for ln in L]
     en_share = english_share([w for ln in L for w in ln["words"]])
     en_ok = en_share >= LATIN_EN_MIN
@@ -1197,10 +1335,10 @@ def align_lyrics(vocals: np.ndarray, lines: list, sr: int = SR, dev: str | None 
         skipped = f"no lyrics a model here can time (english_share {en_share:.2f})"
     L = [ln for ln in L if any(lg in langs for _, lg in ln["words"])]
     chained = {ln["i"] for ln in L}
-    L = [ln for k, ln in enumerate(L) if not (cues is not None and _unsung(ln, cues, L[k - 1]["t1"] if k else ln["t0"], L[k + 1]["t0"] if k + 1 < len(L) else ln["t1"]))]
-    for x in info:  # (stems._off_lines; a line no model can time has no regret either, and isn't one of these)
-        x["dropped"] = x["i"] in chained and all(ln["i"] != x["i"] for ln in L)
-    for ln in L:  # a line no model can time beside one, that no chain hears: it can't run across it
+    maybe = {ln["i"] for k, ln in enumerate(L) if cues is not None and _unsung(ln, cues, L[k - 1]["t1"] if k else ln["t0"], L[k + 1]["t0"] if k + 1 < len(L) else ln["t1"])}
+    L_all = L
+    L = [ln for ln in L_all if ln["i"] not in maybe]
+    for ln in L_all:  # a line no model can time beside one, that no chain hears: it can't run across it
         before, after = lines[ln["i"] - 1] if ln["i"] else None, lines[ln["i"] + 1] if ln["i"] + 1 < len(lines) else None
         ln["fence"] = (before["t1"] if before and ln["i"] - 1 not in chained and before.get("t1") is not None else None,
                        after["t0"] if after and ln["i"] + 1 not in chained and after.get("t0") is not None else None)
@@ -1213,6 +1351,7 @@ def align_lyrics(vocals: np.ndarray, lines: list, sr: int = SR, dev: str | None 
                 for g in langs:
                     vocab[g], blank[g], delim[g] = load(g, dev)[1:4]
                 raw = {g: _song_emissions(g, y16, w16, on_whole, dev) for g in langs}
+                mix = (_song_emissions("hg", y16, w16, on_whole, dev), _respell_vocab(dev)) if n_en and respell_ready() else None
             finally:
                 if not KEEP:
                     unload()
@@ -1220,13 +1359,32 @@ def align_lyrics(vocals: np.ndarray, lines: list, sr: int = SR, dev: str | None 
         n = min(len(x) for x in raw.values())
         raw = {g: x[:n] for g, x in raw.items()}
         c0 = time.perf_counter()
-        r = _align(L, raw, vocab, blank, delim, en_ok, cues, lrc if lrc and len(lrc.get("times") or []) == len(lines) else None)  # (Whisper can give back fewer lines than it was given: the stamps would be other lines')
+        lrc_ = lrc if lrc and len(lrc.get("times") or []) == len(lines) else None  # (Whisper can give back fewer lines than it was given: the stamps would be other lines')
+        r = _align(L, raw, vocab, blank, delim, en_ok, cues, lrc_)
+        rb = _align(L_all, raw, vocab, blank, delim, en_ok, cues, lrc_) if maybe and r else None
+        if rb:  # lines Whisper laid on no voice (_unsung), chained all the same: sung after all if they're heard there as the song's other lines are, at no cost to those
+            fa, fb = {ln["i"]: f["regret"] for ln, f in zip(L, r[1])}, {ln["i"]: f["regret"] for ln, f in zip(L_all, rb[1])}
+            rest = [i for i in fa if fa[i] is not None and fb.get(i) is not None]
+            if rest:
+                heard = {i for i in maybe if fb.get(i) is not None and fb[i] >= np.percentile([fb[i] for i in rest], UNSUNG_HEARD[0])}
+                tm["unsung"] = {"maybe": sorted(maybe), "heard": sorted(heard), "rest": round(float(np.mean([fb[i] - fa[i] for i in rest])), 3)}
+                if heard and np.mean([fb[i] - fa[i] for i in rest]) >= -UNSUNG_HEARD[1]:
+                    L = [ln for ln in L_all if ln["i"] not in maybe - heard]
+                    r = rb if heard == maybe else _align(L, raw, vocab, blank, delim, en_ok, cues, lrc_)
+        if r and mix is not None:  # the same lines once more, their English words respelled for the hg model
+            (vh, bh, dh), m, rest = mix[1], min(n, len(mix[0])), [g for g in raw if g != "en"]
+            rh = _align(L, {**{g: raw[g][:m] for g in rest}, "hg": mix[0][:m]}, {**{g: vocab[g] for g in rest}, "hg": vh}, {**{g: blank[g] for g in rest}, "hg": bh},
+                        {**{g: delim[g] for g in rest}, "hg": dh}, en_ok, cues, lrc_, respell=True)
+            if rh:
+                r = (_respell_mix(r[0], rh[0]), r[1])
         tm["align"] = time.perf_counter() - c0
         if r:
             syl = r[0]
             at = {x["i"]: x for x in info}
             for ln, f in zip(L, r[1]):
                 at[ln["i"]]["tok_logp"], at[ln["i"]]["regret"] = (None if f[k] is None else round(f[k], 3) for k in ("logp", "regret"))
+    for x in info:  # (stems._off_lines; a line no model can time has no regret either, and isn't one of these)
+        x["dropped"] = x["i"] in chained and all(ln["i"] != x["i"] for ln in L)
     # A line the chain squeezed into nothing (a voice too soft to hear, a verse this recording doesn't have) has Whisper's words on
     # the page, if Whisper's line is any longer; the bars go by the chain's, for little. And words of a line no model could time.
     by = {}
@@ -1290,3 +1448,46 @@ def align_lyrics(vocals: np.ndarray, lines: list, sr: int = SR, dev: str | None 
     heard.sort(key=lambda s: s["t"])
     return {"syllables": heard, "onsets": [(s["t"] if s.get("vowel_initial") else s.get("heard_at", s["t"]), s["strength"] if s.get("implausible") or not s.get("vowel_initial") else round(VOWEL_BAR_ODDS * s["strength"] / (1 + (VOWEL_BAR_ODDS - 1) * s["strength"]), 3)) for s in heard], "lines": info, "timings": tm, "primary": primary,
             "device": dev, "skipped": skipped, "sung": sung_lines(lines or [], order)}
+
+
+# ------------------------------------------------------------------------------------------------- a pack of other models
+# models/own/pack.json, where there is one (the owner's PC: no release ships or fetches it): other weights for the models above, the constants that go with them,
+# and the second model with its table of respelled words. It is data beside the models, so an update of the app leaves it alone and what a release changes
+# here applies with it; VERSION carries the pack's v, so the songs are timed again when either changes. All of it or none: a pack with a piece missing isn't used.
+#     {"v": 1, "models": {"ko": "w2v_ko", "en": "w2v_en", "hg": "w2v_hg"}, "respell": "hangul.json", "set": {"NOTE_PRIOR": 6.0, "FAR_MOST": 50}}
+OWN = os.path.join(_HERE, "models", "own")
+PACK = None  # the one in use
+
+
+def _use_pack(folder: str) -> dict | None:
+    global VERSION, PACK
+    try:
+        with open(os.path.join(folder, "pack.json"), encoding="utf-8") as f:
+            pack = json.load(f)
+        v, models, table, consts = int(pack["v"]), dict(pack.get("models") or {}), pack.get("respell"), dict(pack.get("set") or {})
+        if not 0 < v < 1000:
+            raise ValueError("v must be 1 to 999")
+        for g, name in models.items():
+            if g not in PATHS or not os.path.isfile(os.path.join(folder, name, "model.safetensors")):
+                raise ValueError(f"no model for {g} in {name}")
+        if table is not None and not os.path.isfile(os.path.join(folder, table)):
+            raise ValueError(f"no {table}")
+        for k, x in consts.items():
+            if not k.isupper() or type(globals().get(k)) not in (int, float) or type(x) not in (int, float):
+                raise ValueError(f"{k} is not a number set here")
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+        print(f"syllables: the pack in {folder} is not used ({e})", flush=True)
+        return None
+    for g, name in models.items():
+        PATHS[g].insert(1 if os.environ.get("STEM_W2V_" + g.upper()) else 0, os.path.join(folder, name))  # (after a path the environment names)
+    if table is not None:
+        _respell["path"] = os.path.join(folder, table)
+    for k, x in consts.items():
+        globals()[k] = type(globals()[k])(x)
+    VERSION, PACK = VERSION * 1000 + v, pack
+    return pack
+
+
+_use_pack(OWN)
