@@ -206,6 +206,11 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
   is dropped only if the chain can't hear it either (`UNSUNG_HEARD`).** Was: a run of lines Whisper put a chorus early
   stayed there, and lines it spread over an instrumental break were dropped though sung (20 real songs: words over 1 s
   off 4.4% → 2.3%; `syllables.py`). A lower cap costs songs with backing vocals when the stock models hear them.
+- **A song timed by an older version opens with the timing it has; re-timing is asked for on its page** (the button
+  left of Download, its panel open on the first such song after an update; `update_state`, `retime_song`). Was: asked
+  once before the app opened, and "Later" re-timed each song when it was opened, 10-20 s of waiting and bars that moved
+  under a singer who had said later. A new helper in `stems.py` must not take an existing name: `_shown` did, and
+  every job's progress threw.
 - **Lyric timing: letters said one by one (A,L,L) are timed as their names, rests between them free; a number is read
   as the words around it say (12시엔 열두, 150 백오십, 2 am two); a note's start pays only a syllable come from a blank.**
   Was: the letters packed together (4 of 12 placed), a number in a Hangul line had no token, and two syllables shared

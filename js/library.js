@@ -69,8 +69,8 @@ async function renderLibrary() {
   try { await drawLibrary(); } finally { libDrawnNow(); }
   paintUpdate();
 }
-// Update, right of the search: there while songs wait to be timed again by an update (stems.update_state), after "Later" at
-// launch or with songs that couldn't be done; gone while it runs (the songs being done show it in the list). Asked at most
+// Update, right of the search: there while songs wait to be timed again by an update (stems.update_state: every one of them
+// at once, as a song's own button with "all songs" ticked); gone while it runs (the songs being done show it in the list). Asked at most
 // every few seconds, with the list.
 let updateAsked = 0;
 async function paintUpdate(force) {

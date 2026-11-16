@@ -139,9 +139,11 @@ shown muted. Only where a tooltip is allowed (`style.md`). Copies: the phrase st
   (`ownKeys`, `app.js`); anything else that takes arrows or letters must stop propagation.
 - **Panel under a button** (`.pop`, in a `position: relative` holder such as `.ears-at`): `showEars`/`initEars`
   (`practice.js`) and `showLive`/`initLive` (`live.js`) wire it the same way: click-outside, Escape back to the button,
-  close on focusout, close the others. Copy that wiring for a third.
+  close on focusout, close the others. `showRetime`/`initRetime` (`studio.js`, the lyric timing update left of
+  Download) is the third: copy that wiring for a fourth.
 - **Drawer**: `showJobs`/`closeDrawer`, `drawerEdge` (keeps the scrollbar's room), `afterSlide` (`adding.js`).
-- **Question before the app opens**: `askUpdate()` (`app.js`, `.boot-ask`).
+- **Question before the app opens**: `askUpdate()` (`app.js`, `.boot-ask`). Not used now: the re-timing question moved
+  to the song's page.
 - **Messages**: there's no general toast. Mic trouble: `notice(msg)`. A word in Practice's head line: `flashNote(text)`.
   A take row: `takeNote`. The Add drawer: `addMsg`. Lyrics: `lyricNote`.
 - **"Click again to delete"**: there's no helper; the song menu's `data-armed` ("Really delete?") is the pattern to

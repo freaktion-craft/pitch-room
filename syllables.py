@@ -41,7 +41,8 @@ import numpy as np
 from lyrics import STAMP_MIN
 
 SR = 44100
-VERSION = 8  # bump when the onsets or the lines as sung change (syllables.json keeps both): it's worked out again for every song (stems.start_upgrades)
+VERSION = 8  # bump when the onsets or the lines as sung change (syllables.json keeps both): each song is offered its timing again (stems.update_state)
+SHOWN_FROM = 7  # the oldest VERSION whose syllables.json the page can still show: a song timed by an older logic keeps what it has until it's timed again. Raise it when the saved form changes.
 FRAME = 0.02  # wav2vec2 frame hop (320 samples at 16 kHz)
 FRAME_CENTER = 0.0125  # frame k covers samples [320k, 320k + 400): centre 12.5 ms after k * 20 ms
 _HERE = os.environ.get("PITCHROOM_DATA") or os.path.dirname(os.path.abspath(__file__))  # where models/ is (stems.DATA)

@@ -111,6 +111,12 @@ Lyrics: LRCLIB candidates, Whisper (large-v3-turbo via stable-ts) to screen and 
 
 - `melody.VERSION`, `syllables.VERSION` and `stems.LYRICS_VERSION` mark cached output. Bump the matching one when a
   change alters that output (the first two have a "bump when ..." comment); the page then offers to re-time songs.
+- Nothing is re-timed by itself. A song whose melody or syllables are only from an older version opens with what it
+  has (`get_melody` without `renew`, `_melody_outdated(..., versions=False)`, `_sung`), as long as that version is at
+  least the module's `SHOWN_FROM`: raise `melody.SHOWN_FROM` or `syllables.SHOWN_FROM` when the saved form changes, and
+  such songs are read again when opened, as before. `GET /api/upgrades[?id=]` (`update_state`) says how many wait and
+  whether this one does; `POST /api/upgrades` `{id}` times one (`retime_song`), `{now: true}` all of them
+  (`answer_update`). What can't wait (lyrics edited, a model that's there now) is still worked out when the song opens.
 - `stems.BEATS_VERSION` is different: `_tempo_upgrade` only re-runs the half-time check (`_double_time`) on songs under
   `SLOW` (70) BPM with a lower `beatsV`, silently at every launch; the page never asks. Bumping it doesn't redo beat
   tracking: a change to beat tracking itself needs its own migration.

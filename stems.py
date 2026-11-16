@@ -2263,8 +2263,8 @@ def _sung(folder: str, data: dict) -> list | None:
         syl = _load_json(path) if data.get("lines") and os.path.isfile(path) else None
     except ValueError:
         return None
-    if not syl or syl.get("at") != data.get("at") or syl.get("v") != syllables.VERSION or len(syl.get("lines") or []) != len(data["lines"]):
-        return None
+    if not syl or syl.get("at") != data.get("at") or not _showable(syl.get("v"), syllables) or len(syl.get("lines") or []) != len(data["lines"]):
+        return None  # (timed by an older logic that can still be shown: kept until the song's timed again, see _melody_outdated)
     data["offLines"] = syl.get("offLines")  # (_off_lines: the page's note, with the syllables it came from)
     return syl["lines"]
 
@@ -2992,17 +2992,25 @@ def _syllables(folder: str, lyr: dict | None, job=None, share: tuple[float, floa
     return data
 
 
-def _melody_outdated(folder: str, data: dict) -> bool:
+def _showable(v, module) -> bool:
+    """What a song has, worked out by version v of melody or syllables, can still be shown (their SHOWN_FROM)."""
+    return isinstance(v, int) and v >= module.SHOWN_FROM
+
+
+def _melody_outdated(folder: str, data: dict, versions: bool = True) -> bool:
     """melody.json (data) is to be read again: the extraction changed (melody.VERSION), it came from the whole vocal
     stem and the lead model is installed now, the lyrics changed or their syllables were worked out differently, or it
-    was read without a model that's there now (_stale)."""
+    was read without a model that's there now (_stale). Without versions: only what can't wait. A song whose melody or
+    syllables are just from an older logic (and can still be shown, _showable) is opened as it is: working it out again takes
+    the GPU for a while and moves what the singer has got used to, so its page asks (update_state, retime_song)."""
     import melody
     import syllables
     running = get_job(_lyrics_jobs.get(os.path.basename(folder), ""))
     if data and running and running["status"] in ("queued", "running"):  # being lined up: the bars follow when it's done
         return False
     lyr = _lyrics_data(folder) if data.get("lead") else None
-    if data.get("v") != melody.VERSION or not (data.get("lead") or not lead_available()) or data.get("lyricsAt") != (lyr or {}).get("at"):
+    old = (lambda v, module: v != module.VERSION) if versions else (lambda v, module: not _showable(v, module))
+    if old(data.get("v"), melody) or not (data.get("lead") or not lead_available()) or data.get("lyricsAt") != (lyr or {}).get("at"):
         return True
     path = os.path.join(folder, "syllables.json")
     try:
@@ -3013,7 +3021,7 @@ def _melody_outdated(folder: str, data: dict) -> bool:
     if running and running["status"] in ("queued", "running"):  # being lined up: its syllables.json runs ahead of lyrics.json till it's done, and the bars follow
         return False
     # (its syllables couldn't be had: left as it is until they can, _stale)
-    return (not data.get("sylFailed") and bool(syl and (syl.get("v") != syllables.VERSION or syl.get("at") != lyr.get("at") or os.path.getmtime(path) > os.path.getmtime(os.path.join(folder, "melody.json"))))) or _stale(data, lyr, os.path.getmtime(os.path.join(folder, "melody.json")))  # (syllables.json is written first: newer means the bars never came)
+    return (not data.get("sylFailed") and bool(syl and (old(syl.get("v"), syllables) or syl.get("at") != lyr.get("at") or os.path.getmtime(path) > os.path.getmtime(os.path.join(folder, "melody.json"))))) or _stale(data, lyr, os.path.getmtime(os.path.join(folder, "melody.json")))  # (syllables.json is written first: newer means the bars never came)
 
 
 _STARTED = time.time()
@@ -3050,12 +3058,13 @@ def _splice(data: dict, ranges: list) -> dict:
     return {k: v for k, v in data.items() if k != "full"} | {"notes": notes, "contour": contour, "range": rng}
 
 
-def get_melody(song_id: str) -> dict:
-    """Cached melody.json. Rebuilt when the extraction changed, when it came from the whole vocal stem and the lead
-    model is installed now (the lead vocal is separated first: about a minute, once per song), when the lyrics changed
-    (their syllables cut the bars: the first time they're timed on the lead vocal, 10-20 s on a GPU), or when it was read
-    without a model that's there now. On the GPU unless a separation has it (then on the CPU, a minute or so). With unsplit
-    parts, those take the notes of all the vocals, read once (a few seconds) and kept in melody.json as "full"."""
+def get_melody(song_id: str, renew: bool = False) -> dict:
+    """Cached melody.json. Rebuilt when it came from the whole vocal stem and the lead model is installed now (the lead
+    vocal is separated first: about a minute, once per song), when the lyrics changed (their syllables cut the bars: the
+    first time they're timed on the lead vocal, 10-20 s on a GPU), or when it was read without a model that's there now;
+    and, with renew, when the logic that read it or timed its syllables has moved on (else it's opened as it is, see
+    _melody_outdated). On the GPU unless a separation has it (then on the CPU, a minute or so). With unsplit parts, those
+    take the notes of all the vocals, read once (a few seconds) and kept in melody.json as "full"."""
     import melody
     folder = _song_dir(song_id)
     path = os.path.join(folder, "melody.json")
@@ -3063,9 +3072,9 @@ def get_melody(song_id: str) -> dict:
         ready = _load_json(path) if os.path.isfile(path) else None
     except ValueError:
         ready = None
-    if ready and "full" in ready and ready.get("lead") and (ranges := _read_meta(folder).get("unsplit")) and not _melody_outdated(folder, ready):
+    if ready and "full" in ready and ready.get("lead") and (ranges := _read_meta(folder).get("unsplit")) and not _melody_outdated(folder, ready, renew):
         return _splice(ready, ranges)  # (read already: no waiting either)
-    if ready and not _melody_outdated(folder, ready) and not (_read_meta(folder).get("unsplit") and ready.get("lead")):
+    if ready and not _melody_outdated(folder, ready, renew) and not (_read_meta(folder).get("unsplit") and ready.get("lead")):
         return {k: v for k, v in ready.items() if k != "full"}
     with _melody_lock:
         data = None
@@ -3074,7 +3083,7 @@ def get_melody(song_id: str) -> dict:
                 data = _load_json(path)
             except ValueError:
                 data = {}  # damaged: built again below
-            if _melody_outdated(folder, data):
+            if _melody_outdated(folder, data, renew):
                 data = None
         vocals = os.path.join(folder, "vocals.mp3")
         if data is None:
@@ -3112,9 +3121,10 @@ def get_melody(song_id: str) -> dict:
         return _splice(data, ranges)
 
 
-# Songs made by older logic, brought up to date in the background once the server starts, one at a time, newest
-# first: their lyrics lined up again when LYRICS_VERSION has moved on (their syllables and bars follow), else their
-# bars read again when melody.VERSION or syllables.VERSION has. The library shows the one being done (its cover
+# Songs made by older logic, brought up to date in the background once that's asked for (a song's own button or the
+# library's Update: update_state), one at a time, newest first: their lyrics lined up again when LYRICS_VERSION has
+# moved on (their syllables and bars follow), else their bars read again when melody.VERSION or syllables.VERSION has.
+# Until then a song opens with what it has. The library shows the one being done (its cover
 # dimmed under a ring, library()'s "upgrade"); Practice opened on it meanwhile waits for its bars (on a lyrics
 # job: has what it had, then the new). Only the bars' own models (rmvpe.pt, the lead vocal's) are downloaded for it.
 # Lyrics that would need a Whisper model that isn't here are left as they are; bars whose syllable models aren't here are
@@ -3130,7 +3140,7 @@ def _lyrics_outdated(folder: str) -> bool:
 
 def _melody_job(job, song_id: str):
     _set(job, status="running", stage="Reading the melody again", progress=0)
-    get_melody(song_id)
+    get_melody(song_id, renew=True)
 
 
 _singing_until = 0.0  # a page is playing a song until about then (singing)
@@ -3173,31 +3183,61 @@ def _outdated(folder: str) -> bool:
         return False
 
 
-# Re-timing every song after an update takes minutes and the GPU, so the page asks first (update_offer, as it opens): until
-# it's answered, launching starts nothing of it. "now": start_upgrades with timing; "later": without (each song is worked
-# out again when it's opened, get_melody). Asked again at the next launch.
+# Re-timing songs after an update takes minutes and the GPU, and moves what the singer has got used to, so nothing of it starts
+# by itself: a song keeps the timing it has, and its page asks (update_state: the button left of Download, opened by itself on
+# the first song after an update). There: this song (retime_song) or all of them (answer_update: start_upgrades with timing).
+# The library's Update is all of them too.
 _update_answer = None
 _timing_run = False  # start_upgrades with timing is going through the songs
 UPDATE_SONG_S = 15  # about how long a song takes, for the question's estimate
 
 
 def update_offer() -> dict | None:
-    """{songs, min} while songs wait to be worked out again and the question hasn't been answered; else None."""
-    if _update_answer is not None or not installed():
-        return None
-    n = sum(_outdated(_song_dir(m["id"])) for m in library())
-    return {"songs": n, "min": max(1, round(n * UPDATE_SONG_S / 60))} if n else None
+    """Nothing: the question the page asked as it opened (index.html's SAVED_UPDATE, app.js askUpdate) is now asked on a song's page."""
+    return None
 
 
-def update_state() -> dict:
-    """For the library's Update button: {songs, min} waiting to be worked out again, and whether that's under way."""
+def update_state(song_id: str | None = None) -> dict:
+    """For the library's Update button and a song's own: {songs, min} waiting to be worked out again, whether that's under way, v (the logic
+    now, as one word: what the page has asked about already), and for song_id: old (it's one of them), job (it's being done now)."""
+    import melody
+    import syllables
     n = sum(_outdated(_song_dir(m["id"])) for m in library()) if installed() else 0
-    return {"songs": n, "min": max(1, round(n * UPDATE_SONG_S / 60)) if n else 0, "running": _timing_run}
+    out = {"songs": n, "min": max(1, round(n * UPDATE_SONG_S / 60)) if n else 0, "running": _timing_run, "v": f"{LYRICS_VERSION}.{melody.VERSION}.{syllables.VERSION}"}
+    if song_id:
+        job = get_job(_retiming.get(song_id, "")) or (get_job(_upgrading["job"] or "") if _upgrading["id"] == song_id else None)
+        out["job"] = job["id"] if job and job["status"] in ("queued", "running") else None
+        out["old"] = bool(installed() and not out["job"] and _outdated(_song_dir(song_id)))
+    return out
+
+
+_retiming: dict[str, str] = {}  # song id -> the job timing it again by itself (retime_song)
+
+
+def retime_song(song_id: str) -> str | None:
+    """One song worked out again now, asked for on its page: its lyrics lined up again where that logic moved on (its syllables and melody
+    follow), else its melody and syllables read again. Returns its job, or None with nothing to do or all of them under way (it gets its turn)."""
+    folder = _song_dir(song_id)
+    running = get_job(_retiming.get(song_id, ""))
+    if running and running["status"] in ("queued", "running"):
+        return running["id"]
+    if _timing_run or not installed():
+        return None
+    if _lyrics_outdated(folder):
+        job_id = start_lyrics(song_id, None, again=True)
+    elif os.path.isfile(os.path.join(folder, "melody.json")) and _melody_outdated(folder, _load_json(os.path.join(folder, "melody.json"))):
+        job = _new_job("melody")
+        job["songId"] = song_id
+        job_id = _run(job, _melody_job, song_id)
+    else:
+        return None
+    _retiming[song_id] = job_id
+    return job_id
 
 
 def answer_update(now: bool) -> bool:
-    """The page's answer: to update_offer at launch, or the library's Update button later (now). Returns whether songs are being
-    worked out again."""
+    """All the songs that wait, worked out again (now): a song's own button with "all songs" ticked, or the library's Update. Returns
+    whether songs are being worked out again."""
     global _update_answer
     first = _update_answer is None
     if now or first:

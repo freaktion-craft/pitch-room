@@ -1131,7 +1131,7 @@ async function singSong(m, btn) {
   let mel, lyr;
   try {
     if (!P.song || P.song.id !== m.id) await openSong(m);
-    const r = await fetch("/api/melody/" + m.id); // first: it's what brings an older song's syllables up to date, that the lyrics then come with
+    const r = await fetch("/api/melody/" + m.id); // first: it's what times a song's syllables where its lyrics are newer than they are, that the lyrics then come with
     mel = await r.json();
     if (!r.ok) throw new Error(mel.error || "Couldn’t read the melody.");
     lyr = await fetch(`/api/library/${m.id}/lyrics`, { cache: "no-store" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
