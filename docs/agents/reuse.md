@@ -55,6 +55,10 @@ one at run time, but not by code that runs while the earlier file loads.
   list, and it runs again when the naming or key changes.
 - Lighting and centring: `renderKeys`/`centerKeys` (Practice). Copies: `vcKeys` and the scroll in `voiceShow`
   (`voice.js`).
+- Typing the piano (the Lab, `VK` in `voice.js`): the home row is the white keys from `VK.base`, the row above the
+  black ones, by `e.code`; Z and X move it. `vkLayout` makes the map, `vkPaint` puts a key's letter on it (`data-k`,
+  `stage.css`), `vkDown`/`vkUp` hold and let go a note (`playKey`'s gain). It takes its keys before the page's
+  shortcuts (capture, `stopImmediatePropagation`) and is off in a run. A second typed keyboard reuses these.
 
 ## Audio and the mic
 

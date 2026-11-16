@@ -105,6 +105,11 @@
 .key.w { width: 26px; height: 84px; background: var(--key-w); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); border-radius: 0 0 var(--radius-xs) var(--radius-xs); margin-right: -1px;
   display: flex; align-items: end; justify-content: center; font: 9px var(--mono); color: rgba(0, 0, 0, 0.62); padding-bottom: var(--space-1); }
 .key.b { position: absolute; top: 0; width: 16px; height: 52px; background: var(--key-b); border-radius: 0 0 var(--radius-xs) var(--radius-xs); z-index: 1; }
+/* a key the computer's keyboard plays (the Lab's typing, voice.js vkPaint): its letter on it, above a C's name on a white key, at the foot of a black one */
+.key.w[data-k] { position: relative; }
+.key[data-k]::before { content: attr(data-k); position: absolute; left: 0; right: 0; text-align: center; font: 700 9px var(--mono); }
+.key.w[data-k]::before { top: 57px; color: rgba(0, 0, 0, 0.78); }
+.key.b[data-k]::before { bottom: var(--space-1); color: rgba(255, 255, 255, 0.82); }
 /* your colour as each key shows it: held to a lightness that stands 3:1 off the key (--key-w-lit, --key-b-lit), and its
    tint for a key pointed at, as light for every colour (--key-w-tint, --key-b-tint). Each in your colour's hue, with no
    more chroma than every colour can have at its lightness (one the screen can't show is clipped, which turns its hue):

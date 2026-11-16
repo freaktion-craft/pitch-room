@@ -171,6 +171,7 @@ function vcStart(m, arrow = false) {
 // none), and the vowel picked (none while Scales is on a trill: paintScale)
 function paintLab() {
   const m = vcShown();
+  $("#vkBtn").disabled = !!(SV.run || RV.run || MV.run); // (typing the piano: between runs)
   $(".vc-step").hidden = m == null;
   if (m != null) say($("#vcStepLbl"), VC.view === "scale" ? (SV.run ? "Key" : "Start note") : VC.view === "reach" || MV.run ? "Target" : "Centre");
   vcGuide();
@@ -349,6 +350,7 @@ function paintVoiceRead() {
   setText("vcNote", m == null ? "–" : absName(m)); vcGuide(); // (the names as set now)
   const c = m == null ? null : Math.round((m - Math.round(m)) * 100);
   setText("vcCents", c == null ? "" : (c > 0 ? "+" : c < 0 ? "−" : "±") + Math.abs(c) + "¢");
+  setText("vkYou", shown.vcNote); setText("vkCents", shown.vcCents); // (the same, beside the note the typed keys play: vkPaint)
   $("#vcNeedle").style.left = (c == null ? 50 : 50 + c) + "%";
   $("#vcNeedle").style.opacity = c == null ? 0 : 1;
   const db = (v) => (v == null ? "–" : (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " dB");
@@ -384,7 +386,7 @@ function voiceShow() {
 }
 // Left (route): Scales' set stopped, its call hushed (a pattern queued on the piano would play on over the next page); the
 // mic with the echo filter again, if it's set
-function voiceHide() { if (SV.run) scAbort(); if (RV.run) rvAbort(); if (MV.run) mvAbort(); if (micOn && micAsked !== micEcho()) restartMic(); }
+function voiceHide() { vkOff(); if (SV.run) scAbort(); if (RV.run) rvAbort(); if (MV.run) mvAbort(); if (micOn && micAsked !== micEcho()) restartMic(); }
 // The view: Scales, Reach, Match, the spectrogram or the EQ (the spectrogram's to begin with); the mic's ask (#vcOff) over
 // whichever's shown. Leaving Scales, Reach or Match stops its run.
 function vcShowView(v) {
@@ -397,7 +399,80 @@ function vcShowView(v) {
   for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
   paintLab(); paintScale(); paintReach(); paintMatch();
 }
+// ---------- typing the piano ----------
+// The computer's keys as the piano, laid out as a DAW's: the home row is the white keys up from VK.base (a C or an F), the row
+// above it the black keys between them. By where a key is (e.code), not its letter, so it's the same while typing Korean.
+// Z and X move it an octave, with Shift half of one (C to F to the next C). On by its button, and only between runs: a run has
+// its own keys, and in Match the answer could be played. A key sounds while it's held. The mic goes on being read (vcPlay hushes
+// it only in a run), so the note you sing shows beside the one you play; on speakers the piano can be read as you.
+const VK_HOME = ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote"];
+const VK_TOP = ["KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft"]; // (VK_TOP[i] sits between VK_HOME[i] and the next)
+const VK_CAP = { Semicolon: ";", Quote: "'", BracketLeft: "[" };
+const VK_BASES = [36, 41, 48, 53, 60, 65, 72]; // where A can be: C2 to C5 (from C5 the row runs past the keyboard's top, C6: the keys after K play nothing)
+const VK_HOLD = 6, VK_LET_GO = 0.08; // s: the longest a held key sounds; how fast it dies away when let go
+const VK = { on: false, base: 60, map: new Map(), held: new Map() }; // map: e.code -> MIDI; held: e.code -> { m, g: its gain }
+const vkBlack = (m) => [1, 3, 6, 8, 10].includes(((m % 12) + 12) % 12);
+function vkLayout() {
+  VK.map = new Map();
+  let m = VK.base;
+  VK_HOME.forEach((code, i) => {
+    if (i && vkBlack(++m)) { if (m <= KEY_HI) VK.map.set(VK_TOP[i - 1], m); m++; } // the black key between this white one and the last, where there is one
+    if (m <= KEY_HI) VK.map.set(code, m);
+  });
+}
+// The letters on the keys they play, the range in words, and the note being played (the last key still held)
+function vkPaint() {
+  $("#vkBtn").setAttribute("aria-pressed", String(VK.on));
+  $("#vkRange").hidden = $("#vkRead").hidden = !VK.on;
+  vcKeyEls.forEach((b) => { delete b.dataset.k; });
+  if (!VK.on) return;
+  for (const [code, m] of VK.map) { const b = vcKeyEls.get(m); if (b) b.dataset.k = VK_CAP[code] || code.slice(3); }
+  const ms = [...VK.map.values()], lo = Math.min(...ms), hi = Math.max(...ms);
+  say($("#vkRange"), "{a}–{b} · Z and X move it an octave, with Shift half", { a: () => absName(lo), b: () => absName(hi) });
+  const wrap = $("#vcKeys").parentElement, a = vcKeyEls.get(lo), b = vcKeyEls.get(hi); // all of the range in view
+  if (a && b && (a.offsetLeft < wrap.scrollLeft || b.offsetLeft + b.offsetWidth > wrap.scrollLeft + wrap.clientWidth)) wrap.scrollTo({ left: (a.offsetLeft + b.offsetLeft) / 2 - wrap.clientWidth / 2, behavior: "smooth" });
+  vkRead();
+}
+function vkRead() { const last = [...VK.held.values()].pop(); setText("vkPlay", last ? absName(last.m) : "–"); }
+function vkSet(on) { VK.on = on; store.set("vcType", on); if (!on) vkOff(); vkPaint(); }
+function vkMove(up, half) {
+  const i = VK_BASES.indexOf(VK.base) + (up ? 1 : -1) * (half ? 1 : 2);
+  if (i < 0 || i >= VK_BASES.length) return; // (as far as it goes)
+  vkOff(); VK.base = VK_BASES[i]; store.set("vcTypeBase", VK.base); vkLayout(); vkPaint();
+}
+function vkDown(e) {
+  if (!VK.on || view !== "voice" || SV.run || RV.run || MV.run || ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const move = e.code === "KeyZ" || e.code === "KeyX", m = VK.map.get(e.code);
+  if (!move && m == null) return;
+  e.preventDefault(); e.stopImmediatePropagation(); // (the page's own shortcuts don't get a key the piano has)
+  if (e.repeat) return;
+  if (move) return vkMove(e.code === "KeyX", e.shiftKey);
+  if (VK.held.has(e.code)) return;
+  VK.held.set(e.code, { m, g: playKey(m, VK_HOLD) });
+  vcKeyEls.get(m)?.classList.add("down"); vkRead();
+}
+function vkUp(code) {
+  const h = VK.held.get(code);
+  if (!h) return;
+  VK.held.delete(code);
+  try { h.g.gain.cancelScheduledValues(ac.currentTime); h.g.gain.setTargetAtTime(0, ac.currentTime, VK_LET_GO); setTimeout(() => h.g.disconnect(), 1000); } catch (e) { /* (gone already) */ }
+  if (![...VK.held.values()].some((x) => x.m === h.m)) vcKeyEls.get(h.m)?.classList.remove("down");
+  vkRead();
+}
+function vkOff() { for (const code of [...VK.held.keys()]) vkUp(code); } // every key let go: the window left, the range moved, typing turned off
+function initType() {
+  VK.on = store.get("vcType", false) === true;
+  VK.base = VK_BASES.includes(store.get("vcTypeBase", 60)) ? store.get("vcTypeBase", 60) : 60;
+  vkLayout(); vkPaint();
+  $("#vkBtn").onclick = () => vkSet(!VK.on);
+  document.addEventListener("keydown", vkDown, true);
+  document.addEventListener("keyup", (e) => vkUp(e.code), true);
+  addEventListener("blur", vkOff);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) vkOff(); });
+}
+
 function initVoice() {
+  initType();
   // the header's Lab tab: in, and the mic on with it (this click lets it start)
   $("#tabLab").onclick = () => { if (view !== "voice") startMic(); };
   $("#vcMic").onclick = () => startMic();

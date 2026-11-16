@@ -317,7 +317,16 @@
 @media (max-width: 760px) { .vc-match { height: 52vh; } }
 /* the view's note (Scales' start, Reach's note, Match's centre) between a semitone down and up, in the keyboard's card beside the keys
    at the right; held on pitch in Find, its button fills from the left */
-.vc-keys { display: flex; align-items: center; gap: var(--space-8); }
+.vc-keys { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-8); }
+/* above the keys, all the card's width: typing the piano. Its button (lit in your colour while it's on), the range in words, and at the right the note the keys play and the one you sing */
+.vc-type { flex: 0 0 100%; display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-md); font-size: var(--text-sm); }
+#vkBtn[aria-pressed="true"] { background: var(--voice-fill); color: var(--on-fill); }
+.vk-range { color: var(--muted); font-variant-numeric: tabular-nums; }
+.vk-read { margin-left: auto; display: flex; align-items: baseline; gap: var(--space-2); font-variant-numeric: tabular-nums; }
+.vk-read span { color: var(--muted); }
+.vk-read b { min-width: 4ch; font-size: var(--text-xl); font-weight: var(--weight-medium); line-height: 1; }
+.vk-read b + span { margin-left: var(--space-4); }
+.vk-read i { min-width: 5ch; font: var(--text-sm) var(--mono); font-style: normal; color: var(--muted); }
 .vc-step { display: grid; flex: none; width: 240px; margin-left: auto; gap: var(--space-2); font-size: var(--text-sm); }
 .vc-step b { font-weight: var(--weight-medium); }
 .vc-step p { margin: 0; }
