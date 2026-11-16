@@ -58,7 +58,6 @@ const SC = {
   unread: 0.4, readMin: 0.6,    // a key with more than 40% of its notes unread is unread; clean needs ≥ 60% read
   drift: 20, driftMin: 10, driftShare: 0.75, // whole key off one way: the median beyond 20 c, 75% of read notes past 10 c,
   driftSpread: 20,              // and they're off by much the same: within 20 c of it (median), missed or not
-  turnNear: 1, tzMin: 4, tzGap: 15, // st; notes; percentage points
   up: 12, past: 2, days: 60     // keys up at most; semitones past the best; day rows kept
 };
 // (turn.js's weighted medians; not declared again here: in the page every script shares one scope)
@@ -307,7 +306,7 @@ function scOctave(P, N) {
   return best;
 }
 // One key's response, judged. xs: its samples {t, w, m, v} (m null: not pitched, or pitched an octave off; v: voiced);
-// N: the notes played (keys); opts.turn: the vowel's turn (or null); opts.early: the singer came in before reading began.
+// N: the notes played (keys); opts.early: the singer came in before reading began.
 // The whole response's octave o first (sung an octave from the piano is judged there); then each note's core (scCentre:
 // its voice's start and end trimmed off) against its target T: good within SC.good cents, close within SC.close, else a
 // miss; skip: not sung (under SC.minHeard ms voiced, or SC.minNote long); short: heard, but voiced under SC.minNote (too
@@ -318,8 +317,7 @@ function scOctave(P, N) {
 // good (the highest key sung cleanly), else null.
 function scJudge(xs, N, opts = {}) {
   const K = N.length, P = xs.filter((s) => s.m != null);
-  const tz = { k: 0, n: 0 }, rs = { k: 0, n: 0 };
-  const res = { ok: -1, o: 0, T: N.slice(), notes: [], good: 0, close: 0, miss: 0, skip: 0, short: 0, oct: 0, unread: 0, judged: 0, heard: 0, clean: false, top: null, worst: null, drift: null, tz, rs };
+  const res = { ok: -1, o: 0, T: N.slice(), notes: [], good: 0, close: 0, miss: 0, skip: 0, short: 0, oct: 0, unread: 0, judged: 0, heard: 0, clean: false, top: null, worst: null, drift: null };
   if (P.reduce((u, s) => u + s.w, 0) < SC.minCore) {
     res.notes = N.map((tgt, k) => ({ k, tgt, a: null, b: null, m: null, c: null, st: "unread" }));
     res.unread = K;
@@ -411,12 +409,6 @@ function scJudge(xs, N, opts = {}) {
     const share = read.filter((nt) => Math.sign(nt.c) === sg && Math.abs(nt.c) > SC.driftMin).length / read.length;
     const spread = scMedian(read.map((nt) => Math.abs(nt.c - med)));
     if (sg && share >= SC.driftShare && Math.abs(med) > SC.drift && spread <= SC.driftSpread) res.drift = { dir: sg, c: Math.round(med) };
-  }
-  // at the turn and the rest (each note judged: an unread one isn't)
-  for (const nt of res.notes) {
-    if (nt.st === "unread") continue;
-    const z = opts.turn != null && Math.abs(nt.tgt - opts.turn) <= SC.turnNear ? tz : rs;
-    z.n++; if (nt.st === "good") z.k++;
   }
   return res;
 }

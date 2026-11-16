@@ -251,6 +251,8 @@ Each was asked for. A change that undoes one needs the owner's word.
 - Takes are practice notes: no scores, no progress chart.
 - No hearing yourself through the browser (no monitoring).
 - The app starts in English; Korean once picked.
+- The Lab has no Turn view (Find and Smooth): too hard to understand, and the least sure of its measures. What it
+  read from the harmonics stays for the note shown, the EQ and the side's numbers (`turn.js`).
 - Updates download the whole installer.
 - The song picker asks at 40% sure or less, with nothing ticked until you pick.
 - Scales' hide-my-line is a plain eye, not a struck-out one.

@@ -61,11 +61,11 @@ Each area keeps its state in one short capitalised object.
 | `takes.js` | `R` recording, latency Sync; `T` the take list |
 | `takes-studio.js` | `TS`: Takes Studio |
 | `stage.js` | Practice canvas; `C` (canvas colours); accent and theme; the main `loop()` |
-| `turn.js` | `TN`: the Lab's Turn measures (harmonic levels, the turn, a pass's break or step). Pure, runs in Node |
+| `turn.js` | `TN`: what the Lab reads from a frame's harmonics (their levels, the pitch put right an octave down on a yell: `tnRead`, `tnHold`), the judges' weighted medians (`tnMed`, `wmed`) and the timings a call and response share. Pure, runs in Node. Named for the Turn view, which is gone |
 | `scale.js` | `SC`, `SC_PATS`: the Lab's Scales judging (`scAlign`, `scJudge`, `scStep`). Pure, runs in Node |
 | `reach.js` | `RC`, `RC_WAYS`: the Lab's Reach judging (`rcJudge`, `rcEnd`, `rcStep`): ways onto one note, read for arriving, settling, holding, breaks, and how even the level stayed. Pure, runs in Node |
 | `match.js` | `MT`: the Lab's Match judging (`mtJudge`, `mtEnd`: where one sung note landed, in cents) and choosing (`mtPick`, `mtGrade`: Leitner boxes per note; a miss back after one other; a new note once all in play are got twice running). Pure, runs in Node |
-| `voice.js` | `VC`: the Lab page, its mic and pitch frames (`VC.fr`), and the Turn view |
+| `voice.js` | `VC`: the Lab page, its mic and pitch frames (`VC.fr`), the Spectrogram and the EQ |
 | `voice-scale.js` | `SV`: the Lab's Scales view (call and response at the piano) |
 | `voice-reach.js` | `RV`: the Lab's Reach view; Practice's note menu (a right-click on a bar, or N), sending a note there (`sendToLab`) |
 | `voice-match.js` | `MV`: the Lab's Match view (one piano note, sung back; the notes in play and how familiar each is, kept in `voiceMatch`) |
