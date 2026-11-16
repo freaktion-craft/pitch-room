@@ -19,7 +19,7 @@ const RC = {
                                 //   to 0.7 of the vibrato's width off its centre; 100 read ±100 c vibrato unsteady at 30 fps,
                                 //   180 read a 1.5 Hz wobble steady)
   steady: 0.3,                  // st: settled, the trend within this of where the voice ended up (the last hold/2 ms)
-  hold: 1000,                   // ms held steady, as Find holds a note (TN.hold)
+  hold: 1000,                   // ms held steady
   settle: 500,                  // ms from arriving to settled: past this, slow to settle (the tracker's own line lags ~110 ms
                                 //   on a clean voice: the lesson report's check; singers' corrections take 197–259 ms, Grell
                                 //   et al. 2009)
@@ -30,7 +30,7 @@ const RC = {
                                 //   up to 20 st/s, and a frame's slip (an octave misread) doesn't stay
   jumpStay: 0.75,               // (the share of jump that has to stay)
   clip: 2,                      // st: the trend's mean leaves out what's further than this from its median (SC.clip)
-  gap: 80,                      // ms unvoiced within the slide: a break (TN.gap)
+  gap: 80,                      // ms unvoiced within the slide: a break
   release: 100,                 // ms off the response's end (the voice falling away as it stops)
   octWin: 250,                  // ms: the octave sung, from the response's first pitched ms (as Scales' o0)
   minRead: 300,                 // ms pitched in all, else not read
@@ -45,7 +45,7 @@ const RC = {
   // 70/2, 2013, p. 191). So a rise (or fall) of up to rise dB a semitone of the pitch moved is let be, as is the level held
   // as it was; past that band by lvlTol dB, it got louder (or softer) toward that note.
   rise: 0.5,                    // dB a semitone (6 dB an octave, Titze's)
-  lvlTol: 4,                    // dB past the band (Smooth's step in loudness, TN.loud)
+  lvlTol: 4,                    // dB past the band
   lvlWin: 250,                  // ms: each read of the level, the median over this; the first, from the way's first note on,
                                 //   what the rest is against
   lvlMin: 0.6                   // of the time from the first note to the hold's end with a level, else it isn't read (the

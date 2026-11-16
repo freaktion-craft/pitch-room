@@ -42,7 +42,8 @@ one at run time, but not by code that runs while the earlier file loads.
   start a second detector or analyser for pitch.
 - The Lab's judges (`turn.js`, `scale.js`, `reach.js`, `match.js`) are pure and run in Node: new maths for them stays
   DOM-free and reaches the others through the `typeof module` shim at their top. Medians: `scMedian` there, `middle` in
-  `stage.js`. Copies: `tnMed`, `wmed` (`turn.js`).
+  `stage.js`. Copies: `tnMed`, `wmed` (`turn.js`, which also holds the timings every call and response shares:
+  `TN.mute`, `TN.wait`, `TN.stall`).
 
 ## Piano keyboard
 
@@ -181,8 +182,7 @@ No shared helper. The recipe each one follows: `setPointerCapture` only after a 
 - Redrawing: `repaintCanvases()` redraws the static canvases on a theme switch. `setAccent` and `setVibrant` only call
   `readColors()`: a static canvas that must follow your colour needs its redraw there too.
 - Canvas setup: device pixel ratio capped at 2 (`Math.min(2, devicePixelRatio || 1)`), as every canvas has it.
-- Lab drawing: `scRound`, `scHalo`, `scMark` (`voice-scale.js`); `vcNames`, `vcVline`, `vcTrace`, `vcMine`, `vcTone`
-  (`voice.js`). Practice's `rr` is tied to the stage's context; elsewhere use `scRound` or `ctx.roundRect`.
+- Lab drawing: `scRound`, `scHalo`, `scMark` (`voice-scale.js`); `vcVline`, `vcMine` (`voice.js`). Practice's `rr` is tied to the stage's context; elsewhere use `scRound` or `ctx.roundRect`.
 
 ## Copies not yet folded together
 
@@ -193,8 +193,8 @@ Each pair below does one job twice. Use the first; folding them is a change of i
 | Menu of actions | song menu (`library.js`) | `noteMenu`, `scMenu`, `edExportMenu` |
 | Panel under a button | `showEars` (`practice.js`) | `showLive` (`live.js`) |
 | Fold-open form | `foldBox` (`adding.js`) | `lyricsBox` |
-| Lab status line | `vcSay` (`voice.js`) | `scSay`, `rvSay`, `mvSay` (the last two re-do `vcTitles`) |
-| Lab canvas set-up | `drawTurn` (`voice.js`) | `drawScale`, `drawReach`, `drawMatch`, `drawSpec`, `drawEq` |
+| Lab status line | `scSay` (`voice-scale.js`) | `rvSay`, `mvSay` (both re-do `vcTitles`) |
+| Lab canvas set-up | `drawScale` (`voice-scale.js`) | `drawReach`, `drawMatch`, `drawSpec`, `drawEq` |
 | Rounded rect | `scRound` / `ctx.roundRect` | `rr` (stage only) |
 | Peaks | `computePeaks` (`studio.js`) | `takePeaks`, `tsClipWave`, `lyedit.js` |
 | Today / yesterday / a date | `cpDay` (`library.js`) | `newDay`, `daysAgo`/`dayName`/`longDate` (`takes.js`), `vcToday` |
