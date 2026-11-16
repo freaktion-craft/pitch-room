@@ -23,13 +23,15 @@ Windows and macOS only.
     the whole installer, then `standIn` shows a PowerShell stand-in splash (`update-splash.ps1`) while the installer
     runs.
   - Self-update (macOS, packaged, not WIP): `updateMac` (`desktop/mac-update.js`), in the splash too. The app's unsigned,
-    so not electron-updater (Squirrel.Mac takes only a signed app): `latest-mac.yml` read, this Mac's zip downloaded
+    so not electron-updater (Squirrel.Mac takes only a signed app): the newest release with Mac files found
+    (`newestRelease`), its `latest-mac.yml` read, this Mac's zip downloaded
     to the temp folder and its sha512 checked, unpacked with `ditto` and its version checked, then a detached `sh`
     script waits for the app to quit, moves the old `.app` aside, puts the new one in its place (the old one back if
     that fails) and opens it. Skipped where it can't swap the app (run from a disk image, App Translocation, a folder
     it can't write) or on any failure: the app starts as it is.
   - Dev runs, and a Mac that couldn't update itself, get a "newer version" dialog that opens pitchroom.dev
-    (`checkUpdates`).
+    (`checkUpdates`), for the newest release that has this system's update file (`newestRelease`), not GitHub's
+    "latest".
   - The automatic update check runs 8 s after start on builds that don't self-update (and not WIP). "Check for
     Updates…" (File menu on Windows, the app menu on macOS) runs it by hand on every build.
   - Menu: Help → Show Log, Third-Party Notices, Open Data Folder, Pitchroom Releases.
@@ -128,9 +130,10 @@ scripts/release-mac.mjs [vX.Y.Z]`; the latest published release by default) adds
 - Like the Windows build made here, it includes `icons.local.js` when this checkout has it.
 
 **macOS and a Windows-only release:** it becomes "latest" with no `.dmg` (until `release-mac` adds the Mac files). The site then offers Mac
-visitors the newest `.dmg` from an earlier release, and the macOS app's update check offers a version it can't get.
-1.0.12-1.0.14 carried the previous release's Mac files over; 1.0.15 on did not. Which practice to keep is the owner's
-call: ask.
+visitors the newest `.dmg` from an earlier release, and the macOS app neither updates to it nor offers it: both look
+for the newest release holding `latest-mac.yml` (`newestRelease` in `main.js`, `releaseWith` in `mac-update.js`).
+Mac apps up to 1.0.32 still read GitHub's "latest" and offer a version they can't get, until they've updated once.
+1.0.12-1.0.14 carried the previous release's Mac files over; 1.0.15 on did not.
 
 Notes:
 

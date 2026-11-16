@@ -286,6 +286,23 @@ async function updateFirst() { // true: it's installing, the app's about to quit
     return false;
   }
 }
+// The newest release this system can get (mac-update.js, releaseWith: the newest holding its update file, not GitHub's
+// "latest"), or null with none. Asked once a minute at most: the Mac asks at the splash and again for checkUpdates, and
+// GitHub answers 60 times an hour.
+const UPDATE_FILE = process.platform === "darwin" ? "latest-mac.yml" : "latest.yml";
+let relAsked = 0, relAnswer = null;
+function newestRelease() {
+  if (relAnswer && Date.now() - relAsked < 60000) return relAnswer;
+  relAsked = Date.now();
+  relAnswer = fetch(`https://api.github.com/repos/${RELEASES}/releases?per_page=10`, { headers: { Accept: "application/vnd.github+json" } })
+    .then(async (r) => {
+      if (r.status === 404) return null; // (no releases yet)
+      if (!r.ok) throw new Error(`releases: ${r.status}`);
+      return require("./mac-update").releaseWith(await r.json(), UPDATE_FILE);
+    });
+  relAnswer.catch(() => { relAnswer = null; }); // (not answered: asked again next time)
+  return relAnswer;
+}
 // macOS: as Windows' (updateFirst), by mac-update.js. True: the new one's going in, the app's about to quit.
 async function updateMac() {
   const mu = require("./mac-update");
@@ -293,8 +310,15 @@ async function updateMac() {
   if (!bundle) return false; // somewhere a new one can't be put in its place: offered as a download instead (checkUpdates)
   try {
     status("Checking for updates…");
-    const text = await within(5000, fetch(`https://github.com/${RELEASES}/releases/latest/download/latest-mac.yml`)
-      .then((r) => { if (!r.ok) throw new Error(`latest-mac.yml: ${r.status}`); return r.text(); }));
+    // the newest release with Mac files, its latest-mac.yml; GitHub's list not answering (its hourly limit), the latest
+    // release's, as before: there or not
+    const text = await within(5000, (async () => {
+      const rel = await newestRelease().catch(() => undefined);
+      if (rel === null) return "";
+      const r = await fetch(`https://github.com/${RELEASES}/releases/${rel ? `download/${rel.tag_name}` : "latest/download"}/latest-mac.yml`);
+      if (!r.ok) throw new Error(`latest-mac.yml: ${r.status}`);
+      return r.text();
+    })());
     const { version: v, files } = mu.parseInfo(text), file = mu.zipFor(files, process.arch);
     if (!v || !file || !newer(v, app.getVersion())) return false;
     const dir = path.join(app.getPath("temp"), `pitchroom-update-${v}`);
@@ -344,9 +368,7 @@ function standIn() {
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 async function checkUpdates(asked) {
   try {
-    const r = await fetch(`https://api.github.com/repos/${RELEASES}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
-    if (r.status === 404) { if (asked) dialog.showMessageBox(win, { message: "You have the latest Pitchroom", detail: `Version ${app.getVersion()}.` }); return; }
-    const rel = await r.json(), v = String(rel.tag_name || "").replace(/^v/, "");
+    const rel = await newestRelease(), v = String((rel && rel.tag_name) || "").replace(/^v/, ""); // (one this system can get)
     if (v && newer(v, app.getVersion())) {
       const { response } = await dialog.showMessageBox(win, {
         message: `Pitchroom ${v} is out`, detail: `You have ${app.getVersion()}. Download it, then open the new one in place of this.`,
