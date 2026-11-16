@@ -1,7 +1,7 @@
 {
   "name": "pitchroom",
   "productName": "Pitchroom",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "private": true,
   "description": "Sing along to any song: its stems, your pitch on the melody, takes to listen back to.",
   "author": "freaktion",
