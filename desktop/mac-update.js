@@ -16,6 +16,11 @@ function parseInfo(text) {
     .map((m) => ({ url: m[1], sha512: m[2], size: Number(m[3]) }));
   return { version, files };
 }
+// The newest release a system can get: of GitHub's list (newest first), the first that's out (not a draft or a
+// prerelease) and holds that system's update file by name (latest-mac.yml, latest.yml); null with none. Not GitHub's
+// "latest": a release is Windows' alone until release-mac.mjs adds the Mac files, and a Mac that asked for the latest
+// was offered a version it couldn't get (1.0.32, for 30 hours).
+const releaseWith = (list, name) => (Array.isArray(list) ? list : []).find((r) => r && !r.draft && !r.prerelease && (r.assets || []).some((a) => a && a.name === name)) || null;
 // this Mac's zip: Apple silicon's with "arm64" in its name, Intel's without
 const zipFor = (files, arch) => files.find((f) => f.url.endsWith(".zip") && /arm64/.test(f.url) === (arch === "arm64")) || null;
 
@@ -97,4 +102,4 @@ function swapAfter(pid, app, fresh, dir, script = SWAP) {
   spawn("/bin/sh", [file, String(pid), app, fresh, path.join(dir, "old.app"), path.join(dir, "swap.log")], { detached: true, stdio: "ignore" }).unref();
 }
 
-module.exports = { parseInfo, zipFor, bundleOf, download, unpack, SWAP, swapAfter };
+module.exports = { parseInfo, releaseWith, zipFor, bundleOf, download, unpack, SWAP, swapAfter };

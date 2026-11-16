@@ -231,6 +231,9 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
   on one PC Pitchroom couldn't be found in Windows' search and its taskbar icon went when it closed. An update itself
   keeps a taskbar pin (tried with a real installer and the installed app); it is lost when the app's exe is missing
   as the installer starts, or on uninstall.
+- **The app asks for the newest release that has its own system's update file, never GitHub's "latest"**: a
+  release is Windows' alone until the Mac files are added, and for 30 hours Macs were told 1.0.32 was out with no Mac
+  build, their own update finding nothing (`newestRelease`, `releaseWith`).
 - **The window's minimum size comes from the page's** (1440 × 880 plus the frame), inside the screen; a smaller saved
   size is raised to it (d806a73).
 - **iPad says it's a Mac**: tell it by `navigator.maxTouchPoints > 1` (b7f0a03).
@@ -256,6 +259,8 @@ Each was asked for. A change that undoes one needs the owner's word.
 - Takes are practice notes: no scores, no progress chart.
 - No hearing yourself through the browser (no monitoring).
 - The app starts in English; Korean once picked.
+- The Lab has no Turn view (Find and Smooth): too hard to understand, and the least sure of its measures. What it
+  read from the harmonics stays for the note shown, the EQ and the side's numbers (`turn.js`).
 - Updates download the whole installer.
 - The song picker asks at 40% sure or less, with nothing ticked until you pick.
 - Scales' hide-my-line is a plain eye, not a struck-out one.

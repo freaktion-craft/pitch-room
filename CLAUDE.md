@@ -114,8 +114,8 @@ Details and recipes: `docs/agents/verifying.md`.
 - **Pro icons never committed.** `icons.local.js` (Hugeicons Pro, gitignored) overrides the free set by name. Never commit
   it or paste Pro paths into `js/helpers.js`.
 - **No secrets or private data** in commits, release notes or docs. Release notes are public.
-- **The Lab's thresholds are guesses.** The Lab (`#voice`: Turn, Scales and Reach) keeps every threshold in `TN`
-  (`js/turn.js`), `SC` (`js/scale.js`), `RC` (`js/reach.js`) and `MT` (`js/match.js`), one for all voices, not yet tried with real voices. Change them there, never
+- **The Lab's thresholds are guesses.** The Lab (`#voice`: Scales, Reach and Match) keeps every threshold in `TN`
+  (`js/turn.js`: what's read from a frame's harmonics), `SC` (`js/scale.js`), `RC` (`js/reach.js`) and `MT` (`js/match.js`), one for all voices, not yet tried with real voices. Change them there, never
   as a special case in the page code, and keep the check scripts passing.
 
 ## Git, PRs and releases

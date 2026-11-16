@@ -222,28 +222,21 @@
   .pr-cols.with-takes .tk-empty { padding: var(--space-4); font-size: var(--text-sm); }
 }
 
-/* The Lab (#voice): Turn (in the view's place: its mode and Go at the top, one line of status and one of what to do
-   under them, the canvas below; the lanes' and the axis's names on it), and beside it the note, the numbers and the
-   vowels; the keyboard under both. */
+/* The Lab (#voice): the view (Scales here: its controls at the top, one line of status and one of what to do under
+   them, the canvas below), and beside it the note, the numbers and the vowels; the keyboard under both. */
 .vc { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--space-3); }
-.vc-pad, .vc-scale { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; }
-#vcPad, #scPad { position: absolute; inset: 0; width: 100%; height: 100%; }
-.vc-ax { position: absolute; font-size: var(--text-sm); color: var(--muted); pointer-events: none; white-space: nowrap; }
+.vc-scale { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; }
+#scPad { position: absolute; inset: 0; width: 100%; height: 100%; }
 .vc-mode { position: absolute; top: var(--space-3); left: var(--space-3); z-index: 1; }
 .vc-go { position: absolute; top: var(--space-3); right: var(--space-3); z-index: 1; }
 .vc-say { position: absolute; top: calc(var(--space-3) + var(--control-md) + var(--space-2)); left: var(--space-4); right: var(--space-4); display: grid; gap: var(--space-half); pointer-events: none; }
 .vc-say p { margin: 0; font-size: var(--text-sm); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: auto; }
-#vcSay, #scSay { color: var(--ink); font-weight: var(--weight-medium); }
-/* (in the colour of what it reports, as the canvas marks it, whatever your accent: vcSay, scSay) */
-#vcSay[data-tone="good"], #scSay[data-tone="good"] { color: var(--good); }
-#vcSay[data-tone="bad"], #scSay[data-tone="bad"] { color: var(--bad); }
-#vcSay[data-tone="step"], #scSay[data-tone="step"] { color: var(--orange); }
-#vcDo, #scDo { color: var(--muted); }
-/* (in Scales the vowels' day bars, Smooth's, are hidden; the rows keep their layout) */
-.vc[data-view="scale"] .vc-bars { visibility: hidden; }
-/* (their tops set from the canvas's plot and lanes, drawTurn) */
-.vc-ax.h2 { top: 96px; left: var(--space-3); pointer-events: auto; }
-.vc-ax.lane { left: var(--space-3); top: 96px; }
+#scSay { color: var(--ink); font-weight: var(--weight-medium); }
+/* (in the colour of what it reports, as the canvas marks it, whatever your accent: scSay) */
+#scSay[data-tone="good"] { color: var(--good); }
+#scSay[data-tone="bad"] { color: var(--bad); }
+#scSay[data-tone="step"] { color: var(--orange); }
+#scDo { color: var(--muted); }
 .vc-side { display: grid; align-content: start; gap: var(--space-4); padding: var(--pad-card); background: var(--surface); border-radius: var(--radius-card); }
 .vc-note { display: flex; align-items: baseline; gap: var(--space-2); min-height: 40px; }
 .vc-note b { font-size: 36px; line-height: 1; font-weight: var(--weight-medium); }
@@ -261,20 +254,14 @@
 .vc-in { display: grid; gap: var(--space-half); font-size: var(--text-xs); }
 .vc-in p { margin: 0; color: var(--muted); }
 .vc-in #vcInSay { color: var(--warn-ink); font-weight: var(--weight-medium); }
-/* the vowels, one a row: its name, its newest turn, and its last 8 days of Smooth (how many passes were even) */
+/* the vowels, one a row */
 .vc-vowels { display: grid; gap: var(--space-half); padding-top: var(--space-4); border-top: 1px solid var(--line); }
-.vc-vowels button { display: grid; grid-template-columns: 1fr auto 40px; align-items: center; gap: var(--space-3); height: var(--control-sm); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-size: var(--text-sm); text-align: left; }
+.vc-vowels button { display: grid; grid-template-columns: 1fr; align-items: center; height: var(--control-sm); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-size: var(--text-sm); text-align: left; }
 .vc-vowels button:hover { background: var(--fill); }
 .vc-vowels button[aria-checked="true"] { position: relative; background: var(--surface-2); } /* picked (its bar at the left: below, with a pattern's) */
-.vc-vowels .vt { font-family: var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.vc-bars { display: flex; align-items: end; gap: 2px; height: 14px; }
-.vc-bars i { flex: 1; min-height: 1px; border-radius: 1px; background: var(--good); }
-.vc-bars i.thin:not(.none) { opacity: .55; }
-.vc-bars i.none { background: var(--line); }
-/* Scales' trills under the vowels: a name alone (no turn, no days); the first a line off them */
-.vc-vowels button[data-on] { grid-template-columns: 1fr; }
+/* Scales' trills under the vowels, the first a line off them */
 .vc-vowels [data-v] + [data-on] { margin-top: var(--space-2); }
-/* Scales' top row, in Turn's mode's and Go's places: at the left the pattern, its name on a button, and beside it your
+/* Scales' top row: at the left the pattern, its name on a button, and beside it your
    line hidden while you sing and the piano slower; at the right, in a set, come down and this key again, then Go. Each
    toggle pressed as Freeze is. (Where it's still too narrow, the pattern's name is cut short.) Its menu: the groups side
    by side, each pattern its name over its degrees */
@@ -306,8 +293,8 @@
   border-radius: var(--radius-pill); background: var(--voice-mark); }
 .sc-deg { font: var(--text-xs) var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) { .sc-pats { grid-template-columns: minmax(0, 1fr); } }
-/* Reach (js/voice-reach.js): as Scales, its ways a segmented row in the pattern's place; its lines as Turn's and Scales',
-   in the colour of what they report */
+/* Reach (js/voice-reach.js): as Scales, its ways a segmented row in the pattern's place; its lines as Scales', in the
+   colour of what they report */
 .vc-reach { position: relative; height: min(60vh, 520px); min-height: 280px; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; }
 #rvPad { position: absolute; inset: 0; width: 100%; height: 100%; }
 #rvSay { color: var(--ink); font-weight: var(--weight-medium); }
@@ -315,7 +302,6 @@
 #rvSay[data-tone="bad"] { color: var(--bad); }
 #rvSay[data-tone="step"] { color: var(--orange); }
 #rvDo { color: var(--muted); }
-.vc[data-view="reach"] .vc-bars { visibility: hidden; }
 /* (the ways on one line, clear of Go, scrolled sideways where they don't fit: a phone) */
 #rvWays { max-width: calc(100% - 2 * var(--space-3) - 80px); overflow-x: auto; scrollbar-width: none; } /* 80: Go and a gap */
 #rvWays button { flex: none; white-space: nowrap; }
@@ -328,9 +314,8 @@
 #mvSay[data-tone="bad"] { color: var(--bad); }
 #mvSay[data-tone="step"] { color: var(--orange); }
 #mvDo { color: var(--muted); }
-.vc[data-view="match"] .vc-bars { visibility: hidden; }
 @media (max-width: 760px) { .vc-match { height: 52vh; } }
-/* the note to sing (Find's first, Smooth's centre) between a semitone down and up, in the keyboard's card beside the keys
+/* the view's note (Scales' start, Reach's note, Match's centre) between a semitone down and up, in the keyboard's card beside the keys
    at the right; held on pitch in Find, its button fills from the left */
 .vc-keys { display: flex; align-items: center; gap: var(--space-8); }
 .vc-step { display: grid; flex: none; width: 240px; margin-left: auto; gap: var(--space-2); font-size: var(--text-sm); }
@@ -347,7 +332,7 @@
 /* the Lab's keyboard as Practice's: from its card's left, as far under what's above it (.keys-wrap, stage.css) */
 @media (max-width: 760px) {
   .vc { grid-template-columns: minmax(0, 1fr); }
-  .vc-pad, .vc-scale, .vc-spec, .vc-eq { height: 52vh; }
+  .vc-scale, .vc-spec, .vc-eq { height: 52vh; }
 }
 
 /* Practice's timeline, under the song's bar: the whole song, the part played filled, a head where it's heard; click or

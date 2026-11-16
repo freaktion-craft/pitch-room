@@ -136,7 +136,7 @@ function respond(sim, N, opts = {}) {
       if (s.t - t0 >= cap) { tEnd = s.t; why = "cap"; break; }
     }
     if (tEnd == null) tEnd = xs[xs.length - 1].t;
-    const res = scJudge(xs.filter((s) => s.t >= t0 - 100 && s.t <= tEnd), N, { turn: opts.turn ?? null, early });
+    const res = scJudge(xs.filter((s) => s.t >= t0 - 100 && s.t <= tEnd), N, { early });
     if (scFalse(res, why)) { from = tEnd; falses++; continue; }
     return { t0, tEnd, why, peakAt, res, early, falses };
   }
