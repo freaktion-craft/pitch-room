@@ -25,7 +25,8 @@ The shared helpers and controls to reuse are in `reuse.md`; bugs already fixed o
 
 - `const SAVED = /*SETTINGS*/null;`: the settings (`stems.get_settings()`).
 - `const SAVED_LIB = /*LIBRARY*/null;`: `{lib, jobs}`, so the library draws at once.
-- `const SAVED_UPDATE = /*UPDATE*/null;`: the re-timing offer; `askUpdate()` in `app.js` asks "Update your songs?".
+- `const SAVED_UPDATE = /*UPDATE*/null;`: the re-timing offer at launch, always null now (`askUpdate()` in `app.js` asked
+  "Update your songs?"); a song's own page asks instead (`paintRetime`, `studio.js`).
 
 They must stay byte-exact: the server replaces the exact strings, and the desktop build throws if one is lost. Opened
 without the server, all three are `null` and settings come from localStorage only.

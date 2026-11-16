@@ -170,6 +170,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Update": "업데이트",
 
   "Update your songs?": "곡을 업데이트할까요?", "Later": "나중에", "Update now": "지금 업데이트",
+  "Lyric timing update": "가사 타이밍 업데이트", "Apply to all songs": "모든 곡에 적용", "{n} songs · about {m} min": "{n}곡 · 약 {m}분", "Update all": "모두 업데이트",
+  "Timing got better. This song takes about 1 min.": "타이밍이 좋아졌어요. 이 곡은 약 1분 걸려요.",
+  "Timing got better. All songs update in the background.": "타이밍이 좋아졌어요. 모든 곡을 백그라운드에서 맞춰요.",
   "Lyrics and melody timing got better. Re-timing {n} songs takes about {m} min, in the background.": "가사와 멜로디 타이밍이 좋아졌어요. {n}곡을 다시 맞추는 데 약 {m}분 걸려요. 백그라운드에서 해요.",
   "Lyrics and melody timing got better. Re-timing your song takes about a minute, in the background.": "가사와 멜로디 타이밍이 좋아졌어요. 곡을 다시 맞추는 데 약 1분 걸려요. 백그라운드에서 해요.",
   "Edit": "편집","Lyrics timing": "가사 타이밍",

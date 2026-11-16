@@ -34,7 +34,7 @@
 const SAVED = /*SETTINGS*/null;
 /* the library and the songs being added, as the server had them as it sent the page: the list's first drawing */
 const SAVED_LIB = /*LIBRARY*/null;
-/* songs an update would time again ({songs, min}; stems.update_offer): asked on the opening screen before anything else */
+/* songs an update would time again ({songs, min}; stems.update_offer): was asked on the opening screen; null now, a song's own page asks (studio.js paintRetime) */
 const SAVED_UPDATE = /*UPDATE*/null;
 if (SAVED_UPDATE) document.documentElement.classList.add("asking");
 /* the theme before first paint (Settings: System, the default, Light or Dark; applyTheme follows the system's as it changes) */
@@ -293,7 +293,7 @@ const EMPTY_LIBRARY = false;
     </div>
   </main>
   <main id="vStems" aria-label="Stems" hidden>
-    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><button class="btn sm" id="pExport" type="button">Download</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
+    <div class="backbar" id="sBackBar" hidden><nav class="crumbs" id="sCrumbs" aria-label="Where you are"></nav><div class="bb-acts" id="sSongActs" hidden><span class="rt-at" id="rtAt" hidden><button class="btn sm icon" id="rtBtn" type="button" aria-label="Lyric timing update" title="Lyric timing update" aria-expanded="false" aria-controls="rtPop"></button><div class="pop" id="rtPop" role="dialog" aria-labelledby="rtTitle" hidden><b class="pop-title" id="rtTitle">Lyric timing update</b><p class="hint" id="rtLine"></p><label class="rt-all" id="rtAllRow"><input type="checkbox" id="rtAll"><span>Apply to all songs</span><small id="rtAllN"></small></label><div class="rt-acts"><button class="btn sm" id="rtLater" type="button">Later</button><button class="btn sm primary" id="rtNow" type="button">Update</button></div></div></span><button class="btn sm" id="pExport" type="button">Download</button><button class="btn sm primary" id="pSing" type="button"><span class="txt">Practice</span></button></div></div>
     <p class="server-off" id="sServer" data-html hidden>This needs the Python server. Start the app with the <code>start-…</code> file for your OS, then reopen it from <b>http://localhost:5178</b>.</p>
     <p class="server-off" id="sErr" hidden></p>
 

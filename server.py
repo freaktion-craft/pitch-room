@@ -326,8 +326,12 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, stems.get_settings())
         if path == "/api/import":  # how Import beta library is going (stems.import_state)
             return self._json(200, stems.import_state())
-        if path == "/api/upgrades":  # the library's Update button: songs waiting to be timed again (stems.update_state)
-            return self._json(200, stems.update_state())
+        if path == "/api/upgrades":  # songs waiting to be timed again, and ?id= whether this one is (stems.update_state): the library's Update, a song's own button
+            song = (parse_qs(urlparse(self.path).query).get("id") or [""])[0]
+            try:
+                return self._json(200, stems.update_state(song or None))
+            except ValueError as e:
+                return self._json(422, {"error": str(e)})
         if path.startswith("/api/library/") and path.endswith(("/info", "/takes", "/lyrics", "/truth", "/notes")):
             try:
                 song = path.split("/")[3]
@@ -356,9 +360,12 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/jobs/singing":  # the page, every 5 s while a song plays
             stems.singing()
             return self._json(200, {"ok": True})
-        if url.path == "/api/upgrades":  # {now}: the answer to the page's question at launch (stems.update_offer)
+        if url.path == "/api/upgrades":  # {now}: every song that waits timed again; {id}: that one (stems.answer_update, retime_song)
             body = json.loads(self._body(1000) or b"{}")
-            return self._json(200, {"running": stems.answer_update(bool(isinstance(body, dict) and body.get("now")))})
+            body = body if isinstance(body, dict) else {}
+            if body.get("id"):
+                return self._json(200, {"job": stems.retime_song(str(body["id"])), "running": stems.update_state()["running"]})
+            return self._json(200, {"running": stems.answer_update(bool(body.get("now")))})
         if url.path == "/api/settings":
             return self._json(200, stems.set_settings(json.loads(self._body(600_000) or b"{}")))
         if url.path == "/api/import":  # {path}: a beta's folder, its songs, settings and models copied in (stems.start_import)
@@ -481,8 +488,7 @@ def serve(port: int) -> ThreadingHTTPServer:
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     stems.freshen_finders()  # the desktop app's yt-dlp, a day old at most
     stems.sweep_unfinished()  # songs whose adding was cut off by the app closing: their folders
-    if not stems.update_offer():  # (with songs to time again, the page asks first: stems.answer_update)
-        stems.start_upgrades()  # songs made by an older version, brought up to date in the background
+    stems.start_upgrades(timing=False)  # songs made by an older version: their beat checked in the background (their timing waits to be asked for: stems.update_state)
     return httpd
 
 

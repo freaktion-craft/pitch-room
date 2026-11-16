@@ -139,7 +139,9 @@ function stemsRoute(sub, extra, from) {
   else if (stemsPage === "song") { // the song still loaded: its name as found since; its mix as it was coming back from Practice
     const c = libCache.get(sub); if (c) { P.song.title = c.title; P.song.artist = c.artist; } // (and its Takes Studio or Info), fresh from anywhere else
     if (from !== "practice" && !(from === "stems" && ["song", "takes", "info"].includes(prev))) freshMix(); else renderTracks();
+    paintRetime(true); // (timed again meanwhile, or still waiting)
   }
+  if (stemsPage !== "song") showRetime(false);
   if (stemsPage === "info") renderInfo(sub); else stopHear();
 }
 // The song as the library list last read it opens at once, so its page appears whole. Otherwise (a reload, a link,
@@ -229,6 +231,7 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const RISE_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 const rise = (node, delay, dy = 8, blur = 8) => node && node.animate([{ opacity: 0, transform: `translateY(${dy}px)`, filter: `blur(${blur}px)` },
   { opacity: 1, transform: "none", filter: "blur(0)" }], { duration: 640, delay, easing: RISE_EASE, fill: "backwards" });
+// (Not asked any more: stems.update_offer gives nothing. A song's own page asks, studio.js paintRetime.) It was:
 // An update that would time every song again waits for a yes (stems.update_offer), asked before the bar: "Later" leaves each
 // song to be worked out again when it's opened. Escape is "Later".
 function askUpdate() {

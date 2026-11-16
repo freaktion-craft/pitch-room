@@ -310,6 +310,14 @@ a.crumb:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; bord
 .crumb[aria-current] { color: var(--ink); } /* where you are: only its colour differs */
 .crumb-sep { color: var(--faint); }
 .bb-acts { display: flex; align-items: center; gap: var(--space-2); } /* the song's own: Download (what you hear, an MP3), then Practice */
+/* before them, on a song timed by an older logic (studio.js paintRetime): its button, a dot in your colour on it, and the panel that asks. A ring turns in it while it's done */
+.rt-at { position: relative; display: inline-flex; }
+.rt-at > .btn { position: relative; }
+.rt-dot { position: absolute; top: var(--space-1); right: var(--space-1); width: var(--space-2); height: var(--space-2); border: var(--space-half) solid var(--surface-2); border-radius: 50%; background: var(--voice-mark); }
+.pop label.rt-all { justify-content: flex-start; gap: var(--space-2); cursor: pointer; }
+.rt-all input { width: var(--icon-sm); height: var(--icon-sm); margin: 0; accent-color: var(--ink); flex: none; }
+.rt-all small { color: var(--muted); }
+.rt-acts { display: flex; justify-content: flex-end; gap: var(--space-2); }
 .lib-head { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); margin-bottom: var(--space-4); } /* 28 px to what's next (New, Continue practising, or the list) with the group's 12; search and Add song together at the right, 8 px apart as every field is from its button */
 /* Search, heading the list in place of a "Library" that said nothing: the songs whose title or artist has every word
    typed, as it's typed; a field like the others, 32 px, its glass inside on the left. Ctrl K (⌘ K on a Mac) or / goes

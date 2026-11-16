@@ -18,7 +18,7 @@ async function openSong(m) {
   P.song = m; P.offset = 0; P.ph = null; labelKeys();
   noteSong(m.id, "o"); // (the library's Continue practising asks its takes again)
   $("#pSing").hidden = !m.stems.includes("vocals");
-  paintCrumbs();
+  paintCrumbs(); paintRetime(true);
   keyOf(m).then(() => { if (P.song === m) paintKey(); });
   P.tracks = {};
   for (const name of trackNames(m)) P.tracks[name] = { gain: null };
@@ -962,5 +962,56 @@ function initStems() {
   $("#pEnd").onclick = seekEnd;
   $("#pSing").onclick = () => P.song && singSong(P.song, $("#pSing"));
   $("#pExport").onclick = exportAudible;
+  initRetime();
   initWave();
+}
+// A song timed by an older logic keeps the timing it has (stems._melody_outdated): its page says so with a button left of
+// Download, and asks. Its panel opens by itself on the first such song opened after an update (once for each: "rtAsked" is
+// the logic asked about already), after that by the button. Later: closed, the button stays. Update: this song, or with the
+// box ticked every song that waits; a ring turns in the button while it's done, and it goes when it is.
+let rtTimer = 0;
+async function paintRetime(ask) {
+  const at = $("#rtAt"), btn = $("#rtBtn"), id = P.song && stemsPage === "song" ? P.song.id : null;
+  clearTimeout(rtTimer);
+  if (!id) { at.hidden = true; showRetime(false); return; }
+  let u = null;
+  try { u = await (await fetch("/api/upgrades?id=" + id, { cache: "no-store" })).json(); } catch (e) { u = null; }
+  if (!P.song || P.song.id !== id || stemsPage !== "song") return; // moved on meanwhile
+  const busy = !!u && (!!u.job || (u.running && u.old));
+  at.hidden = !u || !(u.old || busy);
+  if (at.hidden) { showRetime(false); return; }
+  if (btn.disabled !== busy) { btn.disabled = busy; btn.replaceChildren(...(busy ? [progRing(0)] : [icon("retry"), el("i", "rt-dot")])); }
+  if (busy) { showRetime(false); rtTimer = setTimeout(paintRetime, 1500); return; }
+  const one = u.songs < 2;
+  $("#rtAllRow").hidden = one; if (one) $("#rtAll").checked = false;
+  say($("#rtAllN"), "{n} songs · about {m} min", { n: u.songs, m: u.min });
+  paintRetimeAll();
+  if (ask && store.get("rtAsked", "") !== u.v) { store.set("rtAsked", u.v); showRetime(true); }
+}
+function paintRetimeAll() {
+  const all = $("#rtAll").checked;
+  say($("#rtLine"), all ? "Timing got better. All songs update in the background." : "Timing got better. This song takes about 1 min.");
+  say($("#rtNow"), all ? "Update all" : "Update");
+}
+function showRetime(on) {
+  $("#rtPop").hidden = !on; $("#rtBtn").setAttribute("aria-expanded", String(on));
+  if (on) { $("#rtAll").checked = false; paintRetimeAll(); showJobs(false); } // (this song, each time it's opened: all of them is a choice made there)
+}
+function initRetime() {
+  const btn = $("#rtBtn"), pop = $("#rtPop");
+  btn.append(icon("retry"), el("i", "rt-dot"));
+  btn.onclick = (e) => { e.stopPropagation(); showRetime(pop.hidden); };
+  pop.onclick = (e) => e.stopPropagation();
+  document.addEventListener("click", () => { if (!pop.hidden) showRetime(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { showRetime(false); btn.focus(); } });
+  pop.addEventListener("focusout", (e) => { const to = e.relatedTarget; if (!pop.hidden && to && !pop.contains(to) && to !== btn) showRetime(false); });
+  $("#rtAll").onchange = paintRetimeAll;
+  $("#rtLater").onclick = () => { showRetime(false); btn.focus(); };
+  $("#rtNow").onclick = async () => {
+    const id = P.song && P.song.id, all = $("#rtAll").checked;
+    showRetime(false);
+    if (!id) return;
+    await fetch("/api/upgrades", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(all ? { now: true } : { id }) }).catch(() => {});
+    paintRetime();
+  };
 }

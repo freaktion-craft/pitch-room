@@ -123,7 +123,7 @@ The app caps its own torch threads (8 in `melody.py` and `syllables.py`). Ad-hoc
 On macOS: `nice -n 10 <cmd>`.
 
 Version bumps: after raising `melody.VERSION`, `syllables.VERSION` or `stems.LYRICS_VERSION`, `GET /api/upgrades`
-should report the outdated songs and a fresh page load shows the question. That needs the song tools installed
+should report the outdated songs, and the first of them opened shows the button left of Download with its panel open. That needs the song tools installed
 (`installed()`), a `melody.json` for melody bumps, and Whisper's model in `<data>/models` for lyrics bumps: a scratch
 folder without `models/` reports 0. Don't answer "now" on the owner's library
 without asking.

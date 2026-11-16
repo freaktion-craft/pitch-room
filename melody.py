@@ -29,7 +29,8 @@ import numpy as np
 
 SR = 44100
 STEP = 0.01  # 10 ms frames
-VERSION = 8  # bump when the output changes so cached melody.json files are rebuilt (stems.start_upgrades)
+VERSION = 8  # bump when the output changes: each song is offered its melody again (stems.update_state)
+SHOWN_FROM = 8  # the oldest VERSION whose melody.json the page can still show (as syllables.SHOWN_FROM): an older one is read again when the song's opened
 
 # 1. RMVPE (Wei et al. 2023): note F1 0.615 with pYIN and v6's segmenter, 0.733 with RMVPE and the segmenter below.
 _HERE = os.environ.get("PITCHROOM_DATA") or os.path.dirname(os.path.abspath(__file__))  # where models/ is (stems.DATA)
