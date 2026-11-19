@@ -1,6 +1,10 @@
+![Pitchroom](site/img/og.png)
+
 # Pitchroom
 
-Personal singing practice software. A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
+**Every decision here is mine. The code is written by Claude.** What Pitchroom does, how it looks, how it behaves and what's left out are my calls, checked by using it. The code is Claude's ([Claude Code](https://claude.com/claude-code)), working from the notes in [CLAUDE.md](CLAUDE.md). More under [How it's made](#how-its-made).
+
+Personal singing practice software for macOS and Windows: [pitchroom.dev](https://pitchroom.dev). A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
 
 > **For personal practice only.** Use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service. Songs, lyrics and models stay on your computer and are never part of this repository.
 
@@ -24,7 +28,7 @@ Python comes inside it, so there's nothing else to install. The first time a son
 
 **Updates:** it checks GitHub once it opens and offers a newer version as a download (also **Check for Updates…** in the menu).
 
-**Building it** (in `desktop/`, Node 22.12 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. Releases are built on the developer's own computers into [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (public, the installers only): Windows on a Windows PC, macOS on a Mac (`npm run release-mac`). Steps: `docs/agents/desktop-and-release.md`.
+**Building it** (in `desktop/`, Node 22.12 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. Releases are built on the developer's own computers into [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (the installers only): Windows on a Windows PC, macOS on a Mac (`npm run release-mac`). Steps: `docs/agents/desktop-and-release.md`.
 
 ## Get it
 
@@ -81,6 +85,8 @@ Close Pitchroom, then double-click the updater for your system in the `update` f
 
 **Sync** (in Practice, just before Record, and in Settings under Microphone) shows the delay takes allow for, and a press measures how late your voice reaches the app when it comes through a DAW or a loopback, whose delay the browser can't see: hold your headphones up to the mic (or turn on your speakers), press **Measure**, and eight clicks are played and timed on their way back. Takes recorded from that input after allow for it; the Takes Studio's Sync shows it as part of their automatic amount.
 
+**Lab** — exercises for the voice alone, at the piano, with a Spectrogram and an EQ of what the mic hears. **Scales** plays a pattern and you sing it back; **Reach** tries ways onto one note and reads how you arrive, settle and hold; **Match** plays one note to sing back and brings the ones you miss around again. Its judging is new and not yet tried with many voices.
+
 Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, audio-separator, Whisper, the melody's pitch tracker — about 3–4 GB, into `.venv` and `models/`). The first song with Korean or English lyrics adds a model that times their syllables (1.3 GB for Korean, 0.4 GB for English). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.
 
 **GPU:** on Windows the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
@@ -91,16 +97,29 @@ Songs are kept in `library/` so they open instantly next time. The first time yo
 |---|---|
 | `index.html` | The page's markup; it loads the stylesheets and scripts below. No build step |
 | `css/` | `tokens.css`, the design tokens on `:root` (colour, type, space, radius, depth, motion, control sizes); then, built from them in cascade order, `base.css` (layout, the top bar, controls, one `.btn` in sizes, tones and shapes), `stage.css`, `stems.css`, `practice.css` |
-| `js/` | The app, as plain scripts sharing one scope and run in order (see `index.html`): `core` (settings, language), `ko` (Korean), `audio`, `helpers` (elements, the dropdown, icons), `library`, `info`, `adding`, `studio`, `practice`, `takes`, `takes-studio`, `stage` (the canvas and the main loop), and `app` (routes, opening), which starts it |
+| `js/` | The app, as plain scripts sharing one scope and run in order (see `index.html`): `core` (settings, language), `ko` (Korean), `audio`, `live` (Live mic), `helpers` (elements, the dropdown, icons), `library`, `info`, `adding`, `studio`, `practice`, `lyedit`, `takes`, `takes-studio`, `stage` (the canvas and the main loop), the Lab (`turn`, `scale`, `reach`, `match` judge; `voice`, `voice-scale`, `voice-reach`, `voice-match` show), `onboard`, and `app` (routes, opening), which starts it |
 | `server.py` | Serves the page and the library API |
 | `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export, takes (jobs run in the background) |
 | `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |
 | `syllables.py` | The lyrics' syllables timed on the lead vocal: what the karaoke fills by, and where the melody's notes may start |
+| `lyrics.py`, `covers.py`, `playlists.py` | Lyrics from LRCLIB; song names and covers from iTunes and Deezer; YouTube and Spotify playlists |
 | `launch.py` | Installs packages, finds a free port, starts the server, opens Chrome |
 | `update.py`, `update/` | Brings a copy up to date: `git pull` in a clone, else the latest ZIP's changed files (your library and settings kept); `update/` has a launcher per OS |
 | `start-*` | One-click launchers per OS |
+| `desktop/` | The Electron app around the same page and server |
+| `site/` | The download page at pitchroom.dev |
+| `scripts/` | Checks: the colours' contrast, and the Lab's judging on made-up voices |
+| `CLAUDE.md`, `docs/agents/` | The notes the coding agents work from |
 
 Run the server directly with `.venv/bin/python server.py` (port 5178) if you prefer.
+
+## How it's made
+
+I don't write the code. I decide what goes in, how it looks and how it behaves, try each change, and say what's wrong; Claude writes it and checks it.
+
+- [CLAUDE.md](CLAUDE.md) and [docs/agents/](docs/agents/) are what the agents read first: my rules, the problems already solved (so they don't come back), and what to reuse.
+- Commit subjects say what is now true and why, so `git log` reads as the record of the decisions.
+- It's plain HTML, CSS and JavaScript with a Python server: no framework, no bundler, no test suite.
 
 ## Credits
 
@@ -113,4 +132,4 @@ Run the server directly with `.venv/bin/python server.py` (port 5178) if you pre
 
 ## License
 
-All rights reserved ([LICENSE](LICENSE)), for Pitchroom's own code, design and name only. The libraries and models it uses keep their own licences (above; Praat through parselmouth is GPL-3.0: the start scripts install it from PyPI, and the desktop app leaves it out). The songs and recordings you add, and what's made from them, are yours. Versions released earlier under the MIT License stay so.
+[MIT](LICENSE), for Pitchroom's own code. The name "Pitchroom" and its mark (the P) aren't part of it: a changed copy goes by a name of its own. The libraries and models it uses keep their own licences (above; Praat through parselmouth is GPL-3.0: the start scripts install it from PyPI, and the desktop app leaves it out). The songs and recordings you add, and what's made from them, are yours.

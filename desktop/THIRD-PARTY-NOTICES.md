@@ -1,7 +1,7 @@
 # Third-party notices
 
-Pitchroom's own code, design and name are its author's (LICENSE). The desktop app also contains, or downloads,
-other people's work, each under its own licence:
+Pitchroom's own code is under the MIT License (LICENSE); its name and mark are its author's. The desktop app
+also contains, or downloads, other people's work, each under its own licence:
 
 ## Inside the app
 

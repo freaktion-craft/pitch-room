@@ -13,7 +13,7 @@ const net = require("node:net");
 const path = require("node:path");
 const { autoUpdater } = require("electron-updater");
 
-const RELEASES = "freaktion-craft/pitchroom-releases"; // public, the installers only (the code's repo is private)
+const RELEASES = "freaktion-craft/pitchroom-releases"; // the installers only (the code is in pitch-room)
 const SITE = "https://pitchroom.dev/"; // the download page (site/index.html): a newer version's offered from there
 const PORTS = [5278, 5298]; // a range of its own, so a copy started from the repo (5178…) is never taken for this one
 // the page's theme (its Theme setting: shade()): the window before the page paints in its --bg (oklch(0.165 0 0), oklch(0.965 0 0)),
