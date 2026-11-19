@@ -5,7 +5,7 @@
   "private": true,
   "description": "Sing along to any song: its stems, your pitch on the melody, takes to listen back to.",
   "author": "freaktion",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "main": "main.js",
   "scripts": {
     "python": "node scripts/fetch-python.mjs",
