@@ -8,7 +8,7 @@ exists. A mechanism bug you fix gets a line in `solved.md`; a shared piece you a
 
 ## What it is
 
-Pitchroom is a local singing-practice app. You add a song (a YouTube link, a playlist or a file). The app splits it into
+Pitchroom is a local singing-practice app. You add a song (a YouTube link or a playlist). The app splits it into
 stems, reads its melody and lyrics, and lets you sing along: the singer's notes scroll past, your own pitch is drawn on
 top, and you can loop a phrase, change key or tempo, and record takes. Everything stays on the user's computer.
 
