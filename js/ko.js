@@ -449,7 +449,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Saving take…": "테이크 저장하는 중…", "Couldn’t save this take": "테이크를 저장하지 못했어요", "Couldn’t save the take.": "테이크를 저장하지 못했어요.",
   "Try saving it again": "다시 저장해 보기", "Dismiss": "닫기", "Delete this take": "이 테이크 삭제", "Click again to delete": "한 번 더 누르면 삭제돼요",
   "Really delete this take?": "이 테이크를 정말 삭제할까요?", "Couldn’t delete the take. Is the app still running?": "테이크를 삭제하지 못했어요. 앱이 아직 실행 중인가요?",
-  "Download as WAV, mixed as set above": "위 설정대로 믹스해서 WAV로 내려받기", "Download this take as WAV": "이 테이크를 WAV로 내려받기",
+  "Download as WAV, mixed as set above": "위 설정대로 믹스해서 WAV로 내려받기", "Download this take as WAV": "이 테이크를 WAV로 내려받기", "Export what you hear (MP3)": "들리는 그대로 내보내기 (MP3)",
   "Mixing the WAV…": "WAV 믹스하는 중…", "Couldn’t make the WAV.": "WAV를 만들지 못했어요.",
   "Loading…": "불러오는 중…", "Getting the band in key {n}…": "{n} 키 반주 준비하는 중…", "The song changed.": "곡이 바뀌었어요.",
   "Play on": "이어서 재생", "Play this take with the band": "반주와 함께 이 테이크 듣기", "Where in the take": "테이크 안의 위치",
