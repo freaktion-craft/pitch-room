@@ -4,13 +4,13 @@
 
 **Every decision here is mine. The code is written by Claude.** What Pitchroom does, how it looks, how it behaves and what's left out are my calls, checked by using it. The code is Claude's ([Claude Code](https://claude.com/claude-code)), working from the notes in [CLAUDE.md](CLAUDE.md). More under [How it's made](#how-its-made).
 
-Personal singing practice software for macOS and Windows: [pitchroom.dev](https://pitchroom.dev). A local app for learning songs by singing them. Split a song into stems, then practice singing it: note bars from the original singer scroll past, your own pitch is drawn on top, and you can loop one phrase at a time.
+Singing practice on your own computer, for macOS and Windows: [pitchroom.dev](https://pitchroom.dev). Add a song from a YouTube link and Pitchroom splits it into its parts (vocals, drums, bass and the rest), finds its melody and lyrics, and lets you sing along: the singer's notes scroll past, your own pitch is drawn on top, and you can loop a phrase, change the key or tempo, and record takes. Songs, takes and models stay on your computer.
 
-> **For personal practice only.** Use audio you have the right to use; downloading from YouTube may go against YouTube’s Terms of Service. Songs, lyrics and models stay on your computer and are never part of this repository.
+> **For personal practice only.** Use audio you have the right to use; downloading from YouTube may go against YouTube's Terms of Service. Songs, lyrics and models are never part of this repository.
 
-## The desktop app
+## Get the app
 
-Pitchroom as an app of its own: an installer, a window with its own icon, no terminal. Download it from [Releases](https://github.com/freaktion-craft/pitchroom-releases/releases/latest):
+An installer, a window of its own, no terminal. Download it from [pitchroom.dev](https://pitchroom.dev) or from [Releases](https://github.com/freaktion-craft/pitchroom-releases/releases/latest):
 
 | OS | File |
 |---|---|
@@ -18,100 +18,58 @@ Pitchroom as an app of its own: an installer, a window with its own icon, no ter
 | macOS (Intel) | `Pitchroom-…-mac-x64.dmg` |
 | Windows | `pitchroom_install.exe` |
 
-Python comes inside it, so there's nothing else to install. The first time a song is added, it downloads the tools that split songs and read their melody and lyrics (3–4 GB, once), as the web version does.
+Python comes inside it, so there's nothing else to install. The first song needs the song tools, which split songs and read their melody and lyrics (3–4 GB, downloaded once).
 
-**Opening it the first time.** The app isn't signed yet, so the system asks once:
-- **macOS:** open it, then **System Settings → Privacy & Security → Open Anyway**.
-- **Windows:** at "Windows protected your PC", **More info → Run anyway**.
+- **Opening it the first time.** The app isn't signed yet, so the system asks once. On macOS: open it, then **System Settings → Privacy & Security → Open Anyway**. On Windows: at "Windows protected your PC", **More info → Run anyway**.
+- **Your songs** are kept in the app's own folder, so updates never touch them: `~/Library/Application Support/Pitchroom` on macOS, `%APPDATA%\Pitchroom` on Windows (**Help → Open Data Folder**).
+- **Updates.** It looks for a newer version as it opens and updates itself (also **Check for Updates…** in the menu).
 
-**Your songs** are kept in the app's own folder, not next to it, so updates never touch them: `~/Library/Application Support/Pitchroom` on macOS, `%APPDATA%\Pitchroom` on Windows (**Help → Open Data Folder**). It doesn't share them with a copy started from the files below: to bring those over, **Settings → Advanced → Import beta library** and pick that copy's folder (it's copied, not moved).
+## What's inside
 
-**Updates:** it checks GitHub once it opens and offers a newer version as a download (also **Check for Updates…** in the menu).
+**Library.** Paste YouTube links, or a YouTube or Spotify playlist to pick songs from. Each song is split into vocals, drums, bass and the rest, and the vocals into lead and backing; its beat, key, melody and lyrics are read as part of adding it. Songs are added one at a time, the rest waiting in line. Each is listed as what it is, not by its video's title: its title, artist and album art as found on iTunes or Deezer. Browse by **Song**, **Artist** or **Album**, sort by a column, or search (Ctrl K or ⌘K, or /).
 
-**Building it** (in `desktop/`, Node 22.12 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for the installer in `desktop/dist`. Releases are built on the developer's own computers into [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases) (the installers only): Windows on a Windows PC, macOS on a Mac (`npm run release-mac`). Steps: `docs/agents/desktop-and-release.md`.
+**Studio**, a song's own page. Every track with mute, solo and volume, and a metronome that follows the song's own tempo. **Key** moves the song up to 6 semitones either way, and tempo plays it at 50–150 % at the same pitch; Practice, downloads and takes follow. Drag across a muted track and press **Keep playing here** to keep that stretch sounding. **Download** writes the mix you hear as an MP3. **Info** has the song's tempo, key and the melody's range, and looks its lyrics up again or takes them pasted in.
 
-## Get it
+**Practice.** The melody is read from the lead vocal, so note bars scroll in while the band plays; the singer's own pitch line is drawn faintly behind them, yours on top. The lead vocal stays on as a guide with its own volume. Lyrics are lined up with the voice syllable by syllable and fill in as they're sung. The song is cut into phrases, a line of the lyrics each: jump to one and it counts you in, **Loop** (L) repeats it, a drag across the strip loops a run of them, ← and → move between them. If a line's timing is off, `,` and `.` move it earlier or later (`[` and `]` all of them), and **Edit** opens the timing to fix by hand. **Headphones** sends the band, the guide and the metronome each to the ear you want.
 
-To run it from its files instead (for working on it, or without an installer). No GitHub account needed. Either download it — **Code → Download ZIP** on this page, then unzip it anywhere — or, with git:
+**Takes.** **Record** (R) keeps a take each time the song plays, or the whole song as one, timed to the band. Play one back over the band, compare it with the original (one in each ear), or download it as a WAV. **Takes Studio** lays takes out on the song's timeline to play together, each at its own volume; **Sync** moves them earlier or later, and **Match** puts them where the singer comes in. If your voice comes through a DAW or a loopback, **Settings → Recording** measures its delay so takes allow for it.
+
+**Lab.** Exercises for the voice alone, at the piano, with a Spectrogram and an EQ of what the mic hears. **Scales** plays a pattern and you sing it back; **Reach** tries ways onto one note and reads how you arrive, settle and hold; **Match** plays one note to sing back and brings the ones you miss around again; **Piano** is the keyboard alone, played from the computer's keys. Its judging is new and not yet tried with many voices.
+
+**Live** (Windows). The song and your voice as one microphone other apps can use, for a call or a stream, through [VB-CABLE](https://vb-audio.com/Cable/).
+
+**Settings.** English or Korean (한국어), light or dark, an accent colour, note names, and which mic and output to use.
+
+Use earphones while practising so the song doesn't leak into the mic, or turn on **Filter out speaker sound** in Settings.
+
+## Run it from source
+
+For working on it, or without an installer. No GitHub account needed: **Code → Download ZIP** on this page and unzip it anywhere, or
 
 ```bash
 git clone https://github.com/freaktion-craft/pitch-room.git
 ```
 
-## Start it
-
-Double-click the launcher for your system:
+**Start it.** Double-click the launcher for your system:
 
 | OS | File |
 |---|---|
 | Windows | `start-windows.bat` |
 | macOS | `start-mac.command` |
 
-The first run creates a private Python environment in `.venv` and installs the base tools (1–2 minutes). After that it starts in a couple of seconds and opens a tab in Chrome (or your default browser if Chrome isn't installed). Close the terminal window to stop it. Running the launcher again while it's already open just reopens the tab.
+The first run makes a Python environment in `.venv` and installs the base packages. After that it starts in a couple of seconds and opens a tab in Chrome (or your default browser). Close the terminal window to stop it.
 
-**Needs:** nothing installed beforehand. The launcher uses the computer's Python if it has 3.9 or newer; if not, it fetches its own (Python 3.11, through [uv](https://github.com/astral-sh/uv)) into the app's `.tools` folder, and nothing outside the folder changes. Everything else (numpy, parselmouth, ffmpeg) is installed automatically.
+- **Needs:** nothing installed beforehand. The launcher uses the computer's Python if it has 3.9 or newer (3.10 or newer to split lead from backing vocals); if not, it fetches its own Python 3.11 through [uv](https://github.com/astral-sh/uv) into `.tools`, and nothing outside the folder changes.
+- **macOS:** if double-clicking says the file can't be opened, right-click it → **Open** once. If it says permission denied, run `chmod +x start-mac.command` in Terminal.
+- **Song tools:** the first run offers them, and **Settings → Advanced → Song tools** installs them later (PyTorch, Demucs, Whisper and the rest, 3–4 GB). The first song with Korean or English lyrics adds a model that times their syllables (1.3 GB for Korean, 0.4 GB for English).
+- **GPU:** on Windows the install looks for an NVIDIA card and takes the CUDA build of PyTorch your driver supports (CUDA 12.4 or newer). AMD and Intel graphics run on the CPU. Macs use the Apple GPU.
+- **Songs** are kept in `library/`. The app doesn't share them: to bring them over, **Settings → Advanced → Import beta library** in the app and pick this folder (it's copied, not moved).
 
-**macOS note:** if double-clicking says the file can't be opened, right-click it → **Open** once. If it says permission denied, run `chmod +x start-mac.command` in Terminal.
+**Update it.** Close Pitchroom, then double-click the updater for your system in `update/`: `update-windows.bat` or `update-mac.command`. A git clone is pulled; a downloaded copy gets the latest version's files. Your songs, takes, settings and models stay as they are. When a new version times lyrics better, **Update** in the library times your songs again.
 
-Use earphones while practicing so the song doesn't leak into the mic, or turn on **Filter out speaker sound** in Practice's mic settings. The mic settings also choose which **Input** to sing into, if you have more than one.
+**The server alone:** `.venv/bin/python server.py` on macOS, `.venv\Scripts\python.exe server.py` on Windows (port 5178).
 
-The page is in English or Korean (한국어): **Language** in the settings (the gear). It starts in Korean when the browser is set to Korean.
-
-## Update it
-
-Close Pitchroom, then double-click the updater for your system in the `update` folder: `update-windows.bat` or `update-mac.command`. A git clone is pulled; a downloaded copy gets the latest version's files, written over the ones that changed. Your songs, takes, settings and downloaded models stay as they are. Start Pitchroom as usual afterwards. When a new version lines lyrics up, times their syllables or reads melodies better, the songs you have are brought up to date in the background once it starts, one at a time, none starting while a song plays: the one being done shows a ring over its cover in the library.
-
-## What's inside
-
-**Library** — paste a YouTube link (or a YouTube or Spotify playlist, to pick songs from) and the song is split into vocals, drums, bass and other (or 6 stems with guitar and piano) by [Demucs](https://github.com/facebookresearch/demucs). A karaoke model then splits the vocals into the lead and the backing vocals. The beat is tracked with librosa, so a click track follows the song’s own tempo. While songs are being added (one at a time, the rest waiting in line), a ring beside the mic shows how far along they are; press it to see each one’s progress or cancel it. A new song fades into the list when it’s ready; its lyrics are then found and lined up too (see Practice). The library lists each song by **what it is**, not by the video’s title: its title and artist as found on iTunes or Deezer (looked up by the video’s or file’s title, and by its channel’s name when the title is the song’s name alone; nothing else is sent), with its **album art**, and its tempo, key, the day it was added and its length. A cover (“Cover” or “커버” in the title) is listed as “Song (Cover)” by whoever sings it, with its video’s thumbnail. An uploaded file’s own tags and cover come first; a song found nowhere keeps its title (split at “ - ” into artist and title) and the video’s thumbnail. Press a cover to see it up close; press a column’s header to sort by it; **Search** (Ctrl K, or /) finds songs by title or artist as you type. In the player:
-
-- mute / solo / volume per track, plus the click (accent shift, 2/4–6/4),
-- waveform overview to jump around, Space to play / pause, Shift+← / Shift+→ (or Home / End) to go to the start / the end,
-- **Key** and **tempo** beside the title: move the song up or down by up to 6 semitones, or type a tempo (50–150 % of the song’s) and it plays slower or faster at the same pitch. Each version is made once with Rubber Band (about ten seconds) and kept; Practice, the click, exports and takes follow it,
-- to keep some part of a track playing even while it's muted, drag across it on the track's waveform and press **Keep playing here**; × on a shaded part lets it go. The ↓ beside it exports just that stretch of the track as an MP3,
-- **Export what you hear** writes the current mix (with the click if it’s on) as a 320 kbps MP3; the ↓ next to a track exports just that track,
-- **Info** (⋮ in the library): tempo, key, and the melody’s range, with its lowest and highest notes to listen to.
-- **Rename** (⋮ in the library) edits a song’s title right in the list.
-
-**Practice** — the melody is read from the lead vocal (RMVPE pitch tracking, cut into notes, and once the song has lyrics also where their syllables start; the backing vocals' leftovers in the lead stem are left out), so note bars scroll in while the band plays. The lead vocal stays on as a **guide** with its own volume; backing vocals play with the band. The singer’s actual pitch line (slides and vibrato included) is drawn faintly behind the bars, with yours in blue on top.
-
-- **Find lyrics** (beside Record) looks the song up on [LRCLIB](https://lrclib.net) and lines the lyrics up with the lead vocal syllable by syllable: [Whisper](https://github.com/openai/whisper) hears roughly where each line goes, a speech model for Korean and one for English time every syllable, and the song's own notes say where they start and stop (lyrics in other languages go by Whisper's words). They scroll by left of the playhead: the line being sung a little above the middle, filled in syllable by syllable as it's sung (a held note glows as it's held), the next ones under it, the bars already sung blurred behind them. The next line is there to read before its first word; backing vocals, in brackets in the lyrics, are smaller, at a line's end a row of their own. If a line is off, `,` and `.` move it earlier or later, `[` and `]` all of them, 50 ms a press; Shift+`,` and Shift+`.` put its start on the voice's last or next entry, its tail staying where there's a rest to take up the move. That's kept with the song. If LRCLIB has the wrong song or none, the song’s **Info** page searches it by hand or takes lyrics pasted in.
-- The song is cut into **phrases**: a line of the lyrics each (♪ where the singer sings on with no words), or without lyrics, where the singer breathes. Hover one on the strip to see its words; jump to one and it counts you in (4 3 2 1); **Loop** repeats it, and a drag across phrases on the strip (or Shift+click) loops the run of them. ← / → move between phrases, Home / End go to the start / the end, L turns the loop on and off. With **Developer tools** on in the settings, Alt+click on the strip (Option on a Mac), or M as it plays, marks where a phrase should have been split, or two joined; the button at the strip's right copies the marks, with the words and notes around each, to paste into a chat and fix how phrases are made (copied, they're cleared).
-- After an intro or a break, a count-in shows when the voice comes back.
-- The bars can move an octave up or down if the song sits outside your range.
-- **Record** (R) keeps a take each time the song plays: your voice, timed to the band (the delay of your speakers and mic is allowed for), named by the lyrics it covers. Under the keyboard, **Takes** lists them by day, like notes to self; play one back over the band (its waveform under it: press anywhere on it to play from there), compare it with the original (the song as it is in one ear, your take in the other; which ear hears which is set under Headphones), or download it as a WAV mixed with your own voice and band volumes. Takes are kept with the song in `library/<song>/takes/`. Record's label picks **Each play** (a take each time you play: a looped phrase gives one each pass) or **Full song** (back to the start, the whole song as one take).
-- **Headphones** (beside Find lyrics) sends each part to the ear you want: the band, the guide vocal and the metronome (its count-in too) each to the left, the right or both, live as the song plays.
-- **Takes Studio** (beside Takes) lays your takes out on the song's timeline, each where you sang it: switch any of them on and play them with the band, in time. Hover a clip and a line across it shows its volume (halfway up is 100%, the top 200%): drag it up or down, or press ↑ ↓ on a clip; double-click it for 100% again. The ↓ in its corner downloads that take alone as a WAV, mixed as the sliders have it. If your voice comes out late or early against the band (a DAW's own buffering, which the browser can't see), the **Sync** slider moves the takes that are on (left earlier), 5 ms a step, heard as it plays. It shows the whole of it: the delay the browser reported when they were recorded, already allowed for and marked on the slider, plus what you add; double-click it to go back to the mark, and ← → on a clip move that take alone. **Match** moves the takes that are on to where the singer comes in; a take with too few of the singer's entries, or scattered ones, stays put. Volume and sync are kept with the take, and its WAV and the Takes Studio's MP3 are mixed with them.
-
-**Sync** (in Practice, just before Record, and in Settings under Microphone) shows the delay takes allow for, and a press measures how late your voice reaches the app when it comes through a DAW or a loopback, whose delay the browser can't see: hold your headphones up to the mic (or turn on your speakers), press **Measure**, and eight clicks are played and timed on their way back. Takes recorded from that input after allow for it; the Takes Studio's Sync shows it as part of their automatic amount.
-
-**Lab** — exercises for the voice alone, at the piano, with a Spectrogram and an EQ of what the mic hears. **Scales** plays a pattern and you sing it back; **Reach** tries ways onto one note and reads how you arrive, settle and hold; **Match** plays one note to sing back and brings the ones you miss around again. Its judging is new and not yet tried with many voices.
-
-Songs are kept in `library/` so they open instantly next time. The first time you add a song, the page offers to install the separation tools (PyTorch, Demucs, librosa, audio-separator, Whisper, the melody's pitch tracker — about 3–4 GB, into `.venv` and `models/`). The first song with Korean or English lyrics adds a model that times their syllables (1.3 GB for Korean, 0.4 GB for English). Speed: about 30 s for a 4-minute song on an Apple-silicon GPU, a minute or two on an NVIDIA GPU, several minutes on a CPU.
-
-**GPU:** on Windows the installer looks for an NVIDIA card (`nvidia-smi`) and installs the CUDA build of PyTorch that your driver supports (CUDA 12.4 or newer). If the CPU build is already installed on a PC with an NVIDIA card, the page shows **Use my NVIDIA GPU** to switch — restart the app afterwards. AMD and Intel graphics run on the CPU. Macs use the Apple GPU automatically.
-
-## Files
-
-| | |
-|---|---|
-| `index.html` | The page's markup; it loads the stylesheets and scripts below. No build step |
-| `css/` | `tokens.css`, the design tokens on `:root` (colour, type, space, radius, depth, motion, control sizes); then, built from them in cascade order, `base.css` (layout, the top bar, controls, one `.btn` in sizes, tones and shapes), `stage.css`, `stems.css`, `practice.css` |
-| `js/` | The app, as plain scripts sharing one scope and run in order (see `index.html`): `core` (settings, language), `ko` (Korean), `audio`, `live` (Live mic), `helpers` (elements, the dropdown, icons), `library`, `info`, `adding`, `studio`, `practice`, `lyedit`, `takes`, `takes-studio`, `stage` (the canvas and the main loop), the Lab (`turn`, `scale`, `reach`, `match` judge; `voice`, `voice-scale`, `voice-reach`, `voice-match` show), `onboard`, and `app` (routes, opening), which starts it |
-| `server.py` | Serves the page and the library API |
-| `stems.py` | Downloads, stem and lead-vocal separation, beat and key, MP3 export, takes (jobs run in the background) |
-| `melody.py` | Melody notes and pitch contour from the lead vocal, for Practice |
-| `syllables.py` | The lyrics' syllables timed on the lead vocal: what the karaoke fills by, and where the melody's notes may start |
-| `lyrics.py`, `covers.py`, `playlists.py` | Lyrics from LRCLIB; song names and covers from iTunes and Deezer; YouTube and Spotify playlists |
-| `launch.py` | Installs packages, finds a free port, starts the server, opens Chrome |
-| `update.py`, `update/` | Brings a copy up to date: `git pull` in a clone, else the latest ZIP's changed files (your library and settings kept); `update/` has a launcher per OS |
-| `start-*` | One-click launchers per OS |
-| `desktop/` | The Electron app around the same page and server |
-| `site/` | The download page at pitchroom.dev |
-| `scripts/` | Checks: the colours' contrast, and the Lab's judging on made-up voices |
-| `CLAUDE.md`, `docs/agents/` | The notes the coding agents work from |
-
-Run the server directly with `.venv/bin/python server.py` (port 5178) if you prefer.
+**The desktop app** is built in `desktop/` (Node 22.12 or newer): `npm ci`, then `npm run python` (fetches the app's own Python into `desktop/runtime`), then `npm start` to run it or `npm run dist` for an installer in `desktop/dist`. Releases are built on my own computers, Windows on a PC and macOS on a Mac, into [pitchroom-releases](https://github.com/freaktion-craft/pitchroom-releases), which holds the installers only. Steps: [docs/agents/desktop-and-release.md](docs/agents/desktop-and-release.md).
 
 ## How it's made
 
@@ -121,14 +79,37 @@ I don't write the code. I decide what goes in, how it looks and how it behaves, 
 - Commit subjects say what is now true and why, so `git log` reads as the record of the decisions.
 - It's plain HTML, CSS and JavaScript with a Python server: no framework, no bundler, no test suite.
 
+## Files
+
+| | |
+|---|---|
+| `index.html` | The page's markup, and the order its scripts load in |
+| `css/` | `tokens.css` (the design tokens, both themes), then `base`, `stage`, `stems`, `practice` |
+| `js/` | The page's 24 plain scripts, sharing one scope: `core` first, `app` last. The Lab's judging (`turn`, `scale`, `reach`, `match`) also runs in Node |
+| `server.py` | Serves the page and the API, on this computer only |
+| `stems.py` | The library and settings, adding a song (download, splitting, beat and key, lyrics), key and tempo versions, downloads, takes |
+| `melody.py` | The singer's notes and pitch line, from the lead vocal |
+| `syllables.py` | The lyrics' syllables timed on the lead vocal |
+| `lyrics.py`, `covers.py`, `playlists.py` | Lyrics from LRCLIB; song names and covers from iTunes and Deezer; YouTube and Spotify playlists |
+| `launch.py`, `start-*` | The launchers: install the base packages, find a free port, start the server, open the browser |
+| `update.py`, `update/` | Brings a copy run from source up to date |
+| `desktop/` | The Electron app around the same page and server |
+| `site/` | The download page at pitchroom.dev |
+| `scripts/` | Checks: the colours' contrast, and the Lab's judging on made-up voices |
+| `CLAUDE.md`, `docs/agents/` | The notes the coding agents work from |
+
 ## Credits
 
-- Piano (the keyboard under Practice): [Salamander Grand Piano](https://archive.org/details/SalamanderGrandPianoV3) by Alexander Holm (CC-BY 3.0), loaded at runtime from the Tone.js sample host.
+- Piano (the keyboard in Practice and the Lab): [Salamander Grand Piano](https://archive.org/details/SalamanderGrandPianoV3) by Alexander Holm (CC-BY 3.0), loaded at runtime from the Tone.js sample host.
 - Font: [Pretendard](https://github.com/orioncactus/pretendard) (SIL OFL 1.1), loaded from jsDelivr.
 - Icons: [Hugeicons](https://hugeicons.com) (MIT).
-- Stems: [Demucs](https://github.com/facebookresearch/demucs) (htdemucs / htdemucs_6s) on PyTorch; lead and backing vocals with [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) and the BS-Roformer karaoke model by frazer & becruily; beats, key and pitch tracking with [librosa](https://librosa.org) ([Praat](https://www.fon.hum.uva.nl/praat/) through parselmouth as a fallback); downloads with [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://deno.com) as its JavaScript runtime; ffmpeg via imageio-ffmpeg.
-- Album art: the [iTunes Search API](https://performance-partners.apple.com/search-api) and the [Deezer API](https://developers.deezer.com/api), or YouTube’s thumbnail.
-- Lyrics: [LRCLIB](https://lrclib.net), lined up with the voice by OpenAI’s [Whisper](https://github.com/openai/whisper) (turbo) through [stable-ts](https://github.com/jianfch/stable-ts), their syllables by [wav2vec2-large-xlsr-korean](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean) and [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h).
+- Splitting: [Demucs](https://github.com/facebookresearch/demucs) (htdemucs) on PyTorch; lead and backing vocals with [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) and the BS-Roformer karaoke model by frazer & becruily.
+- Melody: RMVPE (Wei et al., the RVC project's weights, MIT), with [librosa](https://librosa.org)'s pYIN and [Praat](https://www.fon.hum.uva.nl/praat/) (through parselmouth) to fall back on. Beats and key with librosa.
+- Key and tempo: Rubber Band, through ffmpeg (imageio-ffmpeg).
+- Downloads: [yt-dlp](https://github.com/yt-dlp/yt-dlp), with [Deno](https://deno.com) as its JavaScript runtime.
+- Album art: the [iTunes Search API](https://performance-partners.apple.com/search-api) and the [Deezer API](https://developers.deezer.com/api), or YouTube's thumbnail.
+- Lyrics: [LRCLIB](https://lrclib.net), lined up with the voice by OpenAI's [Whisper](https://github.com/openai/whisper) (turbo) through [stable-ts](https://github.com/jianfch/stable-ts), their syllables by [wav2vec2-large-xlsr-korean](https://huggingface.co/kresnik/wav2vec2-large-xlsr-korean) and [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h).
+- Live: [VB-CABLE](https://vb-audio.com/Cable/) by VB-Audio.
 
 ## License
 
