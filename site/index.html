@@ -72,6 +72,8 @@ a { -webkit-user-drag: none; }
 /* the line at the page's foot, 24 px up as the app's column is in from its sides */
 .note { position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 48px);
   margin: 0; text-align: center; color: rgba(255, 255, 255, 0.55); font: 400 13px/1.45 var(--font); }
+/* and the line over it, a line of its type higher */
+.note.over { bottom: calc(max(24px, env(safe-area-inset-bottom, 0px)) + 13px * 1.45); }
 /* once the download starts: a tip up at the browser's downloads icon, in the toolbar above the page's top right (how far
    in, set by tipAt()) */
 /* the installer's icon (the app's, in its folder) at its left, inset the same on its three sides (6 px), 8 px to the
@@ -120,6 +122,7 @@ a { -webkit-user-drag: none; }
 <span class="ver" id="ver"></span>
 <span class="word" id="word" aria-hidden="true">Pitchroom</span>
 <p class="desktop" id="desktop">Please visit from a desktop</p>
+<p class="note over" id="stays">Everything stays on your computer.</p>
 <p class="note" id="note">A hobby project for people who want to practice their singing.</p>
 <div class="tip" id="tip" role="status"><img src="img/installer-icon.png" alt="" width="28" height="28"><span id="tipText"></span></div>
 
@@ -170,6 +173,7 @@ function ago(when) {
 }
 
 (async () => {
+  if (ko) document.getElementById("stays").textContent = "노래도 녹음도 컴퓨터 밖으로 나가지 않아요.";
   if (ko) document.getElementById("note").textContent = "노래 연습을 하고 싶은 사람들을 위한 취미 프로젝트예요.";
   if (ko) document.getElementById("desktop").textContent = "데스크톱에서 방문해 주세요";
   const os = detectOS();
@@ -262,7 +266,7 @@ async function fly(get) {
 // the line under the button (its version, how long ago) trying to follow it, and failing: as the button sets off to the
 // right, the line holds on and is dragged after it, its right end first (pulled taut), then lets go a character at a
 // time from its left end, the right end holding on longest. Each flies on the way it was going, to the right and a
-// little up, then drops: onto the line at the page's foot (on its letters, where it's over them) or past it to the
+// little up, then drops: onto the lines at the page's foot (on their letters, where it's over them) or past it to the
 // window's foot (off its right edge, if it gets that far); lands, bounces, slides (off the end of the line, and on
 // down, if it slides that far) to a stop and lies there, tipped. Each one's path worked out ahead (dragged, then thrown,
 // under gravity), played as keyframes
@@ -285,20 +289,21 @@ function fall(ver, dotAt) {
   }).filter(Boolean);
   const placed = spans.map((s) => s.getBoundingClientRect()), n = spans.length;
   ver.style.visibility = "hidden";
-  // the line at the page's foot as something to land on, letter by letter: where each of its letters is along it and how
-  // high its top is (from its type's own measures: its baseline in its line, less how far that letter reaches up; along
-  // it, the canvas's widths, fitted to the line's own)
-  const note = document.getElementById("note"), nr = note.getBoundingClientRect(), ns = getComputedStyle(note);
-  const ctx = document.createElement("canvas").getContext("2d");
+  // the lines at the page's foot as something to land on, letter by letter: where each of their letters is along its line
+  // and how high its top is (from its type's own measures: its baseline in its line, less how far that letter reaches up;
+  // along it, the canvas's widths, fitted to the line's own)
+  const ctx = document.createElement("canvas").getContext("2d"), ns = getComputedStyle(document.getElementById("note")), tops = [];
   ctx.font = `${ns.fontWeight} ${ns.fontSize} ${ns.fontFamily}`;
-  const nm = ctx.measureText(note.textContent), base = nr.top + (parseFloat(ns.lineHeight) - nm.fontBoundingBoxAscent - nm.fontBoundingBoxDescent) / 2 + nm.fontBoundingBoxAscent;
-  const fit = nr.width / nm.width, tops = [];
-  let along = "";
-  for (const c of note.textContent) {
-    const x0 = ctx.measureText(along).width; along += c;
-    tops.push([nr.left + x0 * fit, nr.left + ctx.measureText(along).width * fit, base - Math.max(0, ctx.measureText(c).actualBoundingBoxAscent)]);
+  for (const note of document.querySelectorAll(".note")) {
+    const nr = note.getBoundingClientRect(), nm = ctx.measureText(note.textContent), fit = nr.width / nm.width;
+    const base = nr.top + (parseFloat(ns.lineHeight) - nm.fontBoundingBoxAscent - nm.fontBoundingBoxDescent) / 2 + nm.fontBoundingBoxAscent;
+    let along = "";
+    for (const c of note.textContent) {
+      const x0 = ctx.measureText(along).width; along += c;
+      tops.push([nr.left + x0 * fit, nr.left + ctx.measureText(along).width * fit, base - Math.max(0, ctx.measureText(c).actualBoundingBoxAscent)]);
+    }
   }
-  // the highest letter top under a stretch of it (none: not over the line)
+  // the highest letter top under a stretch of them (none: not over either line)
   const topOver = (x0, x1) => tops.reduce((top, [l, r, y]) => (l < x1 && r > x0 ? Math.min(top, y) : top), Infinity);
   ctx.font = `400 12px ${ns.fontFamily}`; // (the characters' own type, .bit)
   spans.forEach((s, i) => {
