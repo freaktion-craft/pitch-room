@@ -179,7 +179,7 @@ const EMPTY_LIBRARY = false;
       <!-- Reach, sent a note from Practice: back to the song there, where it was (js/voice-reach.js) -->
       <div class="bb-acts"><button class="btn sm" id="rvBack" type="button" hidden>Back to Practice</button></div></div>
     <div class="vc">
-      <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><span style="bottom: 20%">1k</span><span style="bottom: 40%">2k</span><span style="bottom: 60%">3k</span><span style="bottom: 80%">4k</span>
+      <section class="vc-spec" aria-label="Spectrogram"><canvas id="vcSpec" aria-hidden="true"></canvas><div class="sg-hz" id="vcSpecHz" aria-hidden="true"></div><i class="sg-at" id="vcSpecLine"></i><span class="sg-tip" id="vcSpecTip" aria-hidden="true"></span>
         <!-- the mic's ask, over whichever view is shown (vcShowView moves it there) -->
         <div class="overlay" id="vcOff" hidden><p>Use headphones, so the speakers don’t leak in.</p><button class="btn primary" id="vcMic" type="button">Turn the mic on</button></div></section>
       <section class="vc-eq" aria-label="Spectrum and formants" hidden><canvas id="vcEq" aria-hidden="true"></canvas><button class="btn sm vc-freeze" id="vcFreeze" type="button" aria-pressed="false">Freeze</button></section>

@@ -337,13 +337,24 @@
 .vc-tgt { min-width: 56px; justify-content: center; font-variant-numeric: tabular-nums;
   background: linear-gradient(to right, color-mix(in oklab, var(--voice) 40%, transparent) var(--p, 0%), var(--fill) 0); }
 /* the spectrogram, in the pad's place when it's the view: always dark, whatever the theme, so its kHz marks are light */
-.vc-spec { position: relative; height: min(60vh, 520px); min-height: 280px; border-radius: var(--radius-card); overflow: hidden; background: rgb(6 6 24); }
+.vc-spec { position: relative; height: min(66vh, 620px); min-height: 340px; border-radius: var(--radius-card); overflow: hidden; background: rgb(6 6 24); cursor: crosshair; }
 #vcSpec { position: absolute; inset: 0; width: 100%; height: 100%; }
-.vc-spec span { position: absolute; left: var(--space-2); transform: translateY(50%); font: var(--text-2xs) var(--mono); color: rgba(255, 255, 255, 0.55); pointer-events: none; }
+/* its Hz: a faint line every 250 Hz (each kHz brighter), named at the left (sgScale) */
+.sg-hz { position: absolute; inset: 0; pointer-events: none; }
+.sg-hz i { position: absolute; left: 0; right: 0; height: 1px; background: var(--spec-grid); }
+.sg-hz i.k { background: var(--spec-grid-k); }
+.sg-hz span { position: absolute; left: var(--space-2); transform: translateY(50%); font: var(--text-2xs) var(--mono); font-variant-numeric: tabular-nums; color: var(--spec-label); }
+/* the Hz and note under the pointer, at the right (sgTip) */
+.sg-at { position: absolute; left: 0; right: 0; height: 1px; margin-top: -0.5px; background: var(--spec-ink); opacity: 0; pointer-events: none; }
+.sg-tip { position: absolute; right: var(--space-2); transform: translateY(-50%); padding: 2px var(--space-2); border-radius: var(--radius-sm); background: var(--spec-tip); color: var(--spec-ink);
+  font: var(--weight-medium) var(--text-xs) var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0; pointer-events: none; }
+.sg-at.on { opacity: 0.4; }
+.sg-tip.on { opacity: 1; }
 /* the Lab's keyboard as Practice's: from its card's left, as far under what's above it (.keys-wrap, stage.css) */
 @media (max-width: 760px) {
   .vc { grid-template-columns: minmax(0, 1fr); }
-  .vc-scale, .vc-spec, .vc-eq, .vc-piano { height: 52vh; }
+  .vc-scale, .vc-eq, .vc-piano { height: 52vh; }
+  .vc-spec { height: 62vh; min-height: 320px; }
 }
 
 /* Practice's timeline, under the song's bar: the whole song, the part played filled, a head where it's heard; click or

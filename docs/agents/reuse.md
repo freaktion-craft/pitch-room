@@ -68,7 +68,8 @@ one at run time, but not by code that runs while the earlier file loads.
   `ac.destination`.
 - A mic stream into a node: `micPlug(stream, dest)` (the chosen input channel); disconnect every node it returns.
 - Piano: `playKey(m, dur, delay)` plays at the user's volume and returns the gain (to hush a queued note); `piano(...)`
-  for a custom destination. In the Lab, `vcPlay(m)`, which also mutes the mic reading for a moment.
+  for a custom destination. In the Lab, `vcPlay(m)`, which also mutes the mic reading for a moment. `playKey` goes
+  through `keyBus` (into `master`), which the Lab's spectrogram reads to draw the keys; `piano(...)` elsewhere doesn't.
 - The mic is one stream for the whole app: `startMic()` (single-flight, says why it failed through `notice`),
   `openMic(echo)` (used by onboarding and Sync), `restartMic()`, `stopMic()`, `listMics()`, `micBlocked()` (how to
   allow it). Don't call `getUserMedia` yourself.
