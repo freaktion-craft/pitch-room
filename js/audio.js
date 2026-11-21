@@ -3,7 +3,7 @@
 // pitch detector (YIN).
 
 // ---------- audio ----------
-let ac = null, analyser = null, tbuf = null, master = null, noiseBuf = null, bandTap = null;
+let ac = null, analyser = null, tbuf = null, master = null, keyBus = null, noiseBuf = null, bandTap = null;
 let micStream = null, micNodes = null, micBus = null, micOn = false, testOsc = null, testOffset = 0;
 // Everything the page plays meets in master, then goes through a limiter on its way out: tracks summed loud (or turned
 // up past 100, or moved to another key) peak over full scale, which the sound system would clip. The limiter turns
@@ -54,6 +54,7 @@ function ensureCtx() {
     try { ac = S.out && canPickOut() ? new AC({ sinkId: S.out }) : new AC(); } catch (e) { ac = new AC(); } // (one that's gone: setOut)
     outBus = ac.createGain(); routeOut(); listOuts(); // (its pair, once it's known how many it has)
     master = ac.createGain(); master.gain.value = 1; master.connect(outBus);
+    keyBus = ac.createGain(); keyBus.connect(master); // (the piano's keys, playKey: the Lab's spectrogram reads them)
     if (ac.audioWorklet) limitInit().catch(() => {});
     analyser = ac.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
     // the mic goes in here, so the pitch tracker and the take recorder hear the same input, whichever one is plugged in
@@ -204,7 +205,7 @@ function synthPiano(m, at, dur, dest, vel) {
   nz.connect(bp); bp.connect(ng); ng.connect(dest); nz.start(at);
 }
 // (returns the note's gain: a note queued ahead can be hushed, scHush)
-function playKey(m, dur = 1.2, delay = 0) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.vol; g.connect(master); piano(m, ac.currentTime + 0.01 + delay, dur, g, 0.55); return g; }
+function playKey(m, dur = 1.2, delay = 0) { ensureCtx(); const g = ac.createGain(); g.gain.value = S.vol; g.connect(keyBus); piano(m, ac.currentTime + 0.01 + delay, dur, g, 0.55); return g; }
 
 // Where a refused mic is allowed again: the system's own settings in the desktop app (it can't be asked twice there),
 // the mic in the address bar in a browser. how: what to do, {link} where the settings' path goes (obMic makes it a link)
