@@ -298,6 +298,8 @@
   /* ---- depth (its shadows are with the colours) ---- */
   --radius-card: var(--radius-2xl); --pad-card: var(--space-4); /* a card: one corner and one inset for all of them, set off by its tone alone (no edge) */
   --gap-float: var(--space-2); /* how far a panel stands off the button that opened it (floatGap() for those placed by script) */
+  --lab-pane-h: min(66vh, 620px); --lab-pane-min: 340px; /* the Lab's view, whichever it is (narrow: 62vh, 320px) */
+  --lab-pane-h-narrow: 62vh; --lab-pane-min-narrow: 320px;
   /* the Lab's spectrogram: dark in both themes (its colours drawn are voice.js's SG_LUT), so what's over it is light */
   --spec-label: rgba(255, 255, 255, 0.6); --spec-grid: rgba(255, 255, 255, 0.06); --spec-grid-k: rgba(255, 255, 255, 0.14);
   --spec-ink: rgb(255 255 255); --spec-tip: rgba(0, 0, 0, 0.6);

@@ -36,17 +36,18 @@ function vcAnalyser() {
   return VC.an;
 }
 
-// The formants: an all-pole fit (LPC) of the last 2048 samples, brought down to about 11 kHz, pre-emphasised and windowed; the
-// fit's envelope (dB at VC_ENV points up to half that rate) and its peaks from 200 Hz up, the first three. null while there's
-// no voice. On high notes the harmonics are far apart and the fit follows them more than the vowel: less sure there.
-const VC_ENV = 256, VC_LPC = 12;
-function vcFormants() {
-  const sr = ac.sampleRate, D = Math.max(1, Math.round(sr / 11025)), fs = sr / D, n = Math.floor(tbuf.length / D);
+// The formants: an all-pole fit (LPC) of the last 2048 samples, brought down to about 11 kHz, pre-emphasised and windowed; its
+// peaks from 200 Hz up, the first three. null while there's no voice. On high notes the harmonics are far apart and the fit
+// follows them more than the vowel: less sure there. The EQ's envelope is a second fit at the full rate (VC_WIDE poles), so it
+// runs the EQ's whole width (EQ.lo to EQ.hi), at VC_ENV points spaced as the EQ's octaves are.
+const VC_ENV = 256, VC_LPC = 12, VC_WIDE = 24;
+function vcLpc(D, p) { // the fit of tbuf brought down D times: its coefficients (a), error (e) and rate (fs), or null
+  const fs = ac.sampleRate / D, n = Math.floor(tbuf.length / D);
   const x = new Float64Array(n);
   for (let i = 0; i < n; i++) { let s = 0; for (let k = 0; k < D; k++) s += tbuf[i * D + k]; x[i] = s / D; }
   for (let i = n - 1; i > 0; i--) x[i] -= 0.97 * x[i - 1];
   for (let i = 0; i < n; i++) x[i] *= 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (n - 1));
-  const p = VC_LPC, r = new Float64Array(p + 1);
+  const r = new Float64Array(p + 1);
   for (let l = 0; l <= p; l++) { let s = 0; for (let i = l; i < n; i++) s += x[i] * x[i - l]; r[l] = s; }
   if (r[0] <= 0) return null;
   r[0] *= 1 + 1e-9;
@@ -56,15 +57,28 @@ function vcFormants() {
     const b = a.slice(); for (let j = 1; j < i; j++) b[j] = a[j] + k * a[i - j]; b[i] = k; a = b; e *= 1 - k * k;
     if (e <= 0) return null;
   }
+  return { a, e, fs };
+}
+const vcLpcDb = ({ a, e, fs }, f) => { // the fit's level at f Hz
+  const w = (2 * Math.PI * f) / fs; let re = 0, im = 0;
+  for (let j = 0; j < a.length; j++) { re += a[j] * Math.cos(w * j); im -= a[j] * Math.sin(w * j); }
+  return 10 * Math.log10(e / (re * re + im * im + 1e-30));
+};
+function vcFormants() {
+  const fit = vcLpc(Math.max(1, Math.round(ac.sampleRate / 11025)), VC_LPC);
+  if (!fit) return null;
   const env = new Float32Array(VC_ENV), hz = new Float32Array(VC_ENV);
-  for (let q = 0; q < VC_ENV; q++) {
-    const w = (Math.PI * (q + 0.5)) / VC_ENV; let re = 0, im = 0;
-    for (let j = 0; j <= p; j++) { re += a[j] * Math.cos(w * j); im -= a[j] * Math.sin(w * j); }
-    env[q] = 10 * Math.log10(e / (re * re + im * im + 1e-30)); hz[q] = (w / Math.PI) * (fs / 2);
-  }
+  for (let q = 0; q < VC_ENV; q++) { hz[q] = ((q + 0.5) / VC_ENV) * (fit.fs / 2); env[q] = vcLpcDb(fit, hz[q]); }
   const peaks = [];
   for (let q = 1; q < VC_ENV - 1; q++) if (env[q] > env[q - 1] && env[q] >= env[q + 1] && hz[q] >= 200 && hz[q] <= 4500) peaks.push(hz[q]);
-  return { env, hz, f: peaks.slice(0, 3) };
+  return peaks.slice(0, 3);
+}
+function vcEnvelope() {
+  const fit = vcLpc(1, VC_WIDE);
+  if (!fit) return null;
+  const hi = Math.min(EQ.hi, fit.fs / 2), env = new Float32Array(VC_ENV), hz = new Float32Array(VC_ENV);
+  for (let q = 0; q < VC_ENV; q++) { hz[q] = EQ.lo * Math.pow(hi / EQ.lo, q / (VC_ENV - 1)); env[q] = vcLpcDb(fit, hz[q]); }
+  return { env, hz };
 }
 
 // One frame, from the main loop while the page is shown: read the sound, keep a sample of it (time-weighted: js/turn.js),
@@ -88,8 +102,8 @@ function voiceFrame() {
     if (h.h12 != null) VC.h12 = VC.h12 == null ? h.h12 : VC.h12 + (h.h12 - VC.h12) * (1 - Math.exp(-dt / 150));
     VC.db = 20 * Math.log10(level);
     const fm = vcFormants(); // (smoothed, each formant to the one read near it)
-    VC.env = fm;
-    if (fm) { VC.fm = fm.f.map((v, i) => (VC.fm && VC.fm[i] != null && Math.abs(VC.fm[i] - v) < 400 ? VC.fm[i] + (v - VC.fm[i]) * 0.3 : v)); VC.fmAt = m; }
+    VC.env = fm && vcEnvelope();
+    if (fm) { VC.fm = fm.map((v, i) => (VC.fm && VC.fm[i] != null && Math.abs(VC.fm[i] - v) < 400 ? VC.fm[i] + (v - VC.fm[i]) * 0.3 : v)); VC.fmAt = m; }
     VC.last = { t: now };
   } else if (VC.last && now - VC.last.t > 120) VC.h12 = VC.fm = VC.env = null;
   if (hearing && now >= VC.mute) { // (nothing while the piano sounds)
@@ -303,7 +317,8 @@ function drawEq(now, hearing) {
     const w = g.measureText(text).width + 12, l = Math.max(2, Math.min(W - w - 2, x - w / 2));
     g.fillStyle = bg; g.beginPath(); g.roundRect(l, y - 18, w, 18, 4); g.fill(); g.fillStyle = fg; g.textAlign = "left"; g.fillText(text, l + 6, y - 5);
   };
-  // the tops of a spectrum: each column the loudest within half a harmonic (of step Hz) either side, a 30th of an octave up high
+  // the tops of a spectrum: each column the loudest within half a harmonic (of step Hz) either side, a 30th of an octave up high;
+  // from edge to edge, at the first and last columns' levels (below H1 and above the last top it falls away, not cut off)
   const tops = (cols, step) => {
     const pts = [], m = cols.length, floor = EQ.top - EQ.span + 3, cx = (c) => ((c + 0.5) / m) * W;
     for (let c = 0; c < m; c++) {
@@ -312,6 +327,7 @@ function drawEq(now, hearing) {
       let top = true; for (let j = a; j <= b && top; j++) if (cols[j] > cols[c]) top = false;
       if (top && cols[c] > floor && (!pts.length || cx(c) - pts[pts.length - 1][0] > 3)) pts.push([cx(c), yOf(cols[c])]);
     }
+    if (pts.length) { if (pts[0][0] > cx(0)) pts.unshift([0, yOf(cols[0])]); if (pts[pts.length - 1][0] < cx(m - 1)) pts.push([W, yOf(cols[m - 1])]); }
     return pts;
   };
   const curve = (pts) => { // through the points, its corners rounded (a quadratic through each midpoint)
@@ -429,7 +445,7 @@ function vcShowView(v) {
   if (v !== "match" && MV.run) mvAbort();
   VC.view = v; $(".vc").dataset.view = v;
   $(".vc-scale").hidden = v !== "scale"; $(".vc-reach").hidden = v !== "reach"; $(".vc-match").hidden = v !== "match"; $(".vc-spec").hidden = v !== "spec"; $(".vc-eq").hidden = v !== "eq";
-  $(".vc-piano").hidden = v !== "piano"; vkSet(v === "piano"); // (the computer's keys play only there)
+  $(".vc-piano").hidden = v !== "piano"; vkPaint(v === "piano"); // (the computer's keys play in every view; Piano's brings their range into view)
   $(".vc-" + v).append($("#vcOff"));
   for (const b of $("#vcView").children) b.setAttribute("aria-checked", String(b.dataset.v === v));
   paintLab(); paintScale(); paintReach(); paintMatch();
@@ -437,15 +453,15 @@ function vcShowView(v) {
 // ---------- typing the piano ----------
 // The computer's keys as the piano, laid out as a DAW's: the home row is the white keys up from VK.base (a C or an F), the row
 // above it the black keys between them. By where a key is (e.code), not its letter, so it's the same while typing Korean.
-// Z and X move it an octave, with Shift half of one (C to F to the next C). On while Piano is the view, and only there: a run has
-// its own keys, and in Match the answer could be played. A key sounds while it's held. The mic goes on being read (vcPlay hushes
+// Z and X move it an octave, with Shift half of one (C to F to the next C). On in every view of the Lab, but not in a run
+// (Scales, Reach or Match): a run has its own keys, and in Match the answer could be played. A key sounds while it's held. The mic goes on being read (vcPlay hushes
 // it only in a run), so the note you sing shows beside the one you play; on speakers the piano can be read as you.
 const VK_HOME = ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote"];
 const VK_TOP = ["KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft"]; // (VK_TOP[i] sits between VK_HOME[i] and the next)
 const VK_CAP = { Semicolon: ";", Quote: "'", BracketLeft: "[" };
 const VK_BASES = [36, 41, 48, 53, 60, 65, 72]; // where A can be: C2 to C5 (from C5 the row runs past the keyboard's top, C6: the keys after K play nothing)
 const VK_HOLD = 6, VK_LET_GO = 0.08; // s: the longest a held key sounds; how fast it dies away when let go
-const VK = { on: false, base: 60, map: new Map(), held: new Map() }; // map: e.code -> MIDI; held: e.code -> { m, g: its gain }
+const VK = { base: 60, map: new Map(), held: new Map() }; // map: e.code -> MIDI; held: e.code -> { m, g: its gain }
 const vkBlack = (m) => [1, 3, 6, 8, 10].includes(((m % 12) + 12) % 12);
 function vkLayout() {
   VK.map = new Map();
@@ -456,25 +472,23 @@ function vkLayout() {
   });
 }
 // The letters on the keys they play, the range in words, and the note being played (the last key still held)
-function vkPaint() {
+function vkPaint(scroll = true) {
   vcKeyEls.forEach((b) => { delete b.dataset.k; });
-  if (!VK.on) return;
   for (const [code, m] of VK.map) { const b = vcKeyEls.get(m); if (b) b.dataset.k = VK_CAP[code] || code.slice(3); }
   const ms = [...VK.map.values()], lo = Math.min(...ms), hi = Math.max(...ms);
   say($("#vkSay"), "The home row plays {a}–{b}, the row above it the black keys", { a: () => absName(lo), b: () => absName(hi) });
   const wrap = $("#vcKeys").parentElement, a = vcKeyEls.get(lo), b = vcKeyEls.get(hi); // all of the range in view
-  if (a && b && (a.offsetLeft < wrap.scrollLeft || b.offsetLeft + b.offsetWidth > wrap.scrollLeft + wrap.clientWidth)) wrap.scrollTo({ left: (a.offsetLeft + b.offsetLeft) / 2 - wrap.clientWidth / 2, behavior: "smooth" });
+  if (scroll && a && b && (a.offsetLeft < wrap.scrollLeft || b.offsetLeft + b.offsetWidth > wrap.scrollLeft + wrap.clientWidth)) wrap.scrollTo({ left: (a.offsetLeft + b.offsetLeft) / 2 - wrap.clientWidth / 2, behavior: "smooth" });
   vkRead();
 }
 function vkRead() { const last = [...VK.held.values()].pop(); setText("vkPlay", last ? absName(last.m) : "–"); }
-function vkSet(on) { VK.on = on; if (!on) vkOff(); vkPaint(); }
 function vkMove(up, half) {
   const i = VK_BASES.indexOf(VK.base) + (up ? 1 : -1) * (half ? 1 : 2);
   if (i < 0 || i >= VK_BASES.length) return; // (as far as it goes)
   vkOff(); VK.base = VK_BASES[i]; store.set("vcTypeBase", VK.base); vkLayout(); vkPaint();
 }
 function vkDown(e) {
-  if (!VK.on || view !== "voice" || SV.run || RV.run || MV.run || ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (view !== "voice" || SV.run || RV.run || MV.run || ownKeys(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   const move = e.code === "KeyZ" || e.code === "KeyX", m = VK.map.get(e.code);
   if (!move && m == null) return;
   e.preventDefault(); e.stopImmediatePropagation(); // (the page's own shortcuts don't get a key the piano has)
@@ -492,7 +506,7 @@ function vkUp(code) {
   if (![...VK.held.values()].some((x) => x.m === h.m)) vcKeyEls.get(h.m)?.classList.remove("down");
   vkRead();
 }
-function vkOff() { for (const code of [...VK.held.keys()]) vkUp(code); } // every key let go: the window left, the range moved, typing turned off
+function vkOff() { for (const code of [...VK.held.keys()]) vkUp(code); } // every key let go: the window left, the range moved, the Lab left
 function initType() {
   VK.base = VK_BASES.includes(store.get("vcTypeBase", 60)) ? store.get("vcTypeBase", 60) : 60;
   vkLayout(); // (painted when its view is shown: vcShowView)
