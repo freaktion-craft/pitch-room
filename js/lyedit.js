@@ -8,15 +8,17 @@
 
 // t0, span: the track's view (s); undo: the edits as they were before each change; sel: the line last touched; drag: what a
 // held pointer is doing; pick: a run of one line's words picked (a click picks a word, Shift+click runs to another) to split
-// off as a line of its own or make backing vocals; busy: the song being timed again after that
-const ED = { on: false, t0: 0, span: 12, undo: [], sel: null, drag: null, pick: null, busy: false };
+// off as a line of its own or make backing vocals; busy: the song being timed again after that; typing: a line's words being
+// typed ({op: "text", line} or {op: "add", at}: edType); armed: the line Delete line was pressed for once; hit: the line last clicked and when (twice running: its words retyped)
+const ED = { on: false, t0: 0, span: 12, undo: [], sel: null, drag: null, pick: null, busy: false, typing: null, armed: null, hit: null };
+const ED_DBL = 450; // ms between the two clicks of a double-click on a line
 const ED_MIN = 0.05, ED_JOIN = 0.03; // a word's shortest (s); a word's end this close to the next one's start runs up to it
 const ED_ROWS = [[28, 48], [92, 112]], ED_WAVE = 156; // [line bar, words] y (px) for even and odd lines; where the waveform starts
 const r3 = (t) => Math.round(t * 1000) / 1000;
 
 function edOpen(on) {
   if (on && (!K.lyrics || !K.song)) return;
-  ED.on = on; ED.drag = null; edExportMenu(false);
+  ED.on = on; ED.drag = null; edExportMenu(false); edTypeEnd();
   $("#lyEdit").hidden = !on; $("#kEdit").setAttribute("aria-pressed", String(on));
   for (const n of [$(".tl-row"), $("#keysWrap"), $("#vPractice .credit")]) n.hidden = on; // (the song's timeline and the keyboard: no use while editing, the editor has its own navigator)
   const b = $("#kEdit"); // Edit, and Done while it's open
@@ -35,22 +37,59 @@ function edButtons() {
   const p = ED.pick, l = p && K.lyrics[p.i], all = l && l.words.slice(p.a, p.b + 1).every((w) => w[4]);
   $("#lySplit").hidden = $("#lyBacking").hidden = !l || ED.busy;
   if (l) { $("#lySplit").disabled = p.a === 0 && p.b === l.words.length - 1; say($("#lyBacking"), all ? "Not backing" : "Backing"); }
+  // the line picked: its words typed again, or the line taken out (pressed twice); a new line, any time
+  $("#lyRetype").hidden = $("#lyDelLine").hidden = ED.sel == null || !K.lyrics?.[ED.sel] || ED.busy;
+  if (ED.armed !== ED.sel) ED.armed = null; // (another line picked: asked afresh)
+  say($("#lyDelLine"), ED.armed != null ? "Really delete?" : "Delete line");
+  $("#lyAdd").disabled = ED.busy;
+}
+// A line's words by hand, where what's sung isn't what the lyrics say (a cover's changed line; stems.change_lyric_lines' text,
+// add and delete): Retype, or a double-click on a line, puts its words in a field in the subtitle's place; Add line, an empty
+// one, for a line sung from where the playhead is. Enter or Save sends it, Escape or Cancel lets it go. The song is timed again
+// after, as after Split off (edLines).
+function edType(mode) {
+  if (ED.busy || !ED.on || (mode === "text" && (ED.sel == null || !K.lyRaw[ED.sel]))) return;
+  ED.typing = mode === "add" ? { op: "add", at: Math.max(0, heardStage()) } : { op: "text", line: ED.sel };
+  const f = $("#lyTypeIn");
+  f.value = mode === "add" ? "" : K.lyRaw[ED.sel].text;
+  say(f, mode === "add" ? "The new line’s words, sung from the playhead" : "The line’s words", null, "placeholder");
+  $("#lyType").hidden = false; $("#lySub").hidden = true;
+  f.focus(); f.select();
+}
+function edTypeEnd() {
+  if (!ED.typing) return;
+  ED.typing = null; $("#lyType").hidden = true; $("#lySub").hidden = false;
+}
+function edTypeSend() {
+  const t = ED.typing, text = $("#lyTypeIn").value.replace(/\s+/g, " ").trim();
+  if (!t || !text) return;
+  edTypeEnd();
+  if (t.op === "text" && text === K.lyRaw[t.line]?.text) return; // (as it was)
+  edLines(t.op, { ...t, text });
+}
+function edDelLine() {
+  if (ED.sel == null || ED.busy) return;
+  if (ED.armed !== ED.sel) { ED.armed = ED.sel; edButtons(); return; }
+  const line = ED.sel;
+  ED.armed = ED.sel = null;
+  edLines("delete", { op: "delete", line });
 }
 // The picked words split off as a line of their own, or put in or out of brackets (stems.change_lyric_lines): the lines change,
 // the song is timed again, and the edits and nudges go with their lines (what came back says where)
-async function edLines(op) {
+async function edLines(op, typed) { // (typed: a line retyped, added or taken out, as it's sent: edType, edDelLine)
   const m = K.song, p = ED.pick, l = p && K.lyrics[p.i];
-  if (!l || ED.busy) return;
-  const body = { op, line: p.i, from: p.a, to: p.b };
+  if ((!l && !typed) || ED.busy) return;
+  const body = typed || { op, line: p.i, from: p.a, to: p.b };
   if (op === "backing") body.on = !l.words.slice(p.a, p.b + 1).every((w) => w[4]);
   let j;
   try {
     const r = await fetch(`/api/library/${m.id}/lyrics/lines`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     j = await r.json();
     if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
-  } catch (e) { flashNote(tr("Couldn’t save that.")); console.warn("Lyrics lines:", e.message); return; }
+  } catch (e) { flashNote(typed && e.message && !/^HTTP /.test(e.message) && !(e instanceof TypeError) ? tr(e.message) : tr("Couldn’t save that.")); console.warn("Lyrics lines:", e.message); return; } // (a typed line turned away says why: the only line left)
   for (const s of [libCache.get(m.id), P.song, m]) if (s && s.id === m.id) { s.lyricEdits = j.lyricEdits; s.lyricNudge = j.lyricNudge; }
   ED.pick = null; ED.undo = []; ED.busy = true; // (the lines are numbered anew: the old undos don't fit)
+  if (typed && typed.op !== "text") ED.sel = null; // (the line picked is another now)
   $("#lyEdit").classList.add("busy"); edButtons();
   flashNote(tr("Timing this song again…"));
   watchJob(j.job, "lyrics", m.id); // lyricsDone brings the new lines in, and edDone opens the editor to them
@@ -311,6 +350,13 @@ function initLyEdit() {
 
   $("#lyUndo").onclick = edUndo; $("#lyReset").onclick = edReset;
   $("#lySplit").onclick = () => edLines("split"); $("#lyBacking").onclick = () => edLines("backing");
+  $("#lyRetype").onclick = () => edType("text"); $("#lyAdd").onclick = () => edType("add"); $("#lyDelLine").onclick = edDelLine;
+  $("#lyTypeGo").onclick = edTypeSend; $("#lyTypeX").onclick = edTypeEnd;
+  $("#lyTypeIn").addEventListener("keydown", (e) => {
+    if (e.isComposing || e.keyCode === 229) return; // (Enter that ends an IME composition only ends that)
+    if (e.key === "Enter") { e.preventDefault(); edTypeSend(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); edTypeEnd(); $("#kEdit").focus({ preventScroll: true }); }
+  });
 
   $("#lyExport").append(icon("upload")); $("#lyImport").append(icon("download")); // (out of the app goes up and out of the tray; into it comes down into it)
   $("#lyExport").onclick = (e) => { e.stopPropagation(); edExportMenu($("#lyExportMenu").hidden); };
@@ -363,6 +409,10 @@ function initLyEdit() {
         ED.pick = e.shiftKey && p && p.i === D.i ? { i: D.i, a: Math.min(p.a, D.k), b: Math.max(p.b, D.k) } : { i: D.i, a: D.k, b: D.k };
       } else if (!cancel) ED.pick = null;
       edPaint(false); edButtons();
+      // (a second click on the line within DBL ms, a double-click: its words to retype. Counted here: the clips are drawn again between the two)
+      const now = performance.now(), twice = !cancel && !e.shiftKey && ED.hit && ED.hit.i === D.i && now - ED.hit.at < ED_DBL;
+      ED.hit = twice || cancel ? null : { i: D.i, at: now };
+      if (twice) { edType("text"); return; }
       if (!cancel && !(e.shiftKey && D.mode === "onset")) { const l = K.lyrics[D.i], w = D.k != null ? l.words[D.k] : null; seekWithin(Math.max(0, w && w[0] != null ? (D.mode === "end" ? w[1] - 1 : w[0]) : l.t0)); } // (its end: from a second before)
     }
   };

@@ -34,7 +34,8 @@
   which the page polls), `library`, `settings`, `import`, `upgrades`, and per song `info`, `takes`, `lyrics`, `truth`,
   `notes`, take `pitch`, `melody/<id>`.
 - POST routes (`_stems_post`): `jobs/singing` (heartbeat while a song plays), `upgrades`, `settings`, `import`,
-  `stems/install`, `stems/youtube`, `stems/playlist`, job `cancel`/`pick`/`lyrics`, and per song `delete`, `rename`,
+  `stems/install`, `stems/youtube` (`coverOf`: a song's id, for a cover of it), `stems/playlist`, job
+  `cancel`/`pick`/`lyrics`/`start` (`{at}`: where a cover's first line starts), and per song `delete`, `rename`,
   `split`, `mix`, `keep`, `truth`, `notes`, `marks`, `key`, `export`, `lyrics/...`, `takes...`.
 - A `ValueError` becomes 422 `{error}` (shown by the page) in POST routes and the per-song GETs; in other GETs it's a
   500 `"ValueError: ..."`. Anything else is a 500 with a traceback in the terminal.
@@ -63,7 +64,9 @@ The `id` is 12 hex characters. The docstring at the top of `stems.py` gives a pa
   when the lead-vocal model is installed.
 - `cover.jpg` and `cover-96.jpg`.
 - `meta.json`: title, source, duration, bpm, beats, key, stems, naming (`sure`, `picked`, `named`), mix and practice
-  state (`keep`, `mix`, `lyricNudge`, `lyricEdits`, `phraseMarks`), and `adding` while being added.
+  state (`keep`, `mix`, `lyricNudge`, `lyricEdits`, `phraseMarks`), and `adding` while being added. A cover kept
+  under its song has `coverOf` (that song's id), `sourceTitle` (the video's own title) and `cut` (seconds taken off
+  its start); a cover that is a song of its own has `covered` (the artist of the record it covers).
 - `lyrics.json`: timed lines and words, or `lines: null` when none were found or they were let go.
 - `syllables.json`: onsets and sung lines; valid only while its `at` equals `lyrics.json`'s and its `v` equals
   `syllables.VERSION`.
@@ -94,7 +97,7 @@ within the hour.
 
 ## Adding a song
 
-`start_youtube` → `_pipeline` → `_lyrics_phase`:
+`start_youtube` → `_pipeline` → `_lyrics_phase` (a cover: `_cover_phase` → `mark_start` → `_lyrics_phase`):
 
 1. Join the queue, then download the audio once its turn is near (`_fetch_turn`).
 2. In its turn: decode, Demucs (`_separate`), lead vocal (`_lead_vocal`), melody, beats, key.
@@ -102,6 +105,25 @@ within the hour.
 4. Background naming and covers start (`_want_lookup`).
 5. Lyrics (a separate "lyrics" job): may stop to ask for a pick (`needPick`, when `sure` ≤ `ASK_AT` 0.4, the owner's
    choice) or for lyrics (`needLyrics`).
+
+**Covers** (another singer's version of a song in the library; the comment over `COVER_LEAD` in `stems.py`):
+
+- A cover is an ordinary song folder whose meta has `coverOf`. `library()` lists it like any song; the page keeps it
+  out of the list and under its song. Its title is the song's (`rename_song` renames them together), its artist is who
+  sings it and its art the video's thumbnail (`_name_cover`: no iTunes or Deezer lookup). `delete_song` deletes a
+  song's covers with it (`_covers_of`).
+- It's added from `stems/youtube` with `coverOf` (a link only; a cover's id there means its song), or by itself: a
+  cover's video sent as any link is kept under its song when the library has exactly one song of that title whose
+  artist is the covered record's (`_its_song`, after naming). With no such song it stays a song of its own.
+- Once its tracks are in, the job stops with `needStart` (`startAt`: its first note; `voice`: the track to show), as
+  `needPick` does. `POST jobs/<id>/start` `{at}` (`mark_start`) cuts every track to begin `COVER_LEAD` (8 s) before
+  the mark (`_cut_start`: the mp3s re-encoded, `beats`, `duration` and `melody.json` moved with them; under `CUT_MIN`
+  nothing is cut), then lines the song's own lyrics up with this voice like pasted ones. A song with no lyrics has
+  them looked for, by the song's artist and title.
+- Words a cover sings differently are changed by hand: `lyrics/lines` takes `{op: "text", line, text}`,
+  `{op: "delete", line}` and `{op: "add", at, text}` beside the timing ops (`_retype_lines`). A retyped line keeps
+  its span, its words spread over it by length (`_typed_words`); saved edits and nudges are moved to the new line
+  numbers.
 
 Lyrics: LRCLIB candidates, Whisper (large-v3-turbo via stable-ts) to screen and align, then on split songs
 `syllables.align_lyrics` and the melody re-cut at syllable onsets. `get_lyrics` returns the sung lines when
@@ -184,6 +206,9 @@ Lyrics: LRCLIB candidates, Whisper (large-v3-turbo via stable-ts) to screen and 
 - `_melody_outdated` is false while a lyrics job runs for the song, since `syllables.json` runs ahead of `lyrics.json`.
 - A failed syllables run isn't saved; `melody.json` carries `sylFailed` and is retried when the models appear.
 - Cancelling an add during its lyrics phase doesn't stop the lyrics job.
+- `_cut_start` re-encodes a cover's mp3s (a second lossy pass on its first seconds onward) and says nothing while
+  it does: the row shows "Cutting the start" with no progress. Key renders made before a cut would be stale, but none
+  exist yet when it runs (the song is still `adding`).
 - `_lead_vocal` may pip-install audioread on the fly.
 - The key render starts one ffmpeg per track, up to the CPU count: CPU-heavy.
 - On Windows a file open elsewhere can't be replaced: wrap new `os.replace` or `json.load` calls with `_retry`.

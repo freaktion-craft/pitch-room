@@ -130,6 +130,14 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
 - **"Tools installed" means the install job finished**, not that the packages import: the models may still be
   downloading (`obToolsIn`; dfd26a2).
 - **Takes that failed to save are kept apart from the open song's list** (lost on switching songs; ba0abaf).
+- **Opening the Add drawer from a click outside it waits for that click to end** (`setTimeout`): the document's
+  click-outside handler closes `#jobsPop` on the same click. Was: Add a cover in the singer menu opened the drawer and
+  it shut at once (`singerStep`).
+- **A list's "click again" state is cleared when the list opens again**, not only when it's used. Was: Delete this
+  cover still said "Really delete?" on the next visit to the menu (`singerStep`, a capture listener on its button).
+- **A double-click on something redrawn between the clicks is counted by hand**, since `dblclick` needs both clicks on
+  the same node. Was: a lyric clip, redrawn on its first click, never opened its words (`ED.hit`, `ED_DBL`,
+  `lyedit.js`).
 
 ## The Lab
 

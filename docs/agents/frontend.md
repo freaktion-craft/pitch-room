@@ -55,10 +55,10 @@ Each area keeps its state in one short capitalised object.
 | `helpers.js` | `el`, `mkBtn`, slider value tips, `makePick` (dropdowns), `progRing`, `ICONS` and `icon()`, `fmtTime` |
 | `library.js` | Song list, sort, search, views, New strip, Continue practising (`CP`), cover zoom (`CV`), song menu, tool status |
 | `info.js` | Info page |
-| `adding.js` | Add-song drawer, jobs (`paintJobs`, `watchJob`), links and playlists |
+| `adding.js` | Add-song drawer, jobs (`paintJobs`, `watchJob`), links and playlists; adding a cover (`addCover`, `coverFor`) and marking its first line (`startAsk`, `starts`) |
 | `studio.js` | `P`: the loaded song and player (`openSong`, `playSong`), tracks, key and tempo, export, `initStems` |
 | `practice.js` | `K`: Practice (phrases, loop, count-in, lyrics); Settings page nav; Headphones; `initSing` |
-| `lyedit.js` | `ED`: the lyric timing editor |
+| `lyedit.js` | `ED`: the lyric timing editor; retyping, adding and deleting a line (`edType`, `edDelLine`) |
 | `takes.js` | `R` recording, latency Sync; `T` the take list |
 | `takes-studio.js` | `TS`: Takes Studio |
 | `stage.js` | Practice canvas; `C` (canvas colours); accent and theme; the main `loop()` |
@@ -186,6 +186,11 @@ working without it.
 - `helpers.js` redefines the `value` setter on `HTMLInputElement.prototype` to keep range fills in sync. Setting a
   range's `.value` from code is fine; don't redefine it again.
 - A `KO_TEXT` key with a straight `'` where the code has `’` silently shows English.
+- A cover (`m.coverOf`, a song in `libCache` like any other) isn't a row of the library while its song is there:
+  `coverSong(m)` is that song, `coversOf(id)` a song's covers (`library.js`). Anything that lists songs filters on
+  `coverSong`; anything that names the loaded song uses `sungName(m)` ("Title · Singer"). A song's page has the singer
+  as the last crumb, a `makePick` (`singerStep`, `app.js`): Original and Covers to switch between, Add a cover, and
+  for a cover its Info and Delete. Covers aren't in the New strip or Continue practising.
 - The Add drawer (`#jobsPop`) and its veil (`#addVeil`) are moved to `<body>` at init (`initSing` in `practice.js`,
   `initStems` in `studio.js`), so selectors scoped to `#vStems` won't find them.
 - The concatenated `node --check` doesn't see the inline scripts in `index.html`: a top-level name in `js/` that

@@ -88,16 +88,19 @@ one at run time, but not by code that runs while the earlier file loads.
 - `.pick` / `select` / number field: the surface-2 field with `--chevron`.
 - Settings: `.set-group > h2 + .set-list > .set-row` (`.set-what > b + small`, the control on the right).
 - Lists: `.group`, `.rows`, `.row`. Small text: `.hint`, `.muted`, `.credit`, `.title`, `.pop-title`.
-- Search with key hints: `.search` (`stems.css`). Back link and crumbs: `.backbar`, `.crumbs`.
+- Search with key hints: `.search` (`stems.css`). Back link and crumbs: `.backbar`, `.crumbs`, filled by
+  `crumbsIn(box, steps)` (`app.js`): a step is `{text, href}` or `{node}` (a control as a crumb, such as the singer).
 
 ### Dropdown: `makePick`
 
 `makePick(btn, name, onPick, {stayOpen, minWidth, foot})` (`helpers.js`) on a `button.pick` already in its final place.
-Items `{v, t, g, full, side, tone, prog, btn}`; API `.set(items, value)`, `.value`, `.close()`, `.relabel()`. It does the
+Items `{v, t, g, full, side, tone, prog, btn, ico, rule}`; API `.set(items, value)`, `.value`, `.close()`, `.relabel()`. It does the
 keys (↑↓, Home, End, Esc, Tab), click-outside, closing on scroll and resize, and opening upwards.
 
 - `name` is English (translated inside); items come translated and are set again in `setLang`.
 - Each one adds document listeners for good: make it once and reuse it (`bpbPick` is moved between rows for this).
+- An item with `ico` is an action in the list (an icon first, never the picked value: `onPick(v)` on every press);
+  `rule` draws a line over an item. The singer crumb (`singerStep`, `app.js`) is the one to copy.
 
 ### Segmented control: `.seg`
 
@@ -133,7 +136,7 @@ shown muted. Only where a tooltip is allowed (`style.md`). Copies: the phrase st
 
 `waveBars(ctx, ...)` (`studio.js`) draws pixel-snapped bars with the played and ahead parts; `waveRise` sweeps them in;
 `timeTip(canvas)` shows the time under the pointer. Peaks: `computePeaks` (`studio.js`). Copies: `takePeaks`,
-`tsClipWave` (`takes-studio.js`, draws its own bars), the scan in `lyedit.js`.
+`tsClipWave` (`takes-studio.js`, draws its own bars), the scan in `lyedit.js`, `loadStart` (`adding.js`, SVG bars).
 
 ## Popups, drawers and messages
 
@@ -148,12 +151,16 @@ shown muted. Only where a tooltip is allowed (`style.md`). Copies: the phrase st
   close on focusout, close the others. `showRetime`/`initRetime` (`studio.js`, the lyric timing update left of
   Download) is the third: copy that wiring for a fourth.
 - **Drawer**: `showJobs`/`closeDrawer`, `drawerEdge` (keeps the scrollbar's room), `afterSlide` (`adding.js`).
+  A job that stopped to be told something (`jobAsks(j)`: its lyrics, which song, a cover's first line) gets its form
+  in its row: `lyricsBox`, `startAsk`. A new question goes into `jobAsks` and gets its form the same way.
+- **Songs and their covers**: `coverSong(m)`, `coversOf(id)` (`library.js`), `sungName(m)` (`app.js`).
 - **Question before the app opens**: `askUpdate()` (`app.js`, `.boot-ask`). Not used now: the re-timing question moved
   to the song's page.
 - **Messages**: there's no general toast. Mic trouble: `notice(msg)`. A word in Practice's head line: `flashNote(text)`.
   A take row: `takeNote`. The Add drawer: `addMsg`. Lyrics: `lyricNote`.
 - **"Click again to delete"**: there's no helper; the song menu's `data-armed` ("Really delete?") is the pattern to
-  follow. Copies: a take's `.armed` with `disarmTakes()`, `clearNotes()`' `.arm`.
+  follow. Copies: a take's `.armed` with `disarmTakes()`, `clearNotes()`' `.arm`, `singer.armed` (the singer
+  crumb's Delete this cover), `ED.armed` (the lyric editor's Delete line).
 - **Focus**: `focusFrom(btn, back)` moves Tab on from what opened a list. The focus ring is `--voice-act`, 2 px.
 
 ## Dragging
@@ -204,7 +211,7 @@ Each pair below does one job twice. Use the first; folding them is a change of i
 | Lab status line | `scSay` (`voice-scale.js`) | `rvSay`, `mvSay` (both re-do `vcTitles`) |
 | Lab canvas set-up | `drawScale` (`voice-scale.js`) | `drawReach`, `drawMatch`, `drawSpec`, `drawEq` |
 | Rounded rect | `scRound` / `ctx.roundRect` | `rr` (stage only) |
-| Peaks | `computePeaks` (`studio.js`) | `takePeaks`, `tsClipWave`, `lyedit.js` |
+| Peaks | `computePeaks` (`studio.js`) | `takePeaks`, `tsClipWave`, `lyedit.js`, `loadStart` |
 | Today / yesterday / a date | `cpDay` (`library.js`) | `newDay`, `daysAgo`/`dayName`/`longDate` (`takes.js`), `vcToday` |
 | Signed number (+/−) | `keySign` (`studio.js`) | `mvC`, `sliderTips`' ms, inline in `practice.js` |
 | Ink chip CSS | `.tip` (`base.css`) | `.slider-tip`, `.strip-tip`, `.ob-tip`, `.ob-hint-tip` |
@@ -212,5 +219,5 @@ Each pair below does one job twice. Use the first; folding them is a change of i
 | Rise easing | `RISE_EASE` | literals in `adding.js`, `library.js`, `onboard.js` |
 | CSS colour to rgb | `readColors.probe` | `cssRgb` (`onboard.js`) |
 | Keyboard lighting | `renderKeys`/`centerKeys` | `vcKeys` |
-| Delete confirm | song menu's `data-armed` | takes' `.armed`, `clearNotes` |
+| Delete confirm | song menu's `data-armed` | takes' `.armed`, `clearNotes`, `singer.armed`, `ED.armed` |
 | Key spelling | `EN`/`EN_FLAT` (`core.js`) | `KEY_MAJOR`/`KEY_MINOR` (`library.js`) |

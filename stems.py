@@ -101,7 +101,7 @@ def _shown(job: dict) -> float:
         return job["progress"]
     if job.get("needLyrics"):
         return SPLIT_SHARE + (1 - SPLIT_SHARE) * job.get("stoppedAt", 0.0)
-    if job.get("needPick"):  # (stopped before its lyrics, to be told which song it is)
+    if job.get("needPick") or job.get("needStart"):  # (stopped before its lyrics, to be told which song it is, or where a cover's first line starts)
         return SPLIT_SHARE
     if job["status"] == "done":
         return 1.0
@@ -114,8 +114,8 @@ def _shown(job: dict) -> float:
 def _settled(job: dict):
     """A song stopped wanting its lyrics (needLyrics) that doesn't any more: deleted, or given them another way (its
     Info page, or Practice without them). Under _jobs_lock."""
-    if job.get("needPick") and job.get("songId") and not os.path.isfile(os.path.join(LIB, job["songId"], "meta.json")):
-        job["needPick"] = False  # (deleted meanwhile)
+    if (job.get("needPick") or job.get("needStart")) and job.get("songId") and not os.path.isfile(os.path.join(LIB, job["songId"], "meta.json")):
+        job["needPick"] = job["needStart"] = False  # (deleted meanwhile)
     if not job.get("needLyrics") or not job.get("songId"):
         return
     folder = os.path.join(LIB, job["songId"])
@@ -127,8 +127,8 @@ def _settled(job: dict):
         job["needLyrics"] = False
 
 
-def _stopped(j: dict) -> bool:  # a song being added stopped, to be told something: its lyrics, or which song it is
-    return bool(j.get("needLyrics") or j.get("needPick"))
+def _stopped(j: dict) -> bool:  # a song being added stopped, to be told something: its lyrics, which song it is, or where a cover's first line starts
+    return bool(j.get("needLyrics") or j.get("needPick") or j.get("needStart"))
 
 
 def active_jobs() -> list[dict]:
@@ -138,7 +138,8 @@ def active_jobs() -> list[dict]:
         for j in _jobs.values():
             _settled(j)
         jobs = [j for j in _jobs.values() if j["kind"] == "separate" and (j["status"] in ("queued", "running") or _stopped(j))]
-        out = [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError", "waiting", "needPick")}
+        out = [{k: j.get(k) for k in ("id", "kind", "status", "stage", "cancel", "name", "link", "songId", "phase", "needLyrics", "lyricsError", "waiting", "needPick",
+                                    "coverOf", "needStart", "startAt", "voice")}
                | {"progress": _shown(j)} for j in sorted(jobs, key=lambda j: j["started"])]
     for j in out:
         if j.get("songId"):
@@ -206,7 +207,7 @@ def cancel_job(job_id: str) -> str:
             raise ValueError("Unknown job.")
         if job.get("phase") == "lyrics":  # its lyrics' part isn't stopped; one stopped wanting them is let go, song and all
             if _stopped(job) and job["status"] == "done":
-                job.update(needLyrics=False, needPick=False, status="cancelled", stage="Cancelled")
+                job.update(needLyrics=False, needPick=False, needStart=False, status="cancelled", stage="Cancelled")
                 if job.get("songId"):
                     shutil.rmtree(os.path.join(LIB, job["songId"]), ignore_errors=True)
             return job["status"]
@@ -1213,6 +1214,8 @@ def _look_up_now(song_id: str, force: bool):
     meta = _read_meta(folder)
     if not force and not _lookup_wanted(meta):
         return
+    if meta.get("coverOf"):  # a cover kept under its song: who sings it, and its video's picture
+        return _name_cover(folder, meta)
     picked = meta.get("picked") or _job_pick(song_id)
     if picked and picked.get("keep"):
         picked = None  # (kept as found: searched as ever)
@@ -1287,6 +1290,8 @@ def _look_up_now(song_id: str, force: bool):
                     cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
         if channel and not meta.get("channel"):
             meta["channel"] = channel
+        if cover and not tagged and record:
+            meta["covered"] = record["artist"][:TITLE_MAX]  # whose song it's a cover of (_its_song)
         if picked:
             meta["picked"] = picked
             meta.pop("sure", None)
@@ -1294,6 +1299,38 @@ def _look_up_now(song_id: str, force: bool):
             meta["sure"] = round(sure, 3)
         if not meta.get("named") or picked:  # (a pick's the user's word too: it names it)
             meta["title"] = name[0][:TITLE_MAX]
+        _write_json(path, meta, ensure_ascii=False)
+
+
+def _name_cover(folder: str, meta: dict):
+    """A cover kept under its song (meta "coverOf", see COVER_LEAD): the song's title stays its own; its artist is who
+    sings this one, as its video's title says ("cover by …", or the name before " - " where that isn't the song's
+    artist), else its channel; its picture the video's. No record's looked for: that's the song's, not this one's."""
+    import covers
+    import lyrics
+    own, channel = meta.get("sourceTitle") or meta["title"], meta.get("channel") or ""
+    try:
+        song = _read_meta(_song_dir(meta["coverOf"]))
+    except (OSError, ValueError):
+        song = {}  # (its song deleted meanwhile: named as it is)
+    before = lyrics.split_title(own)[0]
+    singer = covers.cover_by(own) or (before if before and not lyrics._words(before) & lyrics._words(song.get("artist") or "") else "")
+    if not singer:
+        singer = channel or _channel(meta.get("source") or "")
+    art = None
+    if url := covers.youtube(meta.get("source") or ""):
+        with contextlib.suppress(RuntimeError):
+            if (data := covers.fetch(url)) and covers.save(ffmpeg_exe(), data, os.path.join(folder, "cover.jpg"), letterboxed=True):
+                art = "youtube"
+    with _meta_lock:
+        path = os.path.join(folder, "meta.json")
+        if not os.path.isfile(path):
+            return  # deleted meanwhile
+        meta = _load_json(path)
+        meta.update(sourceTitle=own, artist=singer[:TITLE_MAX], album="", named=True,
+                    cover={"from": art, "at": round(time.time()), "px": covers.SIZE} if art else None)
+        if song.get("title"):
+            meta["title"] = song["title"]
         _write_json(path, meta, ensure_ascii=False)
 
 
@@ -1378,8 +1415,24 @@ def _album_only(song_id: str):
         _write_json(path, disk, ensure_ascii=False)
 
 
+def _covers_of(song_id: str) -> list[str]:
+    """The covers kept under a song: the ids of the songs whose meta's "coverOf" is it."""
+    out = []
+    for d in os.listdir(LIB) if os.path.isdir(LIB) else []:
+        try:
+            if _load_json(os.path.join(LIB, d, "meta.json")).get("coverOf") == song_id:
+                out.append(d)
+        except (OSError, ValueError, AttributeError):
+            continue
+    return out
+
+
 def delete_song(song_id: str):
-    shutil.rmtree(_song_dir(song_id), ignore_errors=True)
+    """A song goes with the covers kept under it (the page asks first, saying so); a cover goes alone."""
+    folder = _song_dir(song_id)
+    for d in _covers_of(song_id):
+        shutil.rmtree(os.path.join(LIB, d), ignore_errors=True)
+    shutil.rmtree(folder, ignore_errors=True)
 
 
 TITLE_MAX = 200
@@ -1395,15 +1448,23 @@ def rename_song(song_id: str, title) -> str:
     if not title:
         raise ValueError("A song needs a title.")
     _update_meta(folder, title=title, named=True)  # not named again by what it's found to be
+    for d in _covers_of(song_id):  # its covers go by its title
+        with contextlib.suppress(OSError, ValueError):
+            _update_meta(os.path.join(LIB, d), title=title)
     return title
 
 
 # ---------- separation pipeline ----------
-def start_youtube(url: str, model: str, find=None, low: bool = False, name=None, ask: bool = True) -> str:
+def start_youtube(url: str, model: str, find=None, low: bool = False, name=None, ask: bool = True, cover_of=None) -> str:
     """A song from a link. find: {artist, title, duration} for a playlist's song from Spotify, looked for on YouTube once
     its turn comes (playlists.match) rather than linked. low: a playlist's, worked on at low priority (_low_priority).
     name: what to call it until its video's title is known. ask: False, never stopped to be asked which song it is
-    (the first steps' first song, which has nowhere to pick it: named as it's found)."""
+    (the first steps' first song, which has nowhere to pick it: named as it's found). cover_of: a song's id, for a
+    cover of it, kept under that song (COVER_LEAD); a link only."""
+    if cover_of is not None:
+        find = None
+        song = _read_meta(_song_dir(str(cover_of)))
+        cover_of = song.get("coverOf") or song["id"]  # (asked from a cover's page: under the same song)
     if find is not None:
         if not isinstance(find, dict) or not isinstance(find.get("title"), str) or not find["title"].strip():
             raise ValueError("Send the song’s title to look for.")
@@ -1418,8 +1479,9 @@ def start_youtube(url: str, model: str, find=None, low: bool = False, name=None,
             raise ValueError("That’s a playlist: add it from the Add song form.")
         name = name[:TITLE_MAX] if isinstance(name, str) and name.strip() else url  # a playlist's video: its title, known already
     job = _new_job("separate", name)
-    job["link"], job["low"], job["noAsk"] = url or None, bool(low), not ask
-    return _run(job, _pipeline, {"kind": "url", "url": url, "find": find}, model)
+    job["link"], job["low"], job["noAsk"] = url or None, bool(low), not ask or bool(cover_of)
+    job["coverOf"] = cover_of
+    return _run(job, _pipeline, {"kind": "url", "url": url, "find": find, "coverOf": cover_of}, model)
 
 
 def playlist(url: str) -> dict:
@@ -1743,13 +1805,153 @@ def _pipeline(job, src: dict, model_name: str):
                     "adding": True}  # (out of the library till its lyrics are in: _lyrics_phase)
             if channel:
                 meta["channel"] = channel  # who put the video up: a cover's singer, often
+            cover_of = src.get("coverOf")
+            if cover_of:  # a cover: under its song, by that song's title (its song deleted meanwhile: a song of its own)
+                try:
+                    meta.update(coverOf=cover_of, title=_read_meta(_song_dir(cover_of))["title"], sourceTitle=title, named=True)
+                except (OSError, ValueError, KeyError):
+                    cover_of = None
             _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
             _set(job, songId=song_id)
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
     _want_lookup(song_id)
-    _lyrics_phase(job, song_id, None)
+    if not cover_of:  # a cover's video sent as any link: under its song too, where that's in the library
+        _set(job, phase="lyrics", stage="Finding out which song it is", progress=0.0, needLyrics=False, needPick=False, lyricsError=None)
+        try:
+            cover_of = _its_song(song_id)
+        except Exception as e:  # noqa: BLE001  (a song of its own, as ever)
+            print(f"Couldn't tell whether library/{song_id} covers a song here: {e}", file=sys.stderr)
+        if cover_of:
+            _set(job, coverOf=cover_of)
+    if cover_of:
+        _cover_phase(job, song_id)
+    else:
+        _lyrics_phase(job, song_id, None)
+
+
+# A cover: another singer's version of a song in the library, added by its YouTube link from that song's page
+# (start_youtube's cover_of). It's a song folder like any, with a band, tracks, bars, lyrics and takes of its own; its
+# meta's "coverOf" is the song it's a version of, and the page lists it under that song (the singer menu in its title)
+# rather than as a row. It goes by that song's title (rename_song), its artist is who sings it (_name_cover), and it's
+# deleted with the song (delete_song). Covers start anywhere (a word to the camera, another intro), so once its tracks
+# are in, the add stops (needStart, as needPick does) for the page to mark where the first line is sung on its vocal
+# (startAt: its first note, to start from); mark_start then cuts every track to begin COVER_LEAD s before the mark
+# (_cut_start) and goes on to the lyrics: the song's own lines, lined up with this voice like pasted ones (changes in
+# them are made by hand in Practice's Edit: change_lyric_lines), or looked for as ever where the song has none.
+# A cover's video sent from Add song like any link is kept under its song as well, when the library has that song
+# (_its_song); with no such song it's a song of its own, named "… (Cover)", as before.
+COVER_LEAD = 8.0  # s of a cover kept before its first line
+CUT_MIN = 0.5  # s: a cut shorter than this isn't made
+
+
+def _its_song(song_id: str) -> str | None:
+    """A song just added that its lookup named a cover ("… (Cover)", of a record by its meta's "covered"): the id of the
+    song in the library it's a cover of, if there's just one of that title by that artist. It's then kept under that
+    song (its meta's coverOf, that song's title). None: a song of its own."""
+    import lyrics
+    _looked_up(song_id, wait=60)
+    folder = os.path.join(LIB, song_id)
+    meta = _read_meta(folder)
+    title, covered = meta.get("title") or "", lyrics._words(meta.get("covered") or "")
+    if not title.endswith(" (Cover)") or not covered or meta.get("named"):
+        return None
+    name, found = lyrics._words(title[: -len(" (Cover)")]), []
+    for d in os.listdir(LIB):
+        try:
+            m = _load_json(os.path.join(LIB, d, "meta.json"))
+        except (OSError, ValueError):
+            continue
+        if d != song_id and isinstance(m, dict) and not m.get("coverOf") and not m.get("adding") and name and lyrics._words(m.get("title") or "") == name \
+                and lyrics._words(m.get("artist") or "") & covered:
+            found.append(m)
+    if len(found) != 1:
+        return None
+    _update_meta(folder, coverOf=found[0]["id"], title=found[0]["title"], named=True)
+    return found[0]["id"]
+
+
+def _cover_phase(job, song_id: str):
+    _set(job, phase="lyrics", stage="Finding out who sings it", progress=0.0, needLyrics=False, needPick=False, lyricsError=None)
+    _looked_up(song_id, wait=60)
+    folder, first = os.path.join(LIB, song_id), 0.0
+    with contextlib.suppress(OSError, ValueError, KeyError, IndexError, TypeError):
+        first = float(_load_json(os.path.join(folder, "melody.json"))["notes"][0][0])
+    _set(job, needStart=True, startAt=round(first, 2), voice="lead" if os.path.isfile(os.path.join(folder, "lead.mp3")) else "vocals",
+         stoppedAt=0.0, stage="Where does the first line start?")
+
+
+def mark_start(job_id: str, at) -> str:
+    """A cover being added, stopped to be shown where its first line starts (needStart): at, in seconds. Its start is
+    cut, and it goes on to its lyrics. Returns its status (running again)."""
+    try:
+        at = float(at)
+        if not 0 <= at < 20 * 60:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise ValueError("Send where the first line starts, in seconds.") from None
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is not None:
+            _settled(job)
+        if job is None or job["kind"] != "separate" or not job.get("needStart") or job["status"] != "done":
+            raise ValueError("Unknown job.")
+        job.update(status="running", needStart=False, lyricsError=None, lyricsFrom=0.0, stage="Cutting the start", progress=0.0)
+    song_id = job["songId"]
+
+    def body():
+        try:
+            try:
+                _cut_start(song_id, at)
+            except Exception as e:  # noqa: BLE001  (in as it is, uncut: its lines can still be lined up)
+                print(f"Couldn't cut library/{song_id}'s start: {e}", file=sys.stderr)
+            how = None
+            with contextlib.suppress(OSError, ValueError, KeyError):
+                own = _lyrics_data(_song_dir(_read_meta(_song_dir(song_id))["coverOf"]))
+                how = {"text": "\n".join(line["text"] for line in own["lines"])[:50_000]} if own else None
+            _lyrics_phase(job, song_id, how)
+        finally:
+            _set(job, status="done", progress=1.0, stage="Done")
+    threading.Thread(target=body, daemon=True).start()
+    return "running"
+
+
+def _cut_start(song_id: str, at: float) -> float:
+    """A cover's start cut, so it begins COVER_LEAD s before its first line (at): every track of it (its stems, lead
+    and backing) read, cut and written again, all of them made before any takes its track's place; then its length and
+    beats in meta (with "cut", how much went), and its bars. Returns the seconds cut (0: under CUT_MIN, nothing done)."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    dur = float(meta["duration"])
+    cut = round(min(max(0.0, at - COVER_LEAD), max(0.0, dur - 3)), 2)
+    if cut < CUT_MIN:
+        return 0.0
+    n = int(round(cut * SR))
+    names = sorted(f for f in os.listdir(folder) if re.fullmatch(r"[a-z]+\.mp3", f))
+    made = []
+    try:
+        for f in names:
+            tmp = os.path.join(folder, "cut-" + f)
+            made.append((tmp, os.path.join(folder, f)))
+            _encode_mp3(_decode_stereo(os.path.join(folder, f))[:, n:], tmp)
+        for tmp, path in made:
+            _retry(os.replace, tmp, path)
+    finally:
+        for tmp, _ in made:
+            with contextlib.suppress(OSError):
+                os.remove(tmp)
+    beats = [round(b - cut, 3) for b in meta.get("beats") or [] if b - cut >= 0]
+    _update_meta(folder, duration=round(dur - cut, 2), beats=beats, cut=round(float(meta.get("cut") or 0) + cut, 2))
+    with _melody_lock:  # its bars, read before the cut: moved with it (they're read again once its lyrics are in)
+        path = os.path.join(folder, "melody.json")
+        with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
+            data = _load_json(path)
+            data["notes"] = [[round(x[0] - cut, 3), round(x[1] - cut, 3), *x[2:]] for x in data["notes"] if x[0] - cut >= 0]
+            data["contour"] = [[round(c[0] - cut, 3), *c[1:]] for c in data["contour"] if c[0] - cut >= 0]
+            data.pop("full", None)
+            _write_json(path, data, separators=(",", ":"))
+    return cut
 
 
 def _lyrics_phase(job, song_id: str, how):
@@ -2326,6 +2528,9 @@ def start_lyrics(song_id: str, how, again: bool = False, low: bool = False, fron
         with _turn(job):  # one model on the GPU at a time
             # whose song it was found to be (not a cover's: that's named for whoever sings it)
             named = f"{meta['artist']} {meta['title']}" if meta.get("artist") and not covers.is_cover(meta["title"]) else ""
+            if meta.get("coverOf"):  # a cover kept under its song: that song's artist, not who sings this one
+                with contextlib.suppress(OSError, ValueError):
+                    named = f"{_read_meta(_song_dir(meta['coverOf'])).get('artist') or ''} {meta['title']}".strip()
             if not named and meta.get("channel") and not covers.is_cover(meta["title"]):  # not known yet: its channel's may be the artist's
                 named = f"{lyrics._clean(meta['channel'])} {meta['title']}"
             data = _song_lyrics(job, meta.get("sourceTitle") or meta["title"], float(meta["duration"]), voice, (0.05, 0.6), ask, named, whole)
@@ -2402,11 +2607,23 @@ def change_lyric_lines(song_id: str, op) -> dict:
     "split" puts the run on a line of its own (what's before and after it stay lines of their own too); "backing" puts it in
     brackets, backing vocals, or with {on: false} takes the brackets off it. lyrics.json is changed in place (Whisper's words go
     with the line they fall in), the hand edits and nudges go with their lines, and the song is timed again (a melody job).
+    Its words by hand too, where what's sung isn't what was found (a cover's changed line, most of all): "text" retypes a line
+    ({line, text}), "delete" takes one out ({line}), "add" puts one in where it's sung ({at: s, text}); see _retype_lines.
     Returns {job, lyricEdits, lyricNudge}."""
     import unicodedata
     folder = _song_dir(song_id)
     meta = _read_meta(folder)
     data = _lyrics_data(folder)
+    if isinstance(op, dict) and op.get("op") in ("text", "delete", "add"):
+        if not data:
+            raise ValueError("This song has no lyrics yet.")
+        edits, nudge = _retype_lines(data, meta, op)
+        data["at"] = time.time()  # the lines changed: their syllables are worked out again
+        _write_json(os.path.join(folder, "lyrics.json"), data, ensure_ascii=False)
+        _update_meta(folder, lyricEdits={"lines": edits}, lyricNudge=nudge)
+        job = _new_job("melody")
+        job["songId"] = song_id
+        return {"job": _run(job, _melody_job, song_id), "lyricEdits": {"lines": edits}, "lyricNudge": nudge}
     try:
         kind, i, a, b = op["op"], int(op["line"]), int(op["from"]), int(op["to"])
         line = data["lines"][i]
@@ -2465,6 +2682,71 @@ def change_lyric_lines(song_id: str, op) -> dict:
     job = _new_job("melody")
     job["songId"] = song_id
     return {"job": _run(job, _melody_job, song_id), "lyricEdits": {"lines": edits}, "lyricNudge": nudge}
+
+
+def _typed_words(text: str, t0: float, t1: float, old: list | None = None) -> list:
+    """A line typed by hand as Whisper's words are kept ([start, end, " word"]): at the times it had, word for word,
+    where there are as many as before; else spread evenly over the line (its syllables are timed on the voice after)."""
+    words = re.findall(r"\S+", text)
+    if old and len(old) == len(words):
+        return [[w[0], w[1], " " + x] for w, x in zip(old, words)]
+    step = (t1 - t0) / max(1, len(words))
+    return [[round(t0 + k * step, 3), round(t0 + (k + 1) * step, 3), " " + x] for k, x in enumerate(words)]
+
+
+def _retype_lines(data: dict, meta: dict, op: dict) -> tuple[dict, dict]:
+    """change_lyric_lines' "text", "delete" and "add", on lyrics.json's data in place. A line retyped keeps its place
+    (and, with as many words as before, their times and its hand edits); one added starts where it was put (at, the
+    playhead) and runs 3 s or up to the next line, the one before it ending there. The hand edits and nudges of the
+    lines after go with them. Returns (lyricEdits' lines, lyricNudge) as they are now."""
+    import unicodedata
+    lines = data["lines"]
+    edits = dict((meta.get("lyricEdits") or {}).get("lines") or {})
+    nudge = dict(meta.get("lyricNudge") or {"all": 0, "lines": {}})
+    nudge["lines"] = dict(nudge.get("lines") or {})
+    kind = op["op"]
+    text = " ".join(unicodedata.normalize("NFC", str(op.get("text") or "")).split())[:2000]
+    if kind != "delete" and not text:
+        raise ValueError("Type the line’s words.")
+    try:
+        i = int(op["line"]) if kind != "add" else 0
+        at = float(op["at"]) if kind == "add" else 0.0
+        if kind != "add" and not 0 <= i < len(lines):
+            raise ValueError
+    except (TypeError, ValueError, KeyError):
+        raise ValueError("Send {op: text, delete or add, line or at, text}.") from None
+    times = data["lrc"]["times"] if data.get("lrc") and isinstance(data["lrc"].get("times"), list) else None
+    def moved(d: dict, at_line: int, by: int) -> dict:  # the lines from at_line on, by places further (or back)
+        return {(str(int(k) + by) if int(k) >= at_line else k): v for k, v in d.items()}
+    if kind == "text":
+        line = lines[i]
+        n = len(re.findall(r"\S+", line.get("text") or ""))
+        line["words"] = _typed_words(text, float(line["t0"]), float(line["t1"]), line.get("words"))
+        line["text"] = text
+        e = edits.pop(str(i), None)
+        if e and len(e.get("words") or []) == n == len(line["words"]):
+            edits[str(i)] = {"text": text, "words": e["words"]}
+        if str(i) in nudge["lines"]:
+            nudge["lines"][str(i)] = {**nudge["lines"][str(i)], "text": text}
+    elif kind == "delete":
+        if len(lines) < 2:
+            raise ValueError("That’s the only line.")
+        del lines[i]
+        if times is not None and i < len(times):
+            del times[i]
+        for d in (edits, nudge["lines"]):
+            d.pop(str(i), None)
+        edits, nudge["lines"] = moved(edits, i + 1, -1), moved(nudge["lines"], i + 1, -1)
+    else:
+        at = round(max(0.0, min(at - float(nudge.get("all") or 0), float(meta.get("duration") or 0))), 3)  # (as lyrics.json keeps times: less the whole song's nudge)
+        j = next((k for k, x in enumerate(lines) if float(x["t0"]) > at), len(lines))
+        end = max(at + 0.3, min(at + 3.0, float(lines[j]["t0"]) - 0.05 if j < len(lines) else at + 3.0))
+        lines.insert(j, {"t0": at, "t1": round(end, 3), "text": text, "words": _typed_words(text, at, end)})
+        if times is not None:
+            times[j:j] = [None]
+        edits, nudge["lines"] = moved(edits, j, 1), moved(nudge["lines"], j, 1)
+        _tidy(lines)
+    return edits, nudge
 
 
 def drop_lyrics(song_id: str):

@@ -60,7 +60,8 @@ function ringOut(btn) {
 // library (leaveDrawer, songArrived).
 const JOB_SECS = [["processing", "Processing"], ["pending", "Pending"], ["stopped", "Stopped"]]; // (one in leaves the drawer: leaveDrawer)
 // (Pending: waiting behind another song still going; the first, with none before it, is Processing from the start)
-function jobSec(j, behind) { return j.done ? "done" : j.needLyrics || j.needPick ? "pending" : j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
+const jobAsks = (j) => !!(j.needLyrics || j.needPick || j.needStart); // stopped, to be told something: its lyrics, which song it is, or where a cover's first line starts
+function jobSec(j, behind) { return j.done ? "done" : jobAsks(j) ? "pending" : j.status === "error" ? "stopped" : j.status === "queued" && behind ? "pending" : "processing"; }
 function jobSection(key, name) {
   const list = $("#jobsList");
   let sec = list.querySelector(`:scope > .jobs-sec[data-sec="${key}"]`);
@@ -72,8 +73,8 @@ function jobSection(key, name) {
   return sec;
 }
 function paintJobs() {
-  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !j.needLyrics && !j.needPick && j.status !== "error"), ready = jobs.filter((j) => j.done);
-  const need = jobs.filter((j) => j.needLyrics || j.needPick); // (stopped, to be told something: its lyrics, or which song it is)
+  const jobs = [...adding.values()], live = jobs.filter((j) => !j.done && !jobAsks(j) && j.status !== "error"), ready = jobs.filter((j) => j.done);
+  const need = jobs.filter(jobAsks);
   const counted = jobs.filter((j) => j.status !== "error"), failed = jobs.length > counted.length;
   const p = counted.length ? counted.reduce((s, j) => s + (j.done ? 1 : j.progress || 0), 0) / counted.length : 1;
   const btn = $("#jobsBtn"), open = !$("#jobsPop").hidden;
@@ -94,14 +95,14 @@ function paintJobs() {
   btn.classList.toggle("idle", !jobs.length && !btn.dataset.leaving); // nothing added: not there (CSS); one sent, it comes in
   if (wasIdle && jobs.length && !stillMotion()) btn.animate([{ transform: "scale(0.5)", opacity: 0 }, { transform: "scale(1.12)", opacity: 1, offset: 0.55 }, { transform: "none", opacity: 1 }], { duration: 380, easing: "ease-out" });
   const pct = Math.round(p * 100);
-  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : need.length ? (need.some((j) => j.needLyrics) ? "Lyrics needed" : "Which song is it?") : ready.length > 1 ? "{n} songs added"
+  say(btn, live.length > 1 ? "Adding {n} songs · {pct}%" : live.length ? "Adding a song · {pct}%" : need.length ? (need.some((j) => j.needLyrics) ? "Lyrics needed" : need.some((j) => j.needPick) ? "Which song is it?" : "Where does the first line start?") : ready.length > 1 ? "{n} songs added"
     : ready.length ? "Song added" : failed ? "Couldn’t add a song" : "Add songs", { n: live.length || ready.length, pct }, "title");
   // the panel: a row for each, kept from one paint to the next (a button keeps its hover and focus)
   const list = $("#jobsList");
   const rowOf = new Map(); // (one just made isn't in the page yet)
   const secOf = new Map();
   let going = 0; // songs before this one still going
-  for (const [id, j] of adding) { secOf.set(id, jobSec(j, going > 0)); if (!j.done && !j.needLyrics && !j.needPick && j.status !== "error") going++; }
+  for (const [id, j] of adding) { secOf.set(id, jobSec(j, going > 0)); if (!j.done && !jobAsks(j) && j.status !== "error") going++; }
   for (const [id, j] of adding) {
     if (j.done && open) j.seen = true; // in while the panel's open: shown
     let row = document.getElementById("job-" + id);
@@ -111,31 +112,34 @@ function paintJobs() {
       const x = el("button", "btn sm icon ghost x"); x.type = "button"; x.onclick = () => (adding.get(id)?.done ? openAdded(id) : cancelJob(id));
       const acts = el("div", "row-acts"), ask = lyricsAsk(id), pk = pickAsk(id); acts.append(pk.open, ask.open, x); // Paste lyrics left of the x, its box under the pixels
       const pic = el("span", "job-cover"); pic.setAttribute("aria-hidden", "true");
-      row.append(pic, top, acts, pixBar(), ask.form, pk.form);
+      row.append(pic, top, acts, pixBar(), ask.form, pk.form, startAsk(id));
     }
     rowOf.set(id, row);
     const err = j.status === "error", stopping = (j.cancel || j.stopping) && !err;
-    const need = !!j.needLyrics, ask = !!j.needPick && !need, lyr = j.phase === "lyrics" && !need && !ask && !j.done; // (its lyrics' part can't be stopped: the song's in)
-    row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need || ask); // (ask: stopped to be told which song it is)
+    const need = !!j.needLyrics, ask = !!j.needPick && !need, start = !!j.needStart && !need && !ask, lyr = j.phase === "lyrics" && !need && !ask && !start && !j.done; // (its lyrics' part can't be stopped: the song's in)
+    row.classList.toggle("err", err); row.classList.toggle("done", !!j.done); row.classList.toggle("need", need || ask || start); // (ask: stopped to be told which song it is; start: where a cover's first line starts)
     // what it is: its link, then its video's title, then the record it was found to be (its title, its artist), each
     // wiped in over the last, blurred to clear; its cover coming in at its left once there's one
     // (one picked: that, till the song's own name and cover are what was picked: its cover saved after the pick)
     const fresh = j.picked && !(j.song?.cover?.at * 1000 > j.picked.at), lib = !fresh && (j.arrived || j.done) && libCache.get(j.songId);
     const found = fresh ? j.picked : j.song?.artist ? j.song : j.early?.title ? j.early : null;
     const name = (lib && lib.title) || found?.title || j.name;
-    wipeTo(row.querySelector(".top b"), name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song"), (lib && lib.artist) || found?.artist || "");
+    // (a cover: who sings it, once that's known, and the song it's a cover of)
+    if (j.coverOf) wipeTo(row.querySelector(".top b"), j.song?.artist || (j.name || tr("A song")).replace(/^https?:\/\/(www\.)?/, ""), tr("cover of {title}", { title: libCache.get(j.coverOf)?.title || j.song?.title || "" }));
+    else wipeTo(row.querySelector(".top b"), name ? name.replace(/^https?:\/\/(www\.)?/, "") : tr("A song"), (lib && lib.artist) || found?.artist || "");
     jobCover(row.querySelector(".job-cover"), fresh ? null : j.songId, fresh ? null : (lib && lib.cover) || j.song?.cover, fresh ? j.picked.art : j.early?.art);
-    paintPicks(row, id, j);
+    paintPicks(row, id, j); paintStart(row, id, j);
     const state = row.querySelector(".top .st");
     if (j.done) say(state, "Added");
     else if (need) say(state, j.lyricsError ? "Manual lyrics needed · {why}" : "Manual lyrics needed", { why: () => tr(j.lyricsError || "") });
     else if (ask) say(state, "Not sure which song this is · pick it below");
+    else if (start) say(state, "Where does the first line start?");
     else if (err) say(state, j.error || "That didn’t work.");
     else if (stopping) say(state, "Cancelling…");
     else if (j.status === "queued" && secOf.get(id) === "processing") say(state, "Starting…"); // (the first: none before it)
     else if (j.status === "queued") say(state, j.ahead ? "Waiting · {n} ahead" : j.ahead === 0 ? "Starting next…" : "Waiting", { n: j.ahead });
     else say(state, "{stage}", { stage: () => tr(j.stage || "") }); // (how far it's got: the pixels under it say)
-    paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, j.status === "running" && !j.waiting && !j.done && !need && !ask && !err && !stopping && !stillMotion(), (need || ask) && !stopping); // (queued, or waiting for its lyrics' turn: still; wanting its lyrics, or which song it is: paused)
+    paintPix(row.querySelector(".px"), j.done ? 1 : j.progress || 0, j.status === "running" && !j.waiting && !j.done && !need && !ask && !start && !err && !stopping && !stillMotion(), (need || ask || start) && !stopping); // (queued, or waiting for its lyrics' turn: still; wanting its lyrics, or which song it is: paused)
     row.querySelector(".lyr-open").hidden = !need; // (not "open": that's the drawer's, read above, for one in that's seen)
     if (!need && !row.querySelector(".lyr-form").hidden) lyricsBox(row, false); // (pasted, or settled elsewhere)
     // cancel, or clear one that failed; once it's in, open it; one wanting its lyrics, let go without them
@@ -316,6 +320,133 @@ async function choosePick(id, c, b) {
   if (going) { const row = document.getElementById("job-" + id); if (row) lyricsBox(row, false); watchJob(id, "separate"); }
   done();
 }
+// A cover stopped to be shown where its first line starts (needStart: stems._cover_phase): a box under its pixels, the
+// start of its voice as a waveform with a mark on it, put at the first note heard, to drag (or ← →, with Shift a
+// second at a time) to where the first line is sung; a click on the waveform puts it there. The song's first line is
+// written on the mark, where it has lyrics. What will be cut is hatched: all but COVER_LEAD s before the mark. Play is
+// the voice from the mark, SF_HEAR s of it. Done sends the mark (stems.mark_start: the cover's start is cut, and it
+// goes on to its lyrics). The view is the first SF_SPAN s, or to SF_AFTER s past the first note; the mark dragged to
+// its end, it reaches further.
+const COVER_LEAD = 8, SF_HEAR = 6, SF_SPAN = 90, SF_AFTER = 45, SF_RATE = 20, SF_BARS = 180; // (COVER_LEAD: as stems.py's; SF_RATE: peaks read a second)
+const starts = new Map(); // job → {at: the mark (s), span: the view (s), dur, peaks, top, buf, line, src, failed}
+function startAsk(id) {
+  const form = el("div", "start-form"), wave = el("div", "sf-wave"), cut = el("i", "sf-cut"), mark = el("div", "sf-mark"), tag = el("span", "sf-tag");
+  const ticks = el("div", "sf-ticks"), acts = el("div", "sf-acts"), play = el("button", "btn sm icon sf-play"), at = el("span", "sf-at"), done = el("button", "btn sm primary sf-done"), hint = el("p", "sf-hint");
+  form.hidden = true;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "sf-bars"); svg.setAttribute("viewBox", `0 0 ${SF_BARS * 3} 100`); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("aria-hidden", "true");
+  svg.append(document.createElementNS("http://www.w3.org/2000/svg", "path"));
+  mark.tabIndex = 0; mark.setAttribute("role", "slider"); say(mark, "Where the first line starts", null, "aria-label"); mark.append(tag);
+  wave.append(svg, cut, mark);
+  play.type = done.type = "button"; play.append(icon("play")); say(play, "Play from the mark", null, "title"); say(play, "Play from the mark", null, "aria-label"); say(done, "Done");
+  say(hint, "Drag the mark to the first line. The cover is cut to start {n} s before it.", { n: COVER_LEAD });
+  acts.append(play, at, done); form.append(wave, ticks, acts, hint);
+  const set = (t) => {
+    const s = starts.get(id);
+    if (!s) return;
+    s.at = Math.max(0, Math.min(t, (s.dur || s.span) - 1));
+    if (s.dur && s.at > s.span * 0.97 && s.span < s.dur) s.span = Math.min(s.dur, s.span + 5); // (at the view's end: further)
+    drawStart(form, id);
+  };
+  let held = false;
+  const to = (e) => { const r = wave.getBoundingClientRect(), s = starts.get(id); if (s) set(((e.clientX - r.left) / r.width) * s.span); };
+  wave.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; held = true; wave.setPointerCapture(e.pointerId); e.preventDefault(); mark.focus({ preventScroll: true }); to(e); });
+  wave.addEventListener("pointermove", (e) => { if (held) to(e); });
+  for (const ev of ["pointerup", "pointercancel"]) wave.addEventListener(ev, () => { held = false; });
+  mark.addEventListener("keydown", (e) => {
+    const d = { ArrowLeft: -1, ArrowRight: 1 }[e.key], s = starts.get(id);
+    if (!d || !s) return;
+    e.preventDefault(); e.stopPropagation(); set(s.at + d * (e.shiftKey ? 1 : 0.1));
+  });
+  play.onclick = () => hearStart(id);
+  done.onclick = async () => {
+    const s = starts.get(id);
+    if (!s) return;
+    done.disabled = true; hushStart(id);
+    try {
+      const r = await fetch(`/api/jobs/${id}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: Math.round(s.at * 100) / 100 }) });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(b.error || "That didn’t work.");
+    } catch (e) {
+      say(hint, e instanceof TypeError ? "Couldn’t reach the server. Is the app still running?" : e.message); hint.classList.add("err"); done.disabled = false;
+      renderLibrary(); // (as the server has it now: marked in another tab, or let go)
+      return;
+    }
+    addingJob(id, { needStart: false, done: false, status: "running", stage: "Cutting the start" }); // (its box folds away with it)
+    watchJob(id, "separate");
+  };
+  return form;
+}
+function paintStart(row, id, j) {
+  const form = row.querySelector(".start-form"), on = !!j.needStart && !j.needLyrics && !j.needPick && !!j.songId;
+  if (!on) { if (!form.hidden) { endStart(id); form.hidden = true; } return; }
+  if ($("#jobsPop").hidden) return; // (its voice is read once the drawer's open to show it)
+  if (!starts.has(id)) { starts.set(id, { at: j.startAt || 0, span: SF_SPAN, dur: 0 }); loadStart(form, id, j); }
+  if (!form.hidden) return;
+  form.hidden = false; form.querySelector(".sf-done").disabled = false;
+  drawStart(form, id);
+  if (!stillMotion() && form.getClientRects().length) {
+    const h = form.offsetHeight;
+    form.style.overflow = "hidden";
+    form.animate([{ height: "0px", opacity: 0 }, { height: h + "px", opacity: 1 }], { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" })
+      .finished.then(() => { form.style.overflow = ""; }, () => { form.style.overflow = ""; });
+  }
+}
+// its voice (the lead vocal, once split), read for the waveform and to play; and the first line of the song it covers
+async function loadStart(form, id, j) {
+  const s = starts.get(id);
+  fetch(`/api/library/${j.coverOf}/lyrics`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null))
+    .then((d) => { s.line = d?.lyrics?.lines?.[0]?.text || ""; drawStart(form, id); }).catch(() => {});
+  try {
+    const r = await fetch(`/library/${j.songId}/${j.voice || "vocals"}.mp3`, { cache: "no-store" }); // (cut later, at the same address: never a kept copy)
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const buf = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await r.arrayBuffer());
+    const ch = buf.getChannelData(0), n = Math.ceil(buf.duration * SF_RATE), peaks = new Float32Array(n), step = buf.sampleRate / SF_RATE;
+    let top = 0;
+    for (let i = 0; i < n; i++) {
+      let m = 0;
+      for (let k = Math.floor(i * step), e = Math.min(ch.length, Math.floor((i + 1) * step)); k < e; k += 8) { const v = Math.abs(ch[k]); if (v > m) m = v; }
+      peaks[i] = m; if (m > top) top = m;
+    }
+    Object.assign(s, { buf, peaks, top: top || 1, dur: buf.duration, span: Math.min(buf.duration, Math.max(SF_SPAN, s.at + SF_AFTER)) });
+  } catch (e) { s.failed = true; console.warn("Cover's voice:", e.message); }
+  if (starts.get(id) === s) drawStart(form, id);
+}
+function drawStart(form, id) {
+  const s = starts.get(id);
+  if (!s) return;
+  const pct = (t) => Math.max(0, Math.min(100, (t / s.span) * 100)) + "%", mark = form.querySelector(".sf-mark"), tag = mark.querySelector(".sf-tag");
+  form.classList.toggle("loading", !s.peaks && !s.failed);
+  if (s.peaks && form.dataset.span !== String(s.span)) { // the bars: the loudest of each bar's share of the view
+    form.dataset.span = String(s.span);
+    let d = "";
+    for (let b = 0; b < SF_BARS; b++) {
+      let m = 0;
+      for (let i = Math.floor((b / SF_BARS) * s.span * SF_RATE), e = Math.min(s.peaks.length, Math.ceil(((b + 1) / SF_BARS) * s.span * SF_RATE)); i < e; i++) if (s.peaks[i] > m) m = s.peaks[i];
+      const h = Math.max(1, (m / s.top) * 92);
+      d += `M${b * 3} ${(50 - h / 2).toFixed(1)}h2v${h.toFixed(1)}h-2z`;
+    }
+    form.querySelector(".sf-bars path").setAttribute("d", d);
+    form.querySelector(".sf-ticks").replaceChildren(...[0, 1, 2, 3].map((k) => el("span", null, fmtTime((k / 3) * s.span))));
+  }
+  mark.style.left = pct(s.at); const cut = form.querySelector(".sf-cut"); cut.style.width = pct(Math.max(0, s.at - COVER_LEAD)); cut.hidden = s.at - COVER_LEAD < 0.5; // (under stems.CUT_MIN: nothing's cut)
+  mark.setAttribute("aria-valuemin", "0"); mark.setAttribute("aria-valuemax", String(Math.round(s.dur || s.span))); mark.setAttribute("aria-valuenow", s.at.toFixed(1)); mark.setAttribute("aria-valuetext", fmtTime(s.at));
+  tag.textContent = s.line || ""; tag.hidden = !s.line; tag.classList.toggle("left", s.at > s.span * 0.55); // (written to the mark's left, past the middle: it stays in the box)
+  form.querySelector(".sf-at").textContent = fmtTime(s.at);
+  form.querySelector(".sf-play").disabled = !s.buf;
+}
+// the voice from the mark, SF_HEAR s of it, faded at its ends (as Info's hearAt); pressed again, from the mark again
+function hearStart(id) {
+  const s = starts.get(id);
+  if (!s?.buf) return;
+  ensureCtx(); hushStart(id);
+  const d = Math.max(0.3, Math.min(SF_HEAR, s.buf.duration - s.at)), now = ac.currentTime, g = ac.createGain();
+  g.connect(master); g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(1, now + 0.03);
+  g.gain.setValueAtTime(1, now + d - 0.08); g.gain.linearRampToValueAtTime(0, now + d);
+  s.src = ac.createBufferSource(); s.src.buffer = s.buf; s.src.connect(g); s.src.start(now, s.at, d);
+}
+function hushStart(id) { const s = starts.get(id); if (s?.src) { try { s.src.stop(); } catch (e) {} s.src = null; } }
+function endStart(id) { hushStart(id); starts.delete(id); }
 // An added song, opened from the panel: it leaves the panel, which closes.
 function openAdded(id) {
   const j = adding.get(id);
@@ -352,8 +483,10 @@ function showJobs(on) {
     if (!was) { checkClip(); requestAnimationFrame(() => { if (!$("#sAdd").hidden && !pop.contains(document.activeElement)) $("#sYtUrl").focus({ preventScroll: true }); }); }
   } else if (was) { // closed: the songs it showed as in have been seen
     for (const [id, j] of adding) if (j.done && j.seen) { adding.delete(id); document.getElementById("job-" + id)?.remove(); }
+    for (const id of starts.keys()) hushStart(id);
     paintJobs();
   }
+  if (!on && coverFor) { coverFor = null; paintAddFor(); } // (Add song's again, the next time it's opened)
 }
 // closed by its x or Escape: the focus back to what opened it, where that's still there
 function closeDrawer() {
@@ -367,7 +500,7 @@ async function cancelJob(id) {
   const j = adding.get(id);
   if (!j) return;
   if (j.status === "error") return dropJob(id);
-  if (j.needLyrics || j.needPick) { await fetch(`/api/jobs/${id}/cancel`, { method: "POST" }).catch(() => {}); return dropJob(id); } // the song let go: it's deleted (told first: the list read again after it)
+  if (jobAsks(j)) { await fetch(`/api/jobs/${id}/cancel`, { method: "POST" }).catch(() => {}); return dropJob(id); } // the song let go: it's deleted (told first: the list read again after it)
   addingJob(id, { stopping: true });
   try {
     const r = await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
@@ -375,7 +508,7 @@ async function cancelJob(id) {
   } catch (e) { addingJob(id, { stopping: false }); }
 }
 function dropJob(id) {
-  clearInterval(pollers[id]); delete pollers[id];
+  clearInterval(pollers[id]); delete pollers[id]; endStart(id);
   adding.delete(id); document.getElementById("job-" + id)?.remove(); paintJobs();
   renderLibrary(); // an empty library shows its "Add your first song" row again
 }
@@ -385,7 +518,7 @@ function dropJob(id) {
 // into the library (songArrived)
 function leaveDrawer(id) {
   const row = document.getElementById("job-" + id);
-  clearInterval(pollers[id]); delete pollers[id];
+  clearInterval(pollers[id]); delete pollers[id]; endStart(id);
   adding.delete(id);
   if (!row || stillMotion() || !row.getClientRects().length) { row?.remove(); paintJobs(); return Promise.resolve(); }
   row.classList.add("leaving"); paintJobs();
@@ -443,14 +576,15 @@ function watchJob(id, kind, forSong) {
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
     } else if (j.status !== "cancelled") {
-      const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError, song, waiting, needPick, link } = j;
+      const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError, song, waiting, needPick, link, coverOf, needStart, startAt, voice } = j;
       const had = adding.get(id); // (a playlist's song: sent by its name, its link known once it's found; its candidates asked then)
       if (had && link && YT_LINK.test(link) && !had.early && !had.findAsked) { had.findAsked = true; findEarly(id, link); }
       skip = status === "queued" && ahead > 1 ? 4 : 0;
-      const arrive = status === "done" && !needLyrics && !needPick && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
+      const arrive = status === "done" && !needLyrics && !needPick && !needStart && songId && !adding.get(id)?.arrived; // in the library, its lyrics too: unfolds there
       addingJob(id, { ...(name ? { name } : {}), ...(song ? { song } : {}), status, stage, progress, ahead, cancel, error, songId, phase, needLyrics: !!needLyrics, lyricsError, waiting: !!waiting, needPick: !!needPick,
-        done: status === "done" && !needLyrics && !needPick, ...(arrive ? { arrived: true } : {}) });
-      if (arrive) leaveDrawer(id).then(() => songArrived(songId));
+        coverOf: coverOf || null, needStart: !!needStart, startAt, voice, done: status === "done" && !needLyrics && !needPick && !needStart, ...(arrive ? { arrived: true } : {}) });
+      if (arrive && coverOf) renderLibrary(); // a cover: under its song, no row to unfold; its row here stays, Added, with the way to it (and its song's page, open, lists it: paintCrumbs)
+      else if (arrive) leaveDrawer(id).then(() => songArrived(songId));
     }
     if (j.status === "done" || j.status === "error" || j.status === "cancelled") {
       clearInterval(pollers[id]); delete pollers[id];
@@ -492,14 +626,16 @@ async function submitYoutube(e) {
   closePlaylist();
   const field = $("#sYtUrl"), all = field.value.split(/\s+/).filter(Boolean); if (!all.length) return;
   const list = all.find((u) => PLAYLIST.test(u)), urls = all.filter((u) => u !== list);
+  const cover = coverFor; // (the drawer opened for a cover of this song: addCover)
+  if (cover && list) return addMsg("A cover is one video’s link, not a playlist.", true);
   addMsg("Starting…");
   const failed = [];
   let sent = 0;
   for (const url of urls) {
     try {
-      const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel() }), { "Content-Type": "application/json" });
+      const id = await postJob("/api/stems/youtube", JSON.stringify({ url, model: stemModel(), ...(cover ? { coverOf: cover.id } : {}) }), { "Content-Type": "application/json" });
       if (!sent++) holdRing();
-      jobStarted(id, url);
+      jobStarted(id, url, cover);
     } catch (err) { failed.push(url); addMsg(urls.length > 1 ? tr("{url}: {why}", { url, why: () => tr(err.message) }) : err.message, true); }
   }
   field.value = [...failed, ...(list ? [list] : [])].join("\n"); fitLinks(); // what didn't start stays, to fix
@@ -596,19 +732,32 @@ function addMsg(text, err) { const p = $("#sAddMsg"); p.hidden = !text; say(p, t
 // What a song's link is, asked as soon as it's sent (/api/yt/find, as the first steps do): the record it most likely
 // is, its artist and album art, for its row till the song's own (its meta) come once it's in its folder.
 function findEarly(id, link) {
-  if (!link || !YT_LINK.test(link)) return;
+  if (!link || !YT_LINK.test(link) || adding.get(id)?.coverOf) return; // (a cover: it's the song it was added to, nothing to pick)
   fetch("/api/yt/find?url=" + encodeURIComponent(link)).then((r) => (r.ok ? r.json() : null)).then((f) => {
     if (f && adding.has(id)) addingJob(id, { early: { title: f.title, artist: f.artist, art: f.art, candidates: f.candidates || [], own: f.own || null } });
   }).catch(() => {});
 }
-function jobStarted(id, name) {
-  lastStarted = id; addingJob(id, { name, link: name, status: "queued", progress: 0 }); watchJob(id, "separate"); findEarly(id, name);
+function jobStarted(id, name, cover) {
+  lastStarted = id; addingJob(id, { name, link: name, status: "queued", progress: 0, coverOf: cover ? cover.id : null }); watchJob(id, "separate"); findEarly(id, name);
   if (clipOffer) showClip(clipOffer); // (sent from the form, the card's own may be among them: not offered again)
 }
 // Add song: the drawer (the + by the mic's), its links field ready to type in (an empty library's row opens it too). It opens with the links field ready
 // to type in; a click elsewhere, Escape or a song sent off closes it.
 let addOnShow = false; // opened by a link to #stems/add, once the library is drawn
 function showAdd(on) { showJobs(on); }
+// Add a cover (a song's singer menu, singerStep): the same drawer, for that song. Its title says which, its field
+// takes the cover's YouTube link, and what's sent from it goes in as a cover of that song (coverOf: stems.start_youtube),
+// under it rather than into the library's list. Closed, it's Add song's again.
+let coverFor = null;
+function addCover(song) { coverFor = song; paintAddFor(); if ($("#jobsPop").hidden) showJobs(true); else checkClip(); }
+function paintAddFor() {
+  const c = coverFor;
+  say($("#jobsPop .pop-title"), c ? "Add a cover of {title}" : "Add a song", c ? { title: c.title } : null);
+  say($("#jobsPop"), c ? "Add a cover" : "Add a song", null, "aria-label");
+  say($("#sYtUrl"), c ? "Paste the cover’s YouTube link" : "Paste YouTube links or a playlist", null, "placeholder");
+  say($("#sYtUrl"), c ? "The cover’s YouTube link" : "YouTube links", null, "aria-label");
+  if (c) closePlaylist();
+}
 // A drawer open: the page's scrollbar away (its room kept, base.css), so the drawer meets the window's edge; back once
 // it's slid out (and the other isn't open)
 function drawerEdge(pop, on) {
@@ -669,7 +818,7 @@ function showClip(links) {
   if ($("#sAdd").hidden) return hideClip(); // (the song tools not in: nothing to send it with)
   links = links.filter((l) => !clipSkipped.has(l) && !clipHave(l));
   if (!links.length) return hideClip();
-  if (links.length === 1 && ytTitles.has(links[0]) && clipNamed(ytTitles.get(links[0]))) return hideClip(); // (in the library under another upload)
+  if (!coverFor && links.length === 1 && ytTitles.has(links[0]) && clipNamed(ytTitles.get(links[0]))) return hideClip(); // (in the library under another upload; a cover of it is named as it is)
   const card = clipCard(), one = links.length === 1, list = links.find((l) => PLAYLIST.test(l));
   const key = links.join(" ");
   placeClip();
@@ -681,7 +830,7 @@ function showClip(links) {
   else pic.append(icon(list ? "studio" : "plus"));
   const bare = (l) => l.replace(/^https?:\/\/(www\.)?/, "");
   if (list) say(name, "A playlist: its songs to pick from");
-  else if (one) { name.textContent = ytTitles.get(links[0]) || bare(links[0]); ytTitle(links[0]).then((t) => { if (!t || clipOffer !== links) return; if (clipNamed(t)) hideClip(); else name.textContent = t; }); }
+  else if (one) { name.textContent = ytTitles.get(links[0]) || bare(links[0]); ytTitle(links[0]).then((t) => { if (!t || clipOffer !== links) return; if (!coverFor && clipNamed(t)) hideClip(); else name.textContent = t; }); }
   else say(name, "{n} YouTube links", { n: links.length });
   say(card.querySelector(".cc-add span"), list ? "Pick songs" : "Add");
   card.hidden = false;
