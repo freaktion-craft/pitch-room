@@ -166,7 +166,8 @@ function resetOnDblClick(input, def) {
 // A dropdown in the app's style: btn shows the choice and opens the list of items ({v, t, g: group heading, full: the
 // whole name, for its tooltip, side: a note at the row's end (tone: "accent" or "faint" for its colour), prog: how far
 // it has got (0…1) when it takes a while, shown where its tick goes, btn: what the button says when it's chosen, if
-// not t}); onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v
+// not t, ico: an icon at its start, for a row that does something rather than being chosen (onPick(v) each time it's
+// pressed, the choice staying as it was), rule: a line over it}); onPick(v) when another one is chosen. stayOpen(v): keep the list open after choosing v
 // (to show how it's coming along in its row); foot: a line under the list (text, or a function giving its nodes). The list lives in the panel the button is
 // in, so a click on it counts as inside that panel; Escape closes the list only. Changing the items while it's open
 // redraws it in place, focus and scroll kept. name is English (tr'd where it's shown); the items come translated.
@@ -193,7 +194,7 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
   let items = [], value = "";
   const options = () => [...list.querySelectorAll('[role="option"]')];
   function paint() {
-    const it = items.find((x) => x.v === value) || items[0];
+    const it = items.find((x) => x.v === value && !x.ico) || items.find((x) => !x.ico);
     label.textContent = it ? it.btn || it.t : ""; btn.title = it ? it.full || it.t : "";
     btn.setAttribute("aria-label", `${tr(name)}: ${label.textContent}`);
   }
@@ -206,14 +207,17 @@ function makePick(btn, name, onPick, { stayOpen, minWidth, foot } = {}) {
     for (const it of items) {
       if (it.g && it.g !== g) list.append(el("div", "grp", it.g));
       g = it.g || "";
+      if (it.rule) list.append(el("div", "rule"));
       const o = el("button"); o.type = "button"; o.setAttribute("role", "option"); o.setAttribute("aria-selected", String(it.v === value));
       o.dataset.v = String(it.v); o.title = it.full || it.t; o.append(el("span", null, it.t));
       if (it.side) o.append(el("small", "side" + (it.tone ? " " + it.tone : ""), it.side));
-      o.append(it.prog != null ? progRing(it.prog) : icon("tick"));
+      if (it.ico) { o.classList.add("act"); o.prepend(icon(it.ico)); }
+      else o.append(it.prog != null ? progRing(it.prog) : icon("tick"));
       o.onclick = () => {
         const keep = stayOpen && stayOpen(it.v);
         if (!keep) { show(false); btn.focus(); }
-        if (it.v !== value) { value = it.v; paint(); onPick(value); }
+        if (it.ico) onPick(it.v); // (done, not chosen)
+        else if (it.v !== value) { value = it.v; paint(); onPick(value); }
       };
       list.append(o);
     }

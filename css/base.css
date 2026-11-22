@@ -537,6 +537,8 @@ select, .pick { appearance: none; -webkit-appearance: none; padding-right: var(-
 .pick-list [role="option"]:hover, .pick-list [role="option"]:focus-visible { background: var(--fill); outline: none; }
 .pick-list [role="option"] span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-list [role="option"] .ico { width: var(--icon-sm); height: var(--icon-sm); flex: none; margin-left: auto; visibility: hidden; }
+.pick-list [role="option"].act .ico { margin-left: 0; visibility: visible; color: var(--muted); } /* a row that does something (Add a cover): its icon first, no tick */
+.pick-list .rule { height: 1px; margin: var(--space-1) 0; background: var(--line); }
 .pick-list [role="option"] .side { margin-left: auto; padding-left: var(--space-4); min-width: 56px; text-align: right; font: var(--text-xs) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .pick-list [role="option"] .side + .ico, .pick-list [role="option"] .side + .ring { margin-left: 0; } /* 12 px after the note, as after a name */
 .pick-list [role="option"] .side.accent { color: var(--muted); } /* the natural-sounding ones: as the notes are; the far ones fainter */

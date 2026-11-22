@@ -100,26 +100,59 @@ function paintCrumbs() {
   }
   if (view === "practice" && K.song) {
     const leave = (to) => () => { leaveSong(); go(to); };
-    return crumbsIn($("#kCrumbs"), [{ ...lib, go: leave("stems") }, { text: K.song.title, href: `#stems/${K.song.id}`, go: leave("stems/" + K.song.id) }, { en: "Practice" }]);
+    return crumbsIn($("#kCrumbs"), [{ ...lib, go: leave("stems") }, { text: sungName(K.song), href: `#stems/${K.song.id}`, go: leave("stems/" + K.song.id) }, { en: "Practice" }]);
   }
   if (view === "voice") { lastCrumbs = [lib, { en: "Lab" }]; return; }
   if (view !== "stems" || stemsPage === "lib") { lastCrumbs = [lib]; return; }
   const id = location.hash.split("/")[1], m = libCache.get(id) || (P.song && P.song.id === id ? P.song : null);
-  const song = { text: m ? m.title : "", href: `#stems/${id}` };
-  if (stemsPage === "song") crumbsIn($("#sCrumbs"), [lib, { text: song.text }]);
+  const song = { text: m ? sungName(m) : "", href: `#stems/${id}` };
+  // the song's own page: its title (a cover's, a link to the song it's a cover of), then who sings it, a menu (singerStep)
+  if (stemsPage === "song") crumbsIn($("#sCrumbs"), m ? [lib, { text: m.title, href: coverSong(m) ? `#stems/${m.coverOf}` : null }, { node: singerStep(m) }] : [lib, { text: "" }]);
   else if (stemsPage === "info") crumbsIn($("#sCrumbs"), [lib, song, { en: "Info" }]);
   else if (stemsPage === "takes") crumbsIn($("#tsCrumbs"), [lib, song, ...(K.on && K.song && K.song.id === id ? [{ en: "Practice", href: "#practice" }] : []), { en: "Takes Studio" }]);
 }
-// steps: {en (a word to translate) or text, href, go (in place of following href)}; the last is where you are
+// steps: {en (a word to translate) or text, href (none: not a link), go (in place of following href), node (a control
+// of its own, in the step's place)}; the last is where you are
 function crumbsIn(nav, steps) {
-  lastCrumbs = steps;
+  lastCrumbs = steps.map((s) => (s.node ? { text: s.node.textContent } : s)); // (Settings' steps carry on from these: words, not another page's control)
   nav.replaceChildren(...steps.flatMap((s, i) => {
-    const here = i === steps.length - 1, n = el(here ? "span" : "a", "crumb" + (s.text != null ? " name" : ""));
-    if (s.en) say(n, s.en); else { n.textContent = s.text; n.title = s.text; }
+    const here = i === steps.length - 1, n = s.node || el(here || !s.href ? "span" : "a", "crumb" + (s.text != null ? " name" : ""));
+    if (s.node) { /* as it is */ } else if (s.en) say(n, s.en); else { n.textContent = s.text; n.title = s.text; }
     if (here) n.setAttribute("aria-current", "page");
-    else { n.href = s.href; if (s.go) n.onclick = (e) => { e.preventDefault(); s.go(); }; }
+    else if (s.href) { n.href = s.href; if (s.go) n.onclick = (e) => { e.preventDefault(); s.go(); }; }
     return i ? [el("span", "crumb-sep", "/"), n] : [n];
   }));
+}
+// A song as it's named beyond its own page (Practice, Info, the Takes Studio): a cover with who sings it
+const sungName = (m) => (coverSong(m) && m.artist ? `${m.title} · ${m.artist}` : m.title);
+// Who sings it, the last step of a song's own page: a menu of the song's singers (Original: its artist; Covers: each
+// cover's, with its key), where picking one opens it. Under them, Add a cover (the drawer, for this song: addCover)
+// and, on a cover, its Info and Delete this cover (pressed twice). One button, kept from one painting to the next.
+let singer = null;
+function singerItems() {
+  const m = singer.m, song = coverSong(m) || m;
+  const row = (x, g) => ({ v: x.id, t: x.artist || tr(g === "Original" ? "Original" : "Cover"), g: tr(g), side: keyShort(x.key) });
+  return [row(song, "Original"), ...coversOf(song.id).map((c) => row(c, "Covers")), { v: "+add", t: tr("Add a cover"), ico: "plus", rule: true },
+    ...(coverSong(m) ? [{ v: "+info", t: tr("Info"), ico: "info" }, { v: "+del", t: tr(singer.armed ? "Really delete?" : "Delete this cover"), ico: "trash" }] : [])];
+}
+function singerStep(m) {
+  if (!singer) {
+    const btn = el("button", "crumb-pick"); btn.type = "button";
+    singer = { btn, m, armed: false };
+    singer.pick = makePick(btn, "Singer", (v) => {
+      const at = singer.m, song = coverSong(at) || at;
+      if (v === "+add") return setTimeout(() => addCover(song)); // (once this click is over: one beside the drawer closes it)
+      if (v === "+info") return go(`stems/${at.id}/info`);
+      if (v !== "+del") return go("stems/" + v);
+      if (!singer.armed) { singer.armed = true; singer.pick.set(singerItems(), at.id); return; } // (asked once more, in its row)
+      fetch(`/api/library/${at.id}/delete`, { method: "POST" }).catch(() => {}).then(() => { closeSong(); libCache.delete(at.id); go("stems/" + song.id); renderLibrary(); });
+    }, { stayOpen: (v) => v === "+del" && !singer.armed, minWidth: 260 });
+    btn.append(icon("chevronDown"));
+    btn.addEventListener("click", () => { if (singer.armed) { singer.armed = false; singer.pick.set(singerItems(), singer.m.id); } }, true); // (opened again: Delete asks afresh)
+  }
+  singer.m = m; singer.armed = false;
+  singer.pick.set(singerItems(), m.id);
+  return singer.btn;
 }
 // Stems pages: the library (#stems) and one song (#stems/<id>, its Info and its Takes Studio). Adding a song is a panel
 // in the library; an old link to #stems/add opens the library with it up.

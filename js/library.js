@@ -62,11 +62,17 @@ async function installDone(j) {
   if (!j?.update || stemsStatus?.restartNeeded) return;
   say($("#sInstallState"), j.changed ? "Updated" : "Up to date").prepend(icon("tick"));
 }
+// Covers: other singers' versions of a song, each a song of its own on the server (its own band, bars, lyrics and
+// takes) whose coverOf is the song it's a version of. The library lists the song alone; its page's title has a menu of
+// who sings it (singerPick), which is how a cover is opened, added (addCover) and deleted.
+const coverSong = (m) => (m && m.coverOf && libCache.get(m.coverOf)) || null; // the song a cover is under (gone: the cover's a row of its own)
+const coversOf = (id) => [...libCache.values()].filter((m) => m.coverOf === id && m.id !== id).sort((a, b) => (a.created || 0) - (b.created || 0));
 // The library's first drawing, which the opening waits for.
 let libDrawnNow;
 const libDrawn = new Promise((res) => { libDrawnNow = res; });
 async function renderLibrary() {
   try { await drawLibrary(); } finally { libDrawnNow(); }
+  paintCrumbs(); // (a song's page open: its singers as they are now, a cover added or gone; in the language picked)
   paintUpdate();
 }
 // Update, right of the search: there while songs wait to be timed again by an update (stems.update_state: every one of them
@@ -91,15 +97,16 @@ async function drawLibrary() {
   else [lib, jobs] = await Promise.all(["/api/library", "/api/jobs"].map((u) => fetch(u, { cache: "no-store" }).then((r) => r.json()).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])));
   if (EMPTY_LIBRARY) { lib = []; jobs = []; } // shown as a first time (the page's head): the songs are only not drawn
   libCache = new Map(lib.map((m) => [m.id, m]));
+  lib = lib.filter((m) => !coverSong(m)); // a cover is under its song (the singer menu in its title: paintCrumbs), not a row
   // the covers drawn already go into the new rows as they are (a reload draws the list twice), so none goes blank
   const tiles = new Map([...libRows].map(([id, row]) => [id, row.querySelector(".cover")]));
   libRows = new Map();
   // songs still being added (this page was reloaded, or opened in a second tab meanwhile) are shown by the mic again
-  for (const [id, a] of adding) if ((a.needLyrics || a.needPick) && !jobs.some((j) => j.id === id)) { adding.delete(id); document.getElementById("job-" + id)?.remove(); } // settled elsewhere
+  for (const [id, a] of adding) if (jobAsks(a) && !jobs.some((j) => j.id === id)) { adding.delete(id); document.getElementById("job-" + id)?.remove(); } // settled elsewhere
   if (adding.size) paintJobs();
   for (const j of jobs) {
     if (pollers[j.id] || adding.has(j.id)) continue;
-    addingJob(j.id, { ...j, arrived: false, done: j.status === "done" && !j.needLyrics && !j.needPick }); // (none of these is in the list yet)
+    addingJob(j.id, { ...j, arrived: false, done: j.status === "done" && !jobAsks(j) }); // (none of these is in the list yet)
     if (j.status !== "done") watchJob(j.id, "separate");
     findEarly(j.id, j.link); // (what it is, till it's in its folder; and what else it could be, for its Other matches: a paused one's to pick from)
   }
@@ -144,7 +151,9 @@ async function drawLibrary() {
     const row = el("div", "row"), info = el("div", "song"), link = el("a");
     row.dataset.id = m.id; libRows.set(m.id, row);
     link.href = "#stems/" + m.id; link.title = m.title; link.setAttribute("aria-label", libLine(m)); link.append(el("b", null, m.title));
-    info.append(link, el("small", null, m.artist || ""));
+    const who = el("small", null, m.artist || ""), sung = coversOf(m.id).length; // (how many covers it has, after its artist)
+    if (sung) who.append((m.artist ? " · " : "") + tr(sung === 1 ? "1 cover" : "{n} covers", { n: sung }));
+    info.append(link, who);
     const key = el("span", "c wide song-key");
     paintKeyCell(key, m.key);
     keyOf(m).then(() => { paintKeyCell(key, m.key); link.setAttribute("aria-label", libLine(m)); if (libSort.by === "key") arrangeRows(); });
@@ -514,7 +523,7 @@ function arrangeRows() {
   const opened = libView === "album" && libAlbum != null, inGrid = libView === "album" && !opened && songs.length > 0; // (no songs: the list's first-song row, not an empty grid)
   const found = [];
   for (const m of songs) {
-    const text = folded(`${m.title} ${m.artist || ""} ${m.album || ""} ${m.sourceTitle || ""}`);
+    const text = folded(`${m.title} ${m.artist || ""} ${m.album || ""} ${m.sourceTitle || ""} ${coversOf(m.id).map((c) => c.artist || "").join(" ")}`); // (found by who covers it too)
     const mine = !opened || groupOf(m, "album").key === libAlbum;
     if (mine && want.every((w) => text.includes(w))) found.push(m); else libRows.get(m.id).remove();
   }
@@ -1101,10 +1110,10 @@ function initSongMenu() {
   $("#mRename").onclick = () => { const m = menuSong, row = menuBtn.closest(".row"); closeMenu(); renameSong(row, m); };
   $("#mDelete").onclick = async () => {
     const b = $("#mDelete"), m = menuSong;
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.querySelector("span").textContent = tr("Really delete?"); return; }
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.querySelector("span").textContent = tr(coversOf(m.id).length ? "Delete it and its covers?" : "Really delete?"); return; } // (its covers go with it: stems.delete_song)
     closeMenu();
     await fetch(`/api/library/${m.id}/delete`, { method: "POST" });
-    if (P.song && P.song.id === m.id) closeSong();
+    if (P.song && (P.song.id === m.id || P.song.coverOf === m.id)) closeSong();
     renderLibrary();
   };
   document.addEventListener("click", (e) => { if (menuBtn && !e.composedPath().some((n) => n === menuBtn || n === $("#songMenu"))) closeMenu(); });
@@ -1154,7 +1163,7 @@ function renameSong(row, m) {
 // A new title shows wherever the song is open: the library's copy, the Studio and Practice. (Info reads the song
 // afresh each time it opens.)
 function songRenamed(id, title) {
-  for (const s of [libCache.get(id), P.song, K.song]) if (s && s.id === id) s.title = title;
+  for (const s of [libCache.get(id), P.song, K.song, ...coversOf(id)]) if (s && (s.id === id || s.coverOf === id)) s.title = title; // (its covers go by its title)
   const card = $(`#sNewTrack .ln-card[data-id="${id}"]`);
   if (card && libCache.get(id)) paintNewCard(card, libCache.get(id));
   paintCont(); // (in Continue practising too)

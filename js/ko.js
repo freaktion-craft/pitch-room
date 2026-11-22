@@ -8,6 +8,8 @@
 // What the server says (stems.py, server.py): job stages and errors. {x} in these stands for anything, matched by pattern.
 const KO_SERVER = {
   "Waiting": "대기 중", "Done": "완료", "Cancelled": "취소됨",
+  "Finding out who sings it": "누가 불렀는지 알아보는 중", "Where does the first line start?": "가사 첫 줄이 어디서 시작하나요?", "Cutting the start": "앞부분 자르는 중",
+  "Type the line’s words.": "줄의 가사를 입력하세요.", "That’s the only line.": "하나 남은 줄이라 지울 수 없어요.", "This song has no lyrics yet.": "이 곡에는 아직 가사가 없어요.",
   "No Pitchroom songs in that folder.": "그 폴더에는 Pitchroom 노래가 없어요.", "That’s this app’s own library.": "이 앱의 라이브러리예요.",
   "Already importing.": "이미 가져오는 중이에요.", "Couldn’t copy: {why}": "복사하지 못했어요: {why}",
   "Unknown job.": "없는 작업이에요.", "Unknown song.": "없는 곡이에요.", "Unknown take.": "없는 테이크예요.", "Not found.": "찾을 수 없어요.",
@@ -178,9 +180,11 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Lyrics and melody timing got better. Re-timing your song takes about a minute, in the background.": "가사와 멜로디 타이밍이 좋아졌어요. 곡을 다시 맞추는 데 약 1분 걸려요. 백그라운드에서 해요.",
   "Edit": "편집","Lyrics timing": "가사 타이밍",
   "Drag each word to where it starts · a line’s bar moves the line": "단어를 들리기 시작하는 곳으로 끌어요 · 줄 막대를 끌면 줄 전체가 움직여요", "Where the line ends": "줄이 끝나는 곳",
-  "Drag a word’s mark to where you hear it start (the word before ends there) · a line’s bar moves the whole line, the mark at its end sets where it ends · click a word, a bar or the track to go there, drag the empty track to scroll · Ctrl+wheel zooms · Ctrl+Z undoes": "단어 표시를 들리기 시작하는 곳으로 끌어요(앞 단어는 거기서 끝나요) · 줄 막대를 끌면 줄 전체가, 끝 표시를 끌면 줄이 끝나는 곳이 움직여요 · 단어·줄 막대·빈 곳을 누르면 그 위치로, 빈 곳을 끌면 스크롤 · Ctrl+휠로 확대 · Ctrl+Z로 되돌리기",
+  "Drag a word’s mark to where you hear it start (the word before ends there) · a line’s bar moves the whole line, the mark at its end sets where it ends · click a word, a bar or the track to go there, drag the empty track to scroll · double-click a line to retype its words · Ctrl+wheel zooms · Ctrl+Z undoes": "단어 표시를 들리기 시작하는 곳으로 끌어요(앞 단어는 거기서 끝나요) · 줄 막대를 끌면 줄 전체가, 끝 표시를 끌면 줄이 끝나는 곳이 움직여요 · 단어·줄 막대·빈 곳을 누르면 그 위치로, 빈 곳을 끌면 스크롤 · 줄을 두 번 누르면 가사를 다시 써요 · Ctrl+휠로 확대 · Ctrl+Z로 되돌리기",
   "Import timing": "타이밍 불러오기", "Import timing from a file": "파일에서 타이밍 불러오기", "Export timing": "타이밍 내보내기", "Save this song’s edited lines to a file": "이 곡에서 고친 줄을 파일로 저장",
   "That isn’t a timing file.": "타이밍 파일이 아니에요.", "None of its lines are this song’s.": "이 곡에 맞는 줄이 없어요.", "{n} of {all} lines imported": "{all}줄 중 {n}줄을 불러왔어요", "{n} lines imported": "{n}줄을 불러왔어요",
+  "Retype": "다시 쓰기", "Delete line": "줄 삭제", "Add line": "줄 추가", "Save": "저장", "The line’s words": "이 줄의 가사",
+  "The new line’s words, sung from the playhead": "지금 위치에서 부르는 새 줄의 가사",
   "Split off": "따로 떼기","Backing": "백보컬", "Not backing": "백보컬 아님","Timing this song again…": "이 곡을 다시 맞추는 중…",
   "The whole song: drag the box to move through it, its edges to zoom; click to go there": "곡 전체: 상자를 끌면 곡을 옮겨 다니고, 상자 양 끝을 끌면 확대/축소, 누르면 그 위치로",
   "Copy to clipboard": "클립보드로 복사", "Save as a file": "파일로 저장", "Copied {n} lines": "{n}줄을 복사했어요",
@@ -456,4 +460,11 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Manual lyrics needed": "가사를 직접 넣어 주세요", "Manual lyrics needed · {why}": "가사를 직접 넣어 주세요 · {why}", "Add lyrics": "가사 넣기",
   "Skip lyrics": "가사 없이 두기", "From your clipboard": "클립보드에서", "Not this": "이건 아니에요", "Pick songs": "곡 고르기",
   "A playlist: its songs to pick from": "플레이리스트: 곡을 골라요", "{n} YouTube links": "YouTube 링크 {n}개", "Pending": "대기 중", "Processing": "처리 중", "Stopped": "멈춤", "Waiting to find the lyrics": "가사 찾을 차례를 기다리는 중", "No lyrics for this song yet.": "이 곡엔 아직 가사가 없어요.", "Lyrics needed": "가사가 필요해요", "A line of the song to each line": "한 줄에 노래 한 줄씩",
+  // covers: other singers' versions under a song (its title's singer menu, Add a cover, the first line's mark)
+  "1 cover": "커버 1곡", "{n} covers": "커버 {n}곡", "Delete it and its covers?": "커버까지 삭제할까요?", "Cover": "커버", "Covers": "커버", "Singer": "가수",
+  "Add a cover": "커버 추가", "Delete this cover": "이 커버 삭제", "cover of {title}": "{title} 커버", "Add a cover of {title}": "{title} 커버 추가",
+  "Paste the cover’s YouTube link": "커버 영상의 YouTube 링크를 붙여넣으세요", "The cover’s YouTube link": "커버 YouTube 링크",
+  "A cover is one video’s link, not a playlist.": "커버는 플레이리스트 말고 영상 하나의 링크로 넣어요.",
+  "Where the first line starts": "첫 줄이 시작하는 곳", "Play from the mark": "표시부터 듣기",
+  "Drag the mark to the first line. The cover is cut to start {n} s before it.": "표시를 가사 첫 줄이 시작하는 곳으로 끌어요. 커버는 그 {n}초 앞부터 남기고 잘라요.",
 }, KO_SERVER);

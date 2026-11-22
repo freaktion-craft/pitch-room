@@ -375,7 +375,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"job": stems.start_install(gpu_only=(q.get("gpu") or ["0"])[0] == "1", update=(q.get("update") or ["0"])[0] == "1")})
         if url.path == "/api/stems/youtube":
             body = json.loads(self._body(10_000) or b"{}")
-            return self._json(200, {"job": stems.start_youtube(str(body.get("url") or "").strip(), body.get("model", model), body.get("find"), bool(body.get("low")), body.get("name"), body.get("ask") is not False)})
+            return self._json(200, {"job": stems.start_youtube(str(body.get("url") or "").strip(), body.get("model", model), body.get("find"), bool(body.get("low")), body.get("name"), body.get("ask") is not False,
+                                                                 cover_of=body.get("coverOf") or None)})  # coverOf: a song's id, for a cover of it
         if url.path == "/api/stems/playlist":  # {url}: what's on a YouTube or Spotify playlist, to pick from (stems.playlist)
             body = json.loads(self._body(10_000) or b"{}")
             return self._json(200, stems.playlist(str(body.get("url") or "") if isinstance(body, dict) else ""))
@@ -387,6 +388,9 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body, dict) and body.get("keep"):
                 return self._json(200, {"status": stems.pick_record(parts[2], {"keep": True})})
             return self._json(200, {"status": stems.pick_record(parts[2], (body.get("record") if isinstance(body, dict) and not body.get("own") else None))})
+        if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "start":  # {at}: a cover being added, where its first line starts (stems.mark_start)
+            body = json.loads(self._body(1000) or b"{}")
+            return self._json(200, {"status": stems.mark_start(parts[2], body.get("at") if isinstance(body, dict) else None)})
         if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "lyrics":  # {text}: a song added wanting its lyrics, them pasted (stems.resume_lyrics)
             body = json.loads(self._body(60_000) or b"{}")
             return self._json(200, {"status": stems.resume_lyrics(parts[2], body.get("text") if isinstance(body, dict) else None)})
