@@ -27,6 +27,9 @@ function vcAnalyser() {
     VC.tn = ac.createAnalyser(); VC.tn.fftSize = 4096; VC.tn.smoothingTimeConstant = 0;
     const sink = ac.createGain(); sink.gain.value = 0;
     micBus.connect(VC.an); VC.an.connect(sink); micBus.connect(VC.tn); VC.tn.connect(sink); sink.connect(ac.destination);
+    // the piano's keys (keyBus), read as the mic is for the spectrogram, which draws them in a colour of their own
+    VC.kn = ac.createAnalyser(); VC.kn.fftSize = 8192; VC.kn.smoothingTimeConstant = 0.5;
+    keyBus.connect(VC.kn); VC.kn.connect(sink); VC.kd = new Float32Array(VC.kn.frequencyBinCount);
     VC.data = new Float32Array(VC.an.frequencyBinCount); VC.hz = ac.sampleRate / VC.an.fftSize;
     VC.td = new Float32Array(VC.tn.frequencyBinCount); VC.tdHz = ac.sampleRate / 4096;
   }
@@ -71,6 +74,7 @@ function voiceFrame() {
   VC.frAt = now;
   const hearing = !!ac && (micOn || !!testOsc);
   if (hearing) { vcAnalyser().getFloatFrequencyData(VC.data); VC.tn.getFloatFrequencyData(VC.td); }
+  if (ac) { vcAnalyser(); VC.kn.getFloatFrequencyData(VC.kd); } // (the keys: heard with the mic off too)
   const voiced = hearing && cur != null && level > S.gate && micQ != null;
   vcLock();
   const raw = !VC.filt.length; // (nothing of the browser's own on the sound: its harmonics and level are read)
@@ -180,17 +184,44 @@ function paintLab() {
 const vcVline = (g, x, y0, y1) => { g.beginPath(); g.moveTo(Math.round(x) + 0.5, y0); g.lineTo(Math.round(x) + 0.5, y1); g.stroke(); };
 
 // The spectrogram (a view of its own): the sound's make-up going by, right to left, 0–5 kHz bottom to top, louder
-// brighter (dark blue, purple, red, yellow). A sung note's harmonics are its stripes.
-const SG = { top: 5000, lo: -100, span: 70, speed: 60 }; // Hz at the top; dB at the darkest; dB to the brightest; px a second
-const SG_LUT = (() => {
-  const stops = [[0, 6, 6, 24], [0.25, 32, 24, 110], [0.5, 120, 34, 130], [0.72, 222, 68, 76], [0.88, 252, 160, 56], [1, 252, 250, 190]];
+// brighter (dark blue, purple, red, yellow). A sung note's harmonics are its stripes. The piano's keys leave theirs too,
+// in teal to white (where they're louder than the mic there), so a key and the note sung to it can be laid side by side.
+// A line every 250 Hz, named (sgScale); the Hz and the note under the pointer (sgTip).
+const SG = { top: 5000, lo: -100, span: 70, speed: 60, grid: 250 }; // Hz at the top; dB at the darkest; dB to the brightest; px a second; Hz a line
+const sgLut = (stops) => {
   const lut = new Uint8Array(256 * 3);
   for (let i = 0; i < 256; i++) {
     const t = i / 255, k = stops.findIndex((s) => s[0] >= t), b = stops[Math.max(1, k)], a = stops[Math.max(0, k - 1)], f = (t - a[0]) / (b[0] - a[0] || 1);
     for (let c = 0; c < 3; c++) lut[i * 3 + c] = Math.round(a[c + 1] + (b[c + 1] - a[c + 1]) * f);
   }
   return lut;
-})();
+};
+const SG_LUT = sgLut([[0, 6, 6, 24], [0.25, 32, 24, 110], [0.5, 120, 34, 130], [0.72, 222, 68, 76], [0.88, 252, 160, 56], [1, 252, 250, 190]]);
+const SG_KEY = sgLut([[0, 6, 6, 24], [0.3, 6, 52, 70], [0.6, 18, 150, 168], [0.85, 110, 228, 226], [1, 236, 255, 252]]); // (the keys')
+// the Hz marks: a line every SG.grid Hz, each kHz brighter, named in Hz under 1 kHz and in kHz from there
+function sgScale() {
+  const box = $("#vcSpecHz");
+  for (let f = SG.grid; f < SG.top; f += SG.grid) {
+    const line = el("i", f % 1000 ? "" : "k"), name = el("span");
+    line.style.bottom = name.style.bottom = (f / SG.top) * 100 + "%";
+    name.textContent = f < 1000 ? String(f) : f / 1000 + "k";
+    box.append(line, name);
+  }
+}
+// the Hz under the pointer, and the note nearest it (off by more than 10 cents, how far)
+function sgTip() {
+  const box = $(".vc-spec"), tip = $("#vcSpecTip"), line = $("#vcSpecLine");
+  const show = (on) => { tip.classList.toggle("on", on); line.classList.toggle("on", on); };
+  box.addEventListener("pointermove", (e) => {
+    if (e.target.closest("#vcOff")) { show(false); return; }
+    const r = box.getBoundingClientRect(), y = Math.max(0, Math.min(r.height, e.clientY - r.top)), f = (1 - y / r.height) * SG.top;
+    if (f < 20) { show(false); return; }
+    const mm = 69 + 12 * Math.log2(f / A4), m = Math.round(mm), c = Math.round((mm - m) * 100);
+    tip.textContent = `${Math.round(f)} Hz · ${absName(m)}${Math.abs(c) > 10 ? ` ${c > 0 ? "+" : "−"}${Math.abs(c)}¢` : ""}`;
+    tip.style.top = line.style.top = y + "px"; show(true);
+  });
+  box.addEventListener("pointerleave", () => show(false));
+}
 let sgRows = null, sgCarry = 0, sgAt = 0;
 function drawSpec(now, hearing) {
   const cv = $("#vcSpec"), r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
@@ -209,12 +240,16 @@ function drawSpec(now, hearing) {
     const hi = (1 - y / h) * SG.top, lo = (1 - (y + 1) / h) * SG.top;
     const a = Math.max(1, Math.floor(lo / VC.hz)); return [a, Math.max(a, Math.min(VC.data.length - 1, Math.floor(hi / VC.hz)))];
   });
-  const col = g.createImageData(step, h), px = col.data;
+  const col = g.createImageData(step, h), px = col.data, lvl = (v) => Math.round(Math.min(1, Math.max(0, (v - SG.lo) / SG.span)) * 255);
   for (let y = 0; y < h; y++) {
-    let v = SG.lo;
-    if (hearing && sgRows) { const [a, b] = sgRows[y]; for (let i = a; i <= b; i++) if (VC.data[i] > v) v = VC.data[i]; }
-    const k = Math.round(Math.min(1, Math.max(0, (v - SG.lo) / SG.span)) * 255) * 3;
-    for (let x = 0; x < step; x++) { const o = (y * step + x) * 4; px[o] = SG_LUT[k]; px[o + 1] = SG_LUT[k + 1]; px[o + 2] = SG_LUT[k + 2]; px[o + 3] = 255; }
+    let v = SG.lo, kv = SG.lo;
+    if (sgRows) {
+      const [a, b] = sgRows[y];
+      if (hearing) for (let i = a; i <= b; i++) if (VC.data[i] > v) v = VC.data[i];
+      if (VC.kd) for (let i = a; i <= b; i++) if (VC.kd[i] > kv) kv = VC.kd[i];
+    }
+    const lv = lvl(v), lk = lvl(kv), key = lk > lv, L = key ? SG_KEY : SG_LUT, k = (key ? lk : lv) * 3; // (the louder of the two)
+    for (let x = 0; x < step; x++) { const o = (y * step + x) * 4; px[o] = L[k]; px[o + 1] = L[k + 1]; px[o + 2] = L[k + 2]; px[o + 3] = 255; }
   }
   g.putImageData(col, w - step, 0);
 }
@@ -472,7 +507,7 @@ function initVoice() {
   // the header's Lab tab: in, and the mic on with it (this click lets it start)
   $("#tabLab").onclick = () => { if (view !== "voice") startMic(); };
   $("#vcMic").onclick = () => startMic();
-  initScales(); initReach(); initMatch();
+  initScales(); initReach(); initMatch(); sgScale(); sgTip();
   for (const b of $("#vcView").children) b.onclick = () => { vcShowView(b.dataset.v); store.set("voiceView", b.dataset.v); };
   vcShowView(["scale", "reach", "match", "piano", "spec", "eq"].includes(store.get("voiceView", "spec")) ? store.get("voiceView", "spec") : "spec"); // (the spectrogram, till another's picked)
   // Freeze: this moment kept faintly behind the EQ's spectrum, envelope and formants, or let go
