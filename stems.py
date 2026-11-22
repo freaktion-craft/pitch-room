@@ -1882,9 +1882,11 @@ def _cover_phase(job, song_id: str):
          stoppedAt=0.0, stage="Where does the first line start?")
 
 
-def mark_start(job_id: str, at) -> str:
+def mark_start(job_id: str, at, text=None) -> str:
     """A cover being added, stopped to be shown where its first line starts (needStart): at, in seconds. Its start is
-    cut, and it goes on to its lyrics. Returns its status (running again)."""
+    cut, and it goes on to its lyrics: text, where this singer's words aren't the song's (a line left out, other
+    words: changed on the page before they're lined up, so nothing unsung is given a place), else the song's own lines.
+    Returns its status (running again)."""
     try:
         at = float(at)
         if not 0 <= at < 20 * 60:
@@ -1906,10 +1908,11 @@ def mark_start(job_id: str, at) -> str:
                 _cut_start(song_id, at)
             except Exception as e:  # noqa: BLE001  (in as it is, uncut: its lines can still be lined up)
                 print(f"Couldn't cut library/{song_id}'s start: {e}", file=sys.stderr)
-            how = None
-            with contextlib.suppress(OSError, ValueError, KeyError):
-                own = _lyrics_data(_song_dir(_read_meta(_song_dir(song_id))["coverOf"]))
-                how = {"text": "\n".join(line["text"] for line in own["lines"])[:50_000]} if own else None
+            how = {"text": text[:50_000]} if isinstance(text, str) and text.strip() else None
+            if how is None:
+                with contextlib.suppress(OSError, ValueError, KeyError):
+                    own = _lyrics_data(_song_dir(_read_meta(_song_dir(song_id))["coverOf"]))
+                    how = {"text": "\n".join(line["text"] for line in own["lines"])[:50_000]} if own else None
             _lyrics_phase(job, song_id, how)
         finally:
             _set(job, status="done", progress=1.0, stage="Done")

@@ -35,7 +35,7 @@
   `notes`, take `pitch`, `melody/<id>`.
 - POST routes (`_stems_post`): `jobs/singing` (heartbeat while a song plays), `upgrades`, `settings`, `import`,
   `stems/install`, `stems/youtube` (`coverOf`: a song's id, for a cover of it), `stems/playlist`, job
-  `cancel`/`pick`/`lyrics`/`start` (`{at}`: where a cover's first line starts), and per song `delete`, `rename`,
+  `cancel`/`pick`/`lyrics`/`start` (`{at, text?}`: where a cover's first line starts, its words where they differ), and per song `delete`, `rename`,
   `split`, `mix`, `keep`, `truth`, `notes`, `marks`, `key`, `export`, `lyrics/...`, `takes...`.
 - A `ValueError` becomes 422 `{error}` (shown by the page) in POST routes and the per-song GETs; in other GETs it's a
   500 `"ValueError: ..."`. Anything else is a 500 with a traceback in the terminal.
@@ -118,8 +118,10 @@ within the hour.
 - Once its tracks are in, the job stops with `needStart` (`startAt`: its first note; `voice`: the track to show), as
   `needPick` does. `POST jobs/<id>/start` `{at}` (`mark_start`) cuts every track to begin `COVER_LEAD` (8 s) before
   the mark (`_cut_start`: the mp3s re-encoded, `beats`, `duration` and `melody.json` moved with them; under `CUT_MIN`
-  nothing is cut), then lines the song's own lyrics up with this voice like pasted ones. A song with no lyrics has
-  them looked for, by the song's artist and title.
+  nothing is cut), then lines the song's own lyrics up with this voice like pasted ones, or `text` where the page
+  sent it (Edit lyrics in that step: a cover that leaves a line out or sings other words has them changed before
+  they're timed, so nothing unsung is given a place). A song with no lyrics has them looked for, by the song's artist
+  and title.
 - Words a cover sings differently are changed by hand: `lyrics/lines` takes `{op: "text", line, text}`,
   `{op: "delete", line}` and `{op: "add", at, text}` beside the timing ops (`_retype_lines`). A retyped line keeps
   its span, its words spread over it by length (`_typed_words`); saved edits and nudges are moved to the new line

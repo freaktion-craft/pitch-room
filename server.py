@@ -388,9 +388,10 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body, dict) and body.get("keep"):
                 return self._json(200, {"status": stems.pick_record(parts[2], {"keep": True})})
             return self._json(200, {"status": stems.pick_record(parts[2], (body.get("record") if isinstance(body, dict) and not body.get("own") else None))})
-        if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "start":  # {at}: a cover being added, where its first line starts (stems.mark_start)
-            body = json.loads(self._body(1000) or b"{}")
-            return self._json(200, {"status": stems.mark_start(parts[2], body.get("at") if isinstance(body, dict) else None)})
+        if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "start":  # {at, text?}: a cover being added, where its first line starts, and its words where they differ (stems.mark_start)
+            body = json.loads(self._body(60_000) or b"{}")
+            body = body if isinstance(body, dict) else {}
+            return self._json(200, {"status": stems.mark_start(parts[2], body.get("at"), body.get("text"))})
         if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "lyrics":  # {text}: a song added wanting its lyrics, them pasted (stems.resume_lyrics)
             body = json.loads(self._body(60_000) or b"{}")
             return self._json(200, {"status": stems.resume_lyrics(parts[2], body.get("text") if isinstance(body, dict) else None)})

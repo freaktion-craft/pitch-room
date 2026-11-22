@@ -466,5 +466,6 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Paste the cover’s YouTube link": "커버 영상의 YouTube 링크를 붙여넣으세요", "The cover’s YouTube link": "커버 YouTube 링크",
   "A cover is one video’s link, not a playlist.": "커버는 플레이리스트 말고 영상 하나의 링크로 넣어요.",
   "Where the first line starts": "첫 줄이 시작하는 곳", "Play from the mark": "표시부터 듣기",
+  "Edit lyrics": "가사 편집",
   "Drag the mark to the first line. The cover is cut to start {n} s before it.": "표시를 가사 첫 줄이 시작하는 곳으로 끌어요. 커버는 그 {n}초 앞부터 남기고 잘라요.",
 }, KO_SERVER);

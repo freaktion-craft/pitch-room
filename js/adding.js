@@ -326,13 +326,25 @@ async function choosePick(id, c, b) {
 // written on the mark, where it has lyrics. What will be cut is hatched: all but COVER_LEAD s before the mark. Play is
 // the voice from the mark, SF_HEAR s of it. Done sends the mark (stems.mark_start: the cover's start is cut, and it
 // goes on to its lyrics). The view is the first SF_SPAN s, or to SF_AFTER s past the first note; the mark dragged to
-// its end, it reaches further.
+// its end, it reaches further. Edit lyrics opens the song's lines to change before they're lined up with this
+// voice (a cover that leaves the opening "yeah" out, or sings other words): the mark's line is then its first, and
+// Done sends them with the mark.
 const COVER_LEAD = 8, SF_HEAR = 6, SF_SPAN = 90, SF_AFTER = 45, SF_RATE = 20, SF_BARS = 180; // (COVER_LEAD: as stems.py's; SF_RATE: peaks read a second)
-const starts = new Map(); // job → {at: the mark (s), span: the view (s), dur, peaks, top, buf, line, src, failed}
+const starts = new Map(); // job → {at: the mark (s), span: the view (s), dur, peaks, top, buf, line, text: the song's lines, src, failed}
 function startAsk(id) {
   const form = el("div", "start-form"), wave = el("div", "sf-wave"), cut = el("i", "sf-cut"), mark = el("div", "sf-mark"), tag = el("span", "sf-tag");
   const ticks = el("div", "sf-ticks"), acts = el("div", "sf-acts"), play = el("button", "btn sm icon sf-play"), at = el("span", "sf-at"), done = el("button", "btn sm primary sf-done"), hint = el("p", "sf-hint");
-  form.hidden = true;
+  const open = el("button", "btn sm sf-edit"), box = el("div", "lyr-form sf-words"), text = el("textarea");
+  form.hidden = open.hidden = box.hidden = true;
+  open.type = "button"; say(open, "Edit lyrics"); open.setAttribute("aria-expanded", "false");
+  text.rows = 6; text.spellcheck = false; say(text, "A line of the song to each line", null, "placeholder"); say(text, "Lyrics", null, "aria-label");
+  open.onclick = () => foldBox(box, open, box.hidden, text);
+  text.oninput = () => { // (the mark's line: the first of them as they are now)
+    const s = starts.get(id);
+    if (s) { s.line = firstLine(text.value); drawStart(form, id); }
+    done.disabled = !text.value.trim();
+  };
+  box.append(text);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "sf-bars"); svg.setAttribute("viewBox", `0 0 ${SF_BARS * 3} 100`); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("aria-hidden", "true");
   svg.append(document.createElementNS("http://www.w3.org/2000/svg", "path"));
@@ -340,7 +352,7 @@ function startAsk(id) {
   wave.append(svg, cut, mark);
   play.type = done.type = "button"; play.append(icon("play")); say(play, "Play from the mark", null, "title"); say(play, "Play from the mark", null, "aria-label"); say(done, "Done");
   say(hint, "Drag the mark to the first line. The cover is cut to start {n} s before it.", { n: COVER_LEAD });
-  acts.append(play, at, done); form.append(wave, ticks, acts, hint);
+  acts.append(play, at, open, done); form.append(wave, ticks, acts, box, hint);
   const set = (t) => {
     const s = starts.get(id);
     if (!s) return;
@@ -364,7 +376,7 @@ function startAsk(id) {
     if (!s) return;
     done.disabled = true; hushStart(id);
     try {
-      const r = await fetch(`/api/jobs/${id}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: Math.round(s.at * 100) / 100 }) });
+      const r = await fetch(`/api/jobs/${id}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: Math.round(s.at * 100) / 100, ...(s.text && text.value.trim() && text.value !== s.text ? { text: text.value } : {}) }) }); // (its words, where they were changed)
       const b = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(b.error || "That didn’t work.");
     } catch (e) {
@@ -392,11 +404,18 @@ function paintStart(row, id, j) {
       .finished.then(() => { form.style.overflow = ""; }, () => { form.style.overflow = ""; });
   }
 }
-// its voice (the lead vocal, once split), read for the waveform and to play; and the first line of the song it covers
+// its voice (the lead vocal, once split), read for the waveform and to play; and the lines of the song it covers
+const firstLine = (t) => t.split("\n").map((l) => l.trim()).find(Boolean) || "";
 async function loadStart(form, id, j) {
   const s = starts.get(id);
   fetch(`/api/library/${j.coverOf}/lyrics`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null))
-    .then((d) => { s.line = d?.lyrics?.lines?.[0]?.text || ""; drawStart(form, id); }).catch(() => {});
+    .then((d) => {
+      s.text = (d?.lyrics?.lines || []).map((l) => l.text || "").join("\n"); s.line = firstLine(s.text);
+      const area = form.querySelector(".sf-words textarea");
+      if (!area.value) area.value = s.text;
+      form.querySelector(".sf-edit").hidden = !s.text; // (a song with no lyrics: this one's are looked for)
+      drawStart(form, id);
+    }).catch(() => {});
   try {
     const r = await fetch(`/library/${j.songId}/${j.voice || "vocals"}.mp3`, { cache: "no-store" }); // (cut later, at the same address: never a kept copy)
     if (!r.ok) throw new Error("HTTP " + r.status);

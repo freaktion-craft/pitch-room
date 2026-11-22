@@ -143,7 +143,9 @@
 .sf-acts { display: flex; align-items: center; gap: var(--space-3); }
 .sf-acts .sf-play > .ico { width: var(--icon-sm); height: var(--icon-sm); }
 .sf-at { font: var(--text-sm) var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.sf-done { margin-left: auto; }
+.sf-at { margin-right: auto; }
+.sf-edit.on { background: var(--hover-2); } /* its box open */
+.sf-words textarea, .sf-words textarea:hover, .sf-words textarea:focus { background: var(--surface); }
 .sf-hint { margin: 0; font-size: var(--text-sm); line-height: 18px; color: var(--muted); }
 .sf-hint.err { color: var(--bad); }
 @media (prefers-reduced-motion: reduce) { .start-form.loading .sf-wave { animation: none; } }
