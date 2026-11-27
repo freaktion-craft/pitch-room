@@ -207,6 +207,9 @@ function draw(now, cur, hist, evs, guide) {
     const y = Y(s.m);
     if (pen) g.lineTo(x, y); else { g.moveTo(x, y); pen = true; }
   }
+  // the line ends where the last reading was sung, short of the playhead by the way in (micLag: with a DAW's delay
+  // measured, tens of px): carried level to the dot, which is that same reading, so the two stay one
+  if (pen && cur != null && hist.length && hist[hist.length - 1].m === cur) g.lineTo(hitX, Y(cur));
   g.strokeStyle = C.voice; g.lineWidth = 3; g.lineJoin = "round"; g.lineCap = "round"; g.stroke();
   g.restore();
   // with lyrics, the stretch already sung is theirs (renderLyrics): a veil over it all the way to the playhead, densest
