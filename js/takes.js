@@ -252,8 +252,9 @@ function findClicks(chunks, from, sr, click) {
 // tooltip has the browser's part as it reports it now and the part measured, when and on what. syncErr: a
 // measurement that didn't work (English), said in red in its line until the next.
 // In Practice: the button's delay, and in its panel the clicks heard (syncHeard: of CLICKS, as they come in and then
-// as the measurement counted them; null before one, and where it couldn't listen), a dot each and their number under
-// them, or in red what went wrong (syncFew: too few heard, said with how many).
+// as the measurement counted them; null before one, and where it couldn't listen), a dot each, and under them one
+// line: what to do before a measurement, then their number, or in red what went wrong (syncFew: too few heard, said
+// with how many).
 let syncErr = "", syncHeard = null, syncFew = false;
 function paintSync() {
   if (!ac) return;
@@ -265,7 +266,7 @@ function paintSync() {
   if (dots.children.length !== N) dots.replaceChildren(...CLICKS.map(() => el("i")));
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < (syncHeard || 0)));
   if (bad && !syncFew) say(got, syncErr);
-  else if (syncHeard == null) say(got, "");
+  else if (syncHeard == null) say(got, "Hold your headphones to the mic.");
   else say(got, bad ? "{n} of {N} heard. Closer, and try again." : "{n} of {N} heard", { n: syncHeard, N });
   got.classList.toggle("err", bad);
   const parts = m ? ["Browser {b} ms + measured {e} ms · {on} · {when}", { b, e: keySign(inMs(m.s)), on: m.label || tr("System default"), when: longDate(new Date(m.at)) }]

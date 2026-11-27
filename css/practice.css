@@ -14,8 +14,9 @@
 #earRows { display: grid; gap: var(--space-2); }
 .ear-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 32px; }
 .ear-row > span { color: var(--muted); }
-/* Sync: the delay on its button beside Headphones ("Sync" in grey before it, as the key's "Key"); its panel: what to
-   do, then a dot for each click (lit once heard) on one line with the button that plays them, and how many under the dots */
+/* Sync: the delay on its button beside Headphones ("Sync" in grey before it, as the key's "Key"); its panel: a dot for
+   each click (lit once heard) on one line with the button that plays them, and one line under the dots: what to do, then
+   how many were heard, or what went wrong */
 .sync-btn { gap: var(--space-2); font-variant-numeric: tabular-nums; }
 .sync-btn .pre { color: var(--muted); }
 .sync-at .pop { display: grid; gap: var(--space-4); }
@@ -24,7 +25,7 @@
 .sync-dots { --dot: var(--space-4); display: flex; gap: var(--space-2); }
 .sync-dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--track); transition: background-color var(--duration-fast); }
 .sync-dots i.on { background: var(--voice-mark); }
-.sync-got small { min-height: 20px; font-size: var(--text-sm); line-height: 20px; color: var(--muted); font-variant-numeric: tabular-nums; } /* its line kept while there's nothing to say */
+.sync-got small { font-size: var(--text-sm); line-height: 20px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .sync-got small.err { color: var(--bad); }
 .ear-sub { margin-top: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--line); font-weight: var(--weight-medium); } /* the comparison's ears, under a hairline */
 .seg { display: inline-flex; gap: var(--space-half); padding: var(--space-half); border-radius: var(--radius-md); background: var(--fill); }
