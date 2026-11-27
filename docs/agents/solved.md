@@ -164,6 +164,10 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
   Korean (`liveCable`; 51aa3c6). Never offer CABLE Output as a mic: the app would hear itself (`cableOut`; e60996f).
 - **The browser reports only its own latency**: a DAW's or loopback's has to be measured, clicks out and in with the
   echo filter off (`measureDelay`; 4b3e43d).
+- **What's measured goes for your line in Practice too, not only for takes** (`micLag` adds `syncExtras`' part, as
+  `recLatency` does). Was: with a DAW or a loopback on the way in, takes lined up with the band while the line was drawn
+  that much late against the bars. The line is carried level from its last reading to the dot (`draw`), or a long way
+  in leaves the dot loose ahead of it.
 
 ## Korean and text
 

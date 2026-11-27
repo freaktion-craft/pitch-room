@@ -1285,7 +1285,7 @@ function renderEars() {
 }
 function showEars(on) {
   $("#earsPop").hidden = !on; $("#kEars").setAttribute("aria-expanded", String(on));
-  if (on) { showJobs(false); renderEars(); if (!$("#livePop").hidden) showLive(false); }
+  if (on) { showJobs(false); renderEars(); if (!$("#livePop").hidden) showLive(false); if (!$("#syncPop").hidden) showSync(false); }
 }
 function initEars() {
   const btn = $("#kEars"), pop = $("#earsPop");
@@ -1395,7 +1395,7 @@ function initSing() {
   $("#devTools").onchange = (e) => { S.dev = e.target.checked; save(); renderPhrases(); if (!S.dev) showNote(null); paintCopy(); };
   paintCopy(); // (as they're set from the start, before any song)
   $("#echo").onchange = async (e) => { S.echo = e.target.checked; save(); if (micOn) { stopMic(); await startMic(); } };
-  micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); syncErr = ""; paintSync(); }); // Sync's is the new input's
+  micPick = makePick($("#micDev"), "Input", (v) => { S.mic = v; save(); restartMic(); syncErr = ""; syncHeard = null; paintSync(); }); // Sync's is the new input's
   micPick.set([{ v: "", t: "System default" }], "");
   micChPick = makePick($("#micCh"), "Input channel", (v) => { S.micCh = v; save(); restartMic(); });
   outPick = makePick($("#outDev"), "Output", (v) => { S.out = v; save(); setOut(); });
