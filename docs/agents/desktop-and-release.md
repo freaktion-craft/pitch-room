@@ -88,32 +88,50 @@ A standalone build of the current code with its own data folder (`Pitchroom WIP`
 
 Only on the owner's explicit yes.
 
-Releases are built on the owner's own computers: Windows on the Windows PC, macOS on the Mac. There are no GitHub
-Actions builds (they needed paid minutes; dropped after 1.0.24).
+A release is made in one go from the owner's Mac. The Mac builds its own files; GitHub Actions builds the Windows
+installer (`.github/workflows/windows.yml`). Both repos are public, so the minutes are free: the Actions builds dropped
+after 1.0.24 were of a private repo and needed paid ones. Nothing is published until every file is in.
 
-**Windows, on the PC:**
+1. `npm run icons-secret` in `desktop/`: this checkout's `icons.local.js` into the repo's Actions secrets
+   (`ICONS_LOCAL_1` to `6`), so the Windows build has the Pro icons as they are now. A tag's build stops without them.
+2. `npm version patch --no-git-tag-version` (`minor`/`major` too; package.json and lock together), commit
+   "Desktop x.y.z" to `main`, tag `vx.y.z`, push both. The tag's push starts the Windows build.
+3. One draft release for the tag in `pitchroom-releases`, named "x.y.z", no notes (`gh release create vx.y.z --repo
+   freaktion-craft/pitchroom-releases --draft --title x.y.z --notes ""`). First check that no release or draft has
+   that tag: two drafts of one tag is how files ended up apart before.
+4. `npm run release-mac -- vx.y.z` at below-normal priority (below): the Mac files into the draft.
+5. `npm run release-win -- vx.y.z --wait`: waits for the tag's run of `windows.yml`, downloads its artifact, checks
+   `latest.yml` against the tag and the installer, and uploads the three files into the draft by its id. A run that
+   failed stops it: read the run's log; the draft stays as it is.
+6. With all twelve files in (three Windows, nine Mac), publish the draft as the latest, by its id (`gh api -X PATCH
+   repos/freaktion-craft/pitchroom-releases/releases/<id> -F draft=false -f make_latest=true`).
 
-1. In `desktop/`: `npm version patch --no-git-tag-version` (`minor`/`major` too; package.json and lock together).
-2. Commit "Desktop x.y.z" to `main`, tag `vx.y.z`, push both.
-3. Run fetch-python and fetch-vbcable if needed (above).
-4. `npm run code`, then `npx electron-builder --win --publish always` with `GH_TOKEN` from `gh auth token` (it needs
-   write access to `pitchroom-releases`), at below-normal priority.
-5. electron-builder can split into two drafts. The `.blockmap`, `latest.yml` and `pitchroom_install.exe` must end up in
-   one draft, published as latest. Upload by the release's id (uploads.github.com), not `gh release upload vX.Y.Z`,
-   which may pick the wrong draft. Then delete the leftover near-empty draft, with the owner's ok.
+**The Windows build on Actions** (`windows.yml`): on a `v*` tag's push (and by hand, or for a pull request that
+changes the workflow, without the tag's checks). `npm ci`, fetch-python, fetch-vbcable, prepare-code, then
+`electron-builder --win --publish never`: the same steps as a build on the PC.
 
-**Windows files for a release made on the Mac:** in `desktop/`, `npm run dist` at below-normal priority, then upload
-`dist/pitchroom_install.exe`, its `.blockmap` and `dist/latest.yml` into that release by its id, replacing the ones of
-the same name. Check `latest.yml`'s `version` first: 1.0.21-1.0.24 went out carrying 1.0.20's Windows files, so Windows
-users weren't offered them.
+- It checks that the tag is package.json's version and that `latest.yml` is of the installer built.
+- **It installs and starts the app**: the installer run silently, `Pitchroom.exe` started, and the engine
+  (`/api/health`) and the page asked for, on a machine that never had Pitchroom. A build that can't start (1.0.18)
+  fails here. It doesn't look at the window.
+- The files are the run's artifact `pitchroom-windows` (kept 14 days). The run has no token for `pitchroom-releases`
+  and publishes nothing: `release-win.mjs` puts the files in from the owner's computer.
+- The Pro icons come from the secrets, never from the repo. Any other build than a tag's goes on with the free set,
+  with a warning.
 
-A local build includes `icons.local.js` when present.
+**Windows built on the PC instead** (Actions down, or a build to try by hand): in `desktop/`, fetch-python and
+fetch-vbcable if needed (above), then `npm run dist` at below-normal priority, and upload `dist/pitchroom_install.exe`,
+its `.blockmap` and `dist/latest.yml` into the release by its id (uploads.github.com), replacing the ones of the same
+name. Check `latest.yml`'s `version` first: 1.0.21-1.0.24 went out carrying 1.0.20's Windows files, so Windows users
+weren't offered them. Don't use `electron-builder --publish always`: it makes drafts of its own, and can split the
+files over two. A local build includes `icons.local.js` when present.
 
 Verify: `gh release view vX.Y.Z --repo freaktion-craft/pitchroom-releases --json assets,isDraft,url` (or the API).
 `gh release list` shows a leftover draft first, so it can look as if the release is still a draft.
 
 **The Mac files, on a Mac:** `npm run release-mac` in `desktop/` (`node
-scripts/release-mac.mjs [vX.Y.Z]`; the latest published release by default) adds a release's Mac files to it.
+scripts/release-mac.mjs [vX.Y.Z]`; the latest published release by default) adds a release's Mac files to it,
+a draft's too when the tag is named.
 
 - It builds the tag as tagged, in a worktree of its own under the temp folder with its own `npm ci`, never this
   checkout's `node_modules`.
@@ -127,9 +145,9 @@ scripts/release-mac.mjs [vX.Y.Z]`; the latest published release by default) adds
   needs Rosetta for the Intel build (`softwareupdate --install-rosetta`); an Intel Mac makes the Intel files only.
 - `--dry-run` says what it would do, on any system. `--no-upload` builds only (kept in the worktree). `--keep` keeps
   the worktree.
-- Like the Windows build made here, it includes `icons.local.js` when this checkout has it.
+- It includes `icons.local.js` when this checkout has it.
 
-**macOS and a Windows-only release:** it becomes "latest" with no `.dmg` (until `release-mac` adds the Mac files). The site then offers Mac
+**macOS and a Windows-only release** (one published before its Mac files are in): it becomes "latest" with no `.dmg` (until `release-mac` adds the Mac files). The site then offers Mac
 visitors the newest `.dmg` from an earlier release, and the macOS app neither updates to it nor offers it: both look
 for the newest release holding `latest-mac.yml` (`newestRelease` in `main.js`, `releaseWith` in `mac-update.js`).
 Mac apps up to 1.0.32 still read GitHub's "latest" and offer a version they can't get, until they've updated once.

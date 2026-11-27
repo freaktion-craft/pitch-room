@@ -281,6 +281,8 @@ Each was asked for. A change that undoes one needs the owner's word.
 - Updates download the whole installer.
 - The song picker asks at 40% sure or less, with nothing ticked until you pick.
 - Scales' hide-my-line is a plain eye, not a struck-out one.
-- Releases are built on the owner's computers, not GitHub Actions.
+- A release's Mac files are built on the owner's Mac; its Windows installer by GitHub Actions, which the owner
+  brought back for that once the repo was public (after 1.0.24 Windows was built on the PC: Actions needed paid
+  minutes then).
 - Models trained or blended here aren't released or hosted: a release works with the models users fetch from
   Hugging Face, and the owner's PC has the rest as a pack in `models/own`.
