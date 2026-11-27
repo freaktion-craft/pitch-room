@@ -149,7 +149,8 @@ shown muted. Only where a tooltip is allowed (`style.md`). Copies: the phrase st
 - **Panel under a button** (`.pop`, in a `position: relative` holder such as `.ears-at`): `showEars`/`initEars`
   (`practice.js`) and `showLive`/`initLive` (`live.js`) wire it the same way: click-outside, Escape back to the button,
   close on focusout, close the others. `showRetime`/`initRetime` (`studio.js`, the lyric timing update left of
-  Download) is the third: copy that wiring for a fourth.
+  Download) is the third, `showSync`/`initSync` (`takes.js`, Sync beside Headphones) the fourth: copy that wiring for
+  a fifth.
 - **Drawer**: `showJobs`/`closeDrawer`, `drawerEdge` (keeps the scrollbar's room), `afterSlide` (`adding.js`).
   A job that stopped to be told something (`jobAsks(j)`: its lyrics, which song, a cover's first line) gets its form
   in its row: `lyricsBox`, `startAsk`. A new question goes into `jobAsks` and gets its form the same way.

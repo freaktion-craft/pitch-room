@@ -236,7 +236,7 @@ function route() {
     $("#overlay").hidden = true;
     if (!K.studio) practiceMix(); // back from the Takes Studio
     loadSamples(); // for the keyboard
-    openSync(); // beside Record: the delay as it is now
+    openSync(); // beside Headphones: the delay as it is now
     renderStart();
     // size and draw the stage now, so the view's first frame is complete rather than an empty stage
     paintTakesShown(); fitStage(); resize(); centerKeys();
