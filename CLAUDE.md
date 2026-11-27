@@ -44,6 +44,7 @@ Platforms are **Windows and macOS only**. Linux was dropped (PR 48): don't add L
 | `scripts/contrast.py` | WCAG contrast check of the colour tokens |
 | `scripts/turn-check.js`, `scripts/scale-check.js`, `scripts/reach-check.js`, `scripts/match-check.js` | Offline checks of the Lab's measures (`js/turn.js`, `js/scale.js`, `js/reach.js`, `js/match.js`) on synthetic voices |
 | `desktop/` | Electron app: `main.js`, `preload.js`, splash, build scripts in `desktop/scripts/` |
+| `.github/workflows/windows.yml` | The Windows installer, built, installed and started by GitHub Actions when a version tag is pushed |
 | `site/` | pitchroom.dev download page |
 | `README.md` | User-facing readme |
 
@@ -112,7 +113,8 @@ Details and recipes: `docs/agents/verifying.md`.
 - **No monitoring or effects engines.** Users sing through their own DAW and loop it into the mic. Monitoring and
   effects stay in the DAW.
 - **Pro icons never committed.** `icons.local.js` (Hugeicons Pro, gitignored) overrides the free set by name. Never commit
-  it or paste Pro paths into `js/helpers.js`.
+  it or paste Pro paths into `js/helpers.js`. The Windows build on Actions has it from the repo's secrets (`npm run
+  icons-secret`), never from the repo.
 - **No secrets or private data** in commits, release notes or docs. Release notes are public.
 - **The Lab's thresholds are guesses.** The Lab (`#voice`: Scales, Reach and Match) keeps every threshold in `TN`
   (`js/turn.js`: what's read from a frame's harmonics), `SC` (`js/scale.js`), `RC` (`js/reach.js`) and `MT` (`js/match.js`), one for all voices, not yet tried with real voices. Change them there, never
@@ -131,8 +133,9 @@ Details and recipes: `docs/agents/verifying.md`.
 - PRs merge into `main` with merge commits ("Merge pull request #N"). To catch up, merge `main` into the branch; don't
   rebase shared branches.
 - **Merges, releases and site deploys happen only on the owner's explicit yes.**
-- Releases are built locally (no GitHub Actions: it needs paid minutes): Windows on the owner's PC, macOS on their
-  Mac. Steps: `docs/agents/desktop-and-release.md`.
+- A release is made from the owner's Mac in one go: the Mac files are built there, the Windows installer by GitHub
+  Actions on the tag's push (`.github/workflows/windows.yml`; free now the repo is public). Steps:
+  `docs/agents/desktop-and-release.md`.
 - Don't commit `.wrangler/`, scratch scripts or screenshots.
 - Style details (comments, naming, line endings, CSS, copy): `docs/agents/style.md`.
 

@@ -1,5 +1,5 @@
-// A release's Mac files, built on a Mac and added to that release in freaktion-craft/pitchroom-releases (there are no
-// GitHub Actions builds), as after a Windows-only release built on the developer's PC. The release's tag is built as it
+// A release's Mac files, built on a Mac and added to that release in freaktion-craft/pitchroom-releases (Actions builds
+// the Windows installer only: .github/workflows/windows.yml, release-win.mjs). The release's tag is built as it
 // was tagged, in a worktree of its own (its own `npm ci`; never this checkout's node_modules), for Apple silicon and Intel in turn (the app's Python is per processor: fetch-python.mjs
 // --arch), and the two builds' update files are made one latest-mac.yml, as electron-builder makes it when it builds
 // both at once. Then the dmg, zip and blockmap of each, and latest-mac.yml, are uploaded into the release (by its id: two
@@ -19,7 +19,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const RELEASES = "freaktion-craft/pitchroom-releases";
+export const RELEASES = "freaktion-craft/pitchroom-releases";
 const here = path.dirname(fileURLToPath(import.meta.url)), desktop = path.dirname(here), repo = path.dirname(desktop);
 
 // ---------- latest-mac.yml: the two builds' files as one ----------
@@ -47,14 +47,14 @@ export function macInfoOf(dir, version, arch) {
 }
 
 // ---------- the release ----------
-const gh = (...args) => execFileSync("gh", args, { encoding: "utf8" });
-const ghJson = (...args) => JSON.parse(gh(...args));
+export const gh = (...args) => execFileSync("gh", args, { encoding: "utf8" });
+export const ghJson = (...args) => JSON.parse(gh(...args));
 // the release a tag names: the published one, else the draft holding the Windows installer, else any draft of it
-function findRelease(tag) {
+export function findRelease(tag) {
   const all = ghJson("api", `repos/${RELEASES}/releases?per_page=50`).filter((r) => r.tag_name === tag);
   return all.find((r) => !r.draft) || all.find((r) => r.assets.some((a) => a.name === "pitchroom_install.exe")) || all[0] || null;
 }
-async function upload(release, file, token) {
+export async function upload(release, file, token) {
   const name = path.basename(file);
   for (const a of release.assets.filter((x) => x.name === name)) gh("api", "-X", "DELETE", `repos/${RELEASES}/releases/assets/${a.id}`); // (one of an earlier run)
   const r = await fetch(`https://uploads.github.com/repos/${RELEASES}/releases/${release.id}/assets?name=${encodeURIComponent(name)}`, {
@@ -71,7 +71,7 @@ async function main() {
   const tag = args.find((a) => /^v\d+\.\d+\.\d+$/.test(a)) || ghJson("api", `repos/${RELEASES}/releases/latest`).tag_name;
   const version = tag.slice(1);
   const release = findRelease(tag);
-  if (!release && !noUpload) throw new Error(`no release ${tag} in ${RELEASES}: release Windows first, or build with --no-upload`);
+  if (!release && !noUpload) throw new Error(`no release ${tag} in ${RELEASES}: make its draft first, or build with --no-upload`);
   execFileSync("git", ["fetch", "--quiet", "origin", "tag", tag], { cwd: repo, stdio: "inherit" });
   const commit = execFileSync("git", ["rev-parse", `${tag}^{commit}`], { cwd: repo, encoding: "utf8" }).trim();
   const host = process.platform === "darwin" ? process.arch : null;
