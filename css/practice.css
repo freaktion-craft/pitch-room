@@ -25,7 +25,7 @@
 .sync-dots { --dot: var(--space-4); display: flex; gap: var(--space-2); }
 .sync-dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--track); transition: background-color var(--duration-fast); }
 .sync-dots i.on { background: var(--voice-mark); }
-.sync-got small { font-size: var(--text-sm); line-height: 20px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sync-got small { font-size: var(--text-sm); line-height: 20px; color: var(--muted); font-variant-numeric: tabular-nums; text-wrap: balance; } /* a message too long for the line: two even lines, not a word left over */
 .sync-got small.err { color: var(--bad); }
 .ear-sub { margin-top: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--line); font-weight: var(--weight-medium); } /* the comparison's ears, under a hairline */
 .seg { display: inline-flex; gap: var(--space-half); padding: var(--space-half); border-radius: var(--radius-md); background: var(--fill); }
