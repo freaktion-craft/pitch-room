@@ -14,14 +14,13 @@
 #earRows { display: grid; gap: var(--space-2); }
 .ear-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 32px; }
 .ear-row > span { color: var(--muted); }
-/* Sync: the delay on its button beside Headphones ("Sync" in grey before it, as the key's "Key"); its panel, down its
-   middle: what to do, the button that plays the clicks, a dot for each click (lit once heard) and how many under them */
+/* Sync: the delay on its button beside Headphones ("Sync" in grey before it, as the key's "Key"); its panel: what to
+   do, then a dot for each click (lit once heard) on one line with the button that plays them, and how many under the dots */
 .sync-btn { gap: var(--space-2); font-variant-numeric: tabular-nums; }
 .sync-btn .pre { color: var(--muted); }
-.sync-at .pop { width: min(300px, calc(100vw - 32px)); display: grid; gap: var(--space-4); }
-.sync-do, .sync-got { display: grid; justify-items: center; text-align: center; }
-.sync-do { gap: var(--space-3); }
-.sync-got { gap: var(--space-2); }
+.sync-at .pop { display: grid; gap: var(--space-4); }
+.sync-got { display: grid; gap: var(--space-2); }
+.sync-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 32px; }
 .sync-dots { --dot: var(--space-4); display: flex; gap: var(--space-2); }
 .sync-dots i { width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--track); transition: background-color var(--duration-fast); }
 .sync-dots i.on { background: var(--voice-mark); }
