@@ -232,7 +232,7 @@ function paintSync() {
   const sNow = $("#setSyncNow"), sGo = $("#setSyncGo"), why = $("#setSyncWhy");
   say(sNow, syncBusy ? "Listening…" : "{t} ms", { t }); say(sNow, parts[0], parts[1], "title");
   sGo.disabled = syncBusy; say(sGo, syncBusy ? "Measuring…" : "Measure");
-  if (syncErr && !syncBusy) say(why, syncErr); else say(why, "How late your voice reaches the app; new takes allow for it");
+  if (syncErr && !syncBusy) say(why, syncErr); else say(why, "How late your voice reaches the app; your line and new takes allow for it");
   why.classList.toggle("err", !!syncErr && !syncBusy);
 }
 async function runSync() {

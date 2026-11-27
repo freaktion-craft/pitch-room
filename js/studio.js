@@ -75,10 +75,14 @@ function heardPos() { return P.playing ? Math.max(P.shownFrom ?? 0, Math.min(son
 function heardStage() { return P.playing ? Math.max(P.shownFrom ?? -Infinity, Math.min(songDur(), P.offset + (heardClock() - P.startAt) * P.rate)) : stageTime(); }
 // Your voice is read later than it's sung: the mic's own latency, the pitch tracker's window (it hears the middle of its
 // last fftSize samples) and the median over the last few readings (about two frames). A reading stands for this long ago.
+// Once the delay's been measured (Sync, in the settings: syncExtras, js/takes.js), what the browser can't see on the way
+// in (a DAW's buffers, a loopback) is part of it too, as it is of a take's (recLatency): your line was drawn that much
+// late against the bars. Measured, the mic's own part is in it, so nothing is guessed for a mic that reports none.
 let frameDt = 1 / 60; // s between frames, measured (loop)
 function micLag() {
-  const tk = micStream && micStream.getAudioTracks()[0], s = (tk && tk.getSettings && tk.getSettings()) || {};
-  return (+s.latency || 0.01) + (analyser ? (0.5 * analyser.fftSize) / ac.sampleRate : 0) + 2 * frameDt;
+  const tk = micStream && micStream.getAudioTracks()[0], s = (tk && tk.getSettings && tk.getSettings()) || {}, meas = syncExtras[syncKey()];
+  const way = meas ? Math.max(0, (+s.latency || 0) + (+meas.s || 0)) : +s.latency || 0.01; // (never ahead of what's heard)
+  return way + (analyser ? (0.5 * analyser.fftSize) / ac.sampleRate : 0) + 2 * frameDt;
 }
 // The lead-in Play will start with, paused here: one a phrase jump set, or from the start, the first entry's count-in
 // where it begins before the song (a voice that comes straight in)

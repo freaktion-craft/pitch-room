@@ -73,7 +73,7 @@ const KO_SERVER = {
   "Couldn’t save the take’s sync.": "테이크 싱크를 저장하지 못했어요.",
   "automatic {a} ms": "자동 {a} ms",
   "Listening…": "듣는 중…", "Measure": "측정", "Measuring…": "측정하는 중…",
-  "How late your voice reaches the app; new takes allow for it": "목소리가 앱에 늦게 닿는 만큼, 새 테이크에 반영돼요",
+  "How late your voice reaches the app; your line and new takes allow for it": "목소리가 앱에 늦게 닿는 만큼, 내 선과 새 테이크에 반영돼요",
   "The browser’s {b} ms only: not measured yet": "브라우저 값 {b} ms만: 아직 측정 안 함",
   "Browser {b} ms + measured {e} ms · {on} · {when}": "브라우저 {b} ms + 측정 {e} ms · {on} · {when}",
   "Recording": "녹음",
