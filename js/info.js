@@ -26,7 +26,7 @@ function drawInfo() {
   $("#iTitle").textContent = s.title;
   const sub = $("#iSub"), src = s.source || "";
   if (/^https?:\/\//.test(src)) { const a = el("a", null, tr("Source")); a.href = src; a.target = "_blank"; a.rel = "noopener"; sub.append(a, " · "); }
-  sub.append(tr("Added {date} · {model}", { date: new Date(s.created * 1000).toLocaleDateString(locale()), model: tr({ htdemucs: "4 stems", htdemucs_6s: "6 stems" }[s.model] || s.model) }));
+  sub.append(tr("Added {date} · {model}", { date: new Date(s.created * 1000).toLocaleDateString(locale()), model: tr({ htdemucs: "4 stems", htdemucs_6s: "6 stems" }[s.otherModel || s.model] || s.model) })); // (otherModel: its Other divided since, into guitar, keys and the rest)
   const fact = (label, value, note) => {
     const d = el("div"); const dd = el("dd", null, value);
     if (note) dd.append(el("small", null, note));
@@ -44,7 +44,7 @@ function drawInfo() {
   s.vocals = v; s.shift = n;
   const key = keyAfter(s.key, n); // the notes named as the key they're shown in has them (absName)
   if (v) fact("Vocal range", `${absName(v.lo, key)}–${absName(v.hi, key)}`, tr("{n} semitones", { n: v.hi - v.lo }) + (v.mostly ? tr(" · mostly {lo}–{hi}", { lo: absName(v.mostly[0], key), hi: absName(v.mostly[1], key) }) : ""));
-  fact("Tracks", String(trackNames(s).length), trackNames(s).map((k) => tr(k)).join(", "));
+  fact("Tracks", String(trackNames(s).length), trackNames(s).map((k) => tr(trackWord(k))).join(", "));
   if (v) renderInfoRange(s);
   renderInfoLyrics(id);
   $("#iOpen").href = `#stems/${id}`;

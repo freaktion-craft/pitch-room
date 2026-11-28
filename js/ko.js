@@ -51,6 +51,8 @@ const KO_SERVER = {
   "Taking out backing vocals and chops": "백킹 보컬과 보컬 찹 걸러내는 중",
   "The lead-vocal model returned {sr} Hz audio.": "리드 보컬 모델이 {sr} Hz 오디오를 돌려줬어요.",
   "This song has no vocal track.": "이 곡에는 보컬 트랙이 없어요.", "The lead-vocal model isn’t installed.": "리드 보컬 모델이 설치되지 않았어요.",
+  "This song has no Other track.": "이 곡에는 나머지 트랙이 없어요.", "This song’s guitar and keys are split out already.": "이 곡은 기타와 건반을 이미 나눴어요.",
+  "This song’s original audio isn’t in its folder any more.": "이 곡의 원본 오디오가 폴더에 없어요.",
   "Each part is a start and an end in seconds.": "구간마다 시작과 끝을 초 단위로 보내 주세요.",
   "Send the kept parts as {track: [[start, end], …]}.": "남길 구간을 {track: [[start, end], …]} 형식으로 보내 주세요.",
   "Send the mix as {tracks: {name: {vol, mute, solo}}, click: {…}}.": "믹스를 {tracks: {name: {vol, mute, solo}}, click: {…}} 형식으로 보내 주세요.",
@@ -297,8 +299,6 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "First, the tools that split songs and read their melody and lyrics: a 3–4 GB download, once.":
     "처음 한 번, 곡을 나누고 멜로디와 가사를 읽는 도구를 받아요 (3–4 GB).",
   "Install": "설치", "Installed": "설치 완료", "Install the song tools first, in Settings.": '먼저 <a href="#settings">설정</a>에서 곡 도구를 설치하세요.', "Song tools": "곡 도구", "Check": "점검", "Checking…": "점검하는 중…", "Split songs into voice and band, and read their melody and lyrics: a 3–4 GB download, once.": "곡을 목소리와 반주로 나누고 멜로디와 가사를 읽는 도구예요. 3–4 GB를 한 번만 받아요.", "Installed · {dev}": "설치됨 · {dev}", "Up to date": "최신이에요", "Updated. Restart the app to use them.": "업데이트했어요. 앱을 다시 시작하면 적용돼요.", "Updated": "업데이트했어요", "Restart": "다시 시작", "Add a song": "새 곡 추가", "Add": "추가",
-  "6 tracks instead of 4. The piano track often picks up other instruments.": "트랙을 4개 대신 6개로 나눠요. 피아노 트랙에 다른 악기 소리가 섞일 때가 많아요.",
-  "Also split out guitar and piano": "기타와 피아노도 따로 나누기",
   "This PC has an NVIDIA graphics card, but separation is running on the CPU. Switching makes it several times faster (≈2–3 GB download).":
     "이 PC에는 NVIDIA 그래픽 카드가 있지만 지금은 CPU로 분리하고 있어요. GPU로 바꾸면 몇 배 빨라져요 (≈2–3 GB 다운로드).",
   "This PC has an NVIDIA graphics card, but its driver is too old for GPU separation. Update the NVIDIA driver (nvidia.com/drivers), restart the app, then come back here.":
@@ -325,7 +325,7 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "could also be {key}": "{key}일 수도 있어요", "relative major: {key}": "나란한조: {key}", "relative minor: {key}": "나란한조: {key}",
   "no pitched tracks": "음정 있는 트랙 없음", "not read yet": "아직 읽지 않음", "no steady beat found": "일정한 박자를 찾지 못했어요",
   "{n} semitones": "{n}반음", " · mostly {lo}–{hi}": " · 주로 {lo}–{hi}",
-  "lead": "리드 보컬", "backing": "백킹 보컬", "vocals": "보컬", "drums": "드럼", "bass": "베이스", "guitar": "기타", "piano": "피아노", "other": "나머지",
+  "lead": "리드 보컬", "backing": "백킹 보컬", "vocals": "보컬", "drums": "드럼", "bass": "베이스", "guitar": "기타", "piano": "피아노", "keys": "건반", "other": "나머지",
   "Where the melody sits": "멜로디 음역",
   "Lyrics": "가사",
   "Paste YouTube links, one per line": "YouTube 링크를 붙여넣으세요 (한 줄에 하나씩)", "YouTube links": "YouTube 링크",
@@ -357,9 +357,9 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Song overview — click to jump": "곡 전체 파형: 클릭하면 그 위치로 이동", "Play": "재생", "Pause": "일시정지",
   "Move through the song": "곡 안에서 이동", "Go to start": "처음으로", "Go to start (Shift+←)": "처음으로 (Shift+←)", "Go to end": "끝으로", "Go to end (Shift+→)": "끝으로 (Shift+→)",
   "Back 5 seconds": "5초 뒤로", "Forward 5 seconds": "5초 앞으로", "−5 s": "−5초", "+5 s": "+5초",
-  "Vocals": "보컬", "Lead": "리드", "Backing": "백킹", "Lead vocal": "리드 보컬", "Backing vocals": "백킹 보컬", "Drums": "드럼", "Bass": "베이스", "Guitar": "기타", "Other": "나머지", "Click": "메트로놈",
+  "Vocals": "보컬", "Lead": "리드", "Backing": "백킹", "Lead vocal": "리드 보컬", "Backing vocals": "백킹 보컬", "Drums": "드럼", "Bass": "베이스", "Guitar": "기타", "Keys": "건반", "Other": "나머지", "Click": "메트로놈",
   "lead and backing": "리드와 백킹", "lead and backing voices": "리드와 백킹 보컬", "the main voice": "메인 보컬", "harmonies, doubles and chops": "화음, 더블링, 보컬 찹",
-  "kit and percussion": "드럼 세트와 타악기", "bass line": "베이스 라인", "guitars": "기타 소리", "piano and keys": "피아노와 건반", "everything else": "그 밖의 모든 소리",
+  "kit and percussion": "드럼 세트와 타악기", "bass line": "베이스 라인", "guitars": "기타 소리", "piano, organs and synths": "피아노, 오르간, 신스", "everything else": "그 밖의 모든 소리",
   "click": "메트로놈", "follows the detected beat": "찾아낸 박자를 따라가요", "click · {bpb}/4 · follows the song’s beat": "메트로놈 · {bpb}/4 · 곡의 박자를 따라가요", "Metronome": "메트로놈",
   "{bpm} BPM · {bpb}/4 · follows the song’s beat": "{bpm} BPM · {bpb}/4 · 곡의 박자를 따라가요",
 
@@ -369,6 +369,8 @@ const KO_TEXT = Object.assign(Object.create(null), {
   "Download {what} only (MP3)": "{what}만 내려받기 (MP3)", "the vocals": "보컬",
   "waiting to split into lead and backing…": "리드와 백킹으로 나누길 기다리는 중…", "splitting into lead and backing…": "리드와 백킹으로 나누는 중…",
   "splitting into lead and backing… {pct}%": "리드와 백킹으로 나누는 중… {pct}%", "Couldn’t split the vocals: {why}": "보컬을 나누지 못했어요: {why}",
+  "Split out guitar and keys": "기타와 건반 나누기", "waiting to split out guitar and keys…": "기타와 건반을 나누길 기다리는 중…",
+  "splitting out guitar and keys… {pct}%": "기타와 건반을 나누는 중… {pct}%", "Couldn’t split out guitar and keys: {why}": "기타와 건반을 나누지 못했어요: {why}",
   "Turn on at least one track.": "트랙을 하나 이상 켜세요.", "Turn on at least one take to export.": "내보낼 테이크를 하나 이상 켜세요.", "Mixing the MP3…": "MP3 믹스하는 중…", "Export failed.": "내보내지 못했어요.",
   "Saved “{name}” to your downloads.": "“{name}” 파일을 다운로드 폴더에 저장했어요.",
   "Couldn’t save that.": "저장하지 못했어요.",

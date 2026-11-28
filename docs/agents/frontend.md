@@ -191,6 +191,10 @@ working without it.
   `coverSong`; anything that names the loaded song uses `sungName(m)` ("Title · Singer"). A song's page has the singer
   as the last crumb, a `makePick` (`singerStep`, `app.js`): Original and Covers to switch between, Add a cover, and
   for a cover its Info and Delete. Covers aren't in the New strip or Continue practising.
+- A song's tracks can change while it's loaded: its Other divided into guitar, keys and the rest (`otherDivided`,
+  `studio.js`) puts the new tracks into `P.tracks`, `P.orig` and the version playing at once, the song playing on. Read
+  the tracks from `trackNames(P.song)` when you need them, not from a list kept earlier (`loadKey` starts over if they
+  changed while it fetched). In a sentence a track goes by `trackWord(name)`: `piano` is shown as Keys.
 - The Add drawer (`#jobsPop`) and its veil (`#addVeil`) are moved to `<body>` at init (`initSing` in `practice.js`,
   `initStems` in `studio.js`), so selectors scoped to `#vStems` won't find them.
 - The concatenated `node --check` doesn't see the inline scripts in `index.html`: a top-level name in `js/` that

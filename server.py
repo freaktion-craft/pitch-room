@@ -404,6 +404,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, {"title": stems.rename_song(parts[2], body.get("title") if isinstance(body, dict) else None)})
             if parts[3] == "split":
                 return self._json(200, {"job": stems.start_split(parts[2])})
+            if parts[3] == "other":  # its Other track into guitar, keys and what's left
+                return self._json(200, {"job": stems.start_other(parts[2])})
             if parts[3] == "mix":
                 body = json.loads(self._body(100_000) or b"{}")
                 return self._json(200, {"mix": stems.set_mix(parts[2], body.get("mix") if isinstance(body, dict) else None)})

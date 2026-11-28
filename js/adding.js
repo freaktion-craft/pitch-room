@@ -594,6 +594,10 @@ function watchJob(id, kind, forSong) {
       splitting[forSong] = j.status === "queued" ? ["waiting to split into lead and backing…"] : ["splitting into lead and backing… {pct}%", { pct: Math.round(j.progress * 100) }];
       const note = $('#pTracks .track[data-name="vocals"] .name small');
       if (note && P.song && P.song.id === forSong) note.textContent = tr(...splitting[forSong]);
+    } else if (kind === "other") {
+      dividing[forSong] = j.status === "queued" ? ["waiting to split out guitar and keys…"] : ["splitting out guitar and keys… {pct}%", { pct: Math.round(j.progress * 100) }];
+      const note = $('#pTracks .track[data-name="other"] .name small');
+      if (note && P.song && P.song.id === forSong) note.textContent = tr(...dividing[forSong]);
     } else if (j.status !== "cancelled") {
       const { name, status, stage, progress, ahead, cancel, error, songId, phase, needLyrics, lyricsError, song, waiting, needPick, link, coverOf, needStart, startAt, voice } = j;
       const had = adding.get(id); // (a playlist's song: sent by its name, its link known once it's found; its candidates asked then)
@@ -622,6 +626,13 @@ function watchJob(id, kind, forSong) {
           }
         }
       }
+      if (kind === "other") {
+        if (j.status === "done") otherDivided(forSong, j.stems); // its guitar and keys come in where the song stands
+        else {
+          delete dividing[forSong];
+          if (P.song && P.song.id === forSong) { delete P.song.dividing; say($("#pExportState"), "Couldn’t split out guitar and keys: {why}", { why: () => tr(j.error) }); renderTracks(); }
+        }
+      }
       if (kind === "separate" && j.status === "done" && j.songId) { // its lyrics: in Practice or Info, if it's open there
         if ((typeof K !== "undefined" && K.song?.id === j.songId) || (typeof infoShown !== "undefined" && infoShown?.id === j.songId)) lyricsDone(j.songId, !j.lyricsError);
       }
@@ -634,7 +645,8 @@ async function postJob(url, body, headers) {
   if (!r.ok) throw new Error(j.error || "That didn’t work.");
   return j.job;
 }
-// 4 stems: vocals, drums, bass and the rest (the 6-stem model's piano track bleeds, so it isn't offered)
+// 4 stems: vocals, drums, bass and the rest (the 6-stem model's piano track bleeds, so it isn't offered here; a song's
+// guitar and keys come out of its Other track later, in the Studio: divideOther)
 const stemModel = () => "htdemucs";
 // Several at once: links a line each (or spaces between). Each is sent in the order given;
 // the server takes them in that order, one at a time, the rest waiting with how many are ahead of them. Once one is
