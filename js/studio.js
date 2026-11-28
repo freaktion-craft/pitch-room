@@ -485,13 +485,10 @@ function trackRow(name, members, sub, open) {
     last.append(icon("download"));
     last.onclick = () => exportMix(vocalsOut(members), null, last);
   }
-  if (name === "other" && !P.tracks.guitar && !P.tracks.piano) { // Other, whole: its guitar and keys can be split out of it
-    if (dividing[P.song.id]) nm.querySelector("small").textContent = tr(...dividing[P.song.id]);
-    else {
-      const opts = el("div", "clickopts"), b = mkBtn(tr("Split out guitar and keys"), () => divideOther(P.song));
-      b.className = "tog"; opts.append(b);
-      label = el("div", "name-row"); label.append(nm, opts);
-    }
+  if (name === "other" && !P.tracks.guitar && !P.tracks.piano) { // Other, whole: its guitar and keys can be split out of it, a link in the line under its name
+    const line = nm.querySelector("small");
+    if (dividing[P.song.id]) line.textContent = tr(...dividing[P.song.id]);
+    else { const b = el("button", null, tr("Split out guitar and keys")); b.type = "button"; b.onclick = () => divideOther(P.song); line.append(" · ", b); }
   }
   const ms = el("div", "ms"); ms.append(m, s);
   row.append(dot, label, ms, v, last);

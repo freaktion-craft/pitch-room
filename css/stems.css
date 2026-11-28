@@ -299,6 +299,9 @@
 .track .ico { width: var(--icon-md); height: var(--icon-md); }
 .track .name { font-size: var(--text-md); min-width: 0; }
 .track .name small { display: block; color: var(--faint); font-size: var(--text-xs); }
+/* a track's own action, in the line under its name (Other's Split out guitar and keys): a link in that line, a step darker */
+.track .name small button { padding: 0; border: 0; background: none; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; } /* (2 px: clear of the letters' tails) */
+.track .name small button:hover { color: var(--ink); }
 .track.off .ico { opacity: 0.35; }
 .track.off .name { color: var(--muted); } /* out of the mix: a step back, still readable */
 #sPlayer .track.off { --fader-fill: var(--dim); } /* and its fader's fill grey (every slider's a fader: base.css) */
