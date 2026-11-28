@@ -82,7 +82,9 @@ one at run time, but not by code that runs while the earlier file loads.
 
 - `.btn`: size by default, `.sm`, `.xs`; tone `.primary`, `.quiet`, `.ghost`; shape `.icon`, `.round`. An icon as the
   first child sets its own padding. Round Play is `.btn.primary.round` with `svg.pp` (below).
-- `.tog` with `aria-pressed`: a small toggle (`.m` in your colour, `.s` solo; `.ms` joins the pair).
+- `.tog` with `aria-pressed`: a small toggle (`.m` in your colour, `.s` solo; `.ms` joins the pair). Without
+  `aria-pressed` it's a small labelled button on a track's own line: `.name-row > .name + .clickopts > .tog` (the
+  metronome's options, Other's Split out guitar and keys; `trackRow`).
 - `<input type="checkbox" class="switch">`: an on/off switch.
 - `input[type="range"]`: every one is a fader with no class (below).
 - `.pick` / `select` / number field: the surface-2 field with `--chevron`.

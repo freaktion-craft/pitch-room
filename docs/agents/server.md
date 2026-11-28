@@ -36,7 +36,7 @@
 - POST routes (`_stems_post`): `jobs/singing` (heartbeat while a song plays), `upgrades`, `settings`, `import`,
   `stems/install`, `stems/youtube` (`coverOf`: a song's id, for a cover of it), `stems/playlist`, job
   `cancel`/`pick`/`lyrics`/`start` (`{at, text?}`: where a cover's first line starts, its words where they differ), and per song `delete`, `rename`,
-  `split`, `mix`, `keep`, `truth`, `notes`, `marks`, `key`, `export`, `lyrics/...`, `takes...`.
+  `split`, `other` (its Other track into guitar, keys and the rest, below), `mix`, `keep`, `truth`, `notes`, `marks`, `key`, `export`, `lyrics/...`, `takes...`.
 - A `ValueError` becomes 422 `{error}` (shown by the page) in POST routes and the per-song GETs; in other GETs it's a
   500 `"ValueError: ..."`. Anything else is a 500 with a traceback in the terminal.
   Body limits are per route (`_body(limit)`).
@@ -60,8 +60,9 @@ The `id` is 12 hex characters. The docstring at the top of `stems.py` gives a pa
 
 - `source.<ext>` (downloaded audio; only the audio and the video's title and channel are fetched). Older songs may have
   a `video.<ext>` that nothing uses any more.
-- Stems as mp3: vocals, drums, bass, other (plus guitar and piano with the 6-stem model); `lead.mp3` and `backing.mp3`
-  when the lead-vocal model is installed.
+- Stems as mp3: vocals, drums, bass, other; `lead.mp3` and `backing.mp3` when the lead-vocal model is installed.
+  Once its Other has been divided (below): guitar and piano too, `other.mp3` what's left, and `other-whole.mp3` the
+  Other there was (not a track: kept so a division cut off halfway can start again).
 - `cover.jpg` and `cover-96.jpg`.
 - `meta.json`: title, source, duration, bpm, beats, key, stems, naming (`sure`, `picked`, `named`), mix and practice
   state (`keep`, `mix`, `lyricNudge`, `lyricEdits`, `phraseMarks`), and `adding` while being added. A cover kept
@@ -83,7 +84,7 @@ within the hour.
 ## Jobs and the queue
 
 - Jobs live in memory (`_jobs`, lost on restart). `_new_job` creates one; `_run(job, fn)` runs it in a thread.
-  Kinds: separate (adding a song), install, split, lyrics, melody, key.
+  Kinds: separate (adding a song), install, split, other, lyrics, melody, key.
 - `Cancelled` is a `BaseException` raised at `_check` and `_stage` checkpoints, so `except Exception` around optional
   steps lets it through.
 - One GPU model at a time: `_work_lock`, and `_turn(job)` for an ordered queue (`_in_line`, then `_held`). Call
@@ -92,8 +93,8 @@ within the hour.
   every one waiting gets `ahead`. It downloads once it's among the first three songs in line (`_fetch_turn`), so at
   most 2 (`FETCH_AHEAD`) are downloaded ahead of the one being split. One downloaded ahead stays `queued` till its turn.
   Playlist songs lower the process priority while they work (`_low_priority`).
-- Jobs are deduped through dicts of job ids: `_lyrics_jobs` and `_split_jobs` keyed by song id, `_key_jobs` by
-  (song id, semitones, speed).
+- Jobs are deduped through dicts of job ids: `_lyrics_jobs`, `_split_jobs` and `_other_jobs` keyed by song id,
+  `_key_jobs` by (song id, semitones, speed).
 
 ## Adding a song
 
@@ -126,6 +127,20 @@ within the hour.
   `{op: "delete", line}` and `{op: "add", at, text}` beside the timing ops (`_retype_lines`). A retyped line keeps
   its span, its words spread over it by length (`_typed_words`); saved edits and nudges are moved to the new line
   numbers.
+
+**Guitar and keys** (`start_other`, asked for on a song's Other track in the Studio; the comment over `OTHER_MODEL`):
+
+- Songs are added with the 4-stem model only (the 6-stem model's piano bleeds: the owner's choice, 2026-10-22). A song
+  already in the library can have its Other divided: `htdemucs_6s` runs over `source.*` (the whole mix, what it was
+  trained on; a cover's `cut` is taken off its output), but its guitar, piano and other only set the shares of the
+  song's own `other.mp3` that go to each (`_divide_other`, a Wiener filter over an STFT). The three add up to the
+  Other there was, so vocals, drums and bass stay the 4-stem model's and the song sounds the same until a fader moves.
+- `_put_other` swaps the files in under `_key_lock`, once no key or tempo of the song is rendering: `other.mp3` moves
+  to `other-whole.mp3`, what's left takes its name, meta gets the six `stems`, `otherModel`, and Other's `mix` and
+  `keep` entries copied to the two new tracks; every `keys/*/other.mp3` is deleted (made of the old Other). The job
+  ends with `stems` set; `library()` marks a song whose job is running with `dividing` (the job's id).
+- The model was never run in a cloud container (its weights' host is blocked there): checks there stand a fake
+  `_separate` in. Listen on a real song, on scratch data, before trusting a change to it.
 
 Lyrics: LRCLIB candidates, Whisper (large-v3-turbo via stable-ts) to screen and align, then on split songs
 `syllables.align_lyrics` and the melody re-cut at syllable onsets. `get_lyrics` returns the sung lines when

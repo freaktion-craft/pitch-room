@@ -197,6 +197,11 @@ When you fix a bug of this kind (a mechanism, not a taste), add its rule here in
 
 ## Server and Python
 
+- **A track's mp3 can change where it is, so the page asks for it with `FRESH` (`cache: "no-cache"`, `studio.js`).**
+  Song files go out with a `Last-Modified` and no `Cache-Control`, which lets a browser keep using its copy for a
+  while without asking: after Other is divided (`start_other`) the old, whole `other.mp3` would play beside the new
+  guitar and keys. A file that's replaced in place also loses its `keys/*/` renders (`_put_other`).
+
 - **HTTP/1.1 keep-alive, and drain bodies you don't read.** Was: with 1.0 about 1 in 7 calls on Windows was reset and
   the "needs the server" banner flickered (`protocol_version`, `_drain`; f5ee1b0). A GET that throws answers 500, never
   drops the connection (eaef68e).

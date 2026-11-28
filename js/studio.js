@@ -4,8 +4,13 @@
 // ---------- the Studio ----------
 // each track's colour (CSS --stem-*), as read for the canvas
 const stemColor = (k) => C["stem-" + k] || C.muted;
-const STEM_NOTES = { vocals: "lead and backing voices", lead: "the main voice", backing: "harmonies, doubles and chops", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano and keys", other: "everything else", click: "follows the detected beat" };
-const TRACK_TITLES = { lead: "Lead vocal", backing: "Backing vocals" };
+const STEM_NOTES = { vocals: "lead and backing voices", lead: "the main voice", backing: "harmonies, doubles and chops", drums: "kit and percussion", bass: "bass line", guitar: "guitars", piano: "piano, organs and synths", other: "everything else", click: "follows the detected beat" };
+const TRACK_TITLES = { lead: "Lead vocal", backing: "Backing vocals", piano: "Keys" };
+// A track's name in a sentence. The piano track is the page's keys: the model that makes it puts organs and synths in it too.
+const trackWord = (name) => (name === "piano" ? "keys" : name);
+// A track's file can change where it is (a cover's start cut, Other divided, a key made again): asked for with this, the
+// browser checks its copy against the server's each time rather than trusting it for a while.
+const FRESH = { cache: "no-cache" };
 // keep: each track's kept parts (keepParts); tsel: a stretch being picked on a track's waveform; mark: one started with J
 const P = { song: null, buffers: {}, keep: {}, tsel: null, mark: null, tracks: {}, playing: false, startAt: 0, offset: 0, sources: [], peaks: null, bus: null, clickNext: 0 };
 // The player's tracks: the stems, with vocals as lead + backing once the song has been split.
@@ -26,11 +31,12 @@ async function openSong(m) {
   freshMix(false);
   P.keep = keepOf(m); P.tsel = P.mark = null;
   // (the mix starts fresh each time: every track up and playing, nothing muted or soloed, the click off)
+  if (m.dividing && !dividing[m.id]) { dividing[m.id] = ["waiting to split out guitar and keys…"]; watchJob(m.dividing, "other", m.id); } // its Other being divided, begun before this page was loaded
   renderTracks(); autoSplit(m);
   P.keyWant = savedKey(m.id); P.rateWant = savedRate(m.id); paintKey();
   if (P.keyWant || P.rateWant !== 1) loadKey(m, P.keyWant, P.rateWant); // alongside the originals, so a version already made is there as they are
   const loaded = await Promise.all(trackNames(m).map(async (name) => {
-    const r = await fetch(`/library/${m.id}/${name}.mp3`);
+    const r = await fetch(`/library/${m.id}/${name}.mp3`, FRESH);
     return [name, await ac.decodeAudioData(await r.arrayBuffer())];
   }));
   if (P.song !== m) return;
@@ -454,7 +460,7 @@ function trackRow(name, members, sub, open) {
   const all = (k) => ts.every((x) => x[k]);
   const m = el("button", "tog m", "M"); m.type = "button"; m.title = tr(name === "click" ? "Click on/off" : "Mute"); m.setAttribute("aria-pressed", String(all("mute")));
   const s = el("button", "tog s", "S"); s.type = "button"; s.title = tr("Solo"); s.setAttribute("aria-pressed", String(all("solo")));
-  const v = document.createElement("input"); v.type = "range"; v.min = 0; v.max = 1.5; v.step = 0.01; v.setAttribute("aria-label", tr("{name} volume", { name: tr(group ? "vocals" : name) }));
+  const v = document.createElement("input"); v.type = "range"; v.min = 0; v.max = 1.5; v.step = 0.01; v.setAttribute("aria-label", tr("{name} volume", { name: tr(group ? "vocals" : trackWord(name)) }));
   v.value = ts.reduce((a, x) => a + x.vol, 0) / ts.length;
   m.onclick = () => { const to = !all("mute"); ts.forEach((x) => (x.mute = to)); applyGains(); renderTracks(); };
   s.onclick = () => { const to = !all("solo"); ts.forEach((x) => (x.solo = to)); applyGains(); renderTracks(); };
@@ -478,6 +484,14 @@ function trackRow(name, members, sub, open) {
     last = el("button", "btn sm icon ghost"); last.type = "button"; last.title = tr("Download {what} only (MP3)", { what: tr(group ? "the vocals" : TRACK_TITLES[name] || name) }); last.setAttribute("aria-label", last.title);
     last.append(icon("download"));
     last.onclick = () => exportMix(vocalsOut(members), null, last);
+  }
+  if (name === "other" && !P.tracks.guitar && !P.tracks.piano) { // Other, whole: its guitar and keys can be split out of it
+    if (dividing[P.song.id]) nm.querySelector("small").textContent = tr(...dividing[P.song.id]);
+    else {
+      const opts = el("div", "clickopts"), b = mkBtn(tr("Split out guitar and keys"), () => divideOther(P.song));
+      b.className = "tog"; opts.append(b);
+      label = el("div", "name-row"); label.append(nm, opts);
+    }
   }
   const ms = el("div", "ms"); ms.append(m, s);
   row.append(dot, label, ms, v, last);
@@ -604,9 +618,11 @@ async function loadKey(m, n, s) {
       if (!still()) return;
     if (!still()) return;
     say(1); // rendered; the files are loading
-    const bufs = Object.fromEntries(await Promise.all(versionTracks(m, s).map(async (k) =>
-      [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n, s))).arrayBuffer())])));
+    const names = versionTracks(m, s);
+    const bufs = Object.fromEntries(await Promise.all(names.map(async (k) =>
+      [k, await ac.decodeAudioData(await (await fetch(trackUrl(m.id, k, n, s), FRESH)).arrayBuffer())])));
     if (!still()) return;
+    if (names.join() !== versionTracks(m, s).join()) return loadKey(m, n, s); // its Other was divided meanwhile (otherDivided): with its tracks as they are now
     P.shifted = { n, s, bufs }; P.keyProg = null; applyKey(n, s);
     document.querySelectorAll(".keyctl").forEach((box) => box.pick.close()); // its list stayed open to show it coming along
   } catch (e) { say(null, e instanceof TypeError ? "Couldn’t reach the server." : e.message); } // kept in English: paintKey translates
@@ -726,6 +742,48 @@ async function autoSplit(m) {
   try { watchJob(await postJob(`/api/library/${m.id}/split`), "split", m.id); }
   catch (e) { delete splitting[m.id]; } // the lead model isn't installed: stay with one vocal track
   if (P.song === m) renderTracks();
+}
+// Guitar and keys out of Other (its row's button; stems.start_other, about as long as the song took to split). Other's
+// row says how far it's got; then the two come in above it where the song stands, playing on if it was, with Other's
+// volume, mute, solo and kept parts, and Other is what's left. The three add up to what Other was, so nothing's heard
+// to change until one of them is moved.
+const dividing = {}; // song id -> what its Other track says meanwhile ([English, vars])
+async function divideOther(m) {
+  dividing[m.id] = ["splitting out guitar and keys… {pct}%", { pct: 0 }]; renderTracks();
+  try { watchJob(await postJob(`/api/library/${m.id}/other`), "other", m.id); }
+  catch (e) {
+    delete dividing[m.id];
+    if (P.song === m) { say($("#pExportState"), "Couldn’t split out guitar and keys: {why}", { why: () => tr(e.message) }); renderTracks(); }
+  }
+}
+// Its job's done (watchJob); stems: the song's, as they are now. The three tracks are read first (and the same three of
+// the key and tempo playing, made first), then put in at once, so no moment plays a mix of old and new.
+async function otherDivided(id, stems) {
+  libCache.delete(id); // the library's copy of it: read afresh
+  const m = P.song, names = ["guitar", "piano", "other"];
+  const load = (n, s) => Promise.all(names.map(async (k) => ac.decodeAudioData(await (await fetch(trackUrl(id, k, n, s), FRESH)).arrayBuffer())));
+  try {
+    if (!m || m.id !== id || !Array.isArray(stems)) return;
+    const orig = await load(0, 1);
+    for (;;) {
+      const n = P.key, s = P.rate, made = !(n || s !== 1) || (await keyRendered(id, n, s)), bufs = made && (n || s !== 1) ? await load(n, s) : null;
+      if (P.song !== m) return;
+      if (!made || n !== P.key || s !== P.rate) continue; // another key or tempo was chosen meanwhile: that one's
+      m.stems = stems; delete m.dividing;
+      if (!Object.keys(P.orig).length) { openSong(m); return; } // still loading, as it was before: opened again, as it is now
+      const was = P.tracks, o = was.other;
+      P.tracks = Object.fromEntries([...trackNames(m), "click"].map((k) => [k, was[k] || { gain: null, vol: o.vol, mute: o.mute, solo: o.solo }]));
+      if (P.keep.other) P.keep.guitar = P.keep.piano = P.keep.other;
+      if (K.studio && K.studio.tracks.other) K.studio.tracks.guitar = K.studio.tracks.piano = K.studio.tracks.other; // (the mix Practice puts back on the way out)
+      names.forEach((k, i) => { P.orig[k] = orig[i]; });
+      if (bufs) names.forEach((k, i) => { P.shifted.bufs[k] = bufs[i]; }); // (the version playing is the one loaded: applyKey)
+      else P.shifted = null; // at the song's own key and tempo: a version loaded before was made of the Other there was, and is loaded again when chosen
+      applyKey(n, s);
+      computePeaks();
+      return;
+    }
+  } catch (e) { if (P.song === m && m) m.stale = true; } // couldn't be read: opened afresh when its page next shows (route)
+  finally { delete dividing[id]; if (P.song && P.song.id === id) renderTracks(); }
 }
 // Kept parts: stretches of a track that play even while it's muted (P.keep: {track: [[a, b], …]}, song seconds), so a
 // muted lead can still sing the bits you'd rather leave to it. Picked by dragging over a track's waveform, or with J

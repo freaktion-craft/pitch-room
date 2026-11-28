@@ -3,7 +3,8 @@
 Songs live in ./library/<id>/ :
     source.*        the original audio (the YouTube download; a file, for a song added from one by an older version)
     video.*         older songs only: the YouTube video's picture, no longer fetched or shown
-    <stem>.mp3      separated stems (drums, bass, other, vocals[, guitar, piano])
+    <stem>.mp3      separated stems (drums, bass, other, vocals; guitar and piano once Other's been divided: start_other,
+                    with other-whole.mp3, the Other there was)
     lead.mp3        the lead vocal alone (backing vocals, harmonies and vocal chops taken out)
     backing.mp3     the rest of the vocal stem: vocals.mp3 = lead.mp3 + backing.mp3
     melody.json     the note bars for Practice, from lead.mp3 (or vocals.mp3 without the lead model), backing.mp3
@@ -844,6 +845,9 @@ def library() -> list[dict]:
                     continue
                 meta.pop("adding", None)  # (cut off: the app closed meanwhile; in as it is)
             meta["split"] = _has_split(folder)
+            dividing = _jobs.get(_other_jobs.get(d, ""))  # its Other being divided (start_other): the job, for a page opened meanwhile to follow
+            if dividing and dividing["status"] in ("queued", "running"):
+                meta["dividing"] = dividing["id"]
             if _upgrading["id"] == d:  # being brought up to date (start_upgrades): how far it's got
                 up = get_job(_upgrading["job"]) or {"status": "queued"}  # (no job yet: it's next, giving way)
                 meta["upgrade"] = 1.0 if up.get("status") not in ("queued", "running") else round(up.get("progress") or 0, 3)
@@ -1612,7 +1616,7 @@ def _get_model(name: str):
     return _model_cache[name]
 
 
-def _separate(job, wav: np.ndarray, model_name: str):
+def _separate(job, wav: np.ndarray, model_name: str, share: tuple[float, float] = (0.25, 0.7)):
     import torch
     from demucs.apply import apply_model
 
@@ -1630,7 +1634,7 @@ def _separate(job, wav: np.ndarray, model_name: str):
         if d.get("state") == "end":
             frac = min(1.0, (d.get("segment_offset", 0) + seg) / length)
             done["max"] = max(done["max"], frac)
-            _set(job, progress=0.25 + 0.45 * done["max"])
+            _set(job, progress=share[0] + (share[1] - share[0]) * done["max"])
 
     dev = device()
     with torch.no_grad():
@@ -2989,6 +2993,164 @@ def start_split(song_id: str) -> str:
 
     _split_jobs[song_id] = _run(_new_job("split"), work)
     return _split_jobs[song_id]
+
+
+# ---------- guitar and keys ----------
+# A song's Other track divided into guitar, keys and what's left, asked for on that track in the Studio. The 6-stem
+# model (OTHER_MODEL) is given the whole song, the kind of audio it was trained on, but it only says how Other
+# divides: at each moment and pitch (an STFT, OTHER_FFT samples a frame), its guitar, piano and other tracks' powers
+# are the shares of the song's own Other that go to each (a Wiener filter). So the three add up to the Other there
+# was, sample for sample, and the song sounds as it did till one of them is moved; nothing of the voice, drums or bass
+# comes into them, and those three stay the 4-stem model's, the better ones. The model's piano takes in organs and
+# synths, and other instruments at times (why a song isn't split in 6 as it's added): the page calls its track Keys.
+# OTHER_FFT is the frame the model itself works in. Checked on made-up tones only: nobody has listened to a real
+# song's yet.
+OTHER_MODEL = "htdemucs_6s"
+OTHER_FFT = 4096  # samples a frame (93 ms), a quarter of it between frames
+OTHER_WHOLE = "other-whole.mp3"  # Other as it was before, kept beside the three: a split cut off halfway starts from it again
+_other_jobs: dict[str, str] = {}  # song id -> its job, so a page opened twice doesn't start two
+
+
+def _frames_of(x: np.ndarray, at: int, count: int) -> np.ndarray:
+    """count frames of x (n,) from frame at, windowed, as their spectra (count, OTHER_FFT / 2 + 1). x was padded with a
+    frame of silence at each end, so every sample of the song is under four whole windows."""
+    hop = OTHER_FFT // 4
+    view = np.lib.stride_tricks.sliding_window_view(x[at * hop: (at + count - 1) * hop + OTHER_FFT], OTHER_FFT)[::hop]
+    return np.fft.rfft(view * _other_window())
+
+
+@lru_cache(maxsize=1)
+def _other_window() -> np.ndarray:
+    """The square root of a Hann window: applied going in and coming out, four overlapping make a constant 2."""
+    return np.sqrt(0.5 - 0.5 * np.cos(2 * np.pi * np.arange(OTHER_FFT) / OTHER_FFT)).astype(np.float32)
+
+
+def _divide_other(other: np.ndarray, guitar: np.ndarray, piano: np.ndarray, rest: np.ndarray, progress=None) -> tuple:
+    """other (2, n), a song's Other track, as (guitar, keys, what's left), each (2, n), adding up to it: its share at
+    each moment and pitch that the model's guitar and piano tracks have of the model's three (guitar, piano, rest, each
+    (2, m), by their powers). Where the model heard nothing, Other stays whole in what's left. progress(0…1) as it goes."""
+    n, hop, win = other.shape[1], OTHER_FFT // 4, _other_window()
+    count = (n + OTHER_FFT) // hop + 1  # frames, over a frame of silence before the song and one after
+
+    def padded(x):  # as long as other, in silence past its own end, between two frames of it
+        out = np.zeros((count - 1) * hop + OTHER_FFT, dtype=np.float32)
+        out[OTHER_FFT: OTHER_FFT + min(n, x.shape[0])] = x[:n]
+        return out
+
+    out = [np.zeros((2, (count - 1) * hop + OTHER_FFT), dtype=np.float32) for _ in range(2)]
+    block = 256  # frames at a time (about 6 s): a few MB each, however long the song
+    for c in range(2):
+        src, model = padded(other[c]), [padded(x[c]) for x in (guitar, piano, rest)]
+        for at in range(0, count, block):
+            k = min(block, count - at)
+            power = [np.abs(_frames_of(x, at, k)) ** 2 for x in model]
+            spec = _frames_of(src, at, k) / (power[0] + power[1] + power[2] + 1e-10)
+            for part, pw in zip(out, power[:2]):
+                frames = np.fft.irfft(spec * pw, OTHER_FFT).astype(np.float32) * win
+                for r in range(4):  # every fourth frame lies end to end with the next: added in at once
+                    f = frames[r::4]
+                    a = (at + r) * hop
+                    part[c, a: a + len(f) * OTHER_FFT] += f.reshape(-1)
+            if progress:
+                progress((c + (at + k) / count) / 2)
+    g, p = (x[:, OTHER_FFT: OTHER_FFT + n] / 2 for x in out)
+    return g, p, other - g - p
+
+
+def start_other(song_id: str) -> str:
+    """Divide a song's Other track into guitar, keys (piano.mp3) and what's left (other.mp3), in the background: the
+    6-stem model over the song's original audio (about as long as its first split took; the first time, the model is
+    downloaded too, 50 MB), then _divide_other. Its tracks then are vocals, drums, bass, guitar, piano, other; the two
+    new ones take Other's volume, mute, solo and kept parts, so the song plays as it did. Returns the job's id; one
+    already under way for the song is returned instead of starting another."""
+    folder = _song_dir(song_id)
+    meta = _read_meta(folder)
+    if not installed():
+        raise ValueError("Pitchroom’s tools aren’t installed yet.")
+    if "other" not in meta["stems"] or not os.path.isfile(os.path.join(folder, "other.mp3")):
+        raise ValueError("This song has no Other track.")
+    if "guitar" in meta["stems"] or "piano" in meta["stems"]:
+        raise ValueError("This song’s guitar and keys are split out already.")
+    source = _saved(folder, "source")
+    if not source:
+        raise ValueError("This song’s original audio isn’t in its folder any more.")
+    running = get_job(_other_jobs.get(song_id, ""))
+    if running and running["status"] in ("queued", "running"):
+        return running["id"]
+
+    def work(job):
+        _set(job, status="running")
+        _stage(job, "Reading the audio", 0.02)
+        wav = _decode_stereo(os.path.join(folder, source))
+        whole = os.path.join(folder, OTHER_WHOLE)
+        other = _decode_stereo(whole if os.path.isfile(whole) else os.path.join(folder, "other.mp3"))
+        _set(job, status="queued", stage="Waiting for the previous song to finish")
+        with _turn(job):  # one model on the GPU at a time
+            _set(job, status="running")
+            _stage(job, f"Loading the separation model ({MODELS[OTHER_MODEL]})", 0.04)
+            _get_model(OTHER_MODEL)
+            _stage(job, f"Separating on {device().upper()}", 0.06)
+            names, stems = _separate(job, wav, OTHER_MODEL, (0.06, 0.8))
+            _model_cache.pop(OTHER_MODEL, None)  # asked for once a song at most: not kept in memory beside the 4-stem model
+        cut = int(round(float(meta.get("cut") or 0) * SR))  # a cover's tracks start that far into its video (_cut_start)
+        model = [stems[names.index(k)][:, cut:] for k in ("guitar", "piano", "other")]
+        del wav, stems
+        parts = _divide_other(other, *model, progress=lambda f: (_check(job), _set(job, progress=0.8 + 0.1 * f)))
+        _stage(job, "Saving tracks", 0.9)
+        made = [(os.path.join(folder, f"split-{k}.mp3"), os.path.join(folder, k + ".mp3")) for k in ("guitar", "piano", "other")]
+        try:
+            for i, ((tmp, _), x) in enumerate(zip(made, parts)):
+                _check(job)
+                _encode_mp3(x, tmp)
+                _set(job, progress=0.9 + 0.09 * (i + 1) / 3)
+            while True:  # in their places once no key or tempo of this song is being made (it would be of the old Other), and none starts meanwhile
+                with _key_lock:
+                    with _jobs_lock:
+                        busy = any(k[0] == song_id and _jobs.get(j, {}).get("status") in ("queued", "running") for k, j in _key_jobs.items())
+                    if not busy:
+                        _set(job, stems=_put_other(folder, whole, made))  # (its tracks now: the page, with the song open, takes them up)
+                        break
+                _check(job)
+                time.sleep(0.25)
+        finally:
+            for tmp, _ in made:
+                with contextlib.suppress(OSError):
+                    os.remove(tmp)
+
+    job = _new_job("other")
+    job["songId"] = song_id
+    job["front"] = True  # asked for by someone looking at the song: next in line, ahead of songs still to be added (_in_line)
+    _other_jobs[song_id] = _run(job, work)
+    return _other_jobs[song_id]
+
+
+def _put_other(folder: str, whole: str, made: list) -> list[str]:
+    """The three tracks into their places (made: [(written, place)], Other's last), and the song's meta with them: the
+    Other there was is kept (OTHER_WHOLE) before what's left takes its name, so a moment's power cut between the two
+    leaves a song that can be split again. The keys and tempos made of the old Other go: they're made again when chosen.
+    Returns the song's stems as they are now."""
+    if not os.path.isfile(os.path.join(folder, "meta.json")):  # deleted meanwhile
+        raise Cancelled
+    for tmp, path in made[:2]:
+        _retry(os.replace, tmp, path)
+    if not os.path.isfile(whole):
+        _retry(os.replace, made[2][1], whole)
+    _retry(os.replace, *made[2])
+    with _meta_lock:
+        meta = _read_meta(folder)
+        meta["stems"] = [n for n in ["vocals", "drums", "bass", "guitar", "piano", "other"] if n in meta["stems"] or n in ("guitar", "piano")]
+        meta["otherModel"] = OTHER_MODEL
+        for field in ("keep", "mix"):  # Other's kept parts and its place in the mix: the two new tracks' too
+            had = meta.get(field) if isinstance(meta.get(field), dict) else None
+            box = had.get("tracks") if field == "mix" and had else had
+            if isinstance(box, dict) and "other" in box:
+                box["guitar"] = box["piano"] = box["other"]
+        _write_json(os.path.join(folder, "meta.json"), meta, ensure_ascii=False)
+    keys = os.path.join(folder, "keys")
+    for d in os.listdir(keys) if os.path.isdir(keys) else []:
+        with contextlib.suppress(OSError):
+            os.remove(os.path.join(keys, d, "other.mp3"))
+    return meta["stems"]
 
 
 # Kept parts (meta "keep": {track: [[t0, t1], …]}): stretches of a track that play even while it's muted, so a muted
